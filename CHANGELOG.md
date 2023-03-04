@@ -1,3 +1,95 @@
+Changes in [23.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0) (2023-02-28)
+==================================================================================================
+
+## ✨ Features
+ * Add easy way to determine if the decryption failure is due to "DecryptionError: The sender has disabled encrypting to unverified devices." ([\#3167](https://github.com/matrix-org/matrix-js-sdk/pull/3167)). Contributed by @florianduros.
+ * Polls: expose end event id on poll model ([\#3160](https://github.com/matrix-org/matrix-js-sdk/pull/3160)). Contributed by @kerryarchibald.
+ * Polls: count undecryptable poll relations ([\#3163](https://github.com/matrix-org/matrix-js-sdk/pull/3163)). Contributed by @kerryarchibald.
+
+## 🐛 Bug Fixes
+ * Better type guard parseTopicContent ([\#3165](https://github.com/matrix-org/matrix-js-sdk/pull/3165)). Fixes matrix-org/element-web-rageshakes#20177 and matrix-org/element-web-rageshakes#20178.
+ * Fix a bug where events in encrypted rooms would sometimes erroneously increment the total unread counter after being processed locally. ([\#3130](https://github.com/matrix-org/matrix-js-sdk/pull/3130)). Fixes vector-im/element-web#24448. Contributed by @Half-Shot.
+ * Stop the ICE disconnected timer on call terminate ([\#3147](https://github.com/matrix-org/matrix-js-sdk/pull/3147)).
+ * Clear notifications when we can infer read status from receipts ([\#3139](https://github.com/matrix-org/matrix-js-sdk/pull/3139)). Fixes vector-im/element-web#23991.
+ * Messages sent out of order after one message fails ([\#3131](https://github.com/matrix-org/matrix-js-sdk/pull/3131)). Fixes vector-im/element-web#22885 and vector-im/element-web#18942. Contributed by @justjanne.
+
+Changes in [23.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.3.0) (2023-02-14)
+==================================================================================================
+
+## ✨ Features
+ * Element-R: implement encryption of outgoing events ([\#3122](https://github.com/matrix-org/matrix-js-sdk/pull/3122)).
+ * Poll model - page /relations results ([\#3073](https://github.com/matrix-org/matrix-js-sdk/pull/3073)). Contributed by @kerryarchibald.
+ * Poll model - validate end events ([\#3072](https://github.com/matrix-org/matrix-js-sdk/pull/3072)). Contributed by @kerryarchibald.
+ * Handle optional last_known_event_id property in m.predecessor ([\#3119](https://github.com/matrix-org/matrix-js-sdk/pull/3119)). Contributed by @andybalaam.
+ * Add support for stable identifier for fixed MAC in SAS verification ([\#3101](https://github.com/matrix-org/matrix-js-sdk/pull/3101)).
+ * Provide eventId as well as roomId from Room.findPredecessor ([\#3095](https://github.com/matrix-org/matrix-js-sdk/pull/3095)). Contributed by @andybalaam.
+ * MSC3946 Dynamic room predecessors ([\#3042](https://github.com/matrix-org/matrix-js-sdk/pull/3042)). Contributed by @andybalaam.
+ * Poll model ([\#3036](https://github.com/matrix-org/matrix-js-sdk/pull/3036)). Contributed by @kerryarchibald.
+ * Remove video tracks on video mute without renegotiating ([\#3091](https://github.com/matrix-org/matrix-js-sdk/pull/3091)).
+ * Introduces a backwards-compatible API change. `MegolmEncrypter#prepareToEncrypt`'s return type has changed from `void` to `() => void`. ([\#3035](https://github.com/matrix-org/matrix-js-sdk/pull/3035)). Contributed by @clarkf.
+
+## 🐛 Bug Fixes
+ * Stop the ICE disconnected timer on call terminate ([\#3147](https://github.com/matrix-org/matrix-js-sdk/pull/3147)).
+ * Clear notifications when we can infer read status from receipts ([\#3139](https://github.com/matrix-org/matrix-js-sdk/pull/3139)). Fixes vector-im/element-web#23991.
+ * Messages sent out of order after one message fails ([\#3131](https://github.com/matrix-org/matrix-js-sdk/pull/3131)). Fixes vector-im/element-web#22885 and vector-im/element-web#18942. Contributed by @justjanne.
+ * Element-R: fix a bug which prevented encryption working after a reload ([\#3126](https://github.com/matrix-org/matrix-js-sdk/pull/3126)).
+ * Element-R: Fix invite processing ([\#3121](https://github.com/matrix-org/matrix-js-sdk/pull/3121)).
+ * Don't throw with no `opponentDeviceInfo` ([\#3107](https://github.com/matrix-org/matrix-js-sdk/pull/3107)).
+ * Remove flaky megolm test ([\#3098](https://github.com/matrix-org/matrix-js-sdk/pull/3098)). Contributed by @clarkf.
+ * Fix "verifyLinks" functionality of getRoomUpgradeHistory ([\#3089](https://github.com/matrix-org/matrix-js-sdk/pull/3089)). Contributed by @andybalaam.
+
+Changes in [23.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.2.0) (2023-01-31)
+==================================================================================================
+
+## ✨ Features
+ * Implement decryption via the rust sdk ([\#3074](https://github.com/matrix-org/matrix-js-sdk/pull/3074)).
+ * Handle edits which are bundled with an event, per MSC3925 ([\#3045](https://github.com/matrix-org/matrix-js-sdk/pull/3045)).
+
+## 🐛 Bug Fixes
+ * Add null check for our own member event ([\#3082](https://github.com/matrix-org/matrix-js-sdk/pull/3082)).
+ * Handle group call getting initialised twice in quick succession ([\#3078](https://github.com/matrix-org/matrix-js-sdk/pull/3078)). Fixes vector-im/element-call#847.
+ * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952. Contributed by @justjanne.
+ * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
+ * Fix spurious "Decryption key withheld" messages ([\#3061](https://github.com/matrix-org/matrix-js-sdk/pull/3061)). Fixes vector-im/element-web#23803.
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+
+Changes in [23.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.1) (2023-01-20)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix backwards compability for environment not support Array.prototype.at ([\#3080](https://github.com/matrix-org/matrix-js-sdk/pull/3080)).
+
+Changes in [23.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0) (2023-01-18)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Remove extensible events v1 field population on legacy events ([\#3040](https://github.com/matrix-org/matrix-js-sdk/pull/3040)).
+
+## ✨ Features
+ * Improve hasUserReadEvent and getUserReadUpTo realibility with threads ([\#3031](https://github.com/matrix-org/matrix-js-sdk/pull/3031)). Fixes vector-im/element-web#24164.
+ * Remove video track when muting video ([\#3028](https://github.com/matrix-org/matrix-js-sdk/pull/3028)). Fixes vector-im/element-call#209.
+ * Make poll start event type available (PSG-962) ([\#3034](https://github.com/matrix-org/matrix-js-sdk/pull/3034)).
+ * Add alt event type matching in Relations model ([\#3018](https://github.com/matrix-org/matrix-js-sdk/pull/3018)).
+ * Remove usage of v1 Identity Server API ([\#3003](https://github.com/matrix-org/matrix-js-sdk/pull/3003)).
+ * Add `device_id` to `/account/whoami` types ([\#3005](https://github.com/matrix-org/matrix-js-sdk/pull/3005)).
+ * Implement MSC3912: Relation-based redactions ([\#2954](https://github.com/matrix-org/matrix-js-sdk/pull/2954)).
+ * Introduce a mechanism for using the rust-crypto-sdk ([\#2969](https://github.com/matrix-org/matrix-js-sdk/pull/2969)).
+ * Support MSC3391: Account data deletion ([\#2967](https://github.com/matrix-org/matrix-js-sdk/pull/2967)).
+
+## 🐛 Bug Fixes
+ * Fix threaded cache receipt when event holds multiple receipts ([\#3026](https://github.com/matrix-org/matrix-js-sdk/pull/3026)).
+ * Fix false key requests after verifying new device ([\#3029](https://github.com/matrix-org/matrix-js-sdk/pull/3029)). Fixes vector-im/element-web#24167 and vector-im/element-web#23333.
+ * Avoid triggering decryption errors when decrypting redacted events ([\#3004](https://github.com/matrix-org/matrix-js-sdk/pull/3004)). Fixes vector-im/element-web#24084.
+ * bugfix: upload OTKs in sliding sync mode ([\#3008](https://github.com/matrix-org/matrix-js-sdk/pull/3008)).
+ * Apply edits discovered from sync after thread is initialised ([\#3002](https://github.com/matrix-org/matrix-js-sdk/pull/3002)). Fixes vector-im/element-web#23921.
+ * Sliding sync: Fix issue where no unsubs are sent when switching rooms ([\#2991](https://github.com/matrix-org/matrix-js-sdk/pull/2991)).
+ * Threads are missing from the timeline ([\#2996](https://github.com/matrix-org/matrix-js-sdk/pull/2996)). Fixes vector-im/element-web#24036.
+ * Close all streams when a call ends ([\#2992](https://github.com/matrix-org/matrix-js-sdk/pull/2992)). Fixes vector-im/element-call#742.
+ * Resume to-device message queue after resumed sync ([\#2920](https://github.com/matrix-org/matrix-js-sdk/pull/2920)). Fixes matrix-org/element-web-rageshakes#17170.
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+ * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
+ * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952.
+
 Changes in [23.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0) (2022-12-21)
 ==================================================================================================
 

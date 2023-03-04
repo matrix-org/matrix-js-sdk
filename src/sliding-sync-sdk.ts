@@ -14,12 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
+import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
+import {
+    ISyncStateData,
+    SyncState,
+    _createAndReEmitRoom,
+    SyncApiOptions,
+    defaultClientOpts,
+    defaultSyncApiOpts,
+} from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
@@ -35,7 +43,6 @@ import {
 } from "./sliding-sync";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { PushProcessor } from "./pushprocessor";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 
@@ -120,7 +127,7 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient, private readonly cryptoCallbacks?: SyncCryptoCallbacks) {}
 
     public name(): string {
         return "to_device";
@@ -143,8 +150,12 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
         const cancelledKeyVerificationTxns: string[] = [];
-        data.events
-            ?.map(this.client.getEventMapper())
+        let events = data["events"] || [];
+        if (events.length > 0 && this.cryptoCallbacks) {
+            events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        }
+        events
+            .map(this.client.getEventMapper())
             .map((toDeviceEvent) => {
                 // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
@@ -250,7 +261,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
             // (see sync) before syncing over the network.
             if (accountDataEvent.getType() === EventType.PushRules) {
                 const rules = accountDataEvent.getContent<IPushRules>();
-                this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                this.client.setPushRules(rules);
             }
             const prevEvent = prevEventsMap[accountDataEvent.getType()];
             this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
@@ -342,6 +353,8 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
 export class SlidingSyncSdk {
+    private readonly opts: IStoredClientOpts;
+    private readonly syncOpts: SyncApiOptions;
     private syncState: SyncState | null = null;
     private syncStateData?: ISyncStateData;
     private lastPos: string | null = null;
@@ -351,19 +364,11 @@ export class SlidingSyncSdk {
     public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
-        private readonly opts: Partial<IStoredClientOpts> = {},
+        opts?: IStoredClientOpts,
+        syncOpts?: SyncApiOptions,
     ) {
-        this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
-        this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
-        this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
-
-        if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (_roomId: string): boolean => {
-                return false;
-            };
-        }
+        this.opts = defaultClientOpts(opts);
+        this.syncOpts = defaultSyncApiOpts(syncOpts);
 
         if (client.getNotifTimelineSet()) {
             client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
@@ -372,13 +377,13 @@ export class SlidingSyncSdk {
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
         const extensions: Extension<any, any>[] = [
-            new ExtensionToDevice(this.client),
+            new ExtensionToDevice(this.client, this.syncOpts.cryptoCallbacks),
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.opts.crypto) {
-            extensions.push(new ExtensionE2EE(this.opts.crypto));
+        if (this.syncOpts.crypto) {
+            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -698,7 +703,7 @@ export class SlidingSyncSdk {
             if (limited) {
                 room.resetLiveTimeline(
                     roomData.prev_batch,
-                    null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
+                    null, // TODO this.syncOpts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -730,8 +735,8 @@ export class SlidingSyncSdk {
 
         const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
-            if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
-                await this.opts.crypto.onCryptoEvent(room, e);
+            if (e.isState() && e.getType() == EventType.RoomEncryption && this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.onCryptoEvent(room, e);
             }
         };
 

@@ -38,7 +38,7 @@ import {
     IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
-import { SyncState } from "../../src/sync";
+import { SyncApiOptions, SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
@@ -52,10 +52,9 @@ describe("SlidingSyncSdk", () => {
     const selfAccessToken = "aseukfgwef";
 
     const mockifySlidingSync = (s: SlidingSync): SlidingSync => {
-        s.getList = jest.fn();
+        s.getListParams = jest.fn();
         s.getListData = jest.fn();
         s.getRoomSubscriptions = jest.fn();
-        s.listLength = jest.fn();
         s.modifyRoomSubscriptionInfo = jest.fn();
         s.modifyRoomSubscriptions = jest.fn();
         s.registerExtension = jest.fn();
@@ -111,17 +110,18 @@ describe("SlidingSyncSdk", () => {
     // assign client/httpBackend globals
     const setupClient = async (testOpts?: Partial<IStoredClientOpts & { withCrypto: boolean }>) => {
         testOpts = testOpts || {};
+        const syncOpts: SyncApiOptions = {};
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
-        mockSlidingSync = mockifySlidingSync(new SlidingSync("", [], {}, client, 0));
+        mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
             await client!.initCrypto();
-            testOpts.crypto = client!.crypto;
+            syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
         }
         httpBackend!.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
-        sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts);
+        sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);
     };
 
     // tear down client/httpBackend globals
@@ -153,11 +153,11 @@ describe("SlidingSyncSdk", () => {
             const hasSynced = sdk!.sync();
             await httpBackend!.flushAllExpected();
             await hasSynced;
-            expect(mockSlidingSync!.start).toBeCalled();
+            expect(mockSlidingSync!.start).toHaveBeenCalled();
         });
         it("can stop()", async () => {
             sdk!.stop();
-            expect(mockSlidingSync!.stop).toBeCalled();
+            expect(mockSlidingSync!.stop).toHaveBeenCalled();
         });
     });
 
@@ -548,7 +548,7 @@ describe("SlidingSyncSdk", () => {
         it("emits SyncState.Reconnecting when < FAILED_SYNC_ERROR_THRESHOLD & SyncState.Error when over", async () => {
             mockSlidingSync!.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete, {
                 pos: "h",
-                lists: [],
+                lists: {},
                 rooms: {},
                 extensions: {},
             });
@@ -576,7 +576,7 @@ describe("SlidingSyncSdk", () => {
         it("emits SyncState.Syncing after a previous SyncState.Error", async () => {
             mockSlidingSync!.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete, {
                 pos: "i",
-                lists: [],
+                lists: {},
                 rooms: {},
                 extensions: {},
             });
@@ -584,7 +584,7 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("emits SyncState.Error immediately when receiving M_UNKNOWN_TOKEN and stops syncing", async () => {
-            expect(mockSlidingSync!.stop).not.toBeCalled();
+            expect(mockSlidingSync!.stop).not.toHaveBeenCalled();
             mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle,
                 SlidingSyncState.RequestFinished,
@@ -595,7 +595,7 @@ describe("SlidingSyncSdk", () => {
                 }),
             );
             expect(sdk!.getSyncState()).toEqual(SyncState.Error);
-            expect(mockSlidingSync!.stop).toBeCalled();
+            expect(mockSlidingSync!.stop).toHaveBeenCalled();
         });
     });
 

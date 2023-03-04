@@ -1,5 +1,5 @@
 /*
-Copyright 2021-2022 The Matrix.org Foundation C.I.C.
+Copyright 2021 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
-import { Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
+import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -50,7 +50,7 @@ interface IThreadOpts {
     room: Room;
     client: MatrixClient;
     pendingEventOrdering?: PendingEventOrdering;
-    receipts?: { event: MatrixEvent; synthetic: boolean }[];
+    receipts?: CachedReceiptStructure[];
 }
 
 export enum FeatureSupport {
@@ -69,9 +69,6 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
     }
 }
 
-/**
- * @experimental
- */
 export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;
@@ -256,7 +253,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.setEventMetadata(event);
 
         const lastReply = this.lastReply();
-        const isNewestReply = !lastReply || event.localTimestamp > lastReply!.localTimestamp;
+        const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
@@ -317,17 +314,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * and apply them to the current thread
      * @param receipts - A collection of the receipts cached from initial sync
      */
-    private processReceipts(receipts: { event: MatrixEvent; synthetic: boolean }[] = []): void {
-        for (const { event, synthetic } of receipts) {
-            const content = event.getContent<ReceiptContent>();
-            Object.keys(content).forEach((eventId: string) => {
-                Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
-                    Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                        const receipt = content[eventId][receiptType][userId] as Receipt;
-                        this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
-                    });
-                });
-            });
+    private processReceipts(receipts: CachedReceiptStructure[] = []): void {
+        for (const { eventId, receiptType, userId, receipt, synthetic } of receipts) {
+            this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
         }
     }
 
@@ -364,6 +353,63 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         );
         this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
         this.pendingReplyCount = pendingEvents.length;
+    }
+
+    /**
+     * Reset the live timeline of all timelineSets, and start new ones.
+     *
+     * <p>This is used when /sync returns a 'limited' timeline. 'Limited' means that there's a gap between the messages
+     * /sync returned, and the last known message in our timeline. In such a case, our live timeline isn't live anymore
+     * and has to be replaced by a new one. To make sure we can continue paginating our timelines correctly, we have to
+     * set new pagination tokens on the old and the new timeline.
+     *
+     * @param backPaginationToken -   token for back-paginating the new timeline
+     * @param forwardPaginationToken - token for forward-paginating the old live timeline,
+     * if absent or null, all timelines are reset, removing old ones (including the previous live
+     * timeline which would otherwise be unable to paginate forwards without this token).
+     * Removing just the old live timeline whilst preserving previous ones is not supported.
+     */
+    public async resetLiveTimeline(
+        backPaginationToken?: string | null,
+        forwardPaginationToken?: string | null,
+    ): Promise<void> {
+        const oldLive = this.liveTimeline;
+        this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
+        const newLive = this.liveTimeline;
+
+        // FIXME: Remove the following as soon as https://github.com/matrix-org/synapse/issues/14830 is resolved.
+        //
+        // The pagination API for thread timelines currently can't handle the type of pagination tokens returned by sync
+        //
+        // To make this work anyway, we'll have to transform them into one of the types that the API can handle.
+        // One option is passing the tokens to /messages, which can handle sync tokens, and returns the right format.
+        // /messages does not return new tokens on requests with a limit of 0.
+        // This means our timelines might overlap a slight bit, but that's not an issue, as we deduplicate messages
+        // anyway.
+
+        let newBackward: string | undefined;
+        let oldForward: string | undefined;
+        if (backPaginationToken) {
+            const res = await this.client.createMessagesRequest(this.roomId, backPaginationToken, 1, Direction.Forward);
+            newBackward = res.end;
+        }
+        if (forwardPaginationToken) {
+            const res = await this.client.createMessagesRequest(
+                this.roomId,
+                forwardPaginationToken,
+                1,
+                Direction.Backward,
+            );
+            oldForward = res.start;
+        }
+        // Only replace the token if we don't have paginated away from this position already. This situation doesn't
+        // occur today, but if the above issue is resolved, we'd have to go down this path.
+        if (forwardPaginationToken && oldLive.getPaginationToken(Direction.Forward) === forwardPaginationToken) {
+            oldLive.setPaginationToken(oldForward ?? null, Direction.Forward);
+        }
+        if (backPaginationToken && newLive.getPaginationToken(Direction.Backward) === backPaginationToken) {
+            newLive.setPaginationToken(newBackward ?? null, Direction.Backward);
+        }
     }
 
     private async updateThreadMetadata(): Promise<void> {
@@ -512,22 +558,89 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         throw new Error("Unsupported function on the thread model");
     }
 
+    /**
+     * Get the ID of the event that a given user has read up to within this thread,
+     * or null if we have received no read receipt (at all) from them.
+     * @param userId - The user ID to get read receipt event ID for
+     * @param ignoreSynthesized - If true, return only receipts that have been
+     *                            sent by the server, not implicit ones generated
+     *                            by the JS SDK.
+     * @returns ID of the latest event that the given user has read, or null.
+     */
+    public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
+        const isCurrentUser = userId === this.client.getUserId();
+        const lastReply = this.timeline[this.timeline.length - 1];
+        if (isCurrentUser && lastReply) {
+            // If the last activity in a thread is prior to the first threaded read receipt
+            // sent in the room (suggesting that it was sent before the user started
+            // using a client that supported threaded read receipts), we want to
+            // consider this thread as read.
+            const beforeFirstThreadedReceipt = lastReply.getTs() < this.room.getOldestThreadedReceiptTs();
+            const lastReplyId = lastReply.getId();
+            // Some unsent events do not have an ID, we do not want to consider them read
+            if (beforeFirstThreadedReceipt && lastReplyId) {
+                return lastReplyId;
+            }
+        }
+
+        const readUpToId = super.getEventReadUpTo(userId, ignoreSynthesized);
+
+        // Check whether the unthreaded read receipt for that user is more recent
+        // than the read receipt inside that thread.
+        if (lastReply) {
+            const unthreadedReceipt = this.room.getLastUnthreadedReceiptFor(userId);
+            if (!unthreadedReceipt) {
+                return readUpToId;
+            }
+
+            for (let i = this.timeline?.length - 1; i >= 0; --i) {
+                const ev = this.timeline[i];
+                // If we encounter the `readUpToId` we do not need to look further
+                // there is no "more recent" unthreaded read receipt
+                if (ev.getId() === readUpToId) return readUpToId;
+
+                // Inspecting events from most recent to oldest, we're checking
+                // whether an unthreaded read receipt is more recent that the current event.
+                // We usually prefer relying on the order of the DAG but in this scenario
+                // it is not possible and we have to rely on timestamp
+                if (ev.getTs() < unthreadedReceipt.ts) return ev.getId() ?? readUpToId;
+            }
+        }
+
+        return readUpToId;
+    }
+
+    /**
+     * Determine if the given user has read a particular event.
+     *
+     * It is invalid to call this method with an event that is not part of this thread.
+     *
+     * This is not a definitive check as it only checks the events that have been
+     * loaded client-side at the time of execution.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns True if the user has read the event, false otherwise.
+     */
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
-            const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
-            const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
-            const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;
-
-            if (!publicReadReceipt && !privateReadReceipt && !hasUnreads) {
-                // Consider an event read if it's part of a thread that has no
-                // read receipts and has no notifications. It is likely that it is
-                // part of a thread that was created before read receipts for threads
-                // were supported (via MSC3771)
+            // Consider an event read if it's part of a thread that is before the
+            // first threaded receipt sent in that room. It is likely that it is
+            // part of a thread that was created before MSC3771 was implemented.
+            // Or before the last unthreaded receipt for the logged in user
+            const beforeFirstThreadedReceipt =
+                (this.lastReply()?.getTs() ?? 0) < this.room.getOldestThreadedReceiptTs();
+            const unthreadedReceiptTs = this.room.getLastUnthreadedReceiptFor(userId)?.ts ?? 0;
+            const beforeLastUnthreadedReceipt = (this?.lastReply()?.getTs() ?? 0) < unthreadedReceiptTs;
+            if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
                 return true;
             }
         }
 
         return super.hasUserReadEvent(userId, eventId);
+    }
+
+    public setUnread(type: NotificationCountType, count: number): void {
+        return this.room.setThreadUnreadNotificationCount(this.id, type, count);
     }
 }
 

@@ -46,7 +46,7 @@ if you do not have it already.
 
 ```javascript
 import * as sdk from "matrix-js-sdk";
-const client = sdk.createClient("https://matrix.org");
+const client = sdk.createClient({ baseUrl: "https://matrix.org" });
 client.publicRooms(function (err, data) {
     console.log("Public Rooms: %s", JSON.stringify(data));
 });

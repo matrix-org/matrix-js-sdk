@@ -33,6 +33,7 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
+    RoomPredecessor = "org.matrix.msc3946.room_predecessor",
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
@@ -66,6 +67,7 @@ export enum EventType {
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
     Reaction = "m.reaction",
+    PollStart = "org.matrix.msc3381.poll.start",
 
     // Room ephemeral events
     Typing = "m.typing",

@@ -245,12 +245,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         // get head of queue
         const obj = this.peekNextEvent(queueName);
         if (!obj) {
-            // queue is empty. Mark as inactive and stop recursing.
-            const index = this.activeQueues.indexOf(queueName);
-            if (index >= 0) {
-                this.activeQueues.splice(index, 1);
-            }
-            debuglog("Stopping queue '%s' as it is now empty", queueName);
+            this.disableQueue(queueName);
             return;
         }
         debuglog("Queue '%s' has %s pending events", queueName, this.queues[queueName].length);
@@ -289,16 +284,31 @@ export class MatrixScheduler<T = ISendEventResponse> {
                         // give up (you quitter!)
                         debuglog("Queue '%s' giving up on event %s", queueName, obj.event.getId());
                         // remove this from the queue
-                        this.removeNextEvent(queueName);
-                        obj.defer.reject(err);
-                        // process next event
-                        this.processQueue(queueName);
+                        this.clearQueue(queueName, err);
                     } else {
                         setTimeout(this.processQueue, waitTimeMs, queueName);
                     }
                 },
             );
     };
+
+    private disableQueue(queueName: string): void {
+        // queue is empty. Mark as inactive and stop recursing.
+        const index = this.activeQueues.indexOf(queueName);
+        if (index >= 0) {
+            this.activeQueues.splice(index, 1);
+        }
+        debuglog("Stopping queue '%s' as it is now empty", queueName);
+    }
+
+    private clearQueue(queueName: string, err: unknown): void {
+        debuglog("clearing queue '%s'", queueName);
+        let obj: IQueueEntry<T> | undefined;
+        while ((obj = this.removeNextEvent(queueName))) {
+            obj.defer.reject(err);
+        }
+        this.disableQueue(queueName);
+    }
 
     private peekNextEvent(queueName: string): IQueueEntry<T> | undefined {
         const queue = this.queues[queueName];

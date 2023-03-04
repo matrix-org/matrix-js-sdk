@@ -16,8 +16,7 @@ limitations under the License.
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
-import { EventType } from "../../../src";
-import { Crypto } from "../../../src/crypto";
+import { Crypto, IEventDecryptionResult } from "../../../src/crypto";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
@@ -88,22 +87,6 @@ describe("MatrixEvent", () => {
         expect(ev.getWireContent().ciphertext).toBeUndefined();
     });
 
-    it("should abort decryption if fails with an error other than a DecryptionError", async () => {
-        const ev = new MatrixEvent({
-            type: EventType.RoomMessageEncrypted,
-            content: {
-                body: "Test",
-            },
-            event_id: "$event1:server",
-        });
-        await ev.attemptDecryption({
-            decryptEvent: jest.fn().mockRejectedValue(new Error("Not a DecryptionError")),
-        } as unknown as Crypto);
-        expect(ev.isEncrypted()).toBeTruthy();
-        expect(ev.isBeingDecrypted()).toBeFalsy();
-        expect(ev.isDecryptionFailure()).toBeFalsy();
-    });
-
     describe("applyVisibilityEvent", () => {
         it("should emit VisibilityChange if a change was made", async () => {
             const ev = new MatrixEvent({
@@ -131,6 +114,40 @@ describe("MatrixEvent", () => {
                 content: {
                     ciphertext: "secrets",
                 },
+            });
+        });
+
+        it("should report decryption errors", async () => {
+            const crypto = {
+                decryptEvent: jest.fn().mockRejectedValue(new Error("test error")),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.isEncrypted()).toBeTruthy();
+            expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
+            expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
+            expect(encryptedEvent.getContent()).toEqual({
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: Error: test error **",
+            });
+        });
+
+        it(`should report "DecryptionError: The sender has disabled encrypting to unverified devices."`, async () => {
+            const crypto = {
+                decryptEvent: jest
+                    .fn()
+                    .mockRejectedValue("DecryptionError: The sender has disabled encrypting to unverified devices."),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.isEncrypted()).toBeTruthy();
+            expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
+            expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeTruthy();
+            expect(encryptedEvent.getContent()).toEqual({
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });
         });
 
@@ -163,6 +180,40 @@ describe("MatrixEvent", () => {
             expect(eventAttemptDecryptionSpy).toHaveBeenCalledTimes(2);
             expect(crypto.decryptEvent).toHaveBeenCalledTimes(2);
             expect(encryptedEvent.getType()).toEqual("m.room.message");
+        });
+    });
+
+    describe("replyEventId", () => {
+        it("should ignore 'm.relates_to' from encrypted content even if cleartext lacks one", async () => {
+            const eventId = "test_encrypted_event";
+            const encryptedEvent = new MatrixEvent({
+                event_id: eventId,
+                type: "m.room.encrypted",
+                content: {
+                    ciphertext: "secrets",
+                },
+            });
+
+            const crypto = {
+                decryptEvent: jest.fn().mockImplementationOnce(() => {
+                    return Promise.resolve<IEventDecryptionResult>({
+                        clearEvent: {
+                            type: "m.room.message",
+                            content: {
+                                "m.relates_to": {
+                                    "m.in_reply_to": {
+                                        event_id: "!anotherEvent",
+                                    },
+                                },
+                            },
+                        },
+                    });
+                }),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.getType()).toEqual("m.room.message");
+            expect(encryptedEvent.replyEventId).toBeUndefined();
         });
     });
 });

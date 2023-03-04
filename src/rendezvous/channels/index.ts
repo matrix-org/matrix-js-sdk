@@ -14,4 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from "./MSC3903ECDHv1RendezvousChannel";
+export * from "./MSC3903ECDHv2RendezvousChannel";

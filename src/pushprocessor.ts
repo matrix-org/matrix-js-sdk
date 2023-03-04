@@ -124,6 +124,12 @@ export class PushProcessor {
     public constructor(private readonly client: MatrixClient) {}
 
     /**
+     * Maps the original key from the push rules to a list of property names
+     * after unescaping.
+     */
+    private readonly parsedKeys = new Map<string, string[]>();
+
+    /**
      * Convert a list of actions into a object with the actions as keys and their values
      * @example
      * eg. `[ 'notify', { set_tweak: 'sound', value: 'default' } ]`
@@ -162,7 +168,7 @@ export class PushProcessor {
         if (!newRules) newRules = {} as IPushRules;
         if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
-        if (!newRules.global.override) newRules.global.underride = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
@@ -200,6 +206,53 @@ export class PushProcessor {
         }
 
         return newRules;
+    }
+
+    /**
+     * Pre-caches the parsed keys for push rules and cleans out any obsolete cache
+     * entries. Should be called after push rules are updated.
+     * @param newRules - The new push rules.
+     */
+    public updateCachedPushRuleKeys(newRules: IPushRules): void {
+        // These lines are mostly to make the tests happy. We shouldn't run into these
+        // properties missing in practice.
+        if (!newRules) newRules = {} as IPushRules;
+        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global.override) newRules.global.override = [];
+        if (!newRules.global.room) newRules.global.room = [];
+        if (!newRules.global.sender) newRules.global.sender = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
+
+        // Process the 'key' property on event_match conditions pre-cache the
+        // values and clean-out any unused values.
+        const toRemoveKeys = new Set(this.parsedKeys.keys());
+        for (const ruleset of [
+            newRules.global.override,
+            newRules.global.room,
+            newRules.global.sender,
+            newRules.global.underride,
+        ]) {
+            for (const rule of ruleset) {
+                if (!rule.conditions) {
+                    continue;
+                }
+
+                for (const condition of rule.conditions) {
+                    if (condition.kind !== ConditionKind.EventMatch) {
+                        continue;
+                    }
+
+                    // Ensure we keep this key.
+                    toRemoveKeys.delete(condition.key);
+
+                    // Pre-process the key.
+                    this.parsedKeys.set(condition.key, PushProcessor.partsForDottedKey(condition.key));
+                }
+            }
+        }
+        // Any keys that were previously cached, but are no longer needed should
+        // be removed.
+        toRemoveKeys.forEach((k) => this.parsedKeys.delete(k));
     }
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
@@ -433,25 +486,99 @@ export class PushProcessor {
         return PushProcessor.cachedGlobToRegex[glob];
     }
 
+    /**
+     * Parse the key into the separate fields to search by splitting on
+     * unescaped ".", and then removing any escape characters.
+     *
+     * @param str - The key of the push rule condition: a dotted field.
+     * @returns The unescaped parts to fetch.
+     * @internal
+     */
+    public static partsForDottedKey(str: string): string[] {
+        const result = [];
+
+        // The current field and whether the previous character was the escape
+        // character (a backslash).
+        let part = "";
+        let escaped = false;
+
+        // Iterate over each character, and decide whether to append to the current
+        // part (following the escape rules) or to start a new part (based on the
+        // field separator).
+        for (const c of str) {
+            // If the previous character was the escape character (a backslash)
+            // then decide what to append to the current part.
+            if (escaped) {
+                if (c === "\\" || c === ".") {
+                    // An escaped backslash or dot just gets added.
+                    part += c;
+                } else {
+                    // A character that shouldn't be escaped gets the backslash prepended.
+                    part += "\\" + c;
+                }
+                // This always resets being escaped.
+                escaped = false;
+                continue;
+            }
+
+            if (c == ".") {
+                // The field separator creates a new part.
+                result.push(part);
+                part = "";
+            } else if (c == "\\") {
+                // A backslash adds no characters, but starts an escape sequence.
+                escaped = true;
+            } else {
+                // Otherwise, just add the current character.
+                part += c;
+            }
+        }
+
+        // Ensure the final part is included. If there's an open escape sequence
+        // it should be included.
+        if (escaped) {
+            part += "\\";
+        }
+        result.push(part);
+
+        return result;
+    }
+
+    /**
+     * For a dotted field and event, fetch the value at that position, if one
+     * exists.
+     *
+     * @param key - The key of the push rule condition: a dotted field to fetch.
+     * @param ev - The matrix event to fetch the field from.
+     * @returns The value at the dotted path given by key.
+     */
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        const parts = key.split(".");
+        // The key should already have been parsed via updateCachedPushRuleKeys,
+        // but if it hasn't (maybe via an old consumer of the SDK which hasn't
+        // been updated?) then lazily calculate it here.
+        let parts = this.parsedKeys.get(key);
+        if (parts === undefined) {
+            parts = PushProcessor.partsForDottedKey(key);
+            this.parsedKeys.set(key, parts);
+        }
         let val: any;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
+        let currentIndex = 0;
         if (firstPart === "content") {
             val = ev.getContent();
-            parts.shift();
+            ++currentIndex;
         } else if (firstPart === "type") {
             val = ev.getType();
-            parts.shift();
+            ++currentIndex;
         } else {
             // use the raw event for any other fields
             val = ev.event;
         }
 
-        while (parts.length > 0) {
-            const thisPart = parts.shift()!;
+        for (; currentIndex < parts.length; ++currentIndex) {
+            const thisPart = parts[currentIndex];
             if (isNullOrUndefined(val[thisPart])) {
                 return null;
             }
@@ -507,6 +634,18 @@ export class PushProcessor {
      * @returns The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule | null {
+        const result = this.getPushRuleAndKindById(ruleId);
+        return result?.rule ?? null;
+    }
+
+    /**
+     * Get one of the users push rules by its ID
+     *
+     * @param ruleId - The ID of the rule to search for
+     * @returns rule The push rule, or null if no such rule was found
+     * @returns kind - The PushRuleKind of the rule to search for
+     */
+    public getPushRuleAndKindById(ruleId: string): { rule: IPushRule; kind: PushRuleKind } | null {
         for (const scope of ["global"] as const) {
             if (this.client.pushRules?.[scope] === undefined) continue;
 
@@ -514,7 +653,7 @@ export class PushProcessor {
                 if (this.client.pushRules[scope][kind] === undefined) continue;
 
                 for (const rule of this.client.pushRules[scope][kind]!) {
-                    if (rule.rule_id === ruleId) return rule;
+                    if (rule.rule_id === ruleId) return { rule, kind };
                 }
             }
         }

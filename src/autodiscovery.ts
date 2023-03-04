@@ -47,7 +47,7 @@ interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
     error?: IWellKnownConfig["error"] | null;
 }
 
-interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
+export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
 }

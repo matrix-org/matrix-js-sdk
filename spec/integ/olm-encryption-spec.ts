@@ -22,20 +22,20 @@ limitations under the License.
  *
  * Note that megolm (group) conversation is not tested here.
  *
- * See also `megolm.spec.js`.
+ * See also `crypto.spec.js`.
  */
 
 // load olm before the sdk if possible
 import "../olm-loader";
 
 import type { Session } from "@matrix-org/olm";
+import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
 import { logger } from "../../src/logger";
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../src/client";
 import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../src/matrix";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
-import { IDeviceKeys, IOneTimeKey } from "../../src/crypto/dehydration";
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";

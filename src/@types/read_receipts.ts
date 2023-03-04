@@ -54,3 +54,11 @@ export type Receipts = {
         [userId: string]: [WrappedReceipt | null, WrappedReceipt | null]; // Pair<real receipt, synthetic receipt> (both nullable)
     };
 };
+
+export type CachedReceiptStructure = {
+    eventId: string;
+    receiptType: string | ReceiptType;
+    userId: string;
+    receipt: Receipt;
+    synthetic: boolean;
+};

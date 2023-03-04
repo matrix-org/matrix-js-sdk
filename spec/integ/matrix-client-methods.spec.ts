@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +35,7 @@ describe("MatrixClient", function () {
     let store: MemoryStore | undefined;
 
     const defaultClientOpts: IStoredClientOpts = {
-        canResetEntireTimeline: (roomId) => false,
-        experimentalThreadSupport: false,
-        crypto: {} as unknown as IStoredClientOpts["crypto"],
+        threadSupport: false,
     };
     const setupTests = (): [MatrixClient, HttpBackend, MemoryStore] => {
         const store = new MemoryStore();
@@ -207,19 +205,17 @@ describe("MatrixClient", function () {
     describe("getFilter", function () {
         const filterId = "f1lt3r1d";
 
-        it("should return a filter from the store if allowCached", function (done) {
+        it("should return a filter from the store if allowCached", async () => {
             const filter = Filter.fromJson(userId, filterId, {
                 event_format: "client",
             });
             store!.storeFilter(filter);
-            client!.getFilter(userId, filterId, true).then(function (gotFilter) {
-                expect(gotFilter).toEqual(filter);
-                done();
-            });
+            const gotFilter = await client!.getFilter(userId, filterId, true);
+            expect(gotFilter).toEqual(filter);
             httpBackend!.verifyNoOutstandingRequests();
         });
 
-        it("should do an HTTP request if !allowCached even if one exists", function (done) {
+        it("should do an HTTP request if !allowCached even if one exists", async () => {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
@@ -232,15 +228,11 @@ describe("MatrixClient", function () {
                 event_format: "client",
             });
             store!.storeFilter(storeFilter);
-            client!.getFilter(userId, filterId, false).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, false), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
         });
 
-        it("should do an HTTP request if nothing is in the cache and then store it", function (done) {
+        it("should do an HTTP request if nothing is in the cache and then store it", async () => {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
@@ -249,20 +241,16 @@ describe("MatrixClient", function () {
             httpBackend!
                 .when("GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId)
                 .respond(200, httpFilterDefinition);
-            client!.getFilter(userId, filterId, true).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                expect(store!.getFilter(userId, filterId)).toBeTruthy();
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, true), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+            expect(store!.getFilter(userId, filterId)).toBeTruthy();
         });
     });
 
     describe("createFilter", function () {
         const filterId = "f1llllllerid";
 
-        it("should do an HTTP request and then store the filter", function (done) {
+        it("should do an HTTP request and then store the filter", async () => {
             expect(store!.getFilter(userId, filterId)).toBe(null);
 
             const filterDefinition = {
@@ -278,13 +266,9 @@ describe("MatrixClient", function () {
                     filter_id: filterId,
                 });
 
-            client!.createFilter(filterDefinition).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(filterDefinition);
-                expect(store!.getFilter(userId, filterId)).toEqual(gotFilter);
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.createFilter(filterDefinition), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(filterDefinition);
+            expect(store!.getFilter(userId, filterId)).toEqual(gotFilter);
         });
     });
 
@@ -673,7 +657,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -704,7 +688,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -728,7 +712,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -752,7 +736,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -776,7 +760,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
             // This is based on recording the events in a real room:
 
@@ -833,7 +817,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -859,7 +843,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -880,7 +864,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -1179,11 +1163,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.emote",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.emote",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
@@ -1199,11 +1182,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.text",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.text",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
@@ -1354,18 +1336,25 @@ describe("MatrixClient", function () {
         it.each([
             {
                 userId: "alice@localhost",
+                powerLevel: 100,
                 expectation: {
                     "alice@localhost": 100,
                 },
             },
             {
                 userId: ["alice@localhost", "bob@localhost"],
+                powerLevel: 100,
                 expectation: {
                     "alice@localhost": 100,
                     "bob@localhost": 100,
                 },
             },
-        ])("should modify power levels of $userId correctly", async ({ userId, expectation }) => {
+            {
+                userId: "alice@localhost",
+                powerLevel: undefined,
+                expectation: {},
+            },
+        ])("should modify power levels of $userId correctly", async ({ userId, powerLevel, expectation }) => {
             const event = {
                 getType: () => "m.room.power_levels",
                 getContent: () => ({
@@ -1382,7 +1371,7 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, {});
 
-            const prom = client!.setPowerLevel("!room_id:server", userId, 100, event);
+            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel, event);
             await httpBackend!.flushAllExpected();
             await prom;
         });

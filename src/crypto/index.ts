@@ -20,7 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -63,7 +63,7 @@ import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/reque
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
-import { DehydrationManager, IDeviceKeys, IOneTimeKey } from "./dehydration";
+import { DehydrationManager } from "./dehydration";
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
@@ -85,10 +85,10 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IContent } from "../models/event";
-import { ISyncResponse } from "../sync-accumulator";
+import { ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
@@ -151,7 +151,7 @@ export interface ICryptoCallbacks {
         requestId: string,
         secretName: string,
         deviceTrust: DeviceTrustLevel,
-    ) => Promise<string>;
+    ) => Promise<string | undefined>;
     getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
@@ -1202,6 +1202,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
         if (!(key instanceof Uint8Array)) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
@@ -2225,9 +2226,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 await upload({ shouldEmit: true });
                 // XXX: we'll need to wait for the device list to be updated
             }
-
-            // redo key requests after verification
-            this.cancelAndResendAllOutgoingKeyRequests();
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
@@ -2811,11 +2809,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    public async encryptEvent(event: MatrixEvent, room?: Room): Promise<void> {
-        if (!room) {
-            throw new Error("Cannot send encrypted messages in unknown rooms");
-        }
-
+    public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         const roomId = event.getRoomId()!;
 
         const alg = this.roomEncryptors.get(roomId);
@@ -2878,11 +2872,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
+            // Try to decrypt the redaction event, to support encrypted
+            // redaction reasons.  If we can't decrypt, just fall back to using
+            // the original redacted_because.
             const redactionEvent = new MatrixEvent({
                 room_id: event.getRoomId(),
                 ...event.getUnsigned().redacted_because,
             });
-            const decryptedEvent = await this.decryptEvent(redactionEvent);
+            let redactedBecause: IEvent = event.getUnsigned().redacted_because!;
+            if (redactionEvent.isEncrypted()) {
+                try {
+                    const decryptedEvent = await this.decryptEvent(redactionEvent);
+                    redactedBecause = decryptedEvent.clearEvent as IEvent;
+                } catch (e) {
+                    logger.warn("Decryption of redaction failed. Falling back to unencrypted event.", e);
+                }
+            }
 
             return {
                 clearEvent: {
@@ -2890,7 +2895,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     type: "m.room.message",
                     content: {},
                     unsigned: {
-                        redacted_because: decryptedEvent.clearEvent as IEvent,
+                        redacted_because: redactedBecause,
                     },
                 },
             };
@@ -3013,7 +3018,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param syncData -  the data from the 'MatrixClient.sync' event
      */
-    public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
+    public async onSyncCompleted(syncData: OnSyncCompletedData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken ?? null);
         this.deviceList.saveIfDirty();
 
@@ -3186,6 +3191,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.error("Error handling membership change:", e);
         }
     };
+
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+        // all we do here is filter out encrypted to-device messages with the wrong algorithm. Decryption
+        // happens later in decryptEvent, via the EventMapper
+        return events.filter((toDevice) => {
+            if (
+                toDevice.type === EventType.RoomMessageEncrypted &&
+                !["m.olm.v1.curve25519-aes-sha2"].includes(toDevice.content?.algorithm)
+            ) {
+                logger.log("Ignoring invalid encrypted to-device event from " + toDevice.sender);
+                return false;
+            }
+            return true;
+        });
+    }
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
@@ -3409,6 +3429,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const sender = event.getSender();
         const algorithm = content.algorithm;
         const deviceKey = content.sender_key;
+
+        this.baseApis.emit(ClientEvent.UndecryptableToDeviceEvent, event);
 
         // retry decryption for all events sent by the sender_key.  This will
         // update the events to show a message indicating that the olm session was
