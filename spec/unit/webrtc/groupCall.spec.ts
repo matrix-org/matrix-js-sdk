@@ -955,7 +955,7 @@ describe("Group Call", function () {
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
-                runOnTrackForStream(call, stream);
+                runOnTrackForStream(call, stream.typed());
 
                 const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(false);

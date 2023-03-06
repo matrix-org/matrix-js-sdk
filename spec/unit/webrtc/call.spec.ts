@@ -325,7 +325,7 @@ describe("Call", function () {
             ]).typed(),
         );
 
-        const feed = call.getFeeds().find((feed) => feed.streamId === "remote_stream");
+        const feed = call.getRemoteFeeds().find((feed) => feed.streamId === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         // @ts-ignore
         expect(feed?.audioMuted).toBeTruthy();
@@ -452,7 +452,7 @@ describe("Call", function () {
             },
         });
         //(call as any).pushRemoteStream(new MockMediaStream("remote_stream", []));
-        const feed = call.getFeeds().find((feed) => feed.streamId === "remote_stream");
+        const feed = call.getRemoteFeeds().find((feed) => feed.streamId === "remote_stream");
 
         call.onSDPStreamMetadataChangedReceived(
             makeMockEvent("@test:foo", {
@@ -911,7 +911,7 @@ describe("Call", function () {
                     new MockMediaStreamTrack("track1", "audio"),
                     new MockMediaStreamTrack("track2", "video"),
                 ]);
-                runOnTrackForStream(call, stream);
+                runOnTrackForStream(call, stream.typed());
             };
 
             it("should handle incoming sdp_stream_metadata_changed with audio muted", async () => {
@@ -1300,8 +1300,9 @@ describe("Call", function () {
         MockRTCPeerConnection.triggerAllNegotiations();
 
         // @ts-ignore
-        const mockVideoSender = call.peerConn.getSenders().find((s) => s.track!.kind === "video");
-        const mockReplaceTrack = (mockVideoSender!.replaceTrack = jest.fn());
+        const mockVideoSender = call.peerConn.getSenders().find((s) => s.track!.kind === "video")!;
+        jest.spyOn(mockVideoSender, "replaceTrack");
+        const mockReplaceTrack = mocked(mockVideoSender?.replaceTrack);
 
         await call.setScreensharingEnabled(true);
 

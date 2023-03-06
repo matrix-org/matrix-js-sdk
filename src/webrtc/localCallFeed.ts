@@ -16,8 +16,9 @@ limitations under the License.
 
 import { logger } from "../logger";
 import { MatrixCall } from "./call";
-import { SDPStreamMetadataObject, SDPStreamMetadataPurpose, SDPStreamMetadataTracks } from "./callEventTypes";
+import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { CallFeed, CallFeedEvent, ICallFeedOpts } from "./callFeed";
+import { FeedPublication } from "./feedPublication";
 import { LocalCallTrack } from "./localCallTrack";
 
 export interface LocalCallFeedOpts extends ICallFeedOpts {
@@ -25,8 +26,15 @@ export interface LocalCallFeedOpts extends ICallFeedOpts {
     stream: MediaStream;
 }
 
+/**
+ * LocalCallFeed is a wrapper around MediaStream. It represents a stream that
+ * we've created locally by getting user/display media. N.B. that this is not
+ * linked to a specific peer connection, a FeedPublication is used for that
+ * purpose.
+ */
 export class LocalCallFeed extends CallFeed {
     protected _tracks: LocalCallTrack[] = [];
+    protected publications: FeedPublication[] = [];
     private _purpose: SDPStreamMetadataPurpose;
 
     protected _stream: MediaStream;
@@ -62,22 +70,6 @@ export class LocalCallFeed extends CallFeed {
         return super.videoTracks as LocalCallTrack[];
     }
 
-    public get metadata(): SDPStreamMetadataObject {
-        return {
-            user_id: this.userId,
-            device_id: this.deviceId,
-            purpose: this.purpose,
-            audio_muted: this.isAudioMuted(),
-            video_muted: this.isVideoMuted(),
-            tracks: this._tracks.reduce((metadata: SDPStreamMetadataTracks, track: LocalCallTrack) => {
-                if (!track.trackId) return metadata;
-
-                metadata[track.trackId] = track.metadata;
-                return metadata;
-            }, {}),
-        };
-    }
-
     public get purpose(): SDPStreamMetadataPurpose {
         return this._purpose;
     }
@@ -88,10 +80,6 @@ export class LocalCallFeed extends CallFeed {
 
     public get deviceId(): string | undefined {
         return this.client.getDeviceId() ?? undefined;
-    }
-
-    public get streamId(): string | undefined {
-        return this._tracks[0]?.streamId;
     }
 
     /**
@@ -146,17 +134,15 @@ export class LocalCallFeed extends CallFeed {
     protected updateStream(oldStream?: MediaStream, newStream?: MediaStream): void {
         super.updateStream(oldStream, newStream);
 
-        if (!newStream) return;
-
         // First, remove tracks which won't be used anymore
         for (const track of this._tracks) {
-            if (!newStream.getTracks().some((streamTrack) => streamTrack.kind === track.kind)) {
+            if (!newStream?.getTracks().some((streamTrack) => streamTrack.kind === track.kind)) {
                 this._tracks.splice(this._tracks.indexOf(track), 1);
-                if (track.published) {
-                    track.unpublish();
-                }
+                this.publications.forEach((publication) => this.unpublishTrack(track, publication));
             }
         }
+
+        if (!newStream) return;
 
         // Then, replace old track where we can and add new tracks
         for (const streamTrack of newStream.getTracks()) {
@@ -171,24 +157,42 @@ export class LocalCallFeed extends CallFeed {
                 track: streamTrack,
             });
             this._tracks.push(track);
-
-            if (this.call) {
-                track.publish(this.call);
-            }
+            this.publications.forEach((publication) => this.publishTrack(track!, publication));
         }
     }
 
-    public publish(call: MatrixCall): void {
-        this.call = call;
-        for (const track of this._tracks) {
-            track.publish(call);
+    public publish(call: MatrixCall): FeedPublication {
+        if (this.publications.some((publication) => publication.call === call)) {
+            throw new Error("Cannot publish a feed that is already published");
         }
+
+        const feedPublication = new FeedPublication({
+            feed: this,
+            call,
+        });
+        this.tracks.forEach((track) => this.publishTrack(track, feedPublication));
+
+        this.publications.push(feedPublication);
+        return feedPublication;
     }
 
-    public unpublish(): void {
-        this.call = undefined;
-        for (const track of this._tracks) {
-            track.unpublish();
-        }
+    public unpublish(call: MatrixCall): void {
+        const feedPublication = this.publications.find((publication) => publication.call === call);
+        if (!feedPublication) return;
+
+        this.publications.splice(this.publications.indexOf(feedPublication), 1);
+        this.tracks.forEach((track) => this.unpublishTrack(track, feedPublication));
+    }
+
+    private publishTrack(track: LocalCallTrack, feedPublication: FeedPublication): void {
+        const trackPublication = track.publish(feedPublication.call);
+        if (!trackPublication) return;
+        feedPublication.addTrackPublication(trackPublication);
+    }
+
+    private unpublishTrack(track: LocalCallTrack, feedPublication: FeedPublication): void {
+        const trackPublication = track.unpublish(feedPublication.call);
+        if (!trackPublication) return;
+        feedPublication.removeTrackPublication(trackPublication);
     }
 }

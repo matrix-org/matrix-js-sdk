@@ -62,6 +62,8 @@ import { MatrixError } from "../http-api";
 import { RemoteCallFeed } from "./remoteCallFeed";
 import { LocalCallFeed } from "./localCallFeed";
 import { LocalCallTrack } from "./localCallTrack";
+import { TrackPublication } from "./trackPublication";
+import { FeedPublication } from "./feedPublication";
 
 interface CallOpts {
     // The room ID for this call.
@@ -350,6 +352,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private candidateSendTries = 0;
     private candidatesEnded = false;
     private feeds: Array<CallFeed> = [];
+    private trackPublications: TrackPublication[] = [];
+    private feedPublications: FeedPublication[] = [];
 
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream = false;
@@ -540,11 +544,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private get hasUserMediaAudioSender(): boolean {
-        return Boolean(this.localUsermediaFeed?.tracks?.find((t) => t.kind === "audio")?.sender);
+        return this.trackPublications.some(
+            ({ track }) => track.purpose === SDPStreamMetadataPurpose.Usermedia && track.isAudio,
+        );
     }
 
     private get hasUserMediaVideoSender(): boolean {
-        return Boolean(this.localUsermediaFeed?.tracks?.find((t) => t.kind === "video")?.sender);
+        return this.trackPublications.some(
+            ({ track }) => track.purpose === SDPStreamMetadataPurpose.Usermedia && track.isVideo,
+        );
     }
 
     public get localUsermediaFeed(): LocalCallFeed | undefined {
@@ -579,7 +587,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.remoteScreensharingFeed?.stream;
     }
 
-    public getFreeTransceiverByKind(kind: string): RTCRtpTransceiver | undefined {
+    private getFreeTransceiverByKind(kind: string): RTCRtpTransceiver | undefined {
         return this.peerConn?.getTransceivers().find((transceiver) => {
             if (transceiver.sender.track) return false;
             if (!transceiver.mid) return false;
@@ -699,10 +707,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @returns localSDPStreamMetadata
      */
     private get metadata(): SDPStreamMetadata {
-        return this.getLocalFeeds().reduce((metadata: SDPStreamMetadata, feed: LocalCallFeed) => {
-            if (!feed.streamId) return metadata;
+        return this.feedPublications.reduce((metadata: SDPStreamMetadata, publication: FeedPublication) => {
+            if (!publication.streamId) return metadata;
 
-            metadata[feed.streamId] = feed.metadata;
+            metadata[publication.streamId] = publication.metadata;
             return metadata;
         }, {});
     }
@@ -761,15 +769,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.info(`Call ${this.callId} pushLocalFeed() succeeded (id=${feed.id} purpose=${feed.purpose})`);
 
         if (addToPeerConnection) {
-            feed.publish(this);
+            this.feedPublications.push(feed.publish(this));
         }
     }
 
-    public publishTrack(track: LocalCallTrack): RTCRtpTransceiver {
+    /**
+     * @internal
+     */
+    public publishTrackOnNewTransceiver(track: LocalCallTrack): RTCRtpTransceiver {
         if (!this.peerConn) {
             throw new Error("MatrixCall publish() called on call without a peer connection");
         }
-        logger.info(`Call ${this.callId} publishTrack() running (id=${track.id}, kind=${track.kind})`);
+        if (this.trackPublications.some((publication) => publication.track === track)) {
+            throw new Error("Cannot publish a track that is already published");
+        }
+        logger.info(
+            `Call ${this.callId} publishTrackUsingNewTransceiver() running (id=${track.id}, kind=${track.kind})`,
+        );
 
         const { stream, encodings } = track;
 
@@ -797,16 +813,55 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return transceiver;
     }
 
-    public unpublishTrack(track: LocalCallTrack): void {
+    /**
+     * @internal
+     */
+    public unpublishTrackOnTransceiver(publication: TrackPublication): void {
         if (!this.peerConn) {
-            throw new Error("MatrixCall unpublish() called on call without a peer connection");
+            throw new Error("MatrixCall unpublishTrackOnTransceiver() called on call without a peer connection");
         }
-        if (!track.sender) {
-            throw new Error("MatrixCall unpublish() called with track without sender");
-        }
-        logger.info(`Call ${this.callId} unpublishTrack() running (id=${track.id}, kind=${track.kind})`);
+        logger.info(`Call ${this.callId} unpublishTrackOnTransceiver() running (${publication.logInfo})`);
 
-        this.peerConn?.removeTrack(track.sender);
+        this.peerConn?.removeTrack(publication.transceiver.sender);
+    }
+
+    public publishTrack(track: LocalCallTrack): TrackPublication {
+        if (!this.peerConn) {
+            throw new Error("MatrixCall publish() called on call without a peer connection");
+        }
+        if (this.trackPublications.some((publication) => publication.track === track)) {
+            throw new Error("Cannot publish a track that is already published");
+        }
+        logger.info(`Call ${this.callId} publishTrack() running (id=${track.id}, kind=${track.kind})`);
+
+        // XXX: We try to re-use transceivers here, but we don't re-use
+        // transceivers with the SFU: this is to work around
+        // https://github.com/matrix-org/waterfall/issues/98 - see the bug for
+        // more. Since we use WebRTC data channels to renegotiate with the SFU,
+        // we're not limited to the size of a Matrix event, so it's 'ok' if the
+        // SDP grows indefinitely (although presumably this would break if we
+        // tried to do an ICE restart over to-device messages after you'd turned
+        // screen sharing on & off too many times...)
+        let transceiver = this.getFreeTransceiverByKind(track.kind);
+        if (!transceiver || (this.isFocus && track.purpose === SDPStreamMetadataPurpose.Screenshare)) {
+            transceiver = this.publishTrackOnNewTransceiver(track);
+        }
+
+        const publication = new TrackPublication({
+            call: this,
+            track,
+            transceiver,
+        });
+
+        this.trackPublications.push(publication);
+        return publication;
+    }
+
+    public unpublishTrack(publication: TrackPublication): void {
+        logger.info(`Call ${this.callId} unpublishTrack() running (${publication.logInfo})`);
+
+        this.unpublishTrackOnTransceiver(publication);
+        this.trackPublications = this.trackPublications.splice(this.trackPublications.indexOf(publication), 1);
     }
 
     /**
@@ -815,7 +870,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param feed - to remove
      */
     public removeLocalFeed(feed: LocalCallFeed): void {
-        feed.unpublish();
+        feed.unpublish(this);
 
         if (feed.stream) {
             switch (feed.purpose) {
@@ -2481,7 +2536,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         }
 
-        const screensharingVideoTransceiver = this.localScreensharingFeed?.videoTrack?.transceiver;
+        const screensharingVideoTransceiver = this.trackPublications.find(
+            ({ track }) => track.purpose === SDPStreamMetadataPurpose.Screenshare && track.isVideo,
+        )?.transceiver;
         if (screensharingVideoTransceiver) screensharingVideoTransceiver.setCodecPreferences(codecs);
     }
 
