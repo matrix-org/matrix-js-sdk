@@ -31,7 +31,7 @@ jobs:
                       reviews.forEach(review => {
                           latestReviews[review.user.login] = review;
                       });
-                      
+
                       const pending = pull.requested_reviewers.length
                           || pull.requested_teams.length
                           || Object.values(latestReviews).some(r => !["APPROVED", "DISMISSED"].includes(r.state));
