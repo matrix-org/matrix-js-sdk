@@ -27,9 +27,14 @@ jobs:
                           repo,
                       });
 
+                      const latestReviews = {};
+                      reviews.forEach(review => {
+                          latestReviews[review.user.login] = review;
+                      });
+                      
                       const pending = pull.requested_reviewers.length
                           || pull.requested_teams.length
-                          || reviews.some(r => r.state !== "APPROVED");
+                          || Object.values(latestReviews).some(r => !["APPROVED", "DISMISSED"].includes(r.state));
 
                       await github.rest.repos.createCommitStatus({
                           context: "Pending reviews",
