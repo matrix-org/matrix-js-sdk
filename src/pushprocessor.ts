@@ -26,6 +26,7 @@ import {
     IContainsDisplayNameCondition,
     IEventMatchCondition,
     IEventPropertyIsCondition,
+    IEventPropertyContainsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -340,6 +341,8 @@ export class PushProcessor {
                 return this.eventFulfillsEventMatchCondition(cond, ev);
             case ConditionKind.EventPropertyIs:
                 return this.eventFulfillsEventPropertyIsCondition(cond, ev);
+            case ConditionKind.EventPropertyContains:
+                return this.eventFulfillsEventPropertyContains(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -486,6 +489,24 @@ export class PushProcessor {
             return false;
         }
         return cond.value === this.valueForDottedKey(cond.key, ev);
+    }
+
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsEventPropertyContains(cond: IEventPropertyContainsCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        const val = this.valueForDottedKey(cond.key, ev);
+        if (!Array.isArray(val)) {
+            return false;
+        }
+        return val.includes(cond.value);
     }
 
     private eventFulfillsCallStartedCondition(
