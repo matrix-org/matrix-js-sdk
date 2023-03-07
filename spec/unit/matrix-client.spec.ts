@@ -725,6 +725,7 @@ describe("MatrixClient", function () {
             getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
+                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -743,6 +744,7 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
+                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -785,6 +787,7 @@ describe("MatrixClient", function () {
             getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
+                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -803,6 +806,7 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
+                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -820,6 +824,7 @@ describe("MatrixClient", function () {
             getMyMembership: () => "join",
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
+                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -837,6 +842,7 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
+                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -858,6 +864,7 @@ describe("MatrixClient", function () {
         const syncPromise = new Promise<void>((resolve, reject) => {
             client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "SYNCING") {
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(httpLookups.length).toEqual(0);
                     client.removeListener(ClientEvent.Sync, syncListener);
                     resolve();
@@ -944,6 +951,7 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
+                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(2);
                         expect(client.retryImmediately()).toBe(true);
@@ -955,6 +963,7 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
+                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -976,8 +985,10 @@ describe("MatrixClient", function () {
             const isSyncingPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
+                        /* eslint-disable jest/no-conditional-expect */
                         expect(httpLookups.length).toEqual(1);
                         expect(client.retryImmediately()).toBe(true);
+                        /* eslint-enable jest/no-conditional-expect */
                         jest.advanceTimersByTime(1);
                     } else if (state === "RECONNECTING" && httpLookups.length > 0) {
                         jest.advanceTimersByTime(10000);
@@ -1004,6 +1015,7 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
+                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(3);
                         expect(client.retryImmediately()).toBe(true);
@@ -1015,6 +1027,7 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
+                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();

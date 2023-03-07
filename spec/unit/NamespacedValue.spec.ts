@@ -46,13 +46,7 @@ describe("NamespacedValue", () => {
     });
 
     it("should not permit falsey values for both parts", () => {
-        try {
-            new UnstableValue(null!, null!);
-            // noinspection ExceptionCaughtLocallyJS
-            throw new Error("Failed to fail");
-        } catch (e) {
-            expect((<Error>e).message).toBe("One of stable or unstable values must be supplied");
-        }
+        expect(() => new UnstableValue(null!, null!)).toThrow("One of stable or unstable values must be supplied");
     });
 });
 
@@ -72,12 +66,6 @@ describe("UnstableValue", () => {
     });
 
     it("should not permit falsey unstable values", () => {
-        try {
-            new UnstableValue("stable", null!);
-            // noinspection ExceptionCaughtLocallyJS
-            throw new Error("Failed to fail");
-        } catch (e) {
-            expect((<Error>e).message).toBe("Unstable value must be supplied");
-        }
+        expect(() => new UnstableValue("stable", null!)).toThrow("Unstable value must be supplied");
     });
 });
