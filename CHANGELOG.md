@@ -1,3 +1,16 @@
+Changes in [23.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.5.0-rc.1) (2023-03-07)
+============================================================================================================
+
+## ✨ Features
+ * Implement MSC3758: a push rule condition to match event properties exactly ([\#3179](https://github.com/matrix-org/matrix-js-sdk/pull/3179)).
+ * Enable group calls without video and audio track by configuration of MatrixClient ([\#3162](https://github.com/matrix-org/matrix-js-sdk/pull/3162)). Contributed by @EnricoSchw.
+ * Updates to protocol used for Sign in with QR code ([\#3155](https://github.com/matrix-org/matrix-js-sdk/pull/3155)). Contributed by @hughns.
+ * Implement MSC3873 to handle escaped dots in push rule keys ([\#3134](https://github.com/matrix-org/matrix-js-sdk/pull/3134)). Fixes undefined/matrix-js-sdk#1454.
+
+## 🐛 Bug Fixes
+ * Fix spec compliance issue around encrypted `m.relates_to` ([\#3178](https://github.com/matrix-org/matrix-js-sdk/pull/3178)).
+ * Fix reactions in threads sometimes causing stuck notifications ([\#3146](https://github.com/matrix-org/matrix-js-sdk/pull/3146)). Fixes vector-im/element-web#24000. Contributed by @justjanne.
+
 Changes in [23.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0) (2023-02-28)
 ==================================================================================================
 
