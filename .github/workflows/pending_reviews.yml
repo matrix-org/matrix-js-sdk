@@ -1,0 +1,46 @@
+name: Pending Reviews
+on:
+    pull_request:
+        types: [opened, synchronize, review_requested, review_request_removed, ready_for_review]
+    pull_request_review:
+        types: [submitted, dismissed]
+    workflow_call: {}
+concurrency: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+jobs:
+    reviews:
+        name: Assert no outstanding reviews
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: read
+            statuses: write
+        steps:
+            - name: 🔍 Check reviewers
+              uses: actions/github-script@v5
+              with:
+                  script: |
+                      const { owner, repo } = context.repo;
+                      const pull = context.payload.pull_request;
+                      const pull_number = pull.number;
+                      const { data: reviews } = await github.rest.pulls.listReviews({
+                          pull_number,
+                          owner,
+                          repo,
+                      });
+
+                      const latestReviews = {};
+                      reviews.forEach(review => {
+                          latestReviews[review.user.login] = review;
+                      });
+
+                      const pending = pull.requested_reviewers.length
+                          || pull.requested_teams.length
+                          || Object.values(latestReviews).some(r => !["APPROVED", "DISMISSED"].includes(r.state));
+
+                      await github.rest.repos.createCommitStatus({
+                          context: "Pending reviews",
+                          sha: pull.head.sha,
+                          state: pending ? "failure" : "success",
+                          description: pending ? "Outstanding pending reviews" : undefined,
+                          owner,
+                          repo,
+                      });

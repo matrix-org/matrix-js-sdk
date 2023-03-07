@@ -130,14 +130,8 @@ describe("MSC3089TreeSpace", () => {
             return Promise.reject(new MatrixError({ errcode: "M_FORBIDDEN", error: "Sample Failure" }));
         });
         client.invite = fn;
-        try {
-            await tree.invite(target, false, false);
 
-            // noinspection ExceptionCaughtLocallyJS
-            throw new Error("Failed to fail");
-        } catch (e) {
-            expect((<MatrixError>e).errcode).toEqual("M_FORBIDDEN");
-        }
+        await expect(tree.invite(target, false, false)).rejects.toThrow("MatrixError: Sample Failure");
 
         expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -357,13 +351,18 @@ describe("MSC3089TreeSpace", () => {
             .fn()
             .mockImplementation(async (roomId: string, eventType: EventType, content: any, stateKey: string) => {
                 expect([tree.roomId, subspaceId]).toContain(roomId);
+
+                let expectedType: string;
+                let expectedStateKey: string;
                 if (roomId === subspaceId) {
-                    expect(eventType).toEqual(EventType.SpaceParent);
-                    expect(stateKey).toEqual(tree.roomId);
+                    expectedType = EventType.SpaceParent;
+                    expectedStateKey = tree.roomId;
                 } else {
-                    expect(eventType).toEqual(EventType.SpaceChild);
-                    expect(stateKey).toEqual(subspaceId);
+                    expectedType = EventType.SpaceChild;
+                    expectedStateKey = subspaceId;
                 }
+                expect(eventType).toEqual(expectedType);
+                expect(stateKey).toEqual(expectedStateKey);
                 expect(content).toMatchObject({ via: [domain] });
 
                 // return value not used
@@ -629,15 +628,8 @@ describe("MSC3089TreeSpace", () => {
         });
 
         it("should throw when setting an order at the top level space", async () => {
-            try {
-                // The tree is what we've defined as top level, so it should work
-                await tree.setOrder(2);
-
-                // noinspection ExceptionCaughtLocallyJS
-                throw new Error("Failed to fail");
-            } catch (e) {
-                expect((<Error>e).message).toEqual("Cannot set order of top level spaces currently");
-            }
+            // The tree is what we've defined as top level, so it should work
+            await expect(tree.setOrder(2)).rejects.toThrow("Cannot set order of top level spaces currently");
         });
 
         it("should return a stable order for unordered children", () => {
