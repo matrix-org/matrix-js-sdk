@@ -8575,7 +8575,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPushRules(rules: IPushRules): void {
         // Fix-up defaults, if applicable.
-        this.pushRules = PushProcessor.rewriteDefaultRules(rules);
+        this.pushRules = PushProcessor.rewriteDefaultRules(rules, this.getUserId()!);
         // Pre-calculate any necessary caches.
         this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }
