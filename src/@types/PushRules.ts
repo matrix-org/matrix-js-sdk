@@ -64,8 +64,6 @@ export enum ConditionKind {
     EventMatch = "event_match",
     EventPropertyIs = "event_property_is",
     EventPropertyContains = "event_property_contains",
-    IsUserMention = "org.matrix.msc3952.is_user_mention",
-    IsRoomMention = "org.matrix.msc3952.is_room_mention",
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
@@ -96,14 +94,6 @@ export interface IEventPropertyContainsCondition extends IPushRuleCondition<Cond
     value: string | boolean | null | number;
 }
 
-export interface IIsUserMentionCondition extends IPushRuleCondition<ConditionKind.IsUserMention> {
-    // no additional fields
-}
-
-export interface IIsRoomMentionCondition extends IPushRuleCondition<ConditionKind.IsRoomMention> {
-    // no additional fields
-}
-
 export interface IContainsDisplayNameCondition extends IPushRuleCondition<ConditionKind.ContainsDisplayName> {
     // no additional fields
 }
@@ -131,8 +121,6 @@ export type PushRuleCondition =
     | IEventMatchCondition
     | IEventPropertyIsCondition
     | IEventPropertyContainsCondition
-    | IIsUserMentionCondition
-    | IIsRoomMentionCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition

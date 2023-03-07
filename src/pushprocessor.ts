@@ -27,8 +27,6 @@ import {
     IEventMatchCondition,
     IEventPropertyIsCondition,
     IEventPropertyContainsCondition,
-    IIsRoomMentionCondition,
-    IIsUserMentionCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -50,8 +48,6 @@ const RULEKINDS_IN_ORDER = [
     PushRuleKind.SenderSpecific,
     PushRuleKind.Underride,
 ];
-
-const MENTIONS_FIELD = "org.matrix.msc3952.mentions";
 
 // The default override rules to apply to the push rules that arrive from the server.
 // We do this for two reasons:
@@ -391,10 +387,6 @@ export class PushProcessor {
                 return this.eventFulfillsEventPropertyIsCondition(cond, ev);
             case ConditionKind.EventPropertyContains:
                 return this.eventFulfillsEventPropertyContains(cond, ev);
-            case ConditionKind.IsUserMention:
-                return this.eventFulfillsUserMentionCondition(cond, ev);
-            case ConditionKind.IsRoomMention:
-                return this.eventFulfillsRoomMentionCondition(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -468,50 +460,6 @@ export class PushProcessor {
             default:
                 return false;
         }
-    }
-
-    private eventFulfillsUserMentionCondition(cond: IIsUserMentionCondition, ev: MatrixEvent): boolean {
-        const content = ev.getContent();
-        // Ensure the mentions field exists as an object and contains a user_ids
-        // field which is an array.
-        if (
-            !content ||
-            !content[MENTIONS_FIELD] ||
-            typeof content[MENTIONS_FIELD] != "object" ||
-            !content[MENTIONS_FIELD].user_ids ||
-            !Array.isArray(content[MENTIONS_FIELD].user_ids)
-        ) {
-            return false;
-        }
-
-        // Ensure the user is still in the room.
-        // XXX Why do we do this?
-        const room = this.client.getRoom(ev.getRoomId());
-        const userId = this.client.credentials.userId!;
-        const member = room?.currentState?.getMember(userId);
-        if (!member) {
-            return false;
-        }
-
-        return content[MENTIONS_FIELD].user_ids.includes(userId);
-    }
-
-    private eventFulfillsRoomMentionCondition(cond: IIsRoomMentionCondition, ev: MatrixEvent): boolean {
-        const content = ev.getContent();
-        // Ensure the mentions field exists as an object and contains a room
-        // field which is a boolean.
-        if (
-            !content ||
-            !content[MENTIONS_FIELD] ||
-            typeof content[MENTIONS_FIELD] != "object" ||
-            !content[MENTIONS_FIELD].room ||
-            typeof content[MENTIONS_FIELD].user_ids != "boolean"
-        ) {
-            return false;
-        }
-
-        // This must be a boolean, so can just return it directly.
-        return content[MENTIONS_FIELD].room;
     }
 
     private eventFulfillsDisplayNameCondition(cond: IContainsDisplayNameCondition, ev: MatrixEvent): boolean {
