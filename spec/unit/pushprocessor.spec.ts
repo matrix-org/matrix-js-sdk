@@ -572,11 +572,7 @@ describe("NotificationService", function () {
             });
 
             const actions = pushProcessor.actionsForEvent(testEvent);
-            if (expected) {
-                expect(actions?.notify).toBeTruthy();
-            } else {
-                expect(actions?.notify).toBeFalsy();
-            }
+            expect(!!actions?.notify).toBe(expected);
         });
     });
 
