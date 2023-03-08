@@ -18,7 +18,7 @@ import { RoomMember } from "./room-member";
 import { logger } from "../logger";
 import * as utils from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
-import { IEvent, MatrixEvent } from "./event";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -502,7 +502,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             try {
                 await matrixClient.decryptEventIfNeeded(event);
                 processBeaconRelation(relatedToEventId, event);
-            } catch {}
+            } catch {
+                if (event.isDecryptionFailure()) {
+                    // add an event listener for once the event is decrypted.
+                    event.once(MatrixEventEvent.Decrypted, async () => {
+                        processBeaconRelation(relatedToEventId, event);
+                    });
+                }
+            }
         }
     }
 
