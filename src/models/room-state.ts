@@ -18,7 +18,7 @@ import { RoomMember } from "./room-member";
 import { logger } from "../logger";
 import * as utils from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
-import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
+import { IEvent, MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -467,7 +467,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.emit(RoomStateEvent.Update, this);
     }
 
-    public processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
+    public async processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): Promise<void> {
         if (
             !events.length ||
             // discard locations if we have no beacons
@@ -476,10 +476,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        const beaconByEventIdDict: Record<string, Beacon> = [...this.beacons.values()].reduce(
-            (dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }),
-            {},
-        );
+        const beaconByEventIdDict = [...this.beacons.values()].reduce<Record<string, Beacon>>((dict, beacon) => {
+            dict[beacon.beaconInfoId] = beacon;
+            return dict;
+        }, {});
 
         const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
             if (!M_BEACON.matches(event.getType())) {
@@ -493,22 +493,17 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
         };
 
-        events.forEach((event: MatrixEvent) => {
+        for (const event of events) {
             const relatedToEventId = event.getRelation()?.event_id;
             // not related to a beacon we know about; discard
             if (!relatedToEventId || !beaconByEventIdDict[relatedToEventId]) return;
+            if (!M_BEACON.matches(event.getType()) && !event.isEncrypted()) return;
 
-            matrixClient.decryptEventIfNeeded(event);
-
-            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-                // add an event listener for once the event is decrypted.
-                event.once(MatrixEventEvent.Decrypted, async () => {
-                    processBeaconRelation(relatedToEventId, event);
-                });
-            } else {
+            try {
+                await matrixClient.decryptEventIfNeeded(event);
                 processBeaconRelation(relatedToEventId, event);
-            }
-        });
+            } catch {}
+        }
     }
 
     /**
