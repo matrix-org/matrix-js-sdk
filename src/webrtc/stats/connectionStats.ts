@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { TransportStats } from "./transportStats";
-import { Bitrate } from "./ssrcStats";
+import { Bitrate } from "./trackStats";
 
 export interface ConnectionStatsBitrate extends Bitrate {
     audio?: Bitrate;
