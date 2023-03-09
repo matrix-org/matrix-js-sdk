@@ -134,6 +134,10 @@ export class MSC3906Rendezvous {
         this._code = JSON.stringify(raw);
     }
 
+    /**
+     *
+     * @returns the checksum of the secure channel if the rendezvous set up was successful, otherwise undefined
+     */
     public async startAfterShowingCode(): Promise<string | undefined> {
         const checksum = await this.channel.connect();
 
@@ -158,17 +162,43 @@ export class MSC3906Rendezvous {
         });
 
         logger.info("Waiting for other device to chose protocol");
-        const { type, protocol, outcome, reason, intent } = await this.receive();
+        const nextPayload = await this.receive();
 
+        this.checkForV1Fallback(nextPayload);
+
+        const protocol = this.v1FallbackEnabled
+            ? await this.handleV1ProtocolPayload(nextPayload)
+            : await this.handleV2ProtocolPayload(nextPayload);
+
+        // invalid protocol
+        if (!protocol || !LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
+            await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
+            return undefined;
+        }
+
+        return checksum;
+    }
+
+    private checkForV1Fallback({ type }: MSC3906RendezvousPayload): void {
         // even if we didn't start in v1 fallback we might detect that the other device is v1
         if (type === PayloadType.Finish || type === PayloadType.Progress) {
             // this is a PDU from a v1 flow so use fallback mode
             this.v1FallbackEnabled = true;
         }
+    }
 
-        // fallback for v1 flow
+    /**
+     *
+     * @returns true if the protocol was received successfully, false otherwise
+     */
+    private async handleV1ProtocolPayload({
+        type,
+        protocol,
+        outcome,
+        reason,
+        intent,
+    }: MSC3906RendezvousPayload): Promise<string | void> {
         if (type === PayloadType.Finish) {
-            this.v1FallbackEnabled = true;
             // new device decided not to complete
             let reason: RendezvousFailureReason;
             if (intent) {
@@ -182,9 +212,29 @@ export class MSC3906Rendezvous {
                 reason = RendezvousFailureReason.Unknown;
             }
             await this.cancel(reason);
-            return undefined;
+            return;
         }
 
+        // unexpected payload
+        if (type !== PayloadType.Progress) {
+            await this.cancel(RendezvousFailureReason.Unknown);
+            return;
+        }
+
+        return protocol;
+    }
+
+    /**
+     *
+     * @returns true if the protocol was received successfully, false otherwise
+     */
+    private async handleV2ProtocolPayload({
+        type,
+        protocol,
+        outcome,
+        reason,
+        intent,
+    }: MSC3906RendezvousPayload): Promise<string | void> {
         // v2 flow
         if (type === PayloadType.Failure) {
             // new device decided not to complete
@@ -206,28 +256,16 @@ export class MSC3906Rendezvous {
                     failureReason = RendezvousFailureReason.Unknown;
             }
             await this.cancel(failureReason);
-            return undefined;
+            return;
         }
 
-        // v1 unexpected payload
-        if (this.v1FallbackEnabled && type !== PayloadType.Progress) {
+        // unexpected payload
+        if (type !== PayloadType.Protocol) {
             await this.cancel(RendezvousFailureReason.Unknown);
-            return undefined;
+            return;
         }
 
-        // v2 unexpected payload
-        if (!this.v1FallbackEnabled && type !== PayloadType.Protocol) {
-            await this.cancel(RendezvousFailureReason.Unknown);
-            return undefined;
-        }
-
-        // invalid protocol
-        if (!protocol || !LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
-            await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
-            return undefined;
-        }
-
-        return checksum;
+        return protocol;
     }
 
     private async receive(): Promise<MSC3906RendezvousPayload> {
