@@ -55,10 +55,11 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
 
     public constructor(private rootEvent: MatrixEvent) {
         super();
-        // setBeaconInfo also assigns this._beaconInfo
-        // reassign here to make tsc believe it is definitely assigned in constructor
-        this._beaconInfo = this.setBeaconInfo(this.rootEvent);
         this.roomId = this.rootEvent.getRoomId()!;
+        // setBeaconInfo also assigns this._beaconInfo
+        // manually assign here to make tsc believe it is definitely assigned in constructor
+        this._beaconInfo = parseBeaconInfoContent(rootEvent.getContent());
+        this.checkLiveness();
     }
 
     public get isLive(): boolean {
@@ -180,10 +181,9 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         this.emit(BeaconEvent.LocationUpdate, this.latestLocationState!);
     };
 
-    private setBeaconInfo(event: MatrixEvent): BeaconInfoState {
+    private setBeaconInfo(event: MatrixEvent): void {
         this._beaconInfo = parseBeaconInfoContent(event.getContent());
         this.checkLiveness();
-        return this._beaconInfo;
     }
 
     private checkLiveness(): void {
