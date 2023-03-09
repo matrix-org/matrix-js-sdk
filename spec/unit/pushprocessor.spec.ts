@@ -1,6 +1,6 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent } from "../../src";
+import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName } from "../../src";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -180,11 +180,11 @@ describe("NotificationService", function () {
                         enabled: true,
                         rule_id: ".m.rule.room_one_to_one",
                     },
-                    msc3914RoomCallRule,
                 ],
                 room: [],
                 sender: [],
                 underride: [
+                    msc3914RoomCallRule,
                     {
                         actions: ["dont-notify"],
                         conditions: [
@@ -507,6 +507,144 @@ describe("NotificationService", function () {
         });
     });
 
+    describe("Test exact event matching", () => {
+        it.each([
+            // Simple string matching.
+            { value: "bar", eventValue: "bar", expected: true },
+            // Matches are case-sensitive.
+            { value: "bar", eventValue: "BAR", expected: false },
+            // Matches must match the full string.
+            { value: "bar", eventValue: "barbar", expected: false },
+            // Values should not be type-coerced.
+            { value: "bar", eventValue: true, expected: false },
+            { value: "bar", eventValue: 1, expected: false },
+            { value: "bar", eventValue: false, expected: false },
+            // Boolean matching.
+            { value: true, eventValue: true, expected: true },
+            { value: false, eventValue: false, expected: true },
+            // Types should not be coerced.
+            { value: true, eventValue: "true", expected: false },
+            { value: true, eventValue: 1, expected: false },
+            { value: false, eventValue: null, expected: false },
+            // Null matching.
+            { value: null, eventValue: null, expected: true },
+            // Types should not be coerced
+            { value: null, eventValue: false, expected: false },
+            { value: null, eventValue: 0, expected: false },
+            { value: null, eventValue: "", expected: false },
+            { value: null, eventValue: undefined, expected: false },
+            // Compound values should never be matched.
+            { value: "bar", eventValue: ["bar"], expected: false },
+            { value: "bar", eventValue: { bar: true }, expected: false },
+            { value: true, eventValue: [true], expected: false },
+            { value: true, eventValue: { true: true }, expected: false },
+            { value: null, eventValue: [], expected: false },
+            { value: null, eventValue: {}, expected: false },
+        ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
+            matrixClient.pushRules! = {
+                global: {
+                    override: [
+                        {
+                            actions: [PushRuleActionName.Notify],
+                            conditions: [
+                                {
+                                    kind: ConditionKind.EventPropertyIs,
+                                    key: "content.foo",
+                                    value: value,
+                                },
+                            ],
+                            default: true,
+                            enabled: true,
+                            rule_id: ".m.rule.test",
+                        },
+                    ],
+                },
+            };
+
+            testEvent = utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    foo: eventValue,
+                },
+            });
+
+            const actions = pushProcessor.actionsForEvent(testEvent);
+            expect(!!actions?.notify).toBe(expected);
+        });
+    });
+
+    describe("Test event property contains", () => {
+        it.each([
+            // Simple string matching.
+            { value: "bar", eventValue: ["bar"], expected: true },
+            // Matches are case-sensitive.
+            { value: "bar", eventValue: ["BAR"], expected: false },
+            // Values should not be type-coerced.
+            { value: "bar", eventValue: [true], expected: false },
+            { value: "bar", eventValue: [1], expected: false },
+            { value: "bar", eventValue: [false], expected: false },
+            // Boolean matching.
+            { value: true, eventValue: [true], expected: true },
+            { value: false, eventValue: [false], expected: true },
+            // Types should not be coerced.
+            { value: true, eventValue: ["true"], expected: false },
+            { value: true, eventValue: [1], expected: false },
+            { value: false, eventValue: [null], expected: false },
+            // Null matching.
+            { value: null, eventValue: [null], expected: true },
+            // Types should not be coerced
+            { value: null, eventValue: [false], expected: false },
+            { value: null, eventValue: [0], expected: false },
+            { value: null, eventValue: [""], expected: false },
+            { value: null, eventValue: [undefined], expected: false },
+            // Non-array or empty values should never be matched.
+            { value: "bar", eventValue: "bar", expected: false },
+            { value: "bar", eventValue: { bar: true }, expected: false },
+            { value: true, eventValue: { true: true }, expected: false },
+            { value: true, eventValue: true, expected: false },
+            { value: null, eventValue: [], expected: false },
+            { value: null, eventValue: {}, expected: false },
+            { value: null, eventValue: null, expected: false },
+            { value: null, eventValue: undefined, expected: false },
+        ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
+            matrixClient.pushRules! = {
+                global: {
+                    override: [
+                        {
+                            actions: [PushRuleActionName.Notify],
+                            conditions: [
+                                {
+                                    kind: ConditionKind.EventPropertyContains,
+                                    key: "content.foo",
+                                    value: value,
+                                },
+                            ],
+                            default: true,
+                            enabled: true,
+                            rule_id: ".m.rule.test",
+                        },
+                    ],
+                },
+            };
+
+            testEvent = utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    foo: eventValue,
+                },
+            });
+
+            const actions = pushProcessor.actionsForEvent(testEvent);
+            expect(actions?.notify).toBe(expected ? true : undefined);
+        });
+    });
+
     it.each([
         // The properly escaped key works.
         { key: "content.m\\.test.foo", pattern: "bar", expected: true },
@@ -569,7 +707,7 @@ describe("NotificationService", function () {
 
         it("returns push rule when it is found in rule set", () => {
             expect(pushProcessor.getPushRuleAndKindById(".org.matrix.msc3914.rule.room.call")).toEqual({
-                kind: "override",
+                kind: "underride",
                 rule: msc3914RoomCallRule,
             });
         });

@@ -58,10 +58,12 @@ describe("MatrixScheduler", function () {
         let yieldedA = false;
         scheduler.setProcessFunction(function (event) {
             if (yieldedA) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventB);
                 return deferB.promise;
             } else {
                 yieldedA = true;
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventA);
                 return deferA.promise;
             }
@@ -89,6 +91,7 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferred.promise;
             } else if (procCount === 2) {
@@ -129,9 +132,11 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferA.promise;
             } else if (procCount === 2) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventB);
                 return deferB.promise;
             }

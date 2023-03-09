@@ -25,6 +25,8 @@ import {
     ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
+    IEventPropertyIsCondition,
+    IEventPropertyContainsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -337,6 +339,10 @@ export class PushProcessor {
         switch (cond.kind) {
             case ConditionKind.EventMatch:
                 return this.eventFulfillsEventMatchCondition(cond, ev);
+            case ConditionKind.EventPropertyIs:
+                return this.eventFulfillsEventPropertyIsCondition(cond, ev);
+            case ConditionKind.EventPropertyContains:
+                return this.eventFulfillsEventPropertyContains(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -435,6 +441,13 @@ export class PushProcessor {
         return content.body.search(pat) > -1;
     }
 
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing against the condition's glob-based
+     * pattern.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
     private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
         if (!cond.key) {
             return false;
@@ -445,6 +458,9 @@ export class PushProcessor {
             return false;
         }
 
+        // XXX This does not match in a case-insensitive manner.
+        //
+        // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1
         if (cond.value) {
             return cond.value === val;
         }
@@ -459,6 +475,38 @@ export class PushProcessor {
                 : this.createCachedRegex("^", cond.pattern, "$");
 
         return !!val.match(regex);
+    }
+
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsEventPropertyIsCondition(cond: IEventPropertyIsCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        return cond.value === this.valueForDottedKey(cond.key, ev);
+    }
+
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsEventPropertyContains(cond: IEventPropertyContainsCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        const val = this.valueForDottedKey(cond.key, ev);
+        if (!Array.isArray(val)) {
+            return false;
+        }
+        return val.includes(cond.value);
     }
 
     private eventFulfillsCallStartedCondition(
@@ -578,10 +626,13 @@ export class PushProcessor {
         }
 
         for (; currentIndex < parts.length; ++currentIndex) {
-            const thisPart = parts[currentIndex];
-            if (isNullOrUndefined(val[thisPart])) {
-                return null;
+            // The previous iteration resulted in null or undefined, bail (and
+            // avoid the type error of attempting to retrieve a property).
+            if (isNullOrUndefined(val)) {
+                return undefined;
             }
+
+            const thisPart = parts[currentIndex];
             val = val[thisPart];
         }
         return val;

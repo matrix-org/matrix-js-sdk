@@ -62,6 +62,8 @@ export function isDmMemberCountCondition(condition: AnyMemberCountCondition): bo
 
 export enum ConditionKind {
     EventMatch = "event_match",
+    EventPropertyIs = "event_property_is",
+    EventPropertyContains = "event_property_contains",
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
@@ -77,7 +79,19 @@ export interface IPushRuleCondition<N extends ConditionKind | string> {
 export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.EventMatch> {
     key: string;
     pattern?: string;
+    // Note that value property is an optimization for patterns which do not do
+    // any globbing and when the key is not "content.body".
     value?: string;
+}
+
+export interface IEventPropertyIsCondition extends IPushRuleCondition<ConditionKind.EventPropertyIs> {
+    key: string;
+    value: string | boolean | null | number;
+}
+
+export interface IEventPropertyContainsCondition extends IPushRuleCondition<ConditionKind.EventPropertyContains> {
+    key: string;
+    value: string | boolean | null | number;
 }
 
 export interface IContainsDisplayNameCondition extends IPushRuleCondition<ConditionKind.ContainsDisplayName> {
@@ -105,6 +119,8 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
 export type PushRuleCondition =
     | IEventMatchCondition
+    | IEventPropertyIsCondition
+    | IEventPropertyContainsCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition

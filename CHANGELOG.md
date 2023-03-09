@@ -7,8 +7,6 @@ Changes in [23.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23
  * Polls: count undecryptable poll relations ([\#3163](https://github.com/matrix-org/matrix-js-sdk/pull/3163)). Contributed by @kerryarchibald.
 
 ## 🐛 Bug Fixes
- * Fix spec compliance issue around encrypted `m.relates_to` ([\#3178](https://github.com/matrix-org/matrix-js-sdk/pull/3178)).
- * Fix reactions in threads sometimes causing stuck notifications ([\#3146](https://github.com/matrix-org/matrix-js-sdk/pull/3146)). Fixes vector-im/element-web#24000. Contributed by @justjanne.
  * Better type guard parseTopicContent ([\#3165](https://github.com/matrix-org/matrix-js-sdk/pull/3165)). Fixes matrix-org/element-web-rageshakes#20177 and matrix-org/element-web-rageshakes#20178.
  * Fix a bug where events in encrypted rooms would sometimes erroneously increment the total unread counter after being processed locally. ([\#3130](https://github.com/matrix-org/matrix-js-sdk/pull/3130)). Fixes vector-im/element-web#24448. Contributed by @Half-Shot.
  * Stop the ICE disconnected timer on call terminate ([\#3147](https://github.com/matrix-org/matrix-js-sdk/pull/3147)).
