@@ -130,7 +130,12 @@ describe("RendezvousV2", function () {
             ...aliceOpts,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
+        const aliceRz = new MSC3906Rendezvous(
+            aliceEcdh,
+            alice,
+            undefined,
+            "org.matrix.msc3906.setup.additional_device.v2",
+        );
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
         const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
@@ -219,7 +224,12 @@ describe("RendezvousV2", function () {
             fetchFn,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
+        const aliceRz = new MSC3906Rendezvous(
+            aliceEcdh,
+            alice,
+            undefined,
+            "org.matrix.msc3906.setup.additional_device.v2",
+        );
 
         expect(aliceRz.code).toBeUndefined();
 

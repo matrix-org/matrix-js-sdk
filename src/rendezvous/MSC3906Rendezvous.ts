@@ -22,7 +22,7 @@ import {
     RendezvousFailureReason,
     RendezvousFlow,
     RendezvousIntent,
-    SETUP_ADDITIONAL_DEVICE_FLOW_V2,
+    SETUP_ADDITIONAL_DEVICE_FLOW_V1,
 } from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
@@ -94,7 +94,6 @@ export class MSC3906Rendezvous {
     private newDeviceId?: string;
     private newDeviceKey?: string;
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
-    private flow: RendezvousFlow = SETUP_ADDITIONAL_DEVICE_FLOW_V2.name;
     private v1FallbackEnabled: boolean;
     private _code?: string;
 
@@ -102,15 +101,15 @@ export class MSC3906Rendezvous {
      * @param channel - The secure channel used for communication
      * @param client - The Matrix client in used on the device already logged in
      * @param onFailure - Callback for when the rendezvous fails
-     * @param startInV1FallbackMode - Whether to start in v1 fallback mode
+     * @param flow - The flow to use. Defaults to MSC3906 v1 for backwards compatibility.
      */
     public constructor(
         private channel: RendezvousChannel<MSC3906RendezvousPayload>,
         private client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
-        startInV1FallbackMode = false,
+        private flow: RendezvousFlow = SETUP_ADDITIONAL_DEVICE_FLOW_V1,
     ) {
-        this.v1FallbackEnabled = startInV1FallbackMode ?? false;
+        this.v1FallbackEnabled = flow === SETUP_ADDITIONAL_DEVICE_FLOW_V1;
     }
 
     /**

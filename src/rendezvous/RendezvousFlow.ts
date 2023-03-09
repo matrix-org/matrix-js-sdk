@@ -16,11 +16,15 @@ limitations under the License.
 
 import { UnstableValue } from "../NamespacedValue";
 
+export const SETUP_ADDITIONAL_DEVICE_FLOW_V1 = "org.matrix.msc3906.v1";
+
 export const SETUP_ADDITIONAL_DEVICE_FLOW_V2 = new UnstableValue(
     "m.setup.additional_device.v2",
     "org.matrix.msc3906.setup.additional_device.v2",
 );
 
+// v1 is never included in the JSON, but we give it a name for the sake of determining the flow to use
 export type RendezvousFlow =
     | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V2.name
-    | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V2.altName;
+    | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V2.altName
+    | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V1;
