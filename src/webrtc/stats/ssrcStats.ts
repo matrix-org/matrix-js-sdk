@@ -1,0 +1,82 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+export interface PackageLoos {
+    packetsTotal: number;
+    packetsLost: number;
+    isDownloadStream: boolean;
+}
+
+export interface Bitrate {
+    download: number;
+    upload: number;
+}
+
+export interface Resolution {
+    width: any;
+    height: any;
+}
+
+export class SsrcStats {
+    private loss: PackageLoos = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
+    private bitrate: Bitrate = { download: 0, upload: 0 };
+    private resolution: Resolution = { width: -1, height: -1 };
+    private framerate = 0;
+    private codec = "";
+
+    public setLoss(loos: PackageLoos): void {
+        this.loss = loos;
+    }
+
+    public getLoss(): PackageLoos {
+        return this.loss;
+    }
+
+    public setResolution(resolution: Resolution): void {
+        this.resolution = resolution;
+    }
+
+    public getResolution(): Resolution {
+        return this.resolution;
+    }
+
+    public setFramerate(framerate: number): void {
+        this.framerate = framerate;
+    }
+
+    public getFramerate(): number {
+        return this.framerate;
+    }
+
+    public addBitrate(bitrate: Bitrate): void {
+        this.bitrate = bitrate;
+    }
+
+    public getBitrate(): Bitrate {
+        return this.bitrate;
+    }
+
+    public setCodec(codecShortType: string): boolean {
+        this.codec = codecShortType;
+        return true;
+    }
+
+    public getCodec(): string {
+        return this.codec;
+    }
+
+    public resetBitrate(): void {}
+}
