@@ -174,7 +174,7 @@ describe("RendezvousV1", function () {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -192,7 +192,7 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
@@ -221,14 +221,14 @@ describe("RendezvousV1", function () {
         await bobStartPromise;
     });
 
-    it("new device declines protocol with outcome unsupported", async function () {
+    it("other device already signed in", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -246,7 +246,128 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
+        const bobOnFailure = jest.fn();
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
+            bobTransport,
+            decodeBase64(code.rendezvous.key), // alice's public key
+            bobOnFailure,
+        );
+
+        const bobStartPromise = (async () => {
+            const bobChecksum = await bobEcdh.connect();
+            logger.info(`Bob checksums is ${bobChecksum} now sending intent`);
+            // await bobEcdh.send({ type: 'm.login.progress', intent: RendezvousIntent.LOGIN_ON_NEW_DEVICE });
+
+            // wait for protocols
+            logger.info("Bob waiting for protocols");
+            const protocols = await bobEcdh.receive();
+
+            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
+
+            expect(protocols).toEqual({
+                type: "m.login.progress",
+                protocols: ["org.matrix.msc3906.login_token"],
+            });
+
+            await bobEcdh.send({
+                type: "m.login.finish",
+                intent: RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE,
+            });
+        })();
+
+        await aliceStartProm;
+        await bobStartPromise;
+
+        expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.OtherDeviceAlreadySignedIn);
+    });
+
+    it("invalid payload after protocols", async function () {
+        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
+        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
+        transports.push(aliceTransport, bobTransport);
+        aliceTransport.otherParty = bobTransport;
+        bobTransport.otherParty = aliceTransport;
+
+        // alice is already signed in and generates a code
+        const aliceOnFailure = jest.fn();
+        const alice = makeMockClient({
+            userId: "alice",
+            deviceId: "ALICE",
+            msc3882Enabled: true,
+            msc3886Enabled: false,
+        });
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice, undefined, true);
+        aliceTransport.onCancelled = aliceOnFailure;
+        await aliceRz.generateCode();
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
+
+        expect(code.rendezvous.key).toBeDefined();
+
+        const aliceStartProm = aliceRz.startAfterShowingCode();
+
+        // bob wants to sign in and scans the code
+        const bobOnFailure = jest.fn();
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
+            bobTransport,
+            decodeBase64(code.rendezvous.key), // alice's public key
+            bobOnFailure,
+        );
+
+        const bobStartPromise = (async () => {
+            const bobChecksum = await bobEcdh.connect();
+            logger.info(`Bob checksums is ${bobChecksum} now sending intent`);
+            // await bobEcdh.send({ type: 'm.login.progress', intent: RendezvousIntent.LOGIN_ON_NEW_DEVICE });
+
+            // wait for protocols
+            logger.info("Bob waiting for protocols");
+            const protocols = await bobEcdh.receive();
+
+            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
+
+            expect(protocols).toEqual({
+                type: "m.login.progress",
+                protocols: ["org.matrix.msc3906.login_token"],
+            });
+
+            await bobEcdh.send({
+                type: "invalid",
+            });
+        })();
+
+        await aliceStartProm;
+        await bobStartPromise;
+
+        expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.Unknown);
+    });
+
+    it("new device declines protocol with outcome unsupported", async function () {
+        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
+        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
+        transports.push(aliceTransport, bobTransport);
+        aliceTransport.otherParty = bobTransport;
+        bobTransport.otherParty = aliceTransport;
+
+        // alice is already signed in and generates a code
+        const aliceOnFailure = jest.fn();
+        const alice = makeMockClient({
+            userId: "alice",
+            deviceId: "ALICE",
+            msc3882Enabled: true,
+            msc3886Enabled: false,
+        });
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice, undefined, true);
+        aliceTransport.onCancelled = aliceOnFailure;
+        await aliceRz.generateCode();
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
+
+        expect(code.rendezvous.key).toBeDefined();
+
+        const aliceStartProm = aliceRz.startAfterShowingCode();
+
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
@@ -286,7 +407,7 @@ describe("RendezvousV1", function () {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -304,7 +425,7 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
@@ -344,7 +465,7 @@ describe("RendezvousV1", function () {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -362,7 +483,7 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
@@ -404,7 +525,7 @@ describe("RendezvousV1", function () {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -422,7 +543,7 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
@@ -471,7 +592,7 @@ describe("RendezvousV1", function () {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is already signs in and generates a code
+        // alice is already signed in and generates a code
         const aliceOnFailure = jest.fn();
         const aliceVerification = jest.fn();
         const alice = makeMockClient({
@@ -496,7 +617,7 @@ describe("RendezvousV1", function () {
 
         const aliceStartProm = aliceRz.startAfterShowingCode();
 
-        // bob is try to sign in and scans the code
+        // bob wants to sign in and scans the code
         const bobOnFailure = jest.fn();
         const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
