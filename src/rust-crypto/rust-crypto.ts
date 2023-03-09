@@ -204,7 +204,13 @@ export class RustCrypto implements CryptoBackend {
         if (existingEncryptor) {
             existingEncryptor.onCryptoEvent(config);
         } else {
-            this.roomEncryptors[room.roomId] = new RoomEncryptor(this.olmMachine, this.keyClaimManager, room, config);
+            this.roomEncryptors[room.roomId] = new RoomEncryptor(
+                this.olmMachine,
+                this.keyClaimManager,
+                this.outgoingRequestProcessor,
+                room,
+                config,
+            );
         }
 
         // start tracking devices for any users already known to be in this room.
