@@ -39,7 +39,7 @@ import { decodeBase64 } from "../../../src/crypto/olmlib";
 import { logger } from "../../../src/logger";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 
-function makeMockClient(opts: {
+interface MockClientOpts {
     userId: string;
     deviceId: string;
     deviceKey?: string;
@@ -54,7 +54,9 @@ function makeMockClient(opts: {
         known: boolean,
     ) => void;
     crossSigningIds?: Record<string, string>;
-}): MatrixClient {
+}
+
+function makeMockClient(opts: MockClientOpts): MatrixClient {
     return {
         getVersions() {
             return {
@@ -110,6 +112,90 @@ describe("RendezvousV2", function () {
     afterEach(function () {
         transports.forEach((x) => x.cleanup());
     });
+
+    async function setupRendezvous(aliceOpts: Partial<MockClientOpts> = {}) {
+        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
+        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
+        transports.push(aliceTransport, bobTransport);
+        aliceTransport.otherParty = bobTransport;
+        bobTransport.otherParty = aliceTransport;
+
+        // alice is already signed in and generates a code
+        const aliceOnFailure = jest.fn();
+        const alice = makeMockClient({
+            userId: "alice",
+            deviceId: "ALICE",
+            msc3882Enabled: true,
+            msc3886Enabled: false,
+            ...aliceOpts,
+        });
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
+        aliceTransport.onCancelled = aliceOnFailure;
+        await aliceRz.generateCode();
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
+
+        const aliceStartProm = aliceRz.startAfterShowingCode();
+
+        // bob wants to sign in and scans the code
+        const bobOnFailure = jest.fn();
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
+            bobTransport,
+            decodeBase64(code.rendezvous.key), // alice's public key
+            bobOnFailure,
+        );
+
+        return {
+            alice,
+            aliceTransport,
+            aliceStartProm,
+            aliceEcdh,
+            aliceRz,
+            aliceOnFailure,
+            bobTransport,
+            bobEcdh,
+            bobOnFailure,
+        };
+    }
+
+    async function completeToProtocolsPayload(
+        next: (x: any, protocolsPayload: any) => Promise<void>,
+        aliceOpts: Partial<MockClientOpts> = {},
+    ) {
+        const x = await setupRendezvous(aliceOpts);
+        const { bobEcdh, aliceStartProm } = x;
+        const bobStartPromise = (async () => {
+            await bobEcdh.connect();
+
+            // wait for protocols
+            logger.info("Bob waiting for protocols");
+            const protocols = await bobEcdh.receive();
+
+            logger.info(`Bob received protocols: ${JSON.stringify(protocols)}`);
+
+            await next(x, protocols);
+        })();
+
+        await aliceStartProm;
+        await bobStartPromise;
+
+        return x;
+    }
+
+    async function completeToSendingProtocolPayload(protocolPayload: any, aliceOpts: Partial<MockClientOpts> = {}) {
+        const x = await completeToProtocolsPayload(
+            async ({ bobEcdh }: { bobEcdh: MSC3903ECDHRendezvousChannel<any> }, protocolsPayload) => {
+                expect(protocolsPayload).toEqual({
+                    type: "m.login.protocols",
+                    protocols: ["org.matrix.msc3906.login_token"],
+                });
+                await bobEcdh.send(protocolPayload);
+            },
+            aliceOpts,
+        );
+
+        return x;
+    }
 
     it("generate and cancel", async function () {
         const alice = makeMockClient({
@@ -174,225 +260,56 @@ describe("RendezvousV2", function () {
     });
 
     it("no protocols", async function () {
-        const aliceTransport = makeTransport("Alice");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: false,
-            msc3886Enabled: false,
-        });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
+        await completeToProtocolsPayload(
+            async (_, protocolsPayload) => {
+                expect(protocolsPayload).toEqual({
+                    type: "m.login.failure",
+                    reason: "unsupported",
+                });
+            },
+            {
+                msc3882Enabled: false,
+                msc3886Enabled: false,
+            },
         );
+    });
 
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum}`);
+    it("other device already signed in", async function () {
+        const { aliceOnFailure } = await completeToSendingProtocolPayload({
+            type: "m.login.failure",
+            reason: "incompatible_intent",
+            intent: RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE,
+        });
+        expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.OtherDeviceAlreadySignedIn);
+    });
 
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.failure",
-                reason: "unsupported",
-            });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
+    it("invalid payload after protocols", async function () {
+        const { aliceOnFailure } = await completeToSendingProtocolPayload({ type: "invalid" });
+        expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.Unknown);
     });
 
     it("new device declines protocol with reason unsupported", async function () {
-        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: true,
-            msc3886Enabled: false,
+        const { aliceOnFailure } = await completeToSendingProtocolPayload({
+            type: "m.login.failure",
+            reason: "unsupported",
         });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
-        );
-
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum} now sending intent`);
-
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.protocols",
-                protocols: ["org.matrix.msc3906.login_token"],
-            });
-
-            await bobEcdh.send({ type: "m.login.failure", reason: "unsupported" });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
-
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
     it("new device requests an invalid protocol", async function () {
-        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: true,
-            msc3886Enabled: false,
+        const { aliceOnFailure } = await completeToSendingProtocolPayload({
+            type: "m.login.protocol",
+            protocol: "bad protocol",
         });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
-        );
-
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum}`);
-
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.protocols",
-                protocols: ["org.matrix.msc3906.login_token"],
-            });
-
-            await bobEcdh.send({ type: "m.login.protocol", protocol: "bad protocol" });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
 
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
     it("decline on existing device", async function () {
-        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: true,
-            msc3886Enabled: false,
+        const { aliceRz, bobEcdh } = await completeToSendingProtocolPayload({
+            type: "m.login.protocol",
+            protocol: "org.matrix.msc3906.login_token",
         });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
-        );
-
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum}`);
-
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.protocols",
-                protocols: ["org.matrix.msc3906.login_token"],
-            });
-
-            await bobEcdh.send({ type: "m.login.protocol", protocol: "org.matrix.msc3906.login_token" });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
 
         await aliceRz.declineLoginOnExistingDevice();
         const loginToken = await bobEcdh.receive();
@@ -400,58 +317,10 @@ describe("RendezvousV2", function () {
     });
 
     it("approve on existing device + no verification", async function () {
-        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: true,
-            msc3886Enabled: false,
+        const { aliceRz, bobEcdh, alice } = await completeToSendingProtocolPayload({
+            type: "m.login.protocol",
+            protocol: "org.matrix.msc3906.login_token",
         });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
-        );
-
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum}`);
-
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.protocols",
-                protocols: ["org.matrix.msc3906.login_token"],
-            });
-
-            await bobEcdh.send({ type: "m.login.protocol", protocol: "org.matrix.msc3906.login_token" });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
 
         const confirmProm = aliceRz.approveLoginOnExistingDevice("token");
 
@@ -466,65 +335,22 @@ describe("RendezvousV2", function () {
     });
 
     async function completeLogin(devices: Record<string, Partial<DeviceInfo>>) {
-        const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
-        const bobTransport = makeTransport("Bob", "https://test.rz/999999");
-        transports.push(aliceTransport, bobTransport);
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is already signs in and generates a code
-        const aliceOnFailure = jest.fn();
         const aliceVerification = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
-            deviceId: "ALICE",
-            msc3882Enabled: true,
-            msc3886Enabled: false,
-            devices,
-            deviceKey: "aaaa",
-            verificationFunction: aliceVerification,
-            crossSigningIds: {
-                master: "mmmmm",
-            },
-        });
-        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
-        const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
-        aliceTransport.onCancelled = aliceOnFailure;
-        await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
-
-        expect(code.rendezvous.key).toBeDefined();
-
-        const aliceStartProm = aliceRz.startAfterShowingCode();
-
-        // bob is try to sign in and scans the code
-        const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHRendezvousChannel(
-            bobTransport,
-            decodeBase64(code.rendezvous.key), // alice's public key
-            bobOnFailure,
-        );
-
-        const bobStartPromise = (async () => {
-            const bobChecksum = await bobEcdh.connect();
-            logger.info(`Bob checksums is ${bobChecksum}`);
-
-            // wait for protocols
-            logger.info("Bob waiting for protocols");
-            const protocols = await bobEcdh.receive();
-
-            logger.info(`Bob protocols: ${JSON.stringify(protocols)}`);
-
-            expect(protocols).toEqual({
-                type: "m.login.protocols",
-                protocols: ["org.matrix.msc3906.login_token"],
-            });
-
-            await bobEcdh.send({ type: "m.login.protocol", protocol: "org.matrix.msc3906.login_token" });
-        })();
-
-        await aliceStartProm;
-        await bobStartPromise;
+        const { aliceRz, bobEcdh, alice, aliceEcdh, aliceTransport, bobTransport } =
+            await completeToSendingProtocolPayload(
+                {
+                    type: "m.login.protocol",
+                    protocol: "org.matrix.msc3906.login_token",
+                },
+                {
+                    devices,
+                    deviceKey: "aaaa",
+                    verificationFunction: aliceVerification,
+                    crossSigningIds: {
+                        master: "mmmmm",
+                    },
+                },
+            );
 
         const confirmProm = aliceRz.approveLoginOnExistingDevice("token");
 
