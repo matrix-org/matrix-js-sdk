@@ -19,7 +19,7 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { MockResponse } from "fetch-mock";
+import { MockResponse, MockResponseFunction } from "fetch-mock";
 
 import type { IDeviceKeys } from "../../src/@types/crypto";
 import * as testUtils from "../test-utils/test-utils";
@@ -47,6 +47,7 @@ import {
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
+import { escapeRegExp } from "../../src/utils";
 
 const ROOM_ID = "!room:id";
 
@@ -449,6 +450,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     }
 
     /**
+     * Add an expectation for a /keys/claim request for the MatrixClient under test
+     *
+     * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
+     *   (or a function that returns one).
+     */
+    function expectAliceKeyClaim(response: MockResponse | MockResponseFunction) {
+        const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
+        fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
+    }
+
+    /**
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
      *
@@ -751,10 +763,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         // ... and then claim one of his OTKs
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            getTestKeysClaimResponse("@bob:xyz"),
-        );
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
         const room = aliceClient.getRoom(ROOM_ID);
@@ -1033,14 +1042,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // mark the device as known, and resend.
         aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            (url: string, opts: RequestInit): MockResponse => {
-                const content = JSON.parse(opts.body as string);
-                expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
-                return getTestKeysClaimResponse(aliceClient.getUserId()!);
-            },
-        );
+        expectAliceKeyClaim((url: string, opts: RequestInit): MockResponse => {
+            const content = JSON.parse(opts.body as string);
+            expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
+            return getTestKeysClaimResponse(aliceClient.getUserId()!);
+        });
 
         const inboundGroupSessionPromise = expectSendRoomKey(aliceClient.getUserId()!, testOlmAccount);
 
