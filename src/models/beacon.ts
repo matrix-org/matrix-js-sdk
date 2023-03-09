@@ -48,7 +48,9 @@ export const getBeaconInfoIdentifier = (event: MatrixEvent): BeaconIdentifier =>
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
-    private _beaconInfo: BeaconInfoState;
+    // beaconInfo is assigned by setBeaconInfo in the constructor
+    // ! to make tsc believe it is definitely assigned
+    private _beaconInfo!: BeaconInfoState;
     private _isLive?: boolean;
     private livenessWatchTimeout?: ReturnType<typeof setTimeout>;
     private _latestLocationEvent?: MatrixEvent;
@@ -56,10 +58,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     public constructor(private rootEvent: MatrixEvent) {
         super();
         this.roomId = this.rootEvent.getRoomId()!;
-        // setBeaconInfo also assigns this._beaconInfo
-        // manually assign here to make tsc believe it is definitely assigned in constructor
-        this._beaconInfo = parseBeaconInfoContent(rootEvent.getContent());
-        this.checkLiveness();
+        this.setBeaconInfo(this.rootEvent);
     }
 
     public get isLive(): boolean {
