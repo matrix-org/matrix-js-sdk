@@ -48,14 +48,16 @@ export const getBeaconInfoIdentifier = (event: MatrixEvent): BeaconIdentifier =>
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.New>, BeaconEventHandlerMap> {
     public readonly roomId: string;
-    private _beaconInfo?: BeaconInfoState;
+    private _beaconInfo: BeaconInfoState;
     private _isLive?: boolean;
     private livenessWatchTimeout?: ReturnType<typeof setTimeout>;
     private _latestLocationEvent?: MatrixEvent;
 
     public constructor(private rootEvent: MatrixEvent) {
         super();
-        this.setBeaconInfo(this.rootEvent);
+        // setBeaconInfo also assigns this._beaconInfo
+        // reassign here to make tsc believe it is definitely assigned in constructor
+        this._beaconInfo = this.setBeaconInfo(this.rootEvent);
         this.roomId = this.rootEvent.getRoomId()!;
     }
 
@@ -79,7 +81,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         return this.rootEvent.getType();
     }
 
-    public get beaconInfo(): BeaconInfoState | undefined {
+    public get beaconInfo(): BeaconInfoState {
         return this._beaconInfo;
     }
 
@@ -158,9 +160,9 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
             if (!parsed.uri || !parsed.timestamp) return false; // we won't be able to process these
             const { timestamp } = parsed;
             return (
-                this._beaconInfo!.timestamp &&
+                this._beaconInfo.timestamp &&
                 // only include positions that were taken inside the beacon's live period
-                isTimestampInDuration(this._beaconInfo!.timestamp, this._beaconInfo!.timeout, timestamp) &&
+                isTimestampInDuration(this._beaconInfo.timestamp, this._beaconInfo.timeout, timestamp) &&
                 // ignore positions older than our current latest location
                 (!this.latestLocationState || timestamp > this.latestLocationState.timestamp!)
             );
@@ -178,9 +180,10 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         this.emit(BeaconEvent.LocationUpdate, this.latestLocationState!);
     };
 
-    private setBeaconInfo(event: MatrixEvent): void {
+    private setBeaconInfo(event: MatrixEvent): BeaconInfoState {
         this._beaconInfo = parseBeaconInfoContent(event.getContent());
         this.checkLiveness();
+        return this._beaconInfo;
     }
 
     private checkLiveness(): void {
@@ -196,9 +199,9 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
                 ? this.beaconInfo.timestamp! - 360000 /* 6min */
                 : this.beaconInfo.timestamp;
         this._isLive =
-            !!this._beaconInfo?.live &&
+            !!this._beaconInfo.live &&
             !!startTimestamp &&
-            isTimestampInDuration(startTimestamp, this._beaconInfo?.timeout, Date.now());
+            isTimestampInDuration(startTimestamp, this._beaconInfo.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {
             this.emit(BeaconEvent.LivenessChange, this.isLive, this);
