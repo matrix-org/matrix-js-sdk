@@ -54,7 +54,12 @@ export class KeyClaimManager {
         // The Rust-SDK requires that we only have one getMissingSessions process in flight at once. This little dance
         // ensures that, by only having one call to ensureSessionsForUsersInner active at once (and making them
         // queue up in order).
-        const prom = this.currentClaimPromise.finally(() => this.ensureSessionsForUsersInner(userList));
+        const prom = this.currentClaimPromise
+            .catch(() => {
+                // any errors in the previous claim will have been reported already, so there is nothing to do here.
+                // we just throw away the error and start anew.
+            })
+            .then(() => this.ensureSessionsForUsersInner(userList));
         this.currentClaimPromise = prom;
         return prom;
     }
