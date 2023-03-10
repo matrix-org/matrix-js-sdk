@@ -332,7 +332,7 @@ export class StatsCollector {
         return undefined;
     }
 
-    private getTackBySSRC(ssrc: number): MediaStreamTrack | undefined {
+    private getTrackBySSRC(ssrc: number): MediaStreamTrack | undefined {
         //@TODO implement this right by using MID
         return undefined;
     }
