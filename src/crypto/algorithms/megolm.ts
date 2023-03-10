@@ -74,6 +74,30 @@ export interface IOlmDevice<T = DeviceInfo> {
     deviceInfo: T;
 }
 
+/** The result of parsing the an `m.room_key` or `m.forwarded_room_key` to-device event */
+interface RoomKey {
+    /**
+     * The Curve25519 key of the megolm session creator.
+     *
+     * For `m.room_key`, this is also the sender of the `m.room_key` to-device event.
+     * For `m.forwarded_room_key`, the two are different (and the key of the sender of the
+     * `m.forwarded_room_key` event is included in `forwardingKeyChain`)
+     */
+    senderKey: string;
+    sessionId: string;
+    sessionKey: string;
+    exportFormat: boolean;
+    roomId: string;
+    algorithm: string;
+    /**
+     * A list of the curve25519 keys of the users involved in forwarding this key, most recent last.
+     * For `m.room_key` events, this is empty.
+     */
+    forwardingKeyChain: string[];
+    keysClaimed: Partial<Record<"ed25519", string>>;
+    extraSessionData: OlmGroupSessionExtraData;
+}
+
 export interface IOutboundGroupSessionKey {
     chain_index: number;
     key: string;
@@ -1475,13 +1499,20 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         }
     }
 
-    public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
+    /**
+     * Parse a RoomKey out of an `m.room_key` event.
+     *
+     * @param event - the event containing the room key.
+     *
+     * @returns The `RoomKey` if it could be successfully parsed out of the
+     * event.
+     *
+     * @internal
+     *
+     */
+    private roomKeyFromEvent(event: MatrixEvent): RoomKey | undefined {
+        const senderKey = event.getSenderKey()!;
         const content = event.getContent<Partial<IMessage["content"]>>();
-        let senderKey = event.getSenderKey()!;
-        let forwardingKeyChain: string[] = [];
-        let exportFormat = false;
-        let keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>;
-
         const extraSessionData: OlmGroupSessionExtraData = {};
 
         if (!content.room_id || !content.session_key || !content.session_id || !content.algorithm) {
@@ -1498,151 +1529,328 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             extraSessionData.sharedHistory = true;
         }
 
-        if (event.getType() == "m.forwarded_room_key") {
-            const deviceInfo = this.crypto.deviceList.getDeviceByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
-            const senderKeyUser = this.baseApis.crypto!.deviceList.getUserByIdentityKey(
-                olmlib.OLM_ALGORITHM,
-                senderKey,
-            );
-            if (senderKeyUser !== event.getSender()) {
-                this.prefixedLogger.error("sending device does not belong to the user it claims to be from");
-                return;
-            }
-            const outgoingRequests = deviceInfo
-                ? await this.crypto.cryptoStore.getOutgoingRoomKeyRequestsByTarget(
-                      event.getSender()!,
-                      deviceInfo.deviceId,
-                      [RoomKeyRequestState.Sent],
-                  )
-                : [];
-            const weRequested = outgoingRequests.some(
-                (req) =>
-                    req.requestBody.room_id === content.room_id && req.requestBody.session_id === content.session_id,
-            );
-            const room = this.baseApis.getRoom(content.room_id);
-            const memberEvent = room?.getMember(this.userId)?.events.member;
-            const fromInviter =
-                memberEvent?.getSender() === event.getSender() ||
-                (memberEvent?.getUnsigned()?.prev_sender === event.getSender() &&
-                    memberEvent?.getPrevContent()?.membership === "invite");
-            const fromUs = event.getSender() === this.baseApis.getUserId();
+        const roomKey: RoomKey = {
+            senderKey: senderKey,
+            sessionId: content.session_id,
+            sessionKey: content.session_key,
+            extraSessionData,
+            exportFormat: false,
+            roomId: content.room_id,
+            algorithm: content.algorithm,
+            forwardingKeyChain: [],
+            keysClaimed: event.getKeysClaimed(),
+        };
 
-            if (!weRequested && !fromUs) {
-                // If someone sends us an unsolicited key and they're
-                // not one of our other devices and it's not shared
-                // history, ignore it
-                if (!extraSessionData.sharedHistory) {
-                    this.prefixedLogger.log("forwarded key not shared history - ignoring");
-                    return;
-                }
+        return roomKey;
+    }
 
-                // If someone sends us an unsolicited key for a room
-                // we're already in, and they're not one of our other
-                // devices or the one who invited us, ignore it
-                if (room && !fromInviter) {
-                    this.prefixedLogger.log("forwarded key not from inviter or from us - ignoring");
-                    return;
-                }
-            }
+    /**
+     * Parse a RoomKey out of an `m.forwarded_room_key` event.
+     *
+     * @param event - the event containing the forwarded room key.
+     *
+     * @returns The `RoomKey` if it could be successfully parsed out of the
+     * event.
+     *
+     * @internal
+     *
+     */
+    private forwardedRoomKeyFromEvent(event: MatrixEvent): RoomKey | undefined {
+        // the properties in m.forwarded_room_key are a superset of those in m.room_key, so
+        // start by parsing the m.room_key fields.
+        const roomKey = this.roomKeyFromEvent(event);
 
-            exportFormat = true;
-            forwardingKeyChain = Array.isArray(content.forwarding_curve25519_key_chain)
-                ? content.forwarding_curve25519_key_chain
-                : [];
+        if (!roomKey) {
+            return;
+        }
 
-            // copy content before we modify it
-            forwardingKeyChain = forwardingKeyChain.slice();
-            forwardingKeyChain.push(senderKey);
+        const senderKey = event.getSenderKey()!;
+        const content = event.getContent<Partial<IMessage["content"]>>();
 
-            if (!content.sender_key) {
-                this.prefixedLogger.error("forwarded_room_key event is missing sender_key field");
-                return;
-            }
+        const senderKeyUser = this.baseApis.crypto!.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
 
-            const ed25519Key = content.sender_claimed_ed25519_key;
-            if (!ed25519Key) {
-                this.prefixedLogger.error(`forwarded_room_key_event is missing sender_claimed_ed25519_key field`);
-                return;
-            }
+        // We received this to-device event from event.getSenderKey(), but the original
+        // creator of the room key is claimed in the content.
+        const claimedCurve25519Key = content.sender_key;
+        const claimedEd25519Key = content.sender_claimed_ed25519_key;
 
-            keysClaimed = {
-                ed25519: ed25519Key,
-            };
+        let forwardingKeyChain = Array.isArray(content.forwarding_curve25519_key_chain)
+            ? content.forwarding_curve25519_key_chain
+            : [];
 
-            // If this is a key for a room we're not in, don't load it
-            // yet, just park it in case *this sender* invites us to
-            // that room later
-            if (!room) {
-                const parkedData = {
-                    senderId: event.getSender()!,
-                    senderKey: content.sender_key,
-                    sessionId: content.session_id,
-                    sessionKey: content.session_key,
-                    keysClaimed,
-                    forwardingCurve25519KeyChain: forwardingKeyChain,
-                };
-                await this.crypto.cryptoStore.doTxn(
-                    "readwrite",
-                    ["parked_shared_history"],
-                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id!, parkedData, txn),
-                    this.prefixedLogger.withPrefix("[addParkedSharedHistory]"),
-                );
-                return;
-            }
+        // copy content before we modify it
+        forwardingKeyChain = forwardingKeyChain.slice();
+        forwardingKeyChain.push(senderKey);
 
-            const sendingDevice =
-                this.crypto.deviceList.getDeviceByIdentityKey(olmlib.OLM_ALGORITHM, senderKey) ?? undefined;
-            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender()!, sendingDevice);
+        // Check if we have all the fields we need.
+        if (senderKeyUser !== event.getSender()) {
+            this.prefixedLogger.error("sending device does not belong to the user it claims to be from");
+            return;
+        }
 
-            if (fromUs && !deviceTrust.isVerified()) {
-                return;
-            }
+        if (!claimedCurve25519Key) {
+            this.prefixedLogger.error("forwarded_room_key event is missing sender_key field");
+            return;
+        }
 
-            // forwarded keys are always untrusted
-            extraSessionData.untrusted = true;
+        if (!claimedEd25519Key) {
+            this.prefixedLogger.error(`forwarded_room_key_event is missing sender_claimed_ed25519_key field`);
+            return;
+        }
 
-            // replace the sender key with the sender key of the session
-            // creator for storage
-            senderKey = content.sender_key;
+        const keysClaimed = {
+            ed25519: claimedEd25519Key,
+        };
+
+        // FIXME: We're reusing the same field to track both:
+        //
+        // 1. The Olm identity we've received this room key from.
+        // 2. The Olm identity deduced (in the trusted case) or claiming (in the
+        // untrusted case) to be the original creator of this room key.
+        //
+        // We now overwrite the value tracking usage 1 with the value tracking usage 2.
+        roomKey.senderKey = claimedCurve25519Key;
+        // Replace our keysClaimed as well.
+        roomKey.keysClaimed = keysClaimed;
+        roomKey.exportFormat = true;
+        roomKey.forwardingKeyChain = forwardingKeyChain;
+        // forwarded keys are always untrusted
+        roomKey.extraSessionData.untrusted = true;
+
+        return roomKey;
+    }
+
+    /**
+     * Determine if we should accept the forwarded room key that was found in the given
+     * event.
+     *
+     * @param event - An `m.forwarded_room_key` event.
+     * @param roomKey - The room key that was found in the event.
+     *
+     * @returns promise that will resolve to a boolean telling us if it's ok to
+     * accept the given forwarded room key.
+     *
+     * @internal
+     *
+     */
+    private async shouldAcceptForwardedKey(event: MatrixEvent, roomKey: RoomKey): Promise<boolean> {
+        const senderKey = event.getSenderKey()!;
+
+        const sendingDevice =
+            this.crypto.deviceList.getDeviceByIdentityKey(olmlib.OLM_ALGORITHM, senderKey) ?? undefined;
+        const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender()!, sendingDevice);
+
+        // Using the plaintext sender here is fine since we checked that the
+        // sender matches to the user id in the device keys when this event was
+        // originally decrypted. This can obviously only happen if the device
+        // keys have been downloaded, but if they haven't the
+        // `deviceTrust.isVerified()` flag would be false as well.
+        //
+        // It would still be far nicer if the `sendingDevice` had a user ID
+        // attached to it that went through signature checks.
+        const fromUs = event.getSender() === this.baseApis.getUserId();
+        const keyFromOurVerifiedDevice = deviceTrust.isVerified() && fromUs;
+        const weRequested = await this.wasRoomKeyRequested(event, roomKey);
+        const fromInviter = this.wasRoomKeyForwardedByInviter(event, roomKey);
+        const sharedAsHistory = this.wasRoomKeyForwardedAsHistory(roomKey);
+
+        return (weRequested && keyFromOurVerifiedDevice) || (fromInviter && sharedAsHistory);
+    }
+
+    /**
+     * Did we ever request the given room key from the event sender and its
+     * accompanying device.
+     *
+     * @param event - An `m.forwarded_room_key` event.
+     * @param roomKey - The room key that was found in the event.
+     *
+     * @internal
+     *
+     */
+    private async wasRoomKeyRequested(event: MatrixEvent, roomKey: RoomKey): Promise<boolean> {
+        // We send the `m.room_key_request` out as a wildcard to-device request,
+        // otherwise we would have to duplicate the same content for each
+        // device. This is why we need to pass in "*" as the device id here.
+        const outgoingRequests = await this.crypto.cryptoStore.getOutgoingRoomKeyRequestsByTarget(
+            event.getSender()!,
+            "*",
+            [RoomKeyRequestState.Sent],
+        );
+
+        return outgoingRequests.some(
+            (req) => req.requestBody.room_id === roomKey.roomId && req.requestBody.session_id === roomKey.sessionId,
+        );
+    }
+
+    private wasRoomKeyForwardedByInviter(event: MatrixEvent, roomKey: RoomKey): boolean {
+        // TODO: This is supposed to have a time limit. We should only accept
+        // such keys if we happen to receive them for a recently joined room.
+        const room = this.baseApis.getRoom(roomKey.roomId);
+        const senderKey = event.getSenderKey();
+
+        if (!senderKey) {
+            return false;
+        }
+
+        const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
+
+        if (!senderKeyUser) {
+            return false;
+        }
+
+        const memberEvent = room?.getMember(this.userId)?.events.member;
+        const fromInviter =
+            memberEvent?.getSender() === senderKeyUser ||
+            (memberEvent?.getUnsigned()?.prev_sender === senderKeyUser &&
+                memberEvent?.getPrevContent()?.membership === "invite");
+
+        if (room && fromInviter) {
+            return true;
         } else {
-            keysClaimed = event.getKeysClaimed();
+            return false;
         }
+    }
 
-        if (content["org.matrix.msc3061.shared_history"]) {
-            extraSessionData.sharedHistory = true;
+    private wasRoomKeyForwardedAsHistory(roomKey: RoomKey): boolean {
+        const room = this.baseApis.getRoom(roomKey.roomId);
+
+        // If the key is not for a known room, then something fishy is going on,
+        // so we reject the key out of caution. In practice, this is a bit moot
+        // because we'll only accept shared_history forwarded by the inviter, and
+        // we won't know who was the inviter for an unknown room, so we'll reject
+        // it anyway.
+        if (room && roomKey.extraSessionData.sharedHistory) {
+            return true;
+        } else {
+            return false;
         }
+    }
 
+    /**
+     * Check if a forwarded room key should be parked.
+     *
+     * A forwarded room key should be parked if it's a key for a room we're not
+     * in. We park the forwarded room key in case *this sender* invites us to
+     * that room later.
+     */
+    private shouldParkForwardedKey(roomKey: RoomKey): boolean {
+        const room = this.baseApis.getRoom(roomKey.roomId);
+
+        if (!room && roomKey.extraSessionData.sharedHistory) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Park the given room key to our store.
+     *
+     * @param event - An `m.forwarded_room_key` event.
+     * @param roomKey - The room key that was found in the event.
+     *
+     * @internal
+     *
+     */
+    private async parkForwardedKey(event: MatrixEvent, roomKey: RoomKey): Promise<void> {
+        const parkedData = {
+            senderId: event.getSender()!,
+            senderKey: roomKey.senderKey,
+            sessionId: roomKey.sessionId,
+            sessionKey: roomKey.sessionKey,
+            keysClaimed: roomKey.keysClaimed,
+            forwardingCurve25519KeyChain: roomKey.forwardingKeyChain,
+        };
+        await this.crypto.cryptoStore.doTxn(
+            "readwrite",
+            ["parked_shared_history"],
+            (txn) => this.crypto.cryptoStore.addParkedSharedHistory(roomKey.roomId, parkedData, txn),
+            logger.withPrefix("[addParkedSharedHistory]"),
+        );
+    }
+
+    /**
+     * Add the given room key to our store.
+     *
+     * @param roomKey - The room key that should be added to the store.
+     *
+     * @internal
+     *
+     */
+    private async addRoomKey(roomKey: RoomKey): Promise<void> {
         try {
             await this.olmDevice.addInboundGroupSession(
-                content.room_id,
-                senderKey,
-                forwardingKeyChain,
-                content.session_id,
-                content.session_key,
-                keysClaimed,
-                exportFormat,
-                extraSessionData,
+                roomKey.roomId,
+                roomKey.senderKey,
+                roomKey.forwardingKeyChain,
+                roomKey.sessionId,
+                roomKey.sessionKey,
+                roomKey.keysClaimed,
+                roomKey.exportFormat,
+                roomKey.extraSessionData,
             );
 
             // have another go at decrypting events sent with this session.
-            if (await this.retryDecryption(senderKey, content.session_id, !extraSessionData.untrusted)) {
+            if (await this.retryDecryption(roomKey.senderKey, roomKey.sessionId, !roomKey.extraSessionData.untrusted)) {
                 // cancel any outstanding room key requests for this session.
                 // Only do this if we managed to decrypt every message in the
                 // session, because if we didn't, we leave the other key
                 // requests in the hopes that someone sends us a key that
                 // includes an earlier index.
                 this.crypto.cancelRoomKeyRequest({
-                    algorithm: content.algorithm,
-                    room_id: content.room_id,
-                    session_id: content.session_id,
-                    sender_key: senderKey,
+                    algorithm: roomKey.algorithm,
+                    room_id: roomKey.roomId,
+                    session_id: roomKey.sessionId,
+                    sender_key: roomKey.senderKey,
                 });
             }
 
             // don't wait for the keys to be backed up for the server
-            await this.crypto.backupManager.backupGroupSession(senderKey, content.session_id);
+            await this.crypto.backupManager.backupGroupSession(roomKey.senderKey, roomKey.sessionId);
         } catch (e) {
             this.prefixedLogger.error(`Error handling m.room_key_event: ${e}`);
+        }
+    }
+
+    /**
+     * Handle room keys that have been forwarded to us as an
+     * `m.forwarded_room_key` event.
+     *
+     * Forwarded room keys need special handling since we have no way of knowing
+     * who the original creator of the room key was. This naturally means that
+     * forwarded room keys are always untrusted and should only be accepted in
+     * some cases.
+     *
+     * @param event - An `m.forwarded_room_key` event.
+     *
+     * @internal
+     *
+     */
+    private async onForwardedRoomKey(event: MatrixEvent): Promise<void> {
+        const roomKey = this.forwardedRoomKeyFromEvent(event);
+
+        if (!roomKey) {
+            return;
+        }
+
+        if (await this.shouldAcceptForwardedKey(event, roomKey)) {
+            await this.addRoomKey(roomKey);
+        } else if (this.shouldParkForwardedKey(roomKey)) {
+            await this.parkForwardedKey(event, roomKey);
+        }
+    }
+
+    public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
+        if (event.getType() == "m.forwarded_room_key") {
+            await this.onForwardedRoomKey(event);
+        } else {
+            const roomKey = this.roomKeyFromEvent(event);
+
+            if (!roomKey) {
+                return;
+            }
+
+            await this.addRoomKey(roomKey);
         }
     }
 

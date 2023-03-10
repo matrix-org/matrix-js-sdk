@@ -891,11 +891,9 @@ describe("SlidingSyncSdk", () => {
                 const evType = ev.getType();
                 expect(seen[evType]).toBeFalsy();
                 seen[evType] = true;
-                if (evType === "m.key.verification.start" || evType === "m.key.verification.request") {
-                    expect(ev.isCancelled()).toEqual(true);
-                } else {
-                    expect(ev.isCancelled()).toEqual(false);
-                }
+                expect(ev.isCancelled()).toEqual(
+                    evType === "m.key.verification.start" || evType === "m.key.verification.request",
+                );
             });
             ext.onResponse({
                 next_batch: "45678",

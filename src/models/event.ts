@@ -576,13 +576,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     public get replyEventId(): string | undefined {
-        // We're prefer ev.getContent() over ev.getWireContent() to make sure
-        // we grab the latest edit with potentially new relations. But we also
-        // can't just rely on ev.getContent() by itself because historically we
-        // still show the reply from the original message even though the edit
-        // event does not include the relation reply.
-        const mRelatesTo = this.getContent()["m.relates_to"] || this.getWireContent()["m.relates_to"];
-        return mRelatesTo?.["m.in_reply_to"]?.event_id;
+        return this.getWireContent()["m.relates_to"]?.["m.in_reply_to"]?.event_id;
     }
 
     public get relationEventId(): string | undefined {
@@ -799,22 +793,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns array of recipients
      */
     public getKeyRequestRecipients(userId: string): IKeyRequestRecipient[] {
-        // send the request to all of our own devices, and the
-        // original sending device if it wasn't us.
-        const wireContent = this.getWireContent();
+        // send the request to all of our own devices
         const recipients = [
             {
                 userId,
                 deviceId: "*",
             },
         ];
-        const sender = this.getSender();
-        if (sender !== userId) {
-            recipients.push({
-                userId: sender!,
-                deviceId: wireContent.device_id,
-            });
-        }
+
         return recipients;
     }
 

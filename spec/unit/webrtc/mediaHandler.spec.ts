@@ -242,6 +242,11 @@ describe("Media Handler", function () {
             );
             expect(await mediaHandler.hasAudioDevice()).toEqual(false);
         });
+
+        it("returns false if the system not permitting access audio inputs", async () => {
+            mockMediaDevices.enumerateDevices.mockRejectedValueOnce(new Error("No Permission"));
+            expect(await mediaHandler.hasAudioDevice()).toEqual(false);
+        });
     });
 
     describe("hasVideoDevice", () => {
@@ -253,6 +258,11 @@ describe("Media Handler", function () {
             mockMediaDevices.enumerateDevices.mockReturnValue(
                 Promise.resolve([new MockMediaDeviceInfo("audioinput").typed()]),
             );
+            expect(await mediaHandler.hasVideoDevice()).toEqual(false);
+        });
+
+        it("returns false if the system not permitting access video inputs", async () => {
+            mockMediaDevices.enumerateDevices.mockRejectedValueOnce(new Error("No Permission"));
             expect(await mediaHandler.hasVideoDevice()).toEqual(false);
         });
     });

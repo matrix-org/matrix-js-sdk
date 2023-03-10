@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
-import { Crypto } from "../../../src/crypto";
+import { Crypto, IEventDecryptionResult } from "../../../src/crypto";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
@@ -180,6 +180,40 @@ describe("MatrixEvent", () => {
             expect(eventAttemptDecryptionSpy).toHaveBeenCalledTimes(2);
             expect(crypto.decryptEvent).toHaveBeenCalledTimes(2);
             expect(encryptedEvent.getType()).toEqual("m.room.message");
+        });
+    });
+
+    describe("replyEventId", () => {
+        it("should ignore 'm.relates_to' from encrypted content even if cleartext lacks one", async () => {
+            const eventId = "test_encrypted_event";
+            const encryptedEvent = new MatrixEvent({
+                event_id: eventId,
+                type: "m.room.encrypted",
+                content: {
+                    ciphertext: "secrets",
+                },
+            });
+
+            const crypto = {
+                decryptEvent: jest.fn().mockImplementationOnce(() => {
+                    return Promise.resolve<IEventDecryptionResult>({
+                        clearEvent: {
+                            type: "m.room.message",
+                            content: {
+                                "m.relates_to": {
+                                    "m.in_reply_to": {
+                                        event_id: "!anotherEvent",
+                                    },
+                                },
+                            },
+                        },
+                    });
+                }),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.getType()).toEqual("m.room.message");
+            expect(encryptedEvent.replyEventId).toBeUndefined();
         });
     });
 });

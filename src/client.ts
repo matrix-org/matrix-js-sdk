@@ -371,6 +371,13 @@ export interface ICreateClientOpts {
      * Defaults to a built-in English handler with basic pluralisation.
      */
     roomNameGenerator?: (roomId: string, state: RoomNameState) => string | null;
+
+    /**
+     * If true, participant can join group call without video and audio this has to be allowed. By default, a local
+     * media stream is needed to establish a group call.
+     * Default: false.
+     */
+    isVoipWithNoMediaAllowed?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1169,6 +1176,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
     public idBaseUrl?: string;
     public baseUrl: string;
+    public readonly isVoipWithNoMediaAllowed;
 
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
@@ -1313,6 +1321,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
         this.supportsCallTransfer = opts.supportsCallTransfer || false;
         this.fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
+        this.isVoipWithNoMediaAllowed = opts.isVoipWithNoMediaAllowed || false;
 
         if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
@@ -1880,6 +1889,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error(`Cannot find room ${roomId}`);
         }
 
+        // Because without Media section a WebRTC connection is not possible, so need a RTCDataChannel to set up a
+        // no media WebRTC connection anyway.
         return new GroupCall(
             this,
             room,
@@ -1887,8 +1898,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             isPtt,
             intent,
             undefined,
-            dataChannelsEnabled,
+            dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
+            this.isVoipWithNoMediaAllowed,
         ).create();
     }
 
@@ -8499,8 +8511,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getPushRules(): Promise<IPushRules> {
         return this.http.authedRequest<IPushRules>(Method.Get, "/pushrules/").then((rules: IPushRules) => {
-            return PushProcessor.rewriteDefaultRules(rules);
+            this.setPushRules(rules);
+            return this.pushRules!;
         });
+    }
+
+    /**
+     * Update the push rules for the account. This should be called whenever
+     * updated push rules are available.
+     */
+    public setPushRules(rules: IPushRules): void {
+        // Fix-up defaults, if applicable.
+        this.pushRules = PushProcessor.rewriteDefaultRules(rules);
+        // Pre-calculate any necessary caches.
+        this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }
 
     /**

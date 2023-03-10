@@ -184,8 +184,11 @@ export class GroupCallEventHandler {
             isPtt,
             callIntent,
             groupCallId,
-            content?.dataChannelsEnabled,
+            // Because without Media section a WebRTC connection is not possible, so need a RTCDataChannel to set up a
+            // no media WebRTC connection anyway.
+            content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
+            this.client.isVoipWithNoMediaAllowed,
         );
 
         this.groupCalls.set(room.roomId, groupCall);
