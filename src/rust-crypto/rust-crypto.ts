@@ -34,7 +34,6 @@ import { KeyClaimManager } from "./KeyClaimManager";
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  */
 export class RustCrypto implements CryptoBackend {
-    public globalBlacklistUnverifiedDevices = false;
     public globalErrorOnUnknownDevices = false;
 
     /** whether {@link stop} has been called */
@@ -79,14 +78,6 @@ export class RustCrypto implements CryptoBackend {
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
         // can then be deleted.
         this.olmMachine.close();
-    }
-
-    public prepareToEncrypt(room: Room): void {
-        const encryptor = this.roomEncryptors[room.roomId];
-
-        if (encryptor) {
-            encryptor.ensureEncryptionSession();
-        }
     }
 
     public async encryptEvent(event: MatrixEvent, _room: Room): Promise<void> {
@@ -147,16 +138,6 @@ export class RustCrypto implements CryptoBackend {
         return ret as IEncryptedEventInfo;
     }
 
-    public async userHasCrossSigningKeys(): Promise<boolean> {
-        // TODO
-        return false;
-    }
-
-    public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        // TODO
-        return [];
-    }
-
     public checkUserTrust(userId: string): UserTrustLevel {
         // TODO
         return new UserTrustLevel(false, false, false);
@@ -165,6 +146,32 @@ export class RustCrypto implements CryptoBackend {
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         // TODO
         return new DeviceTrustLevel(false, false, false, false);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // CryptoApi implementation
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public globalBlacklistUnverifiedDevices = false;
+
+    public async userHasCrossSigningKeys(): Promise<boolean> {
+        // TODO
+        return false;
+    }
+
+    public prepareToEncrypt(room: Room): void {
+        const encryptor = this.roomEncryptors[room.roomId];
+
+        if (encryptor) {
+            encryptor.ensureEncryptionSession();
+        }
+    }
+
+    public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
+        // TODO
+        return [];
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
