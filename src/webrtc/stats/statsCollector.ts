@@ -15,27 +15,27 @@ limitations under the License.
 */
 
 import { ConnectionStats } from "./connectionStats";
-import { SsrcStats } from "./ssrcStats";
 import { TransportStats } from "./transportStats";
-import { StatsEventEmitter } from "./statsEventEmitter";
-import { StatsEvent } from "./statsEvent";
+import { StatsReportEmitter } from "./statsReportEmitter";
+import { Resolution, TrackStats } from "./trackStats";
+import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 
 export class StatsCollector {
     private isActive = true;
     private previousStatsReport: RTCStatsReport | undefined;
     private currentStatsReport: RTCStatsReport | undefined;
     private readonly connectionStats = new ConnectionStats();
-    private readonly ssrc2stats = new Map<number, SsrcStats>();
-    private readonly emitter: StatsEventEmitter = new StatsEventEmitter();
+    private readonly track2stats = new Map<string, TrackStats>();
 
     public constructor(
         public readonly callId: string,
         public readonly remoteUserId: string,
         private readonly pc: RTCPeerConnection,
+        private readonly emitter: StatsReportEmitter,
         private readonly isFocus = false,
     ) {}
 
-    public processStats(groupCallId: string, localUserId: string): Promise<boolean> {
+    public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
         if (this.isActive) {
             return this.pc
                 .getStats()
@@ -62,7 +62,7 @@ export class StatsCollector {
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStats = new Map<number, number>();
+        const byteSentStats: ByteSendStatsReport = new Map<TrackID, ByteSend>();
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
@@ -122,17 +122,19 @@ export class StatsCollector {
                 // RTCSentRtpStreamStats
                 // https://w3c.github.io/webrtc-stats/#sentrtpstats-dict*
             } else if (now.type === "inbound-rtp" || now.type === "outbound-rtp") {
-                const ssrc = this.getNonNegativeValue(now.mid);
+                // inbound-rtp => remote receiving report
+                // outbound-rtp => local sending  report
+                const trackID = now.type === "inbound-rtp" ? now.trackIdentifier : this.getLocalTrackIdByMid(now.mid);
 
-                if (!ssrc) {
+                if (!trackID) {
                     return;
                 }
 
-                let ssrcStats = this.ssrc2stats.get(ssrc);
+                let trackStats = this.track2stats.get(trackID);
 
-                if (!ssrcStats) {
-                    ssrcStats = new SsrcStats();
-                    this.ssrc2stats.set(ssrc, ssrcStats);
+                if (!trackStats) {
+                    trackStats = new TrackStats(now.type === "inbound-rtp" ? "remote" : "local");
+                    this.track2stats.set(trackID, trackStats);
                 }
 
                 let isDownloadStream = true;
@@ -157,7 +159,7 @@ export class StatsCollector {
                     const packetsLostBefore = this.getNonNegativeValue(before.packetsLost);
                     const packetsLostDiff = Math.max(0, packetsLostNow - packetsLostBefore);
 
-                    ssrcStats.setLoss({
+                    trackStats.setLoss({
                         packetsTotal: packetsDiff + packetsLostDiff,
                         packetsLost: packetsLostDiff,
                         isDownloadStream,
@@ -177,12 +179,12 @@ export class StatsCollector {
                     const frameRate = now.framesPerSecond;
 
                     if (resolution.height && resolution.width) {
-                        ssrcStats.setResolution(resolution);
+                        trackStats.setResolution(resolution);
                     }
-                    ssrcStats.setFramerate(Math.round(frameRate || 0));
+                    trackStats.setFramerate(Math.round(frameRate || 0));
 
                     if (before) {
-                        ssrcStats.addBitrate({
+                        trackStats.addBitrate({
                             download: this.calculateBitrate(
                                 now.bytesReceived,
                                 before.bytesReceived,
@@ -193,8 +195,8 @@ export class StatsCollector {
                         });
                     }
                 } else if (before) {
-                    byteSentStats.set(ssrc, this.getNonNegativeValue(now.bytesSent));
-                    ssrcStats.addBitrate({
+                    byteSentStats.set(trackID, this.getNonNegativeValue(now.bytesSent));
+                    trackStats.addBitrate({
                         download: 0,
                         upload: this.calculateBitrate(now.bytesSent, before.bytesSent, now.timestamp, before.timestamp),
                     });
@@ -210,7 +212,7 @@ export class StatsCollector {
                      */
                     const codecShortType = codec.mimeType.split("/")[1];
 
-                    codecShortType && ssrcStats.setCodec(codecShortType);
+                    codecShortType && trackStats.setCodec(codecShortType);
                 }
 
                 // Use track stats for resolution and framerate of the local video source.
@@ -223,23 +225,18 @@ export class StatsCollector {
                 };
                 const localVideoTracks = this.getLocalTracks("video");
 
-                if (!localVideoTracks?.length) {
+                if (localVideoTracks.length === 0) {
                     return;
                 }
 
-                const ssrc = this.getSsrcByTrackId(now.trackIdentifier);
+                let trackStats = this.track2stats.get(now.trackIdentifier);
 
-                if (!ssrc) {
-                    return;
-                }
-                let ssrcStats = this.ssrc2stats.get(ssrc);
-
-                if (!ssrcStats) {
-                    ssrcStats = new SsrcStats();
-                    this.ssrc2stats.set(ssrc, ssrcStats);
+                if (!trackStats) {
+                    trackStats = new TrackStats("local");
+                    this.track2stats.set(now.trackIdentifier, trackStats);
                 }
                 if (resolution.height && resolution.width) {
-                    ssrcStats.setResolution(resolution);
+                    trackStats.setResolution(resolution);
                 }
 
                 // Calculate the frame rate. 'framesSent' is the total aggregate value for all the simulcast streams.
@@ -267,11 +264,11 @@ export class StatsCollector {
 
                 // Reset frame rate to 0 when video is suspended as a result of endpoint falling out of last-n.
                 frameRate = numberOfActiveStreams ? Math.round(frameRate / numberOfActiveStreams) : 0;
-                ssrcStats.setFramerate(frameRate);
+                trackStats.setFramerate(frameRate);
             }
         });
 
-        this.emitter.emitByteSendReport(byteSentStats, this.callId);
+        this.emitter.emitByteSendReport(byteSentStats);
         this.processAndEmitReport();
     }
 
@@ -322,18 +319,40 @@ export class StatsCollector {
         return bitrateKbps;
     }
 
-    private getLocalTracks(kind: "audio" | "video"): MediaStreamTrack[] | undefined {
-        //@TODO implement this right by using MID
-        return undefined;
+    private getLocalTracks(kind: "audio" | "video"): MediaStreamTrack[] {
+        const isNotNullAndKind = (track: MediaStreamTrack | null): boolean => {
+            return track !== null && track.kind === kind;
+        };
+        // @ts-ignore The linter don't get it
+        return this.pc
+            .getTransceivers()
+            .filter((t) => t.currentDirection === "sendonly" || t.currentDirection === "sendrecv")
+            .filter((t) => t.sender !== null)
+            .map((t) => t.sender)
+            .map((s) => s.track)
+            .filter(isNotNullAndKind);
     }
 
-    private getSsrcByTrackId(trackIdentifier: any): number | undefined {
-        //@TODO implement this right by using MID
-        return undefined;
+    private getTackById(trackId: string): MediaStreamTrack | undefined {
+        return this.pc
+            .getTransceivers()
+            .map((t) => {
+                if (t?.sender.track !== null && t.sender.track.id === trackId) {
+                    return t.sender.track;
+                }
+                if (t?.receiver.track !== null && t.receiver.track.id === trackId) {
+                    return t.receiver.track;
+                }
+                return undefined;
+            })
+            .find((t) => t !== undefined);
     }
 
-    private getTackBySSRC(ssrc: number): MediaStreamTrack | undefined {
-        //@TODO implement this right by using MID
+    private getLocalTrackIdByMid(mid: string): string | undefined {
+        const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
+        if (transceiver !== undefined && !!transceiver.sender && !!transceiver.sender.track) {
+            return transceiver.sender.track.id;
+        }
         return undefined;
     }
 
@@ -354,82 +373,47 @@ export class StatsCollector {
         };
         let bitrateDownload = 0;
         let bitrateUpload = 0;
-        const resolutions = {};
-        const framerates = {};
-        const codecs = {};
+        const resolutions: ResolutionMap = {
+            local: new Map<TrackID, Resolution>(),
+            remote: new Map<TrackID, Resolution>(),
+        };
+        const framerates: FramerateMap = { local: new Map<TrackID, number>(), remote: new Map<TrackID, number>() };
+        const codecs: CodecMap = { local: new Map<TrackID, string>(), remote: new Map<TrackID, string>() };
         let audioBitrateDownload = 0;
         let audioBitrateUpload = 0;
         let videoBitrateDownload = 0;
         let videoBitrateUpload = 0;
 
-        for (const [ssrc, ssrcStats] of this.ssrc2stats) {
+        for (const [trackId, trackStats] of this.track2stats) {
             // process packet loss stats
-            const loss = ssrcStats.getLoss();
+            const loss = trackStats.getLoss();
             const type = loss.isDownloadStream ? "download" : "upload";
 
             totalPackets[type] += loss.packetsTotal;
             lostPackets[type] += loss.packetsLost;
 
             // process bitrate stats
-            bitrateDownload += ssrcStats.getBitrate().download;
-            bitrateUpload += ssrcStats.getBitrate().upload;
+            bitrateDownload += trackStats.getBitrate().download;
+            bitrateUpload += trackStats.getBitrate().upload;
 
             // collect resolutions and framerates
-            const track = this.getTackBySSRC(ssrc);
+            const track = this.getTackById(trackId);
 
             if (track) {
-                let audioCodec;
-                let videoCodec;
-
                 if (track.kind === "audio") {
-                    audioBitrateDownload += ssrcStats.getBitrate().download;
-                    audioBitrateUpload += ssrcStats.getBitrate().upload;
-                    audioCodec = ssrcStats.getCodec();
+                    audioBitrateDownload += trackStats.getBitrate().download;
+                    audioBitrateUpload += trackStats.getBitrate().upload;
                 } else {
-                    videoBitrateDownload += ssrcStats.getBitrate().download;
-                    videoBitrateUpload += ssrcStats.getBitrate().upload;
-                    videoCodec = ssrcStats.getCodec();
+                    videoBitrateDownload += trackStats.getBitrate().download;
+                    videoBitrateUpload += trackStats.getBitrate().upload;
                 }
 
-                // @TODO Find a way to identify participant by track!!! and //@TODO implement this right by using MID
-                const participantId = "uuid"; // track.getParticipantId();
-
-                if (participantId) {
-                    const resolution = ssrcStats.getResolution();
-
-                    if (resolution.width && resolution.height && resolution.width !== -1 && resolution.height !== -1) {
-                        // @ts-ignore Fix with Type
-                        const userResolutions = resolutions[participantId] || {};
-
-                        userResolutions[ssrc] = resolution;
-                        // @ts-ignore Fix with Type
-                        resolutions[participantId] = userResolutions;
-                    }
-
-                    if (ssrcStats.getFramerate() > 0) {
-                        // @ts-ignore Fix with Type
-                        const userFramerates = framerates[participantId] || {};
-                        userFramerates[ssrc] = ssrcStats.getFramerate();
-                        // @ts-ignore Fix with Type
-                        framerates[participantId] = userFramerates;
-                    }
-
-                    // @ts-ignore Fix with Type
-                    const userCodecs = codecs[participantId] ?? {};
-
-                    userCodecs[ssrc] = {
-                        audio: audioCodec,
-                        video: videoCodec,
-                    };
-
-                    // @ts-ignore Fix with Type
-                    codecs[participantId] = userCodecs;
-                } else {
-                    // No participant ID returned by ${track}`;
-                }
+                resolutions[trackStats.getType()].set(trackId, trackStats.getResolution());
+                framerates[trackStats.getType()].set(trackId, trackStats.getFramerate());
+                codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
             }
 
-            ssrcStats.resetBitrate();
+            trackStats.resetBitrate();
         }
 
         this.connectionStats.bitrate = {
@@ -456,7 +440,7 @@ export class StatsCollector {
             upload: this.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
         };
 
-        this.emitter.emit(StatsEvent.CONNECTION_STATS, this.pc, {
+        this.emitter.emitConnectionStatsReport({
             bandwidth: this.connectionStats.bandwidth,
             bitrate: this.connectionStats.bitrate,
             packetLoss: this.connectionStats.packetLoss,
@@ -465,12 +449,17 @@ export class StatsCollector {
             codec: codecs,
             transport: this.connectionStats.transport,
         });
+
         this.connectionStats.transport = [];
     }
 
     public stopProcessingStats(): void {}
 
-    private calculatePacketLoss(number: number, number2: number): number {
-        return 0;
+    private calculatePacketLoss(lostPackets: number, totalPackets: number): number {
+        if (!totalPackets || totalPackets <= 0 || !lostPackets || lostPackets <= 0) {
+            return 0;
+        }
+
+        return Math.round((lostPackets / totalPackets) * 100);
     }
 }

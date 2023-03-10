@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { StatsCollector } from "./statsCollector";
+import { StatsReportEmitter } from "./statsReportEmitter";
 
 export class GroupCallStats {
     private timer = -1;
     private readonly collectors: Map<string, StatsCollector> = new Map<string, StatsCollector>();
+    public readonly reports = new StatsReportEmitter();
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
@@ -42,7 +44,7 @@ export class GroupCallStats {
         if (this.hasStatsCollector(callId)) {
             return false;
         }
-        this.collectors.set(callId, new StatsCollector(callId, userId, peerConnection));
+        this.collectors.set(callId, new StatsCollector(callId, userId, peerConnection, this.reports));
         return true;
     }
 

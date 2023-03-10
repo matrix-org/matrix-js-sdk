@@ -25,6 +25,8 @@ import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { LocalCallFeed } from "./localCallFeed";
+import { GroupCallStats } from "./stats/groupCallStats";
+import { ByteSendStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -214,6 +216,8 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
+    private readonly stats: GroupCallStats;
+
     public constructor(
         private client: MatrixClient,
         public room: Room,
@@ -235,6 +239,19 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
+        const userID = this.client.getUserId() || "unknown";
+        this.stats = new GroupCallStats(this.groupCallId, userID);
+        this.stats.start(); // stats reports on/off
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
+    }
+
+    private onConnectionStats(report: ConnectionStatsReport): void {
+        window.console.log("### ConnectionStatsReport", report);
+    }
+
+    private onByteSendStats(report: ByteSendStatsReport): void {
+        window.console.log("### ByteSendStatsReport", report);
     }
 
     public async create(): Promise<GroupCall> {
@@ -1077,6 +1094,8 @@ export class GroupCall extends TypedEventEmitter<
         call.isPtt = this.isPtt;
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
+
+        call.initStats(this.stats);
 
         onCallFeedsChanged();
     }

@@ -17,20 +17,31 @@ limitations under the License.
 import { TransportStats } from "./transportStats";
 import { Bitrate } from "./trackStats";
 
+export interface ConnectionStatsBandwidth {
+    /**
+     * bytes per second
+     */
+    download: number;
+    /**
+     * bytes per second
+     */
+    upload: number;
+}
+
 export interface ConnectionStatsBitrate extends Bitrate {
     audio?: Bitrate;
     video?: Bitrate;
 }
 
-export interface PackageLoos {
+export interface PacketLoos {
     total: number;
     download: number;
     upload: number;
 }
 
 export class ConnectionStats {
-    public bandwidth = {};
+    public bandwidth: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
     public bitrate: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
-    public packetLoss: PackageLoos = {} as PackageLoos;
+    public packetLoss: PacketLoos = {} as PacketLoos;
     public transport: TransportStats[] = [];
 }
