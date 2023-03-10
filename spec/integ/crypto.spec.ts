@@ -536,6 +536,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         fetchMock.mockReset();
     });
 
+    it("MatrixClient.getCrypto returns a CryptoApi", () => {
+        expect(aliceClient.getCrypto()).toHaveProperty("globalBlacklistUnverifiedDevices");
+    });
+
     it("Alice receives a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
