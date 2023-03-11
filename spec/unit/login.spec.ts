@@ -1,7 +1,6 @@
 import fetchMock from "fetch-mock-jest";
 
-import { MatrixClient } from "../../src/client";
-import { ClientPrefix } from "../../src/http-api";
+import { ClientPrefix, MatrixClient, MatrixError } from "../../src";
 import { SSOAction } from "../../src/@types/auth";
 import { TestClient } from "../TestClient";
 
@@ -108,5 +107,43 @@ describe("refreshToken", () => {
 
         const refreshResult = await client.refreshToken("initial_refresh_token");
         expect(refreshResult).toEqual(response);
+    });
+
+    it("re-raises M_UNRECOGNIZED exceptions from /v1", async () => {
+        const client = createExampleMatrixClient();
+
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V3).toString(), {
+            status: 400,
+            body: { errcode: "M_UNRECOGNIZED" },
+        });
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), {
+            status: 400,
+            body: { errcode: "M_UNRECOGNIZED" },
+        });
+
+        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ errcode: "M_UNRECOGNIZED" });
+    });
+
+    it("re-raises non-M_UNRECOGNIZED exceptions from /v3", async () => {
+        const client = createExampleMatrixClient();
+
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V3).toString(), 429);
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), () => {
+            throw new Error("/v1/refresh unexpectedly called");
+        });
+
+        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
+    });
+
+    it("re-raises non-M_UNRECOGNIZED exceptions from /v1", async () => {
+        const client = createExampleMatrixClient();
+
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V3).toString(), {
+            status: 400,
+            body: { errcode: "M_UNRECOGNIZED" },
+        });
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), 429);
+
+        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
     });
 });
