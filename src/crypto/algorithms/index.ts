@@ -16,5 +16,6 @@ limitations under the License.
 
 import "./olm";
 import "./megolm";
+import "./dmls";
 
 export * from "./base";

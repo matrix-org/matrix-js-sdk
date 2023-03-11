@@ -28,6 +28,7 @@ import { logger } from "../logger";
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
+import * as dmls from "./algorithms/dmls";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
@@ -224,9 +225,15 @@ export interface IMegolmEncryptedContent {
     ciphertext: string;
     [ToDeviceMessageId]?: string;
 }
+
+export interface IMlsEncryptedContent {
+    algorithm: typeof dmls.MLS_ALGORITHM.name;
+    ciphertext: string;
+    epoch_creator: string;
+}
 /* eslint-enable camelcase */
 
-export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
+export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent | IMlsEncryptedContent;
 
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
@@ -410,6 +417,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private needsNewFallback?: boolean;
     private fallbackCleanup?: ReturnType<typeof setTimeout>;
 
+    public mlsProvider: dmls.MlsProvider;
+
     /**
      * Cryptography bits
      *
@@ -531,6 +540,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return CrossSigningInfo.getFromSecretStorage(type, this.secretStorage);
             };
         }
+
+        this.mlsProvider = new dmls.MlsProvider(this);
     }
 
     /**
@@ -556,6 +567,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // build our device keys: these will later be uploaded
         this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key!;
         this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key!;
+        this.deviceKeys["org.matrix.msc2883.v0.mls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential.tls_serialize());
 
         logger.log("Crypto: fetching own devices...");
         let myDevices = this.deviceList.getRawStoredDevicesForUser(this.userId);
