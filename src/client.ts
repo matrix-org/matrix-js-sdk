@@ -7581,9 +7581,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 },
             );
 
+        // First try with the (specced) /v3/ prefix.
+        // However, before Synapse 1.72.0, Synapse incorrectly required a /v1/ prefix, so we fall
+        // back to that if the request fails, for backwards compatibility.
         return performRefreshRequestWithPrefix(ClientPrefix.V3).catch((e) => {
             if (e.errcode === "M_UNRECOGNIZED") {
-                // fall back to the /v1 prefixed API, which was incorrectly used in Synapse before 1.72.0
                 return performRefreshRequestWithPrefix(ClientPrefix.V1);
             }
             throw e;
