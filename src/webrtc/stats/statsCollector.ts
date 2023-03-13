@@ -14,18 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { parse as parseSdp } from "sdp-transform";
+
 import { ConnectionStats } from "./connectionStats";
 import { TransportStats } from "./transportStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { Resolution, TrackStats } from "./trackStats";
 import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 
+type Mid = string;
+type Ssrc = string;
+
 export class StatsCollector {
     private isActive = true;
     private previousStatsReport: RTCStatsReport | undefined;
     private currentStatsReport: RTCStatsReport | undefined;
     private readonly connectionStats = new ConnectionStats();
-    private readonly track2stats = new Map<string, TrackStats>();
+    private readonly track2stats = new Map<TrackID, TrackStats>();
+    private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
 
     public constructor(
         public readonly callId: string,
@@ -33,7 +39,9 @@ export class StatsCollector {
         private readonly pc: RTCPeerConnection,
         private readonly emitter: StatsReportEmitter,
         private readonly isFocus = false,
-    ) {}
+    ) {
+        pc.addEventListener("signalingstatechange", this.onSignalStateChange.bind(this));
+    }
 
     public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
         if (this.isActive) {
@@ -66,7 +74,6 @@ export class StatsCollector {
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
-
             // RTCIceCandidatePairStats - https://w3c.github.io/webrtc-stats/#candidatepair-dict*
             if (now.type === "candidate-pair" && now.nominated && now.state === "succeeded") {
                 const availableIncomingBitrate = now.availableIncomingBitrate;
@@ -122,6 +129,21 @@ export class StatsCollector {
                 // RTCSentRtpStreamStats
                 // https://w3c.github.io/webrtc-stats/#sentrtpstats-dict*
             } else if (now.type === "inbound-rtp" || now.type === "outbound-rtp") {
+                let mid: string | undefined = now.mid;
+                if (!mid) {
+                    const type = now.type === "inbound-rtp" ? "remote" : "local";
+                    this.ssrcToMid[type].forEach((ssrcs, m) => {
+                        if (ssrcs.find((s) => s == now.ssrc)) {
+                            mid = m;
+                            return;
+                        }
+                    });
+                    if (now.type === "inbound-rtp" && mid) {
+                        now.trackIdentifier = this.getRemoteTrackIdByMid(mid);
+                    }
+                    now.mid = mid;
+                }
+
                 // inbound-rtp => remote receiving report
                 // outbound-rtp => local sending  report
                 const trackID = now.type === "inbound-rtp" ? now.trackIdentifier : this.getLocalTrackIdByMid(now.mid);
@@ -219,6 +241,16 @@ export class StatsCollector {
                 // RTCVideoHandlerStats - https://w3c.github.io/webrtc-stats/#vststats-dict*
                 // RTCMediaHandlerStats - https://w3c.github.io/webrtc-stats/#mststats-dict*
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
+                if (!now.trackIdentifier) {
+                    let mid: Mid;
+                    this.ssrcToMid.local.forEach((ssrcs, m) => {
+                        if (ssrcs.find((s) => s == now.ssrc)) {
+                            now.trackIdentifier = this.getLocalTrackIdByMid(m);
+                            now.mid = mid;
+                            return;
+                        }
+                    });
+                }
                 const resolution = {
                     height: now.frameHeight,
                     width: now.frameWidth,
@@ -356,6 +388,14 @@ export class StatsCollector {
         return undefined;
     }
 
+    private getRemoteTrackIdByMid(mid: string): string | undefined {
+        const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
+        if (transceiver !== undefined && !!transceiver.receiver && !!transceiver.receiver.track) {
+            return transceiver.receiver.track.id;
+        }
+        return undefined;
+    }
+
     private getActiveSimulcastStreams(): number {
         //@TODO implement this right.. Check how many layer configured
         return 3;
@@ -461,5 +501,33 @@ export class StatsCollector {
         }
 
         return Math.round((lostPackets / totalPackets) * 100);
+    }
+
+    private onSignalStateChange(): void {
+        if (this.pc.signalingState === "stable") {
+            if (this.pc.currentRemoteDescription) {
+                this.parseSsrcs(this.pc.currentRemoteDescription.sdp, "remote");
+            }
+            if (this.pc.currentLocalDescription) {
+                this.parseSsrcs(this.pc.currentLocalDescription.sdp, "local");
+            }
+        }
+    }
+
+    private parseSsrcs(description: string, type: "local" | "remote"): void {
+        const sdp = parseSdp(description);
+        const ssrcToMid = new Map<Mid, Ssrc[]>();
+        sdp.media.forEach((m) => {
+            if ((!!m.mid && m.type === "video") || m.type === "audio") {
+                const ssrcs: Ssrc[] = [];
+                m.ssrcs?.forEach((ssrc) => {
+                    if (ssrc.attribute === "cname") {
+                        ssrcs.push(`${ssrc.id}`);
+                    }
+                });
+                ssrcToMid.set(`${m.mid}`, ssrcs);
+            }
+        });
+        this.ssrcToMid[type] = ssrcToMid;
     }
 }
