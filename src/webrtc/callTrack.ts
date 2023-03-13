@@ -15,27 +15,23 @@ limitations under the License.
 */
 
 import { randomString } from "../randomstring";
-import { SDPStreamMetadataTrack } from "./callEventTypes";
 
 export interface CallTrackOpts {}
 
+/**
+ * CallTrack is a wrapper around MediaStreamTrack. It includes some additional
+ * useful information such as the mute state.
+ */
 export abstract class CallTrack {
     public abstract get id(): string | undefined;
     public abstract get track(): MediaStreamTrack | undefined;
-    public abstract get trackId(): string | undefined;
-    public abstract get metadata(): SDPStreamMetadataTrack | undefined;
     public abstract get kind(): string | undefined;
     public abstract get muted(): boolean;
 
     protected readonly _id: string;
-    protected _transceiver?: RTCRtpTransceiver;
 
     public constructor(opts: CallTrackOpts) {
         this._id = randomString(32);
-    }
-
-    public get transceiver(): RTCRtpTransceiver | undefined {
-        return this._transceiver;
     }
 
     public get isAudio(): boolean {
