@@ -30,7 +30,7 @@ export async function initRustCrypto(
     await RustSdkCryptoJs.initAsync();
 
     // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
+    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Trace).turnOn();
 
     const u = new RustSdkCryptoJs.UserId(userId);
     const d = new RustSdkCryptoJs.DeviceId(deviceId);
