@@ -1,6 +1,6 @@
 import fetchMock from "fetch-mock-jest";
 
-import { ClientPrefix, MatrixClient, MatrixError } from "../../src";
+import { ClientPrefix, MatrixClient } from "../../src";
 import { SSOAction } from "../../src/@types/auth";
 import { TestClient } from "../TestClient";
 
