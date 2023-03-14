@@ -180,23 +180,60 @@ export class RustCrypto implements CryptoBackend {
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Apply sync changes to the olm machine
+     * @param events - the received to-device messages
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     * @returns A list of preprocessed to-device messages.
+     */
+    private async receiveSyncChanges({
+        events,
+        oneTimeKeysCounts = new Map<string, number>(),
+        unusedFallbackKeys = new Set<string>(),
+    }: {
+        events?: IToDeviceEvent[];
+        oneTimeKeysCounts?: Map<string, number>;
+        unusedFallbackKeys?: Set<string>;
+    }): Promise<IToDeviceEvent[]> {
+        const result = await this.olmMachine.receiveSyncChanges(
+            events ? JSON.stringify(events) : "",
+            new RustSdkCryptoJs.DeviceLists(),
+            oneTimeKeysCounts,
+            unusedFallbackKeys,
+        );
+
+        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
+        return JSON.parse(result);
+    }
+
     /** called by the sync loop to preprocess incoming to-device messages
      *
      * @param events - the received to-device messages
      * @returns A list of preprocessed to-device messages.
      */
-    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+    public preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
         // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
         // one-time-keys, or fallback keys, so just pass empty data.
-        const result = await this.olmMachine.receiveSyncChanges(
-            JSON.stringify(events),
-            new RustSdkCryptoJs.DeviceLists(),
-            new Map(),
-            new Set(),
-        );
+        return this.receiveSyncChanges({ events });
+    }
 
-        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
-        return JSON.parse(result);
+    /** called by the sync loop to preprocess one time key counts
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @returns A list of preprocessed to-device messages.
+     */
+    public preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<IToDeviceEvent[]> {
+        return this.receiveSyncChanges({ oneTimeKeysCounts });
+    }
+
+    /** called by the sync loop to preprocess unused fallback keys
+     *
+     * @param unusedFallbackKeys - the received unused fallback keys
+     * @returns A list of preprocessed to-device messages.
+     */
+    public preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<IToDeviceEvent[]> {
+        return this.receiveSyncChanges({ unusedFallbackKeys });
     }
 
     /** called by the sync loop on m.room.encrypted events

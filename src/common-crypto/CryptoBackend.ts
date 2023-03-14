@@ -105,6 +105,10 @@ export interface SyncCryptoCallbacks {
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
 
+    preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<IToDeviceEvent[]>;
+
+    preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<IToDeviceEvent[]>;
+
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.
      *

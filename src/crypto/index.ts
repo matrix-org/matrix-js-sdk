@@ -3207,6 +3207,17 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         });
     }
 
+    public preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<IToDeviceEvent[]> {
+        const currentCount = oneTimeKeysCounts.get("signed_curve25519") || 0;
+        this.updateOneTimeKeyCount(currentCount);
+        return Promise.resolve([]);
+    }
+
+    public preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<IToDeviceEvent[]> {
+        this.setNeedsNewFallback(!unusedFallbackKeys.has("signed_curve25519"));
+        return Promise.resolve([]);
+    }
+
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
             logger.log(
