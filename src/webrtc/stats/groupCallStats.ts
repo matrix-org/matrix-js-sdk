@@ -17,20 +17,22 @@ import { StatsCollector } from "./statsCollector";
 import { StatsReportEmitter } from "./statsReportEmitter";
 
 export class GroupCallStats {
-    private timer = -1;
+    private timer: undefined | number;
     private readonly collectors: Map<string, StatsCollector> = new Map<string, StatsCollector>();
     public readonly reports = new StatsReportEmitter();
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
     public start(): void {
-        this.timer = window.setInterval(() => {
-            this.processStats();
-        }, this.interval);
+        if (this.timer === undefined) {
+            this.timer = window.setInterval(() => {
+                this.processStats();
+            }, this.interval);
+        }
     }
 
     public stop(): void {
-        if (this.timer > 0) {
+        if (this.timer !== undefined) {
             window.clearInterval(this.timer);
             this.collectors.forEach((c) => c.stopProcessingStats());
         }

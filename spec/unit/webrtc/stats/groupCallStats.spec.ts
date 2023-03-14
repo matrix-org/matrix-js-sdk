@@ -93,6 +93,36 @@ describe("GroupCallStats", () => {
                 throw new Error("Test failed, because no Collector found!");
             }
         });
+
+        it("doing nothing if process already running", async () => {
+            // @ts-ignore
+            window.setInterval = jest.fn().mockReturnValue(22);
+            stats.start();
+            expect(window.setInterval).toHaveBeenCalledTimes(1);
+            stats.start();
+            stats.start();
+            stats.start();
+            stats.start();
+            expect(window.setInterval).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("should on stop", () => {
+        it("finish stats process if was started", async () => {
+            // @ts-ignore
+            window.setInterval = jest.fn().mockReturnValue(22);
+            window.clearInterval = jest.fn();
+            stats.start();
+            expect(window.setInterval).toHaveBeenCalledTimes(1);
+            stats.stop();
+            expect(window.clearInterval).toHaveBeenCalledWith(22);
+        });
+
+        it("do nothing if stats process was not started", async () => {
+            window.clearInterval = jest.fn();
+            stats.stop();
+            expect(window.clearInterval).not.toHaveBeenCalled();
+        });
     });
 });
 
