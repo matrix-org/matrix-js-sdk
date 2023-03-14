@@ -1400,6 +1400,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         if (!this.hasUserMediaVideoSender && !muted) {
+            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
