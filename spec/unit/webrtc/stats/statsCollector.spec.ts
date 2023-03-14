@@ -1,5 +1,5 @@
 /*
-Copyright 2020 - 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { StatsCollector } from "../../../../src/webrtc/stats/statsCollector";
+import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 
 const CALL_ID = "CALL_ID";
 const USER_ID = "USER_ID";
@@ -22,20 +23,23 @@ const USER_ID = "USER_ID";
 describe("StatsCollector", () => {
     let collector: StatsCollector;
     let rtcSpy: RTCPeerConnection;
+    let emitter: StatsReportEmitter;
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
-        collector = new StatsCollector(CALL_ID, USER_ID, rtcSpy);
+        rtcSpy.addEventListener = jest.fn();
+        emitter = new StatsReportEmitter();
+        collector = new StatsCollector(CALL_ID, USER_ID, rtcSpy, emitter);
     });
 
-    describe("process stats", () => {
-        it("if active process stats reports", async () => {
+    describe("on process stats", () => {
+        it("if active calculate stats reports", async () => {
             const getStats = jest.spyOn(rtcSpy, "getStats");
             getStats.mockResolvedValue({} as RTCStatsReport);
             await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
         });
 
-        it("if not active do not process stats reports", async () => {
+        it("if not active do not calculate stats reports", async () => {
             collector.setActive(false);
             const getStats = jest.spyOn(rtcSpy, "getStats");
             await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");

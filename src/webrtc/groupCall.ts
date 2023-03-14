@@ -241,7 +241,6 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.start(); // stats reports on/off
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
         this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
     }

@@ -614,6 +614,8 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public typed(): MatrixCall {
         return this as unknown as MatrixCall;
     }
+
+    public initStats = jest.fn();
 }
 
 export class MockCallFeed {
