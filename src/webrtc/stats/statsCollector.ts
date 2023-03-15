@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { parse as parseSdp } from "sdp-transform";
-
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { Resolution, TrackStats } from "./trackStats";
 import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
-
-type Mid = string;
-type Ssrc = string;
+import { Mid, TransceiverHandler } from "./transceiverHandler";
 
 export class StatsCollector {
     private isActive = true;
@@ -32,7 +28,9 @@ export class StatsCollector {
     private currentStatsReport: RTCStatsReport | undefined;
     private readonly connectionStats = new ConnectionStats();
     private readonly track2stats = new Map<TrackID, TrackStats>();
-    private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
+    private readonly transceiverHandler = new TransceiverHandler();
+
+    // private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
 
     public constructor(
         public readonly callId: string,
@@ -93,12 +91,7 @@ export class StatsCollector {
                 let mid: string | undefined = now.mid;
                 if (!mid) {
                     const type = now.type === "inbound-rtp" ? "remote" : "local";
-                    this.ssrcToMid[type].forEach((ssrcs, m) => {
-                        if (ssrcs.find((s) => s == now.ssrc)) {
-                            mid = m;
-                            return;
-                        }
-                    });
+                    mid = this.transceiverHandler.findMidBySsrc(now.ssrc, type);
                     if (now.type === "inbound-rtp" && mid) {
                         now.trackIdentifier = this.getRemoteTrackIdByMid(mid);
                     }
@@ -203,14 +196,11 @@ export class StatsCollector {
                 // RTCMediaHandlerStats - https://w3c.github.io/webrtc-stats/#mststats-dict*
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
                 if (!now.trackIdentifier) {
-                    let mid: Mid;
-                    this.ssrcToMid.local.forEach((ssrcs, m) => {
-                        if (ssrcs.find((s) => s == now.ssrc)) {
-                            now.trackIdentifier = this.getLocalTrackIdByMid(m);
-                            now.mid = mid;
-                            return;
-                        }
-                    });
+                    const mid: Mid | undefined = this.transceiverHandler.findMidBySsrc(now.ssrc, "local");
+                    if (mid !== undefined) {
+                        now.trackIdentifier = this.getLocalTrackIdByMid(mid);
+                        now.mid = mid;
+                    }
                 }
                 const resolution = {
                     height: now.frameHeight,
@@ -467,28 +457,11 @@ export class StatsCollector {
     private onSignalStateChange(): void {
         if (this.pc.signalingState === "stable") {
             if (this.pc.currentRemoteDescription) {
-                this.parseSsrcs(this.pc.currentRemoteDescription.sdp, "remote");
+                this.transceiverHandler.parse(this.pc.currentRemoteDescription.sdp, "remote");
             }
             if (this.pc.currentLocalDescription) {
-                this.parseSsrcs(this.pc.currentLocalDescription.sdp, "local");
+                this.transceiverHandler.parse(this.pc.currentLocalDescription.sdp, "local");
             }
         }
-    }
-
-    private parseSsrcs(description: string, type: "local" | "remote"): void {
-        const sdp = parseSdp(description);
-        const ssrcToMid = new Map<Mid, Ssrc[]>();
-        sdp.media.forEach((m) => {
-            if ((!!m.mid && m.type === "video") || m.type === "audio") {
-                const ssrcs: Ssrc[] = [];
-                m.ssrcs?.forEach((ssrc) => {
-                    if (ssrc.attribute === "cname") {
-                        ssrcs.push(`${ssrc.id}`);
-                    }
-                });
-                ssrcToMid.set(`${m.mid}`, ssrcs);
-            }
-        });
-        this.ssrcToMid[type] = ssrcToMid;
     }
 }

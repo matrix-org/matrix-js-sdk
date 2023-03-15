@@ -1,7 +1,12 @@
 import { TransportStats } from "./transportStats";
 
 export class TransportStatsReporter {
-    public static buildReport(report: RTCStatsReport | undefined, now: RTCIceCandidatePairStats, conferenceStatsTransport: TransportStats[], isFocus: boolean): TransportStats[] {
+    public static buildReport(
+        report: RTCStatsReport | undefined,
+        now: RTCIceCandidatePairStats,
+        conferenceStatsTransport: TransportStats[],
+        isFocus: boolean,
+    ): TransportStats[] {
         const localUsedCandidate = report?.get(now.localCandidateId);
         const remoteUsedCandidate = report?.get(now.remoteCandidateId);
 
@@ -34,7 +39,7 @@ export class TransportStatsReporter {
                     localCandidateType: localUsedCandidate.candidateType,
                     remoteCandidateType: remoteUsedCandidate.candidateType,
                     networkType: localUsedCandidate.networkType,
-                    rtt: now.currentRoundTripTime? now.currentRoundTripTime * 1000: NaN,
+                    rtt: now.currentRoundTripTime ? now.currentRoundTripTime * 1000 : NaN,
                 } as TransportStats);
             }
         }
