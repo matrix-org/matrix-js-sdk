@@ -13,16 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { TrackHandler } from "../../../../src/webrtc/stats/trackHandler";
+import { MediaTrackHandler } from "../../../../../src/webrtc/stats/media/mediaTrackHandler";
 
 describe("TrackHandler", () => {
     let pc: RTCPeerConnection;
-    let handler: TrackHandler;
+    let handler: MediaTrackHandler;
     beforeEach(() => {
         pc = {
             getTransceivers: (): RTCRtpTransceiver[] => [mockTransceiver("1", "audio"), mockTransceiver("2", "video")],
         } as RTCPeerConnection;
-        handler = new TrackHandler(pc);
+        handler = new MediaTrackHandler(pc);
     });
     describe("should get local tracks", () => {
         it("returns video track", () => {

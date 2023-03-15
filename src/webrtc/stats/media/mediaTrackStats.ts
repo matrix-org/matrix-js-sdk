@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { TrackId } from "./mediaTrackHandler";
+
 export interface PackageLoos {
     packetsTotal: number;
     packetsLost: number;
@@ -37,14 +39,14 @@ export interface Resolution {
 }
 
 export type TrackStatsType = "local" | "remote";
-export class TrackStats {
+export class MediaTrackStats {
     private loss: PackageLoos = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
     private bitrate: Bitrate = { download: 0, upload: 0 };
     private resolution: Resolution = { width: -1, height: -1 };
     private framerate = 0;
     private codec = "";
 
-    public constructor(private type: TrackStatsType) {}
+    public constructor(public readonly trackId: TrackId, private type: TrackStatsType) {}
 
     public getType(): TrackStatsType {
         return this.type;

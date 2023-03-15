@@ -16,21 +16,21 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { Resolution, TrackStats } from "./trackStats";
+import { Resolution } from "./media/mediaTrackStats";
 import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
-import { Mid, MediaSsrcHandler } from "./mediaSsrcHandler";
-import { TrackHandler } from "./trackHandler";
+import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
+import { MediaTrackHandler } from "./media/mediaTrackHandler";
+import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
 
 export class StatsCollector {
     private isActive = true;
     private previousStatsReport: RTCStatsReport | undefined;
     private currentStatsReport: RTCStatsReport | undefined;
     private readonly connectionStats = new ConnectionStats();
-    private readonly track2stats = new Map<TrackID, TrackStats>();
-    private readonly transceiverHandler = new MediaSsrcHandler();
-    private readonly trackHandler: TrackHandler;
+
+    private readonly trackStats: MediaTrackStatsHandler;
 
     // private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
 
@@ -42,7 +42,7 @@ export class StatsCollector {
         private readonly isFocus = true,
     ) {
         pc.addEventListener("signalingstatechange", this.onSignalStateChange.bind(this));
-        this.trackHandler = new TrackHandler(pc);
+        this.trackStats = new MediaTrackStatsHandler(new MediaSsrcHandler(), new MediaTrackHandler(pc));
     }
 
     public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
@@ -91,30 +91,34 @@ export class StatsCollector {
                 // RTCSentRtpStreamStats
                 // https://w3c.github.io/webrtc-stats/#sentrtpstats-dict*
             } else if (now.type === "inbound-rtp" || now.type === "outbound-rtp") {
-                let mid: string | undefined = now.mid;
-                if (!mid) {
-                    const type = now.type === "inbound-rtp" ? "remote" : "local";
-                    mid = this.transceiverHandler.findMidBySsrc(now.ssrc, type);
-                    if (now.type === "inbound-rtp" && mid) {
-                        now.trackIdentifier = this.trackHandler.getRemoteTrackIdByMid(mid);
-                    }
-                    now.mid = mid;
-                }
-
-                // inbound-rtp => remote receiving report
-                // outbound-rtp => local sending  report
-                const trackID =
-                    now.type === "inbound-rtp" ? now.trackIdentifier : this.trackHandler.getLocalTrackIdByMid(now.mid);
-
-                if (!trackID) {
-                    return;
-                }
-
-                let trackStats = this.track2stats.get(trackID);
-
+                // let mid: string | undefined = now.mid;
+                // if (!mid) {
+                //     const type = now.type === "inbound-rtp" ? "remote" : "local";
+                //     mid = this.mediaSsrcHandler.findMidBySsrc(now.ssrc, type);
+                //     if (now.type === "inbound-rtp" && mid) {
+                //         now.trackIdentifier = this.trackHandler.getRemoteTrackIdByMid(mid);
+                //     }
+                //     now.mid = mid;
+                // }
+                //
+                // // inbound-rtp => remote receiving report
+                // // outbound-rtp => local sending  report
+                // const trackID =
+                //     now.type === "inbound-rtp" ? now.trackIdentifier : this.trackHandler.getLocalTrackIdByMid(now.mid);
+                //
+                // if (!trackID) {
+                //     return;
+                // }
+                //
+                // let trackStats = this.track2stats.get(trackID);
+                //
+                // if (!trackStats) {
+                //     trackStats = new MediaTrackStats(now.type === "inbound-rtp" ? "remote" : "local");
+                //     this.track2stats.set(trackID, trackStats);
+                // }
+                const trackStats = this.trackStats.findTrack2Stats(now);
                 if (!trackStats) {
-                    trackStats = new TrackStats(now.type === "inbound-rtp" ? "remote" : "local");
-                    this.track2stats.set(trackID, trackStats);
+                    return;
                 }
 
                 let isDownloadStream = true;
@@ -175,7 +179,7 @@ export class StatsCollector {
                         });
                     }
                 } else if (before) {
-                    byteSentStats.set(trackID, this.getNonNegativeValue(now.bytesSent));
+                    byteSentStats.set(trackStats.trackId, this.getNonNegativeValue(now.bytesSent));
                     trackStats.addBitrate({
                         download: 0,
                         upload: this.calculateBitrate(now.bytesSent, before.bytesSent, now.timestamp, before.timestamp),
@@ -199,29 +203,37 @@ export class StatsCollector {
                 // RTCVideoHandlerStats - https://w3c.github.io/webrtc-stats/#vststats-dict*
                 // RTCMediaHandlerStats - https://w3c.github.io/webrtc-stats/#mststats-dict*
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
-                if (!now.trackIdentifier) {
-                    const mid: Mid | undefined = this.transceiverHandler.findMidBySsrc(now.ssrc, "local");
-                    if (mid !== undefined) {
-                        now.trackIdentifier = this.trackHandler.getLocalTrackIdByMid(mid);
-                        now.mid = mid;
-                    }
+                // if (!now.trackIdentifier) {
+                //     const mid: Mid | undefined = this.mediaSsrcHandler.findMidBySsrc(now.ssrc, "local");
+                //     if (mid !== undefined) {
+                //         now.trackIdentifier = this.trackHandler.getLocalTrackIdByMid(mid);
+                //         now.mid = mid;
+                //     }
+                // }
+                // const resolution = {
+                //     height: now.frameHeight,
+                //     width: now.frameWidth,
+                // };
+                // const localVideoTracks = this.trackHandler.getLocalTracks("video");
+                //
+                // if (localVideoTracks.length === 0) {
+                //     return;
+                // }
+                //
+                // let trackStats = this.track2stats.get(now.trackIdentifier);
+                //
+                // if (!trackStats) {
+                //     trackStats = new MediaTrackStats("local");
+                //     this.track2stats.set(now.trackIdentifier, trackStats);
+                // }
+                const trackStats = this.trackStats.findLocalVideoTrackStats(now);
+                if (!trackStats) {
+                    return;
                 }
                 const resolution = {
                     height: now.frameHeight,
                     width: now.frameWidth,
                 };
-                const localVideoTracks = this.trackHandler.getLocalTracks("video");
-
-                if (localVideoTracks.length === 0) {
-                    return;
-                }
-
-                let trackStats = this.track2stats.get(now.trackIdentifier);
-
-                if (!trackStats) {
-                    trackStats = new TrackStats("local");
-                    this.track2stats.set(now.trackIdentifier, trackStats);
-                }
                 if (resolution.height && resolution.width) {
                     trackStats.setResolution(resolution);
                 }
@@ -247,7 +259,7 @@ export class StatsCollector {
                 }
 
                 // Get the number of simulcast streams currently enabled from TPC.
-                const numberOfActiveStreams = this.trackHandler.getActiveSimulcastStreams();
+                const numberOfActiveStreams = this.trackStats.mediaTrackHandler.getActiveSimulcastStreams();
 
                 // Reset frame rate to 0 when video is suspended as a result of endpoint falling out of last-n.
                 frameRate = numberOfActiveStreams ? Math.round(frameRate / numberOfActiveStreams) : 0;
@@ -329,7 +341,7 @@ export class StatsCollector {
         let videoBitrateDownload = 0;
         let videoBitrateUpload = 0;
 
-        for (const [trackId, trackStats] of this.track2stats) {
+        for (const [trackId, trackStats] of this.trackStats.getTrack2stats()) {
             // process packet loss stats
             const loss = trackStats.getLoss();
             const type = loss.isDownloadStream ? "download" : "upload";
@@ -342,7 +354,7 @@ export class StatsCollector {
             bitrateUpload += trackStats.getBitrate().upload;
 
             // collect resolutions and framerates
-            const track = this.trackHandler.getTackById(trackId);
+            const track = this.trackStats.mediaTrackHandler.getTackById(trackId);
 
             if (track) {
                 if (track.kind === "audio") {
@@ -411,10 +423,10 @@ export class StatsCollector {
     private onSignalStateChange(): void {
         if (this.pc.signalingState === "stable") {
             if (this.pc.currentRemoteDescription) {
-                this.transceiverHandler.parse(this.pc.currentRemoteDescription.sdp, "remote");
+                this.trackStats.mediaSsrcHandler.parse(this.pc.currentRemoteDescription.sdp, "remote");
             }
             if (this.pc.currentLocalDescription) {
-                this.transceiverHandler.parse(this.pc.currentLocalDescription.sdp, "local");
+                this.trackStats.mediaSsrcHandler.parse(this.pc.currentLocalDescription.sdp, "local");
             }
         }
     }

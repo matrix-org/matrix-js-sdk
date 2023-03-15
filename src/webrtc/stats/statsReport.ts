@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoos } from "./connectionStats";
 import { TransportStats } from "./transportStats";
-import { Resolution } from "./trackStats";
+import { Resolution } from "./media/mediaTrackStats";
 
 export enum StatsReport {
     CONNECTION_STATS = "connection_stats",

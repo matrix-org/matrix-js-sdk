@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { TransportStats } from "./transportStats";
-import { Bitrate } from "./trackStats";
+import { Bitrate } from "./media/mediaTrackStats";
 
 export interface ConnectionStatsBandwidth {
     /**

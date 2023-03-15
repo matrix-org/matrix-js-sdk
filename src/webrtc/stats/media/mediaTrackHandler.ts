@@ -16,7 +16,7 @@ limitations under the License.
 
 export type TrackId = string;
 
-export class TrackHandler {
+export class MediaTrackHandler {
     public constructor(private readonly pc: RTCPeerConnection) {}
 
     public getLocalTracks(kind: "audio" | "video"): MediaStreamTrack[] {
