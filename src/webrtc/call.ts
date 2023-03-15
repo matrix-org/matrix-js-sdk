@@ -55,7 +55,7 @@ import { MatrixError } from "../http-api";
 
 interface CallOpts {
     // The room ID for this call.
-    roomId?: string;
+    roomId: string;
     invitee?: string;
     // The Matrix Client instance to send events to.
     client: MatrixClient;
@@ -314,7 +314,7 @@ function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverK
 }
 
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
-    public roomId?: string;
+    public roomId: string;
     public callId: string;
     public invitee?: string;
     public hangupParty?: CallParty;
@@ -1400,6 +1400,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         if (!this.hasUserMediaVideoSender && !muted) {
+            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
