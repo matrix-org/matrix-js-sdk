@@ -91,32 +91,10 @@ export class StatsCollector {
                 // RTCSentRtpStreamStats
                 // https://w3c.github.io/webrtc-stats/#sentrtpstats-dict*
             } else if (now.type === "inbound-rtp" || now.type === "outbound-rtp") {
-                // let mid: string | undefined = now.mid;
-                // if (!mid) {
-                //     const type = now.type === "inbound-rtp" ? "remote" : "local";
-                //     mid = this.mediaSsrcHandler.findMidBySsrc(now.ssrc, type);
-                //     if (now.type === "inbound-rtp" && mid) {
-                //         now.trackIdentifier = this.trackHandler.getRemoteTrackIdByMid(mid);
-                //     }
-                //     now.mid = mid;
-                // }
-                //
-                // // inbound-rtp => remote receiving report
-                // // outbound-rtp => local sending  report
-                // const trackID =
-                //     now.type === "inbound-rtp" ? now.trackIdentifier : this.trackHandler.getLocalTrackIdByMid(now.mid);
-                //
-                // if (!trackID) {
-                //     return;
-                // }
-                //
-                // let trackStats = this.track2stats.get(trackID);
-                //
-                // if (!trackStats) {
-                //     trackStats = new MediaTrackStats(now.type === "inbound-rtp" ? "remote" : "local");
-                //     this.track2stats.set(trackID, trackStats);
-                // }
-                const trackStats = this.trackStats.findTrack2Stats(now);
+                const trackStats = this.trackStats.findTrack2Stats(
+                    now,
+                    now.type === "inbound-rtp" ? "remote" : "local",
+                );
                 if (!trackStats) {
                     return;
                 }
@@ -198,34 +176,7 @@ export class StatsCollector {
 
                     codecShortType && trackStats.setCodec(codecShortType);
                 }
-
-                // Use track stats for resolution and framerate of the local video source.
-                // RTCVideoHandlerStats - https://w3c.github.io/webrtc-stats/#vststats-dict*
-                // RTCMediaHandlerStats - https://w3c.github.io/webrtc-stats/#mststats-dict*
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
-                // if (!now.trackIdentifier) {
-                //     const mid: Mid | undefined = this.mediaSsrcHandler.findMidBySsrc(now.ssrc, "local");
-                //     if (mid !== undefined) {
-                //         now.trackIdentifier = this.trackHandler.getLocalTrackIdByMid(mid);
-                //         now.mid = mid;
-                //     }
-                // }
-                // const resolution = {
-                //     height: now.frameHeight,
-                //     width: now.frameWidth,
-                // };
-                // const localVideoTracks = this.trackHandler.getLocalTracks("video");
-                //
-                // if (localVideoTracks.length === 0) {
-                //     return;
-                // }
-                //
-                // let trackStats = this.track2stats.get(now.trackIdentifier);
-                //
-                // if (!trackStats) {
-                //     trackStats = new MediaTrackStats("local");
-                //     this.track2stats.set(now.trackIdentifier, trackStats);
-                // }
                 const trackStats = this.trackStats.findLocalVideoTrackStats(now);
                 if (!trackStats) {
                     return;

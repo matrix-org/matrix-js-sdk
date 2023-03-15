@@ -16,7 +16,7 @@ limitations under the License.
 import { TrackID } from "../statsReport";
 import { MediaTrackStats } from "./mediaTrackStats";
 import { MediaTrackHandler } from "./mediaTrackHandler";
-import { MediaSsrcHandler, Mid } from "./mediaSsrcHandler";
+import { MediaSsrcHandler } from "./mediaSsrcHandler";
 
 export class MediaTrackStatsHandler {
     private readonly track2stats = new Map<TrackID, MediaTrackStats>();
@@ -26,23 +26,25 @@ export class MediaTrackStatsHandler {
         public readonly mediaTrackHandler: MediaTrackHandler,
     ) {}
 
-    public findTrack2Stats(report: any): MediaTrackStats | undefined {
-        let mid: string | undefined = report.mid;
-        if (!mid) {
-            const type = report.type === "inbound-rtp" ? "remote" : "local";
-            mid = this.mediaSsrcHandler.findMidBySsrc(report.ssrc, type);
-            if (report.type === "inbound-rtp" && mid) {
-                report.trackIdentifier = this.mediaTrackHandler.getRemoteTrackIdByMid(mid);
+    public findTrack2Stats(report: any, type: "remote" | "local"): MediaTrackStats | undefined {
+        let trackID;
+        if (report.trackIdentifier) {
+            trackID = report.trackIdentifier;
+        } else if (report.mid) {
+            trackID =
+                type === "remote"
+                    ? this.mediaTrackHandler.getRemoteTrackIdByMid(report.mid)
+                    : this.mediaTrackHandler.getLocalTrackIdByMid(report.mid);
+        } else if (report.ssrc) {
+            const mid = this.mediaSsrcHandler.findMidBySsrc(report.ssrc, type);
+            if (!mid) {
+                return undefined;
             }
-            report.mid = mid;
+            trackID =
+                type === "remote"
+                    ? this.mediaTrackHandler.getRemoteTrackIdByMid(report.mid)
+                    : this.mediaTrackHandler.getLocalTrackIdByMid(report.mid);
         }
-
-        // inbound-rtp => remote receiving report
-        // outbound-rtp => local sending  report
-        const trackID =
-            report.type === "inbound-rtp"
-                ? report.trackIdentifier
-                : this.mediaTrackHandler.getLocalTrackIdByMid(report.mid);
 
         if (!trackID) {
             return undefined;
@@ -51,34 +53,18 @@ export class MediaTrackStatsHandler {
         let trackStats = this.track2stats.get(trackID);
 
         if (!trackStats) {
-            trackStats = new MediaTrackStats(trackID, report.type === "inbound-rtp" ? "remote" : "local");
+            trackStats = new MediaTrackStats(trackID, type);
             this.track2stats.set(trackID, trackStats);
         }
         return trackStats;
     }
 
     public findLocalVideoTrackStats(report: any): MediaTrackStats | undefined {
-        if (!report.trackIdentifier) {
-            const mid: Mid | undefined = this.mediaSsrcHandler.findMidBySsrc(report.ssrc, "local");
-            if (mid !== undefined) {
-                report.trackIdentifier = this.mediaTrackHandler.getLocalTrackIdByMid(mid);
-                report.mid = mid;
-            }
-        }
-
         const localVideoTracks = this.mediaTrackHandler.getLocalTracks("video");
-
         if (localVideoTracks.length === 0) {
             return undefined;
         }
-
-        let trackStats = this.track2stats.get(report.trackIdentifier);
-
-        if (!trackStats) {
-            trackStats = new MediaTrackStats(report.trackIdentifier, "local");
-            this.track2stats.set(report.trackIdentifier, trackStats);
-        }
-        return trackStats;
+        return this.findTrack2Stats(report, "local");
     }
 
     public getTrack2stats(): Map<TrackID, MediaTrackStats> {
