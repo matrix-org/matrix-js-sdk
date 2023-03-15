@@ -20,7 +20,7 @@ export type Mid = string;
 export type Ssrc = string;
 export type MapType = "local" | "remote";
 
-export class TransceiverHandler {
+export class MediaSsrcHandler {
     private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
 
     public findMidBySsrc(ssrc: Ssrc, type: "local" | "remote"): Mid | undefined {

@@ -20,7 +20,8 @@ import { Resolution, TrackStats } from "./trackStats";
 import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
-import { Mid, TransceiverHandler } from "./transceiverHandler";
+import { Mid, MediaSsrcHandler } from "./mediaSsrcHandler";
+import { TrackHandler } from "./trackHandler";
 
 export class StatsCollector {
     private isActive = true;
@@ -28,7 +29,8 @@ export class StatsCollector {
     private currentStatsReport: RTCStatsReport | undefined;
     private readonly connectionStats = new ConnectionStats();
     private readonly track2stats = new Map<TrackID, TrackStats>();
-    private readonly transceiverHandler = new TransceiverHandler();
+    private readonly transceiverHandler = new MediaSsrcHandler();
+    private readonly trackHandler: TrackHandler;
 
     // private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
 
@@ -40,6 +42,7 @@ export class StatsCollector {
         private readonly isFocus = true,
     ) {
         pc.addEventListener("signalingstatechange", this.onSignalStateChange.bind(this));
+        this.trackHandler = new TrackHandler(pc);
     }
 
     public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
@@ -93,14 +96,15 @@ export class StatsCollector {
                     const type = now.type === "inbound-rtp" ? "remote" : "local";
                     mid = this.transceiverHandler.findMidBySsrc(now.ssrc, type);
                     if (now.type === "inbound-rtp" && mid) {
-                        now.trackIdentifier = this.getRemoteTrackIdByMid(mid);
+                        now.trackIdentifier = this.trackHandler.getRemoteTrackIdByMid(mid);
                     }
                     now.mid = mid;
                 }
 
                 // inbound-rtp => remote receiving report
                 // outbound-rtp => local sending  report
-                const trackID = now.type === "inbound-rtp" ? now.trackIdentifier : this.getLocalTrackIdByMid(now.mid);
+                const trackID =
+                    now.type === "inbound-rtp" ? now.trackIdentifier : this.trackHandler.getLocalTrackIdByMid(now.mid);
 
                 if (!trackID) {
                     return;
@@ -198,7 +202,7 @@ export class StatsCollector {
                 if (!now.trackIdentifier) {
                     const mid: Mid | undefined = this.transceiverHandler.findMidBySsrc(now.ssrc, "local");
                     if (mid !== undefined) {
-                        now.trackIdentifier = this.getLocalTrackIdByMid(mid);
+                        now.trackIdentifier = this.trackHandler.getLocalTrackIdByMid(mid);
                         now.mid = mid;
                     }
                 }
@@ -206,7 +210,7 @@ export class StatsCollector {
                     height: now.frameHeight,
                     width: now.frameWidth,
                 };
-                const localVideoTracks = this.getLocalTracks("video");
+                const localVideoTracks = this.trackHandler.getLocalTracks("video");
 
                 if (localVideoTracks.length === 0) {
                     return;
@@ -243,7 +247,7 @@ export class StatsCollector {
                 }
 
                 // Get the number of simulcast streams currently enabled from TPC.
-                const numberOfActiveStreams = this.getActiveSimulcastStreams();
+                const numberOfActiveStreams = this.trackHandler.getActiveSimulcastStreams();
 
                 // Reset frame rate to 0 when video is suspended as a result of endpoint falling out of last-n.
                 frameRate = numberOfActiveStreams ? Math.round(frameRate / numberOfActiveStreams) : 0;
@@ -302,56 +306,6 @@ export class StatsCollector {
         return bitrateKbps;
     }
 
-    private getLocalTracks(kind: "audio" | "video"): MediaStreamTrack[] {
-        const isNotNullAndKind = (track: MediaStreamTrack | null): boolean => {
-            return track !== null && track.kind === kind;
-        };
-        // @ts-ignore The linter don't get it
-        return this.pc
-            .getTransceivers()
-            .filter((t) => t.currentDirection === "sendonly" || t.currentDirection === "sendrecv")
-            .filter((t) => t.sender !== null)
-            .map((t) => t.sender)
-            .map((s) => s.track)
-            .filter(isNotNullAndKind);
-    }
-
-    private getTackById(trackId: string): MediaStreamTrack | undefined {
-        return this.pc
-            .getTransceivers()
-            .map((t) => {
-                if (t?.sender.track !== null && t.sender.track.id === trackId) {
-                    return t.sender.track;
-                }
-                if (t?.receiver.track !== null && t.receiver.track.id === trackId) {
-                    return t.receiver.track;
-                }
-                return undefined;
-            })
-            .find((t) => t !== undefined);
-    }
-
-    private getLocalTrackIdByMid(mid: string): string | undefined {
-        const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
-        if (transceiver !== undefined && !!transceiver.sender && !!transceiver.sender.track) {
-            return transceiver.sender.track.id;
-        }
-        return undefined;
-    }
-
-    private getRemoteTrackIdByMid(mid: string): string | undefined {
-        const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
-        if (transceiver !== undefined && !!transceiver.receiver && !!transceiver.receiver.track) {
-            return transceiver.receiver.track.id;
-        }
-        return undefined;
-    }
-
-    private getActiveSimulcastStreams(): number {
-        //@TODO implement this right.. Check how many layer configured
-        return 3;
-    }
-
     private processAndEmitReport(): void {
         // process stats
         const totalPackets = {
@@ -388,7 +342,7 @@ export class StatsCollector {
             bitrateUpload += trackStats.getBitrate().upload;
 
             // collect resolutions and framerates
-            const track = this.getTackById(trackId);
+            const track = this.trackHandler.getTackById(trackId);
 
             if (track) {
                 if (track.kind === "audio") {
