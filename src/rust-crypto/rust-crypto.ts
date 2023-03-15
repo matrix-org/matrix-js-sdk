@@ -197,7 +197,7 @@ export class RustCrypto implements CryptoBackend {
         unusedFallbackKeys?: Set<string>;
     }): Promise<IToDeviceEvent[]> {
         const result = await this.olmMachine.receiveSyncChanges(
-            events ? JSON.stringify(events) : "",
+            events ? JSON.stringify(events) : "[]",
             new RustSdkCryptoJs.DeviceLists(),
             oneTimeKeysCounts,
             unusedFallbackKeys,

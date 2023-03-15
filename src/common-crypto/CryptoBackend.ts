@@ -105,8 +105,32 @@ export interface SyncCryptoCallbacks {
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
 
+    /**
+     * Called by the /sync loop whenever there are incoming to-device messages.
+     *
+     * The implementation may preprocess the received messages (eg, decrypt them) and return an
+     * updated list of messages for dispatch to the rest of the system.
+     *
+     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
+     * messages, rather than the results of any decryption attempts.
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @returns A list of preprocessed to-device messages.
+     */
     preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<IToDeviceEvent[]>;
 
+    /**
+     * Called by the /sync loop whenever there are incoming to-device messages.
+     *
+     * The implementation may preprocess the received messages (eg, decrypt them) and return an
+     * updated list of messages for dispatch to the rest of the system.
+     *
+     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
+     * messages, rather than the results of any decryption attempts.
+     *
+     * @param unusedFallbackKeys - the received unused fallback keys
+     * @returns A list of preprocessed to-device messages.
+     */
     preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<IToDeviceEvent[]>;
 
     /**
