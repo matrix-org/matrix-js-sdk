@@ -17,10 +17,11 @@ limitations under the License.
 import { parse as parseSdp } from "sdp-transform";
 
 import { ConnectionStats } from "./connectionStats";
-import { TransportStats } from "./transportStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { Resolution, TrackStats } from "./trackStats";
 import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
+import { ConnectionStatsReporter } from "./connectionStatsReporter";
+import { TransportStatsReporter } from "./transportStatsReporter";
 
 type Mid = string;
 type Ssrc = string;
@@ -38,7 +39,7 @@ export class StatsCollector {
         public readonly remoteUserId: string,
         private readonly pc: RTCPeerConnection,
         private readonly emitter: StatsReportEmitter,
-        private readonly isFocus = false,
+        private readonly isFocus = true,
     ) {
         pc.addEventListener("signalingstatechange", this.onSignalStateChange.bind(this));
     }
@@ -76,53 +77,13 @@ export class StatsCollector {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
             // RTCIceCandidatePairStats - https://w3c.github.io/webrtc-stats/#candidatepair-dict*
             if (now.type === "candidate-pair" && now.nominated && now.state === "succeeded") {
-                const availableIncomingBitrate = now.availableIncomingBitrate;
-                const availableOutgoingBitrate = now.availableOutgoingBitrate;
-
-                if (availableIncomingBitrate || availableOutgoingBitrate) {
-                    this.connectionStats.bandwidth = {
-                        download: Math.round(availableIncomingBitrate / 1000),
-                        upload: Math.round(availableOutgoingBitrate / 1000),
-                    };
-                }
-
-                const remoteUsedCandidate = this.currentStatsReport?.get(now.remoteCandidateId);
-                const localUsedCandidate = this.currentStatsReport?.get(now.localCandidateId);
-
-                // RTCIceCandidateStats
-                // https://w3c.github.io/webrtc-stats/#icecandidate-dict*
-                if (remoteUsedCandidate && localUsedCandidate) {
-                    const remoteIpAddress =
-                        remoteUsedCandidate.ip !== undefined ? remoteUsedCandidate.ip : remoteUsedCandidate.address;
-                    const remotePort = remoteUsedCandidate.port;
-                    const ip = `${remoteIpAddress}:${remotePort}`;
-
-                    const localIpAddress =
-                        localUsedCandidate.ip !== undefined ? localUsedCandidate.ip : localUsedCandidate.address;
-                    const localPort = localUsedCandidate.port;
-                    const localIp = `${localIpAddress}:${localPort}`;
-                    const type = remoteUsedCandidate.protocol;
-
-                    // Save the address unless it has been saved already.
-                    const conferenceStatsTransport = this.connectionStats.transport;
-
-                    if (
-                        !conferenceStatsTransport.some(
-                            (t: TransportStats) => t.ip === ip && t.type === type && t.localIp === localIp,
-                        )
-                    ) {
-                        conferenceStatsTransport.push({
-                            ip,
-                            type,
-                            localIp,
-                            isFocus: this.isFocus,
-                            localCandidateType: localUsedCandidate.candidateType,
-                            remoteCandidateType: remoteUsedCandidate.candidateType,
-                            networkType: localUsedCandidate.networkType,
-                            rtt: now.currentRoundTripTime * 1000,
-                        } as TransportStats);
-                    }
-                }
+                this.connectionStats.bandwidth = ConnectionStatsReporter.buildBandwidthReport(now);
+                this.connectionStats.transport = TransportStatsReporter.buildReport(
+                    this.currentStatsReport,
+                    now,
+                    this.connectionStats.transport,
+                    this.isFocus,
+                );
 
                 // RTCReceivedRtpStreamStats
                 // https://w3c.github.io/webrtc-stats/#receivedrtpstats-dict*
