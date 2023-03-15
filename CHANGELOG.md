@@ -1,5 +1,5 @@
-Changes in [23.5.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.5.0-rc.1) (2023-03-07)
-============================================================================================================
+Changes in [23.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.5.0) (2023-03-15)
+==================================================================================================
 
 ## ✨ Features
  * Implement MSC3758: a push rule condition to match event properties exactly ([\#3179](https://github.com/matrix-org/matrix-js-sdk/pull/3179)).
