@@ -17,6 +17,7 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import { IDeviceKeys } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
@@ -24,11 +25,13 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
+import { DeviceVerification, IDevice } from "../crypto/deviceinfo";
+import { DeviceKeys, IDownloadKeyResult, IQueryKeysRequest } from "../client";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -50,7 +53,7 @@ export class RustCrypto implements CryptoBackend {
 
     public constructor(
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         _userId: string,
         _deviceId: string,
     ) {
@@ -172,6 +175,102 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    public async getUserDeviceInfo(
+        userIds: string[],
+        downloadUncached = false,
+    ): Promise<Map<string, Map<string, IDevice>>> {
+        const trackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const result = new Map();
+
+        const untrackedUsers: Set<string> = new Set();
+
+        for (const userId of userIds) {
+            const rustUserId = new RustSdkCryptoJs.UserId(userId);
+
+            // if this is a tracked user, we can just fetch the device list from the rust-sdk
+            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
+            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
+            if (trackedUsers.has(rustUserId)) {
+                const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+                result.set(
+                    userId,
+                    new Map(
+                        devices
+                            .devices()
+                            .map((device: RustSdkCryptoJs.Device) => [
+                                device.deviceId.toString(),
+                                this.rustDeviceToJsDevice(device),
+                            ]),
+                    ),
+                );
+            } else if (downloadUncached) {
+                untrackedUsers.add(userId);
+            }
+        }
+
+        // for any users whose device lists we are not tracking, fall back to downloading the device list
+        // over HTTP.
+        if (untrackedUsers.size >= 1) {
+            const queryBody: IQueryKeysRequest = { device_keys: {} };
+            for (const u of untrackedUsers) {
+                queryBody.device_keys[u] = [];
+            }
+
+            const queryResult: IDownloadKeyResult = await this.http.authedRequest(
+                Method.Post,
+                "/_matrix/client/v3/keys/query",
+                undefined,
+                queryBody,
+                { prefix: "" },
+            );
+            for (const [userId, keys] of Object.entries(queryResult.device_keys)) {
+                result.set(
+                    userId,
+                    new Map(
+                        Object.entries(keys).map(([deviceId, device]) => [
+                            deviceId,
+                            this.downloadDeviceToJsDevice(device),
+                        ]),
+                    ),
+                );
+            }
+        }
+        return result;
+    }
+
+    private rustDeviceToJsDevice(device: RustSdkCryptoJs.Device): IDevice {
+        const keys: Record<string, string> = Object.create(null);
+        for (const [keyId, key] of device.keys.entries()) {
+            keys[keyId.toString()] = key.toBase64();
+        }
+
+        let verified: DeviceVerification = DeviceVerification.Unverified;
+        if (device.isBlacklisted()) {
+            verified = DeviceVerification.Blocked;
+        } else if (device.isVerified()) {
+            verified = DeviceVerification.Verified;
+        }
+
+        return {
+            algorithms: [], // TODO
+            keys: keys,
+            known: false, // TODO
+            signatures: undefined, // TODO
+            verified: verified,
+        };
+    }
+
+    private downloadDeviceToJsDevice(device: DeviceKeys[keyof DeviceKeys]): IDevice {
+        return {
+            algorithms: device.algorithms,
+            keys: device.keys,
+            known: false,
+            signatures: device.signatures,
+            verified: DeviceVerification.Unverified,
+            unsigned: device.unsigned,
+        };
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
