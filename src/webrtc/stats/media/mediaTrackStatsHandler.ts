@@ -26,6 +26,13 @@ export class MediaTrackStatsHandler {
         public readonly mediaTrackHandler: MediaTrackHandler,
     ) {}
 
+    /**
+     * Find tracks by rtc stats
+     * Argument report is any because the stats api is not consistent:
+     * For example `trackIdentifier`, `mid` not existing in every implementations
+     * https://www.w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
+     * https://developer.mozilla.org/en-US/docs/Web/API/RTCInboundRtpStreamStats
+     */
     public findTrack2Stats(report: any, type: "remote" | "local"): MediaTrackStats | undefined {
         let trackID;
         if (report.trackIdentifier) {

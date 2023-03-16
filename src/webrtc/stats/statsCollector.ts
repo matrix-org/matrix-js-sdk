@@ -23,6 +23,7 @@ import { TransportStatsReporter } from "./transportStatsReporter";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
 import { MediaTrackHandler } from "./media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
+import { TrackStatsReporter } from "./trackStatsReporter";
 
 export class StatsCollector {
     private isActive = true;
@@ -99,33 +100,8 @@ export class StatsCollector {
                     return;
                 }
 
-                let isDownloadStream = true;
-                let key = "packetsReceived";
-
-                if (now.type === "outbound-rtp") {
-                    isDownloadStream = false;
-                    key = "packetsSent";
-                }
-
-                let packetsNow = now[key];
-
-                if (!packetsNow || packetsNow < 0) {
-                    packetsNow = 0;
-                }
-
                 if (before) {
-                    const packetsBefore = this.getNonNegativeValue(before[key]);
-                    const packetsDiff = Math.max(0, packetsNow - packetsBefore);
-
-                    const packetsLostNow = this.getNonNegativeValue(now.packetsLost);
-                    const packetsLostBefore = this.getNonNegativeValue(before.packetsLost);
-                    const packetsLostDiff = Math.max(0, packetsLostNow - packetsLostBefore);
-
-                    trackStats.setLoss({
-                        packetsTotal: packetsDiff + packetsLostDiff,
-                        packetsLost: packetsLostDiff,
-                        isDownloadStream,
-                    });
+                    TrackStatsReporter.buildPacketsLost(trackStats, now, before);
                 }
 
                 // Get the resolution and framerate for only remote video sources here. For the local video sources,
@@ -134,87 +110,27 @@ export class StatsCollector {
                 // more calculations needed to determine what is the highest resolution stream sent by the client if the
                 // 'outbound-rtp' stats are used.
                 if (now.type === "inbound-rtp") {
-                    const resolution = {
-                        height: now.frameHeight,
-                        width: now.frameWidth,
-                    };
-                    const frameRate = now.framesPerSecond;
-
-                    if (resolution.height && resolution.width) {
-                        trackStats.setResolution(resolution);
-                    }
-                    trackStats.setFramerate(Math.round(frameRate || 0));
-
+                    TrackStatsReporter.buildFramerateResolution(trackStats, now);
                     if (before) {
-                        trackStats.addBitrate({
-                            download: this.calculateBitrate(
-                                now.bytesReceived,
-                                before.bytesReceived,
-                                now.timestamp,
-                                before.timestamp,
-                            ),
-                            upload: 0,
-                        });
+                        TrackStatsReporter.buildBitrateReceived(trackStats, now, before);
                     }
                 } else if (before) {
                     byteSentStats.set(trackStats.trackId, this.getNonNegativeValue(now.bytesSent));
-                    trackStats.addBitrate({
-                        download: 0,
-                        upload: this.calculateBitrate(now.bytesSent, before.bytesSent, now.timestamp, before.timestamp),
-                    });
+                    TrackStatsReporter.buildBitrateSend(trackStats, now, before);
                 }
-
-                const codec = this.currentStatsReport?.get(now.codecId);
-
-                if (codec) {
-                    /**
-                     * The mime type has the following form: video/VP8 or audio/ISAC,
-                     * so we what to keep just the type after the '/', audio and video
-                     * keys will be added on the processing side.
-                     */
-                    const codecShortType = codec.mimeType.split("/")[1];
-
-                    codecShortType && trackStats.setCodec(codecShortType);
-                }
+                TrackStatsReporter.buildCodec(this.currentStatsReport, trackStats, now);
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
                 const trackStats = this.trackStats.findLocalVideoTrackStats(now);
                 if (!trackStats) {
                     return;
                 }
-                const resolution = {
-                    height: now.frameHeight,
-                    width: now.frameWidth,
-                };
-                if (resolution.height && resolution.width) {
-                    trackStats.setResolution(resolution);
-                }
-
-                // Calculate the frame rate. 'framesSent' is the total aggregate value for all the simulcast streams.
-                // Therefore, it needs to be divided by the total number of active simulcast streams.
-                let frameRate = now.framesPerSecond;
-
-                if (!frameRate) {
-                    if (before) {
-                        const timeMs = now.timestamp - before.timestamp;
-
-                        if (timeMs > 0 && now.framesSent) {
-                            const numberOfFramesSinceBefore = now.framesSent - before.framesSent;
-
-                            frameRate = (numberOfFramesSinceBefore / timeMs) * 1000;
-                        }
-                    }
-
-                    if (!frameRate) {
-                        return;
-                    }
-                }
-
-                // Get the number of simulcast streams currently enabled from TPC.
-                const numberOfActiveStreams = this.trackStats.mediaTrackHandler.getActiveSimulcastStreams();
-
-                // Reset frame rate to 0 when video is suspended as a result of endpoint falling out of last-n.
-                frameRate = numberOfActiveStreams ? Math.round(frameRate / numberOfActiveStreams) : 0;
-                trackStats.setFramerate(frameRate);
+                TrackStatsReporter.buildFramerateResolution(trackStats, now);
+                TrackStatsReporter.calculateSimulcastFramerate(
+                    trackStats,
+                    now,
+                    before,
+                    this.trackStats.mediaTrackHandler.getActiveSimulcastStreams(),
+                );
             }
         });
 
@@ -246,27 +162,6 @@ export class StatsCollector {
         }
 
         return Math.max(0, value);
-    }
-
-    private calculateBitrate(
-        bytesNowAny: any,
-        bytesBeforeAny: any,
-        nowTimestamp: number,
-        beforeTimestamp: number,
-    ): number {
-        const bytesNow = this.getNonNegativeValue(bytesNowAny);
-        const bytesBefore = this.getNonNegativeValue(bytesBeforeAny);
-        const bytesProcessed = Math.max(0, bytesNow - bytesBefore);
-
-        const timeMs = nowTimestamp - beforeTimestamp;
-        let bitrateKbps = 0;
-
-        if (timeMs > 0) {
-            // TODO is there any reason to round here?
-            bitrateKbps = Math.round((bytesProcessed * 8) / timeMs);
-        }
-
-        return bitrateKbps;
     }
 
     private processAndEmitReport(): void {
