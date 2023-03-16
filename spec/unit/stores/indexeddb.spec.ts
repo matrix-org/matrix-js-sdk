@@ -166,4 +166,20 @@ describe("IndexedDBStore", () => {
 
         await expect(store.isNewlyCreated()).resolves.toBeFalsy();
     });
+
+    it("should emit 'closed' if database is unexpectedly closed", async () => {
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+        await store.startup();
+
+        const deferred = defer<void>();
+        store.on("closed", deferred.resolve);
+
+        // @ts-ignore - private field access
+        (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
+        await deferred.promise;
+    });
 });
