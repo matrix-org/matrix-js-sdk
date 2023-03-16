@@ -1853,4 +1853,59 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(event.getContent().body).not.toContain("withheld");
         });
     });
+
+    describe("todo", () => {
+        it("should make key upload request after sync", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+
+            // if we're using the old crypto impl, stub out some methods in the device manager.
+            // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+            if (aliceClient.crypto) {
+                aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+                aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+            }
+
+            const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+
+            // make the room_key event
+            const roomKeyEncrypted = encryptGroupSessionKey({
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: keyReceiver.getDeviceKey(),
+                recipientEd25519Key: keyReceiver.getSigningKey(),
+                olmAccount: testOlmAccount,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // encrypt a message with the group session
+            const messageEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted],
+                },
+                rooms: {
+                    join: {
+                        [ROOM_ID]: { timeline: { events: [messageEncrypted] } },
+                    },
+                },
+            };
+
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            const key = await keyReceiver.awaitOneTimeKeyUpload();
+            expect(Object.keys(key).length).toBeTruthy();
+        });
+    });
 });
