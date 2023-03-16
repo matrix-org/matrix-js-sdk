@@ -287,6 +287,15 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     return mods;
 }
 
+export interface VoipEvent {
+    type: "toDevice" | "sendEvent";
+    eventType: string;
+    userId?: string;
+    opponentDeviceId?: string;
+    roomId?: string;
+    content: Record<string, unknown>;
+}
+
 export type CallEventHandlerMap = {
     [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
     [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
@@ -300,7 +309,7 @@ export type CallEventHandlerMap = {
     [CallEvent.AssertedIdentityChanged]: () => void;
     /* @deprecated */
     [CallEvent.HoldUnhold]: (onHold: boolean) => void;
-    [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
+    [CallEvent.SendVoipEvent]: (event: VoipEvent) => void;
 };
 
 // The key of the transceiver map (purpose + media type, separated by ':')
