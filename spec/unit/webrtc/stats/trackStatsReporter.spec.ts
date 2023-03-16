@@ -19,13 +19,13 @@ import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackSt
 describe("TrackStatsReporter", () => {
     describe("should on frame and resolution stats", () => {
         it("creating empty frame and resolution report, if no data available.", async () => {
-            const trackStats = new MediaTrackStats("1", "local");
+            const trackStats = new MediaTrackStats("1", "local", "video");
             TrackStatsReporter.buildFramerateResolution(trackStats, {});
             expect(trackStats.getFramerate()).toEqual(0);
             expect(trackStats.getResolution()).toEqual({ width: -1, height: -1 });
         });
         it("creating empty frame and resolution report.", async () => {
-            const trackStats = new MediaTrackStats("1", "remote");
+            const trackStats = new MediaTrackStats("1", "remote", "video");
             TrackStatsReporter.buildFramerateResolution(trackStats, {
                 framesPerSecond: 22.2,
                 frameHeight: 180,
@@ -38,7 +38,7 @@ describe("TrackStatsReporter", () => {
 
     describe("should on simulcast", () => {
         it("creating simulcast framerate.", async () => {
-            const trackStats = new MediaTrackStats("1", "local");
+            const trackStats = new MediaTrackStats("1", "local", "video");
             TrackStatsReporter.calculateSimulcastFramerate(
                 trackStats,
                 {
@@ -57,7 +57,7 @@ describe("TrackStatsReporter", () => {
 
     describe("should on bytes received stats", () => {
         it("creating build bitrate received report.", async () => {
-            const trackStats = new MediaTrackStats("1", "remote");
+            const trackStats = new MediaTrackStats("1", "remote", "video");
             TrackStatsReporter.buildBitrateReceived(
                 trackStats,
                 {
@@ -72,7 +72,7 @@ describe("TrackStatsReporter", () => {
 
     describe("should on bytes send stats", () => {
         it("creating build bitrate send report.", async () => {
-            const trackStats = new MediaTrackStats("1", "local");
+            const trackStats = new MediaTrackStats("1", "local", "video");
             TrackStatsReporter.buildBitrateSend(
                 trackStats,
                 {
@@ -87,7 +87,7 @@ describe("TrackStatsReporter", () => {
 
     describe("should on codec stats", () => {
         it("creating build bitrate send report.", async () => {
-            const trackStats = new MediaTrackStats("1", "remote");
+            const trackStats = new MediaTrackStats("1", "remote", "video");
             const remote = {} as RTCStatsReport;
             remote.get = jest.fn().mockReturnValue({ mimeType: "video/v8" });
             TrackStatsReporter.buildCodec(remote, trackStats, { codecId: "codecID" });
@@ -97,7 +97,7 @@ describe("TrackStatsReporter", () => {
 
     describe("should on package lost stats", () => {
         it("creating build package lost on send report.", async () => {
-            const trackStats = new MediaTrackStats("1", "local");
+            const trackStats = new MediaTrackStats("1", "local", "video");
             TrackStatsReporter.buildPacketsLost(
                 trackStats,
                 {
@@ -113,7 +113,7 @@ describe("TrackStatsReporter", () => {
             expect(trackStats.getLoss()).toEqual({ packetsTotal: 190, packetsLost: 90, isDownloadStream: false });
         });
         it("creating build package lost on received report.", async () => {
-            const trackStats = new MediaTrackStats("1", "remote");
+            const trackStats = new MediaTrackStats("1", "remote", "video");
             TrackStatsReporter.buildPacketsLost(
                 trackStats,
                 {
