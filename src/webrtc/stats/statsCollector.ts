@@ -16,14 +16,14 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { Resolution } from "./media/mediaTrackStats";
-import { ByteSend, ByteSendStatsReport, CodecMap, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
+import { ByteSend, ByteSendStatsReport, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
 import { MediaTrackHandler } from "./media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
 import { TrackStatsReporter } from "./trackStatsReporter";
+import { StatsReportBuilder } from "./statsReportBuilder";
 
 export class StatsCollector {
     private isActive = true;
@@ -165,91 +165,14 @@ export class StatsCollector {
     }
 
     private processAndEmitReport(): void {
-        // process stats
-        const totalPackets = {
-            download: 0,
-            upload: 0,
-        };
-        const lostPackets = {
-            download: 0,
-            upload: 0,
-        };
-        let bitrateDownload = 0;
-        let bitrateUpload = 0;
-        const resolutions: ResolutionMap = {
-            local: new Map<TrackID, Resolution>(),
-            remote: new Map<TrackID, Resolution>(),
-        };
-        const framerates: FramerateMap = { local: new Map<TrackID, number>(), remote: new Map<TrackID, number>() };
-        const codecs: CodecMap = { local: new Map<TrackID, string>(), remote: new Map<TrackID, string>() };
-        let audioBitrateDownload = 0;
-        let audioBitrateUpload = 0;
-        let videoBitrateDownload = 0;
-        let videoBitrateUpload = 0;
+        const report = StatsReportBuilder.build(this.trackStats.getTrack2stats());
 
-        for (const [trackId, trackStats] of this.trackStats.getTrack2stats()) {
-            // process packet loss stats
-            const loss = trackStats.getLoss();
-            const type = loss.isDownloadStream ? "download" : "upload";
-
-            totalPackets[type] += loss.packetsTotal;
-            lostPackets[type] += loss.packetsLost;
-
-            // process bitrate stats
-            bitrateDownload += trackStats.getBitrate().download;
-            bitrateUpload += trackStats.getBitrate().upload;
-
-            // collect resolutions and framerates
-            const track = this.trackStats.mediaTrackHandler.getTackById(trackId);
-
-            if (track) {
-                if (track.kind === "audio") {
-                    audioBitrateDownload += trackStats.getBitrate().download;
-                    audioBitrateUpload += trackStats.getBitrate().upload;
-                } else {
-                    videoBitrateDownload += trackStats.getBitrate().download;
-                    videoBitrateUpload += trackStats.getBitrate().upload;
-                }
-
-                resolutions[trackStats.getType()].set(trackId, trackStats.getResolution());
-                framerates[trackStats.getType()].set(trackId, trackStats.getFramerate());
-                codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
-            }
-
-            trackStats.resetBitrate();
-        }
-
-        this.connectionStats.bitrate = {
-            upload: bitrateUpload,
-            download: bitrateDownload,
-        };
-
-        this.connectionStats.bitrate.audio = {
-            upload: audioBitrateUpload,
-            download: audioBitrateDownload,
-        };
-
-        this.connectionStats.bitrate.video = {
-            upload: videoBitrateUpload,
-            download: videoBitrateDownload,
-        };
-
-        this.connectionStats.packetLoss = {
-            total: this.calculatePacketLoss(
-                lostPackets.download + lostPackets.upload,
-                totalPackets.download + totalPackets.upload,
-            ),
-            download: this.calculatePacketLoss(lostPackets.download, totalPackets.download),
-            upload: this.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
-        };
+        this.connectionStats.bandwidth = report.bandwidth;
+        this.connectionStats.bitrate = report.bitrate;
+        this.connectionStats.packetLoss = report.packetLoss;
 
         this.emitter.emitConnectionStatsReport({
-            bandwidth: this.connectionStats.bandwidth,
-            bitrate: this.connectionStats.bitrate,
-            packetLoss: this.connectionStats.packetLoss,
-            resolution: resolutions,
-            framerate: framerates,
-            codec: codecs,
+            ...report,
             transport: this.connectionStats.transport,
         });
 
@@ -257,14 +180,6 @@ export class StatsCollector {
     }
 
     public stopProcessingStats(): void {}
-
-    private calculatePacketLoss(lostPackets: number, totalPackets: number): number {
-        if (!totalPackets || totalPackets <= 0 || !lostPackets || lostPackets <= 0) {
-            return 0;
-        }
-
-        return Math.round((lostPackets / totalPackets) * 100);
-    }
 
     private onSignalStateChange(): void {
         if (this.pc.signalingState === "stable") {

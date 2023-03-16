@@ -27,6 +27,7 @@ describe("MediaTrackStatsHandler", () => {
         trackHandler.getLocalTrackIdByMid = jest.fn().mockReturnValue("2222");
         trackHandler.getRemoteTrackIdByMid = jest.fn().mockReturnValue("5555");
         trackHandler.getLocalTracks = jest.fn().mockReturnValue([{ id: "2222" } as MediaStreamTrack]);
+        trackHandler.getTackById = jest.fn().mockReturnValue([{ id: "2222", kind: "audio" } as MediaStreamTrack]);
         statsHandler = new MediaTrackStatsHandler(ssrcHandler, trackHandler);
     });
     describe("should find track stats", () => {

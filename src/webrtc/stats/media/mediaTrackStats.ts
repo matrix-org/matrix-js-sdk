@@ -39,6 +39,7 @@ export interface Resolution {
 }
 
 export type TrackStatsType = "local" | "remote";
+
 export class MediaTrackStats {
     private loss: PackageLoos = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
     private bitrate: Bitrate = { download: 0, upload: 0 };
@@ -46,7 +47,11 @@ export class MediaTrackStats {
     private framerate = 0;
     private codec = "";
 
-    public constructor(public readonly trackId: TrackId, private type: TrackStatsType) {}
+    public constructor(
+        public readonly trackId: TrackId,
+        public readonly type: TrackStatsType,
+        public readonly kind: "audio" | "video",
+    ) {}
 
     public getType(): TrackStatsType {
         return this.type;
@@ -76,7 +81,7 @@ export class MediaTrackStats {
         return this.framerate;
     }
 
-    public addBitrate(bitrate: Bitrate): void {
+    public setBitrate(bitrate: Bitrate): void {
         this.bitrate = bitrate;
     }
 

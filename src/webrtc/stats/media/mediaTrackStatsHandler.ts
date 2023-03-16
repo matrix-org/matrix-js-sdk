@@ -60,8 +60,14 @@ export class MediaTrackStatsHandler {
         let trackStats = this.track2stats.get(trackID);
 
         if (!trackStats) {
-            trackStats = new MediaTrackStats(trackID, type);
-            this.track2stats.set(trackID, trackStats);
+            const track = this.mediaTrackHandler.getTackById(trackID);
+            if (track !== undefined) {
+                const kind: "audio" | "video" = track.kind === "audio" ? track.kind : "video";
+                trackStats = new MediaTrackStats(trackID, type, kind);
+                this.track2stats.set(trackID, trackStats);
+            } else {
+                return undefined;
+            }
         }
         return trackStats;
     }

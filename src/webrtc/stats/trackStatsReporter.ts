@@ -53,7 +53,7 @@ export class TrackStatsReporter {
     }
 
     public static buildBitrateReceived(trackStats: MediaTrackStats, now: any, before: any): void {
-        trackStats.addBitrate({
+        trackStats.setBitrate({
             download: TrackStatsReporter.calculateBitrate(
                 now.bytesReceived,
                 before.bytesReceived,
@@ -65,7 +65,7 @@ export class TrackStatsReporter {
     }
 
     public static buildBitrateSend(trackStats: MediaTrackStats, now: any, before: any): void {
-        trackStats.addBitrate({
+        trackStats.setBitrate({
             download: 0,
             upload: this.calculateBitrate(now.bytesSent, before.bytesSent, now.timestamp, before.timestamp),
         });
