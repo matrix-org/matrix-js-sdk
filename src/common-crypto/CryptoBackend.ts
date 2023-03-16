@@ -117,7 +117,7 @@ export interface SyncCryptoCallbacks {
      * @param oneTimeKeysCounts - the received one time key counts
      * @returns A list of preprocessed to-device messages.
      */
-    preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<IToDeviceEvent[]>;
+    preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<void>;
 
     /**
      * Called by the /sync loop whenever there are incoming to-device messages.
@@ -131,7 +131,7 @@ export interface SyncCryptoCallbacks {
      * @param unusedFallbackKeys - the received unused fallback keys
      * @returns A list of preprocessed to-device messages.
      */
-    preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<IToDeviceEvent[]>;
+    preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.
