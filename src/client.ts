@@ -206,6 +206,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
+import { CryptoApi } from "./crypto-api";
 
 export type Store = IStore;
 
@@ -1166,7 +1167,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer?: IIdentityServerProvider;
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
-    public crypto?: Crypto; // libolm crypto implementation. XXX: Intended private, used in code. Being replaced by cryptoBackend
+
+    /**
+     * The libolm crypto implementation, if it is in use.
+     *
+     * @deprecated This should not be used. Instead, use the methods exposed directly on this class or
+     * (where they are available) via {@link getCrypto}.
+     */
+    public crypto?: Crypto; // XXX: Intended private, used in code. Being replaced by cryptoBackend
+
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
@@ -2201,8 +2210,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Access the crypto API for this client.
+     *
+     * If end-to-end encryption has been enabled for this client (via {@link initCrypto} or {@link initRustCrypto}),
+     * returns an object giving access to the crypto API. Otherwise, returns `undefined`.
+     */
+    public getCrypto(): CryptoApi | undefined {
+        return this.cryptoBackend;
+    }
+
+    /**
      * Is end-to-end crypto enabled for this client.
      * @returns True if end-to-end is enabled.
+     * @deprecated prefer {@link getCrypto}
      */
     public isCryptoEnabled(): boolean {
         return !!this.cryptoBackend;
@@ -2448,6 +2468,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * do not specify a value.
      *
      * @param value - whether to blacklist all unverified devices by default
+     *
+     * @deprecated Prefer direct access to {@link CryptoApi.globalBlacklistUnverifiedDevices}:
+     *
+     * ```javascript
+     * client.getCrypto().globalBlacklistUnverifiedDevices = value;
+     * ```
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): boolean {
         if (!this.cryptoBackend) {
@@ -2459,6 +2485,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @returns whether to blacklist all unverified devices by default
+     *
+     * @deprecated Prefer direct access to {@link CryptoApi.globalBlacklistUnverifiedDevices}:
+     *
+     * ```javascript
+     * value = client.getCrypto().globalBlacklistUnverifiedDevices;
+     * ```
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         if (!this.cryptoBackend) {
@@ -2476,6 +2508,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This API is currently UNSTABLE and may change or be removed without notice.
      *
      * @param value - whether error on unknown devices
+     *
+     * @deprecated Prefer direct access to {@link CryptoApi.globalBlacklistUnverifiedDevices}:
+     *
+     * ```ts
+     * client.getCrypto().globalBlacklistUnverifiedDevices = value;
+     * ```
      */
     public setGlobalErrorOnUnknownDevices(value: boolean): void {
         if (!this.cryptoBackend) {
@@ -2535,8 +2573,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
      * @param userId - The ID of the user to check.
-     *
-     * @returns
      */
     public checkUserTrust(userId: string): UserTrustLevel {
         if (!this.cryptoBackend) {
@@ -2618,6 +2654,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      * @param room - the room the event is in
+     *
+     * @deprecated Prefer {@link CryptoApi.prepareToEncrypt | `CryptoApi.prepareToEncrypt`}:
+     *
+     * ```javascript
+     * client.getCrypto().prepareToEncrypt(room);
+     * ```
      */
     public prepareToEncrypt(room: Room): void {
         if (!this.cryptoBackend) {
@@ -2631,6 +2673,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This means downloading the devicelist for the user and checking if the list includes
      * the cross-signing pseudo-device.
+     *
+     * @deprecated Prefer {@link CryptoApi.userHasCrossSigningKeys | `CryptoApi.userHasCrossSigningKeys`}:
+     *
+     * ```javascript
+     * result = client.getCrypto().userHasCrossSigningKeys();
+     * ```
      */
     public userHasCrossSigningKeys(): Promise<boolean> {
         if (!this.cryptoBackend) {
@@ -3088,8 +3136,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This should be encrypted before returning it to the user.
      *
-     * @returns a promise which resolves to a list of
-     *    session export objects
+     * @returns a promise which resolves to a list of session export objects
+     *
+     * @deprecated Prefer {@link CryptoApi.exportRoomKeys | `CryptoApi.exportRoomKeys`}:
+     *
+     * ```javascript
+     * sessionData = await client.getCrypto().exportRoomKeys();
+     * ```
      */
     public exportRoomKeys(): Promise<IMegolmSessionData[]> {
         if (!this.cryptoBackend) {

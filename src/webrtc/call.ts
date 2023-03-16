@@ -55,7 +55,7 @@ import { MatrixError } from "../http-api";
 
 interface CallOpts {
     // The room ID for this call.
-    roomId?: string;
+    roomId: string;
     invitee?: string;
     // The Matrix Client instance to send events to.
     client: MatrixClient;
@@ -287,6 +287,15 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     return mods;
 }
 
+export interface VoipEvent {
+    type: "toDevice" | "sendEvent";
+    eventType: string;
+    userId?: string;
+    opponentDeviceId?: string;
+    roomId?: string;
+    content: Record<string, unknown>;
+}
+
 export type CallEventHandlerMap = {
     [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
     [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
@@ -300,7 +309,7 @@ export type CallEventHandlerMap = {
     [CallEvent.AssertedIdentityChanged]: () => void;
     /* @deprecated */
     [CallEvent.HoldUnhold]: (onHold: boolean) => void;
-    [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
+    [CallEvent.SendVoipEvent]: (event: VoipEvent) => void;
 };
 
 // The key of the transceiver map (purpose + media type, separated by ':')
@@ -314,7 +323,7 @@ function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverK
 }
 
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
-    public roomId?: string;
+    public roomId: string;
     public callId: string;
     public invitee?: string;
     public hangupParty?: CallParty;
@@ -1400,6 +1409,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         if (!this.hasUserMediaVideoSender && !muted) {
+            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }

@@ -60,6 +60,7 @@ export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
 export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
+export type { CryptoApi } from "./crypto-api";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 

@@ -431,6 +431,31 @@ describe("Call", function () {
         expect(transceivers.get("m.usermedia:video")!.sender.track!.id).toBe("usermedia_video_track");
     });
 
+    it("should unmute video after upgrading to video call", async () => {
+        // Regression test for https://github.com/vector-im/element-call/issues/925
+        await startVoiceCall(client, call);
+        // start off with video muted
+        await call.setLocalVideoMuted(true);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        // video should now be unmuted
+        expect(call.isLocalVideoMuted()).toBe(false);
+    });
+
     it("should handle SDPStreamMetadata changes", async () => {
         await startVoiceCall(client, call);
 
