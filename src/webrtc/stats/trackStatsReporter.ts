@@ -1,4 +1,5 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
+import { StatsValueFormatter } from "./statsValueFormatter";
 
 export class TrackStatsReporter {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
@@ -79,11 +80,11 @@ export class TrackStatsReporter {
             packetsNow = 0;
         }
 
-        const packetsBefore = TrackStatsReporter.getNonNegativeValue(before[key]);
+        const packetsBefore = StatsValueFormatter.getNonNegativeValue(before[key]);
         const packetsDiff = Math.max(0, packetsNow - packetsBefore);
 
-        const packetsLostNow = TrackStatsReporter.getNonNegativeValue(now.packetsLost);
-        const packetsLostBefore = TrackStatsReporter.getNonNegativeValue(before.packetsLost);
+        const packetsLostNow = StatsValueFormatter.getNonNegativeValue(now.packetsLost);
+        const packetsLostBefore = StatsValueFormatter.getNonNegativeValue(before.packetsLost);
         const packetsLostDiff = Math.max(0, packetsLostNow - packetsLostBefore);
 
         trackStats.setLoss({
@@ -99,8 +100,8 @@ export class TrackStatsReporter {
         nowTimestamp: number,
         beforeTimestamp: number,
     ): number {
-        const bytesNow = TrackStatsReporter.getNonNegativeValue(bytesNowAny);
-        const bytesBefore = TrackStatsReporter.getNonNegativeValue(bytesBeforeAny);
+        const bytesNow = StatsValueFormatter.getNonNegativeValue(bytesNowAny);
+        const bytesBefore = StatsValueFormatter.getNonNegativeValue(bytesBeforeAny);
         const bytesProcessed = Math.max(0, bytesNow - bytesBefore);
 
         const timeMs = nowTimestamp - beforeTimestamp;
@@ -112,19 +113,5 @@ export class TrackStatsReporter {
         }
 
         return bitrateKbps;
-    }
-
-    private static getNonNegativeValue(ssrc: any): number {
-        let value = ssrc;
-
-        if (typeof value !== "number") {
-            value = Number(value);
-        }
-
-        if (isNaN(value)) {
-            return 0;
-        }
-
-        return Math.max(0, value);
     }
 }

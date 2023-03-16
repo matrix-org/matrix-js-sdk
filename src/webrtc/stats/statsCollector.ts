@@ -24,6 +24,7 @@ import { MediaTrackHandler } from "./media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
 import { TrackStatsReporter } from "./trackStatsReporter";
 import { StatsReportBuilder } from "./statsReportBuilder";
+import { StatsValueFormatter } from "./statsValueFormatter";
 
 export class StatsCollector {
     private isActive = true;
@@ -115,7 +116,7 @@ export class StatsCollector {
                         TrackStatsReporter.buildBitrateReceived(trackStats, now, before);
                     }
                 } else if (before) {
-                    byteSentStats.set(trackStats.trackId, this.getNonNegativeValue(now.bytesSent));
+                    byteSentStats.set(trackStats.trackId, StatsValueFormatter.getNonNegativeValue(now.bytesSent));
                     TrackStatsReporter.buildBitrateSend(trackStats, now, before);
                 }
                 TrackStatsReporter.buildCodec(this.currentStatsReport, trackStats, now);
@@ -148,20 +149,6 @@ export class StatsCollector {
 
     private handleError(_: any): void {
         this.isActive = false;
-    }
-
-    private getNonNegativeValue(ssrc: any): number {
-        let value = ssrc;
-
-        if (typeof value !== "number") {
-            value = Number(value);
-        }
-
-        if (isNaN(value)) {
-            return 0;
-        }
-
-        return Math.max(0, value);
     }
 
     private processAndEmitReport(): void {
