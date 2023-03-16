@@ -40,7 +40,7 @@ export interface IStore {
 
     // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
     // for when it falls back to being a memory store due to errors.
-    on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
+    on?: (event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void) => void;
 
     /** @returns whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
