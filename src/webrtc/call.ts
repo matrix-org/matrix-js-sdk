@@ -310,6 +310,15 @@ function isFirefox(): boolean {
     return navigator.userAgent.indexOf("Firefox") !== -1;
 }
 
+export interface VoipEvent {
+    type: "toDevice" | "sendEvent";
+    eventType: string;
+    userId?: string;
+    opponentDeviceId?: string;
+    roomId?: string;
+    content: Record<string, unknown>;
+}
+
 export type CallEventHandlerMap = {
     [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
     [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
@@ -323,7 +332,7 @@ export type CallEventHandlerMap = {
     [CallEvent.AssertedIdentityChanged]: () => void;
     /* @deprecated */
     [CallEvent.HoldUnhold]: (onHold: boolean) => void;
-    [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
+    [CallEvent.SendVoipEvent]: (event: VoipEvent) => void;
 };
 
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
