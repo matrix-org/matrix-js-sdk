@@ -95,12 +95,12 @@ describe("RustCrypto", () => {
 
         it("should pass through one time key counts", async () => {
             const oneTimeKeyCounts = new Map<string, number>([["signed_curve25519", 50]]);
-            await expect(rustCrypto.preprocessOneTimeKeyCounts(oneTimeKeyCounts)).resolves.toBeTruthy();
+            await expect(rustCrypto.preprocessOneTimeKeyCounts(oneTimeKeyCounts)).resolves.not.toBeDefined();
         });
 
         it("should pass through unused fallback keys", async () => {
             const unusedFallbackKeys = new Set(["signed_curve25519"]);
-            await expect(rustCrypto.preprocessUnusedFallbackKeys(unusedFallbackKeys)).resolves.toBeTruthy();
+            await expect(rustCrypto.preprocessUnusedFallbackKeys(unusedFallbackKeys)).resolves.not.toBeDefined();
         });
     });
 
