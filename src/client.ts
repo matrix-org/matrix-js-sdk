@@ -461,6 +461,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * @experimental
+     */
+    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -9470,6 +9475,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public supportsThreads(): boolean {
         return this.clientOpts?.threadSupport || false;
+    }
+
+    /**
+     * A helper to determine intentional mentions support
+     * @returns a boolean to determine if intentional mentions are enabled
+     * @experimental
+     */
+    public supportsIntentionalMentions(): boolean {
+        return this.clientOpts?.intentionalMentions || false;
     }
 
     /**
