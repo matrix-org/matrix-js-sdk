@@ -1494,10 +1494,10 @@
   dependencies:
     lodash "^4.17.21"
 
-"@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.3":
-  version "0.1.0-alpha.4"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-js/-/matrix-sdk-crypto-js-0.1.0-alpha.4.tgz#1b20294e0354c3dcc9c7dc810d883198a4042f04"
-  integrity sha512-mdaDKrw3P5ZVCpq0ioW0pV6ihviDEbS8ZH36kpt9stLKHwwDSopPogE6CkQhi0B1jn1yBUtOYi32mBV/zcOR7g==
+"@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.5":
+  version "0.1.0-alpha.5"
+  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-js/-/matrix-sdk-crypto-js-0.1.0-alpha.5.tgz#60ede2c43b9d808ba8cf46085a3b347b290d9658"
+  integrity sha512-2KjAgWNGfuGLNjJwsrs6gGX157vmcTfNrA4u249utgnMPbJl7QwuUqh1bGxQ0PpK06yvZjgPlkna0lTbuwtuQw==
 
 "@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz":
   version "3.2.14"
