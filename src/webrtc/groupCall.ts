@@ -245,12 +245,12 @@ export class GroupCall extends TypedEventEmitter<
         this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
     }
 
-    private onConnectionStats(report: ConnectionStatsReport): void {
-        window.console.log("### ConnectionStatsReport", report);
+    private onConnectionStats(_: ConnectionStatsReport): void {
+        // @TODO: Implement data argumentation and event broadcasting please
     }
 
-    private onByteSendStats(report: ByteSendStatsReport): void {
-        window.console.log("### ByteSendStatsReport", report);
+    private onByteSendStats(_: ByteSendStatsReport): void {
+        // @TODO: Implement data argumentation and event broadcasting please
     }
 
     public async create(): Promise<GroupCall> {
