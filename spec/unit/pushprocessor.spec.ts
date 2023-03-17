@@ -48,6 +48,7 @@ describe("NotificationService", function () {
         credentials: {
             userId: testUserId,
         },
+        supportsIntentionalMentions: () => false,
         pushRules: {
             device: {},
             global: {
