@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TrackId } from "./mediaTrackHandler";
 
-export interface PackageLoos {
+export interface PacketLoss {
     packetsTotal: number;
     packetsLost: number;
     isDownloadStream: boolean;
@@ -41,7 +41,7 @@ export interface Resolution {
 export type TrackStatsType = "local" | "remote";
 
 export class MediaTrackStats {
-    private loss: PackageLoos = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
+    private loss: PacketLoss = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
     private bitrate: Bitrate = { download: 0, upload: 0 };
     private resolution: Resolution = { width: -1, height: -1 };
     private framerate = 0;
@@ -57,11 +57,11 @@ export class MediaTrackStats {
         return this.type;
     }
 
-    public setLoss(loos: PackageLoos): void {
+    public setLoss(loos: PacketLoss): void {
         this.loss = loos;
     }
 
-    public getLoss(): PackageLoos {
+    public getLoss(): PacketLoss {
         return this.loss;
     }
 

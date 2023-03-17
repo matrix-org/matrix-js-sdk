@@ -17,7 +17,7 @@ import { StatsCollector } from "./statsCollector";
 import { StatsReportEmitter } from "./statsReportEmitter";
 
 export class GroupCallStats {
-    private timer: undefined | number;
+    private timer: undefined | ReturnType<typeof setTimeout>;
     private readonly collectors: Map<string, StatsCollector> = new Map<string, StatsCollector>();
     public readonly reports = new StatsReportEmitter();
 
@@ -25,7 +25,7 @@ export class GroupCallStats {
 
     public start(): void {
         if (this.timer === undefined) {
-            this.timer = window.setInterval(() => {
+            this.timer = setInterval(() => {
                 this.processStats();
             }, this.interval);
         }
@@ -33,7 +33,7 @@ export class GroupCallStats {
 
     public stop(): void {
         if (this.timer !== undefined) {
-            window.clearInterval(this.timer);
+            clearInterval(this.timer);
             this.collectors.forEach((c) => c.stopProcessingStats());
         }
     }

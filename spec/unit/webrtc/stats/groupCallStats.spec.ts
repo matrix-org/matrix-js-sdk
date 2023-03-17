@@ -1,5 +1,5 @@
 /*
-Copyright 2020 - 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,9 +23,6 @@ describe("GroupCallStats", () => {
     let stats: GroupCallStats;
     beforeEach(() => {
         stats = new GroupCallStats(GROUP_CALL_ID, LOCAL_USER_ID, TIME_INTERVAL);
-        // @ts-ignore
-        // eslint-disable-next-line no-global-assign
-        global["window"] = {};
     });
 
     describe("should on adding a stats collector", () => {
@@ -65,11 +62,9 @@ describe("GroupCallStats", () => {
     describe("should on start", () => {
         beforeEach(() => {
             jest.useFakeTimers();
-            window.setInterval = setInterval;
         });
         afterEach(() => {
             jest.useRealTimers();
-            window.setInterval = setInterval;
         });
 
         it("starting processing as well without stats collectors", async () => {
@@ -96,32 +91,38 @@ describe("GroupCallStats", () => {
 
         it("doing nothing if process already running", async () => {
             // @ts-ignore
-            window.setInterval = jest.fn().mockReturnValue(22);
+            jest.spyOn(global, "setInterval").mockReturnValue(22);
             stats.start();
-            expect(window.setInterval).toHaveBeenCalledTimes(1);
-            stats.start();
-            stats.start();
+            expect(setInterval).toHaveBeenCalledTimes(1);
             stats.start();
             stats.start();
-            expect(window.setInterval).toHaveBeenCalledTimes(1);
+            stats.start();
+            stats.start();
+            expect(setInterval).toHaveBeenCalledTimes(1);
         });
     });
 
     describe("should on stop", () => {
+        beforeEach(() => {
+            jest.useFakeTimers();
+        });
+        afterEach(() => {
+            jest.useRealTimers();
+        });
         it("finish stats process if was started", async () => {
             // @ts-ignore
-            window.setInterval = jest.fn().mockReturnValue(22);
-            window.clearInterval = jest.fn();
+            jest.spyOn(global, "setInterval").mockReturnValue(22);
+            jest.spyOn(global, "clearInterval");
             stats.start();
-            expect(window.setInterval).toHaveBeenCalledTimes(1);
+            expect(setInterval).toHaveBeenCalledTimes(1);
             stats.stop();
-            expect(window.clearInterval).toHaveBeenCalledWith(22);
+            expect(clearInterval).toHaveBeenCalledWith(22);
         });
 
         it("do nothing if stats process was not started", async () => {
-            window.clearInterval = jest.fn();
+            jest.spyOn(global, "clearInterval");
             stats.stop();
-            expect(window.clearInterval).not.toHaveBeenCalled();
+            expect(clearInterval).not.toHaveBeenCalled();
         });
     });
 });
