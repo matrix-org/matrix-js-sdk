@@ -229,7 +229,7 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
-    public readonly stats: GroupCallStats;
+    private readonly stats: GroupCallStats;
 
     public constructor(
         private client: MatrixClient,
