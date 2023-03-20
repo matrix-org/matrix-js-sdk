@@ -64,6 +64,7 @@ import { LocalCallFeed } from "./localCallFeed";
 import { LocalCallTrack } from "./localCallTrack";
 import { TrackPublication } from "./trackPublication";
 import { FeedPublication } from "./feedPublication";
+import { GroupCallStats } from "./stats/groupCallStats";
 
 interface CallOpts {
     // The room ID for this call.
@@ -407,6 +408,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // Used to keep the timer for the delay before actually stopping our
     // video track after muting (see setLocalVideoMuted)
     private stopVideoTrackTimer?: ReturnType<typeof setTimeout>;
+    private stats: GroupCallStats | undefined;
 
     /**
      * Construct a new Matrix Call.
@@ -3031,6 +3033,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener("negotiationneeded", this.onNegotiationNeeded);
         pc.addEventListener("datachannel", this.onDataChannel);
 
+        this.stats?.addStatsCollector(this.callId, "unknown", pc);
         return pc;
     }
 
@@ -3102,6 +3105,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public get hasPeerConnection(): boolean {
         return Boolean(this.peerConn);
+    }
+
+    public initStats(stats: GroupCallStats, peerId = "unknown"): void {
+        this.stats = stats;
     }
 }
 
