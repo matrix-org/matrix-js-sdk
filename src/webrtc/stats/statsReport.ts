@@ -19,8 +19,8 @@ import { TransportStats } from "./transportStats";
 import { Resolution } from "./media/mediaTrackStats";
 
 export enum StatsReport {
-    CONNECTION_STATS = "connection_stats",
-    BYTE_SENT_STATS = "byte_sent_stats",
+    CONNECTION_STATS = "StatsReport.connection_stats",
+    BYTE_SENT_STATS = "StatsReport.byte_sent_stats",
 }
 
 export type TrackID = string;

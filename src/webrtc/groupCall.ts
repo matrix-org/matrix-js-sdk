@@ -53,6 +53,7 @@ export enum GroupCallEvent {
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
     Error = "error",
+    ConnectionStats = "connection_stats",
 }
 
 export type GroupCallEventHandlerMap = {
@@ -84,6 +85,18 @@ export type GroupCallEventHandlerMap = {
      * ```
      */
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
+
+    [GroupCallEvent.ConnectionStats]: (report: any) => void;
+};
+
+export enum GroupCallStatsReportEvent {
+    ConnectionStats = "GroupCall.connection_stats",
+    ByteSentStats = "GroupCall.byte_sent_stats",
+}
+
+export type GroupCallStatsReportEventHandlerMap = {
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: any) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: any) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -185,8 +198,8 @@ function getCallUserId(call: MatrixCall): string | null {
 }
 
 export class GroupCall extends TypedEventEmitter<
-    GroupCallEvent | CallEvent,
-    GroupCallEventHandlerMap & CallEventHandlerMap
+    GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
 > {
     // Config
     public activeSpeakerInterval = 1000;
@@ -216,7 +229,7 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
-    private readonly stats: GroupCallStats;
+    public readonly stats: GroupCallStats;
 
     public constructor(
         private client: MatrixClient,
@@ -239,18 +252,23 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
+
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
         this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
     }
 
-    private onConnectionStats(_: ConnectionStatsReport): void {
+    private onConnectionStats(report: ConnectionStatsReport): void {
         // @TODO: Implement data argumentation and event broadcasting please
+        window.console.log("###### --- ", report);
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, report);
     }
 
-    private onByteSendStats(_: ByteSendStatsReport): void {
+    private onByteSendStats(report: ByteSendStatsReport): void {
         // @TODO: Implement data argumentation and event broadcasting please
+        window.console.log("###### ---- ", report);
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, report);
     }
 
     public async create(): Promise<GroupCall> {
