@@ -189,7 +189,9 @@ export class StubStore implements IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    public save(): void {}
+    public save(): Promise<void> {
+        return Promise.resolve();
+    }
 
     /**
      * Startup does nothing.
