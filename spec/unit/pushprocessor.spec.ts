@@ -1,6 +1,6 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName } from "../../src";
+import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName, RuleId } from "../../src";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -48,7 +48,7 @@ describe("NotificationService", function () {
         credentials: {
             userId: testUserId,
         },
-        supportsIntentionalMentions: () => false,
+        supportsIntentionalMentions: () => true,
         pushRules: {
             device: {},
             global: {
@@ -712,6 +712,37 @@ describe("NotificationService", function () {
                 rule: msc3914RoomCallRule,
             });
         });
+    });
+
+    describe("test intentional mentions behaviour", () => {
+        it.each([RuleId.ContainsUserName, RuleId.ContainsDisplayName, RuleId.AtRoomNotification])(
+            "disable legacy rule: %s",
+            (ruleId) => {
+                const rule = {
+                    rule_id: ruleId,
+                    actions: [],
+                    conditions: [],
+                    default: false,
+                    enabled: true,
+                };
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(true);
+
+                // Add the mentions property to the event and the rule is now disabled.
+                testEvent = utils.mkEvent({
+                    type: "m.room.message",
+                    room: testRoomId,
+                    user: "@alfred:localhost",
+                    event: true,
+                    content: {
+                        "body": "",
+                        "msgtype": "m.text",
+                        "org.matrix.msc3952.mentions": {},
+                    },
+                });
+
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(false);
+            },
+        );
     });
 });
 
