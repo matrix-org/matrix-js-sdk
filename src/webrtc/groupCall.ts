@@ -255,19 +255,17 @@ export class GroupCall extends TypedEventEmitter<
 
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats.bind(this));
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats.bind(this));
     }
 
     private onConnectionStats(report: ConnectionStatsReport): void {
         // @TODO: Implement data argumentation and event broadcasting please
-        window.console.log("###### --- ", report);
         this.emit(GroupCallStatsReportEvent.ConnectionStats, report);
     }
 
     private onByteSendStats(report: ByteSendStatsReport): void {
         // @TODO: Implement data argumentation and event broadcasting please
-        window.console.log("###### ---- ", report);
         this.emit(GroupCallStatsReportEvent.ByteSentStats, report);
     }
 
