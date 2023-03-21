@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
-import { ByteSendStatsReport, ConnectionStatsReport, StatsReport } from "../../../../src/webrtc/stats/statsReport";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "../../../../src/webrtc/stats/statsReport";
 
 describe("StatsReportEmitter", () => {
     let emitter: StatsReportEmitter;
@@ -23,7 +23,7 @@ describe("StatsReportEmitter", () => {
     });
 
     it("should emit and receive ByteSendStatsReport", async () => {
-        const report = {} as ByteSendStatsReport;
+        const report = {} as ByteSentStatsReport;
         return new Promise((resolve, _) => {
             emitter.on(StatsReport.BYTE_SENT_STATS, (r) => {
                 expect(r).toBe(report);

@@ -26,7 +26,7 @@ import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { LocalCallFeed } from "./localCallFeed";
 import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSendStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -92,14 +92,18 @@ export enum GroupCallStatsReportEvent {
 }
 
 export type GroupCallStatsReportEventHandlerMap = {
-    [GroupCallStatsReportEvent.ConnectionStats]: (report: any) => void;
-    [GroupCallStatsReportEvent.ByteSentStats]: (report: any) => void;
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
 };
 
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",
+}
+
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+    report: T;
 }
 
 export class GroupCallError extends Error {
@@ -253,17 +257,17 @@ export class GroupCall extends TypedEventEmitter<
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
-        // @TODO: Implement data argumentation and event broadcasting please
-        this.emit(GroupCallStatsReportEvent.ConnectionStats, report);
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
     };
 
-    private onByteSendStats = (report: ByteSendStatsReport): void => {
-        // @TODO: Implement data argumentation and event broadcasting please
-        this.emit(GroupCallStatsReportEvent.ByteSentStats, report);
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
     public async create(): Promise<GroupCall> {

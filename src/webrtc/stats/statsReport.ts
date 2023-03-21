@@ -26,7 +26,7 @@ export enum StatsReport {
 export type TrackID = string;
 export type ByteSend = number;
 
-export interface ByteSendStatsReport extends Map<TrackID, ByteSend> {
+export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
     // is a map: `local trackID` => byte send
 }
 
