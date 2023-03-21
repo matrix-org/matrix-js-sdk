@@ -53,7 +53,6 @@ export enum GroupCallEvent {
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
     Error = "error",
-    ConnectionStats = "connection_stats",
 }
 
 export type GroupCallEventHandlerMap = {
@@ -85,8 +84,6 @@ export type GroupCallEventHandlerMap = {
      * ```
      */
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
-
-    [GroupCallEvent.ConnectionStats]: (report: any) => void;
 };
 
 export enum GroupCallStatsReportEvent {
@@ -255,19 +252,19 @@ export class GroupCall extends TypedEventEmitter<
 
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats.bind(this));
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats.bind(this));
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
     }
 
-    private onConnectionStats(report: ConnectionStatsReport): void {
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
         // @TODO: Implement data argumentation and event broadcasting please
         this.emit(GroupCallStatsReportEvent.ConnectionStats, report);
-    }
+    };
 
-    private onByteSendStats(report: ByteSendStatsReport): void {
+    private onByteSendStats = (report: ByteSendStatsReport): void => {
         // @TODO: Implement data argumentation and event broadcasting please
         this.emit(GroupCallStatsReportEvent.ByteSentStats, report);
-    }
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
