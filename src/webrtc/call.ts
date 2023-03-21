@@ -3118,6 +3118,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public initStats(stats: GroupCallStats, peerId = "unknown"): void {
         this.stats = stats;
+        this.stats.start();
     }
 }
 
