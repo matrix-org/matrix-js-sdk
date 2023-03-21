@@ -47,6 +47,7 @@ import {
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
+import { escapeRegExp } from "../../src/utils";
 
 const ROOM_ID = "!room:id";
 
@@ -438,8 +439,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
             return response;
         }
+        const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
         fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/query", aliceClient.getHomeserverUrl()).toString(),
+            new RegExp(rootRegexp + "(r0|v3)/keys/query"),
             (url: string, opts: RequestInit) => onQueryRequest(JSON.parse(opts.body as string)),
             {
                 // append to the list of intercepts on this path
@@ -1854,16 +1856,60 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    describe("todo", () => {
+    describe("key upload request", () => {
+        function listenToUpload(): Promise<number> {
+            return new Promise((resolve) => {
+                const listener = (url: string, options: RequestInit) => {
+                    const content = JSON.parse(options.body as string);
+                    const keysCount = Object.keys(content?.one_time_keys || {}).length;
+                    if (keysCount) resolve(keysCount);
+                    return {
+                        one_time_key_counts: {
+                            signed_curve25519: keysCount,
+                        },
+                    };
+                };
+
+                // catch both r0 and v3 variants
+                fetchMock.post(
+                    new URL("/_matrix/client/r0/keys/upload", aliceClient.getHomeserverUrl()).toString(),
+                    listener,
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+                fetchMock.post(
+                    new URL("/_matrix/client/v3/keys/upload", aliceClient.getHomeserverUrl()).toString(),
+                    listener,
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
+        }
+
         it("should make key upload request after sync", async () => {
+            let uploadPromise = listenToUpload();
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             await syncPromise(aliceClient);
 
-            const key = await keyReceiver.awaitOneTimeKeyUpload();
-            expect(Object.keys(key).length).toBeTruthy();
+            // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            expect(await uploadPromise).toBeGreaterThan(0);
+
+            uploadPromise = listenToUpload();
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 2,
+                device_one_time_keys_count: { signed_curve25519: 0 },
+            });
+            await syncPromise(aliceClient);
+
+            expect(await uploadPromise).toBeGreaterThan(0);
         });
     });
 });
