@@ -49,9 +49,11 @@ class MlsDecryption extends DecryptionAlgorithm {
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         return {
             clearEvent: {
-                room_id: "",
-                type: "",
-                content: {}
+                room_id: this.roomId,
+                type: "m.room.message",
+                content: {
+                    body: "Decryption doesn't work yet.",
+                },
             }
         }
     }
@@ -80,7 +82,7 @@ export class MlsProvider {
     static key_to_string([group_id_arr, epoch, creator_arr]: [number[], number, number[]]): string {
         let group_id = new Uint8Array(group_id_arr);
         let creator = new Uint8Array(creator_arr);
-        return Buffer.from(group_id).toString("base64") + "|" + epoch + "|" + Buffer.from(creator).toString("base64");
+        return olmlib.encodeUnpaddedBase64(group_id) + "|" + epoch + "|" + olmlib.encodeUnpaddedBase64(creator);
     }
 
     store(key: [number[], number, number[]], value: number[]): void {
