@@ -24,6 +24,7 @@ import { IContent, MatrixEvent } from "../../models/event";
 import { Crypto, IEncryptedContent, IEventDecryptionResult } from "..";
 import { UnstableValue } from "../../NamespacedValue";
 import * as matrix_dmls from "matrix-dmls-wasm";
+import * as olmlib from "../olmlib";
 
 export const MLS_ALGORITHM = new UnstableValue(
     "m.mls.v1.dhkemx25519-aes128gcm-sha256-ed25519",
@@ -37,10 +38,25 @@ let textEncoder = new TextEncoder();
 
 class MlsEncryption extends EncryptionAlgorithm {
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IEncryptedContent> {
+        const mlsProvider = this.crypto.mlsProvider;
+        if (!this.roomId) {
+            throw "No room ID";
+        }
+        const group = mlsProvider.getGroup(this.roomId);
+        if (!group) {
+            throw "No group available";
+        }
+        // TODO: check if membership needs syncing, if group needs resolving
+        const payload = textEncoder.encode(JSON.stringify({
+            room_id: this.roomId,
+            type: eventType,
+            content: content,
+        }));
+        const [ciphertext, _epoch, creator] = group.encrypt_message(mlsProvider.backend, payload);
         return {
             algorithm: MLS_ALGORITHM.name,
-            ciphertext: "",
-            epoch_creator: "",
+            ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(ciphertext)),
+            epoch_creator: olmlib.encodeUnpaddedBase64(Uint8Array.from(creator)),
         }
     }
 }
@@ -62,7 +78,7 @@ class MlsDecryption extends DecryptionAlgorithm {
 export class MlsProvider {
     private readonly groups: Map<string, matrix_dmls.DmlsGroup>;
     private readonly storage: Map<string, number[]> ;
-    private readonly backend: matrix_dmls.DmlsCryptoProvider;
+    public readonly backend: matrix_dmls.DmlsCryptoProvider;
     public readonly credential: matrix_dmls.Credential;
 
     constructor(public readonly crypto: Crypto) {
