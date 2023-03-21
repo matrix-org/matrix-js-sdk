@@ -837,7 +837,7 @@ interface IRoomHierarchy {
     next_batch?: string;
 }
 
-interface ITimestampToEventResponse {
+export interface ITimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
