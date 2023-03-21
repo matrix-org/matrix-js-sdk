@@ -70,6 +70,7 @@ export class StatsCollector {
                         return false;
                     });
             }
+            this.isActive = false;
             return Promise.resolve(false);
         }
         return Promise.resolve(false);
