@@ -716,7 +716,7 @@ describe("NotificationService", function () {
 
     describe("test intentional mentions behaviour", () => {
         it.each([RuleId.ContainsUserName, RuleId.ContainsDisplayName, RuleId.AtRoomNotification])(
-            "disable legacy rule: %s",
+            "Rule %s matches unless intentional mentions are enabled",
             (ruleId) => {
                 const rule = {
                     rule_id: ruleId,

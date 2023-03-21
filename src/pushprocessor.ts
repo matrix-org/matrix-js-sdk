@@ -206,19 +206,21 @@ export class PushProcessor {
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
-        for (let override of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
+        for (const originalOverride of DEFAULT_OVERRIDE_RULES) {
+            const existingRule = globalOverrides.find((r) => r.rule_id === originalOverride.rule_id);
 
             // Dynamically add the user ID as the value for the is_user_mention rule.
-            if (override.rule_id === RuleId.IsUserMention) {
+            let override: IPushRule;
+            if (originalOverride.rule_id === RuleId.IsUserMention) {
                 // If the user ID wasn't provided, skip the rule.
                 if (!userId) {
                     continue;
                 }
 
-                override = JSON.parse(JSON.stringify(override)); // deep clone
-                const conditions = override.conditions!;
-                conditions[0].value = userId;
+                override = JSON.parse(JSON.stringify(originalOverride)); // deep clone
+                override.conditions![0].value = userId;
+            } else {
+                override = originalOverride;
             }
 
             if (existingRule) {
