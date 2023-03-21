@@ -257,16 +257,18 @@ export class GroupCall extends TypedEventEmitter<
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
 
-    private onConnectionStats(_: ConnectionStatsReport): void {
-        // @TODO: Implement data argumentation and event broadcasting please
-    }
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
+    };
 
-    private onByteSendStats(_: ByteSendStatsReport): void {
-        // @TODO: Implement data argumentation and event broadcasting please
-    }
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
