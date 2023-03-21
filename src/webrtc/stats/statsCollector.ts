@@ -49,26 +49,28 @@ export class StatsCollector {
 
     public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
         if (this.isActive) {
-            return this.pc
-                .getStats()
-                .then((report) => {
-                    // @ts-ignore
-                    this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
-                    try {
-                        this.processStatsReport(groupCallId, localUserId);
-                    } catch (error) {
-                        this.isActive = false;
-                        return false;
-                        // logger.error('Processing of RTP stats failed:', error);
-                    }
+            const statsPromise = this.pc.getStats();
+            if (typeof statsPromise?.then === "function") {
+                statsPromise
+                    .then((report) => {
+                        // @ts-ignore
+                        this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
+                        try {
+                            this.processStatsReport(groupCallId, localUserId);
+                        } catch (error) {
+                            this.isActive = false;
+                            return false;
+                        }
 
-                    this.previousStatsReport = this.currentStatsReport;
-                    return true;
-                })
-                .catch((error) => {
-                    this.handleError(error);
-                    return false;
-                });
+                        this.previousStatsReport = this.currentStatsReport;
+                        return true;
+                    })
+                    .catch((error) => {
+                        this.handleError(error);
+                        return false;
+                    });
+            }
+            return Promise.resolve(false);
         }
         return Promise.resolve(false);
     }
