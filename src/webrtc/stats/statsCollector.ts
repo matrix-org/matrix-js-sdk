@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSendStatsReport, TrackID } from "./statsReport";
+import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
@@ -74,7 +74,7 @@ export class StatsCollector {
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStats: ByteSendStatsReport = new Map<TrackID, ByteSend>();
+        const byteSentStats: ByteSentStatsReport = new Map<TrackID, ByteSend>();
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
