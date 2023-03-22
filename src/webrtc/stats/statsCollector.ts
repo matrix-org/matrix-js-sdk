@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSendStatsReport, TrackID } from "./statsReport";
+import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
 import { ConnectionStatsReporter } from "./connectionStatsReporter";
 import { TransportStatsReporter } from "./transportStatsReporter";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
@@ -49,32 +49,34 @@ export class StatsCollector {
 
     public async processStats(groupCallId: string, localUserId: string): Promise<boolean> {
         if (this.isActive) {
-            return this.pc
-                .getStats()
-                .then((report) => {
-                    // @ts-ignore
-                    this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
-                    try {
-                        this.processStatsReport(groupCallId, localUserId);
-                    } catch (error) {
-                        this.isActive = false;
-                        return false;
-                        // logger.error('Processing of RTP stats failed:', error);
-                    }
+            const statsPromise = this.pc.getStats();
+            if (typeof statsPromise?.then === "function") {
+                return statsPromise
+                    .then((report) => {
+                        // @ts-ignore
+                        this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
+                        try {
+                            this.processStatsReport(groupCallId, localUserId);
+                        } catch (error) {
+                            this.isActive = false;
+                            return false;
+                        }
 
-                    this.previousStatsReport = this.currentStatsReport;
-                    return true;
-                })
-                .catch((error) => {
-                    this.handleError(error);
-                    return false;
-                });
+                        this.previousStatsReport = this.currentStatsReport;
+                        return true;
+                    })
+                    .catch((error) => {
+                        this.handleError(error);
+                        return false;
+                    });
+            }
+            this.isActive = false;
         }
         return Promise.resolve(false);
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStats: ByteSendStatsReport = new Map<TrackID, ByteSend>();
+        const byteSentStats: ByteSentStatsReport = new Map<TrackID, ByteSend>();
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;

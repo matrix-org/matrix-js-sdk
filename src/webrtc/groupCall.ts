@@ -26,7 +26,7 @@ import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { LocalCallFeed } from "./localCallFeed";
 import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSendStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -86,10 +86,24 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
+export enum GroupCallStatsReportEvent {
+    ConnectionStats = "GroupCall.connection_stats",
+    ByteSentStats = "GroupCall.byte_sent_stats",
+}
+
+export type GroupCallStatsReportEventHandlerMap = {
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
+};
+
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",
+}
+
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+    report: T;
 }
 
 export class GroupCallError extends Error {
@@ -185,8 +199,8 @@ function getCallUserId(call: MatrixCall): string | null {
 }
 
 export class GroupCall extends TypedEventEmitter<
-    GroupCallEvent | CallEvent,
-    GroupCallEventHandlerMap & CallEventHandlerMap
+    GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
 > {
     // Config
     public activeSpeakerInterval = 1000;
@@ -239,19 +253,22 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
+
         const userID = this.client.getUserId() || "unknown";
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSendStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
 
-    private onConnectionStats(_: ConnectionStatsReport): void {
-        // @TODO: Implement data argumentation and event broadcasting please
-    }
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
+    };
 
-    private onByteSendStats(_: ByteSendStatsReport): void {
-        // @TODO: Implement data argumentation and event broadcasting please
-    }
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
