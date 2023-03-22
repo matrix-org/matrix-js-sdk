@@ -19,7 +19,7 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { MockResponse } from "fetch-mock";
+import { MockResponse, MockResponseFunction } from "fetch-mock";
 
 import type { IDeviceKeys } from "../../src/@types/crypto";
 import * as testUtils from "../test-utils/test-utils";
@@ -451,6 +451,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     }
 
     /**
+     * Add an expectation for a /keys/claim request for the MatrixClient under test
+     *
+     * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
+     *   (or a function that returns one).
+     */
+    function expectAliceKeyClaim(response: MockResponse | MockResponseFunction) {
+        const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
+        fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
+    }
+
+    /**
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
      *
@@ -757,10 +768,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         // ... and then claim one of his OTKs
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            getTestKeysClaimResponse("@bob:xyz"),
-        );
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
         const room = aliceClient.getRoom(ROOM_ID);
@@ -774,7 +782,37 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await p;
     });
 
+    it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
+        aliceClient.setGlobalErrorOnUnknownDevices(false);
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        // Alice shares a room with Bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // ... and claim one of his OTKs ...
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+        // ... and send an m.room_key message
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+        // Finally, send the message, and expect to get an `m.room.encrypted` event that we can decrypt.
+        await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
+        ]);
+    });
+
     oldBackendOnly("Alice sends a megolm message", async () => {
+        // TODO: do something about this for the rust backend.
+        //   Currently it fails because we don't respect the default GlobalErrorOnUnknownDevices and
+        //   send messages to unknown devices.
+
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
@@ -1039,14 +1077,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // mark the device as known, and resend.
         aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            (url: string, opts: RequestInit): MockResponse => {
-                const content = JSON.parse(opts.body as string);
-                expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
-                return getTestKeysClaimResponse(aliceClient.getUserId()!);
-            },
-        );
+        expectAliceKeyClaim((url: string, opts: RequestInit): MockResponse => {
+            const content = JSON.parse(opts.body as string);
+            expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
+            return getTestKeysClaimResponse(aliceClient.getUserId()!);
+        });
 
         const inboundGroupSessionPromise = expectSendRoomKey(aliceClient.getUserId()!, testOlmAccount);
 

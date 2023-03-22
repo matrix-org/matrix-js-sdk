@@ -837,7 +837,7 @@ interface IRoomHierarchy {
     next_batch?: string;
 }
 
-interface ITimestampToEventResponse {
+export interface TimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
@@ -9541,7 +9541,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         timestamp: number,
         dir: Direction,
-    ): Promise<ITimestampToEventResponse> {
+    ): Promise<TimestampToEventResponse> {
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });
