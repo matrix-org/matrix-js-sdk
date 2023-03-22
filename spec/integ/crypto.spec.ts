@@ -755,7 +755,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(event.getContent().body).toEqual("42");
     });
 
-    oldBackendOnly("prepareToEncrypt", async () => {
+    it("prepareToEncrypt", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         aliceClient.setGlobalErrorOnUnknownDevices(false);
