@@ -51,7 +51,7 @@ export class StatsCollector {
         if (this.isActive) {
             const statsPromise = this.pc.getStats();
             if (typeof statsPromise?.then === "function") {
-                statsPromise
+                return statsPromise
                     .then((report) => {
                         // @ts-ignore
                         this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
@@ -71,7 +71,6 @@ export class StatsCollector {
                     });
             }
             this.isActive = false;
-            return Promise.resolve(false);
         }
         return Promise.resolve(false);
     }
