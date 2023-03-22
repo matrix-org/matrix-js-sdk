@@ -2488,13 +2488,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * This should not normally be necessary.
      */
-    public forceDiscardSession(roomId: string): void {
+    public forceDiscardSession(roomId: string): Promise<void> {
         const alg = this.roomEncryptors.get(roomId);
         if (alg === undefined) throw new Error("Room not encrypted");
         if (alg.forceDiscardSession === undefined) {
             throw new Error("Room encryption algorithm doesn't support session discarding");
         }
         alg.forceDiscardSession();
+        return Promise.resolve();
     }
 
     /**
