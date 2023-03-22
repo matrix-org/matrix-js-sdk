@@ -1857,6 +1857,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("key upload request", () => {
+        beforeEach(() => {
+            jest.useFakeTimers();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
         function listenToUpload(): Promise<number> {
             return new Promise((resolve) => {
                 const listener = (url: string, options: RequestInit) => {
@@ -1865,7 +1873,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     if (keysCount) resolve(keysCount);
                     return {
                         one_time_key_counts: {
-                            signed_curve25519: keysCount,
+                            signed_curve25519: keysCount ? 60 : keysCount,
                         },
                     };
                 };
@@ -1893,13 +1901,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([]));
+
             await syncPromise(aliceClient);
-
-            // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
             expect(await uploadPromise).toBeGreaterThan(0);
 
             uploadPromise = listenToUpload();
@@ -1907,6 +1911,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 next_batch: 2,
                 device_one_time_keys_count: { signed_curve25519: 0 },
             });
+
+            // Advance local date to 2 minutes
+            // The old crypto only runs the upload every 60 seconds
+            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+
             await syncPromise(aliceClient);
 
             expect(await uploadPromise).toBeGreaterThan(0);
