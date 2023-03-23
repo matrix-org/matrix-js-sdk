@@ -2028,8 +2028,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const parentEventId = event.getAssociatedId()!;
-        const parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        const parentEventId = event.getAssociatedId();
+        let parentEvent;
+        if (parentEventId) {
+            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        }
 
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
         if (parentEvent && (event.isRelation() || event.isRedaction())) {
