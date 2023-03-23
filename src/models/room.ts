@@ -2029,7 +2029,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         const parentEventId = event.getAssociatedId();
-        let parentEvent;
+        let parentEvent: MatrixEvent | undefined;
         if (parentEventId) {
             parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
         }
