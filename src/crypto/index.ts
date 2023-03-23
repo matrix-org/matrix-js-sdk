@@ -3207,14 +3207,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         });
     }
 
-    public preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<void> {
-        const currentCount = oneTimeKeysCounts.get("signed_curve25519") || 0;
-        this.updateOneTimeKeyCount(currentCount);
-        return Promise.resolve();
-    }
+    public processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void> {
+        if (oneTimeKeysCounts) {
+            this.updateOneTimeKeyCount(oneTimeKeysCounts["signed_curve25519"]);
+        }
 
-    public preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<void> {
-        this.setNeedsNewFallback(!unusedFallbackKeys.has("signed_curve25519"));
+        if (unusedFallbackKeys) {
+            this.setNeedsNewFallback(!unusedFallbackKeys.includes("signed_curve25519"));
+        }
+
         return Promise.resolve();
     }
 

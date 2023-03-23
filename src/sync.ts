@@ -1522,19 +1522,14 @@ export class SyncApi {
             }
         }
 
-        // Handle one_time_keys_count
-        if (data.device_one_time_keys_count) {
-            const map = new Map<string, number>(Object.entries(data.device_one_time_keys_count));
-            this.syncOpts.cryptoCallbacks?.preprocessOneTimeKeyCounts(map);
-        }
-        if (data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
+        // Handle one_time_keys_count and unused fallback keys
+        this.syncOpts.cryptoCallbacks?.processKeyCounts(
+            data.device_one_time_keys_count,
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys =
-                data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.syncOpts.cryptoCallbacks?.preprocessUnusedFallbackKeys(new Set<string>(unusedFallbackKeys || null));
-        }
+            data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
+        );
     }
 
     /**

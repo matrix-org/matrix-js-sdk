@@ -1900,7 +1900,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             jest.useRealTimers();
         });
 
-        function listenToUpload(): Promise<number> {
+        function awaitKeyUploadRequest(): Promise<number> {
             return new Promise((resolve) => {
                 const listener = (url: string, options: RequestInit) => {
                     const content = JSON.parse(options.body as string);
@@ -1908,40 +1908,36 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     if (keysCount) resolve(keysCount);
                     return {
                         one_time_key_counts: {
+                            // The matrix client does `/upload` requests until 50 keys are counted
+                            // We return here 60 to avoid the `/upload` request loop
                             signed_curve25519: keysCount ? 60 : keysCount,
                         },
                     };
                 };
 
-                // catch both r0 and v3 variants
-                fetchMock.post(
-                    new URL("/_matrix/client/r0/keys/upload", aliceClient.getHomeserverUrl()).toString(),
-                    listener,
-                    {
+                for (const path of ["/_matrix/client/r0/keys/upload", "/_matrix/client/v3/keys/upload"]) {
+                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener, {
+                        // These routes are already defined in the E2KeyReceiver
+                        // We want to overwrite the behaviour of the E2KeyReceiver
                         overwriteRoutes: true,
-                    },
-                );
-                fetchMock.post(
-                    new URL("/_matrix/client/v3/keys/upload", aliceClient.getHomeserverUrl()).toString(),
-                    listener,
-                    {
-                        overwriteRoutes: true,
-                    },
-                );
+                    });
+                }
             });
         }
 
         it("should make key upload request after sync", async () => {
-            let uploadPromise = listenToUpload();
+            let uploadPromise = awaitKeyUploadRequest();
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([]));
 
             await syncPromise(aliceClient);
+
+            // Verify than `/upload` is called on Alice homer sever
             expect(await uploadPromise).toBeGreaterThan(0);
 
-            uploadPromise = listenToUpload();
+            uploadPromise = awaitKeyUploadRequest();
             syncResponder.sendOrQueueSyncResponse({
                 next_batch: 2,
                 device_one_time_keys_count: { signed_curve25519: 0 },
@@ -1953,6 +1949,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             await syncPromise(aliceClient);
 
+            // After set device_one_time_keys_count to 0
+            // A `/upload` is expected
             expect(await uploadPromise).toBeGreaterThan(0);
         });
     });
