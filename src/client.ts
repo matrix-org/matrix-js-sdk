@@ -7817,8 +7817,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
         const endpoint = capabilities["org.matrix.msc3882.get_logintoken"]
-            ? "/org.matrix.msc3882/login/get_token"
-            : "/org.matrix.msc3882/login/token";
+            ? "/org.matrix.msc3882/login/get_token" // r1 endpoint
+            : "/org.matrix.msc3882/login/token"; // r0 endpoint
 
         const body: UIARequest<{}> = { auth };
         const res = await this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
