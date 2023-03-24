@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
+import { MapWithDefault } from "../utils";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -45,6 +46,7 @@ export class RustCrypto implements CryptoBackend {
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
+    private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
 
@@ -56,6 +58,7 @@ export class RustCrypto implements CryptoBackend {
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
+        this.eventDecryptor = new EventDecryptor(olmMachine);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,23 +104,7 @@ export class RustCrypto implements CryptoBackend {
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        const res = (await this.olmMachine.decryptRoomEvent(
-            JSON.stringify({
-                event_id: event.getId(),
-                type: event.getWireType(),
-                sender: event.getSender(),
-                state_key: event.getStateKey(),
-                content: event.getWireContent(),
-                origin_server_ts: event.getTs(),
-            }),
-            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-        )) as RustSdkCryptoJs.DecryptedRoomEvent;
-        return {
-            clearEvent: JSON.parse(res.event),
-            claimedEd25519Key: res.senderClaimedEd25519Key,
-            senderCurve25519Key: res.senderCurve25519Key,
-            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
-        };
+        return await this.eventDecryptor.attemptEventDecryption(event);
     }
 
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
@@ -329,6 +316,89 @@ export class RustCrypto implements CryptoBackend {
             logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
         } finally {
             this.outgoingRequestLoopRunning = false;
+        }
+    }
+}
+
+class EventDecryptor {
+    /**
+     * Events which we couldn't decrypt due to unknown sessions / indexes.
+     *
+     * Map from senderKey to sessionId to Set of MatrixEvents
+     */
+    private eventsPendingKey = new MapWithDefault<string, MapWithDefault<string, Set<MatrixEvent>>>(
+        () => new MapWithDefault<string, Set<MatrixEvent>>(() => new Set()),
+    );
+
+    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine) {}
+
+    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
+        logger.info("Attempting decryption of event", event);
+        // add the event to the pending list *before* attempting to decrypt.
+        // then, if the key turns up while decryption is in progress (and
+        // decryption fails), we will schedule a retry.
+        // (fixes https://github.com/vector-im/element-web/issues/5001)
+        this.addEventToPendingList(event);
+
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as RustSdkCryptoJs.DecryptedRoomEvent;
+
+        // Success. We can remove the event from the pending list, if
+        // that hasn't already happened.
+        this.removeEventFromPendingList(event);
+
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
+    }
+
+    /**
+     * Add an event to the list of those awaiting their session keys.
+     */
+    private addEventToPendingList(event: MatrixEvent): void {
+        const content = event.getWireContent();
+        const senderKey = content.sender_key;
+        const sessionId = content.session_id;
+
+        const senderPendingEvents = this.eventsPendingKey.getOrCreate(senderKey);
+        const sessionPendingEvents = senderPendingEvents.getOrCreate(sessionId);
+        sessionPendingEvents.add(event);
+    }
+
+    /**
+     * Remove an event from the list of those awaiting their session keys.
+     */
+    private removeEventFromPendingList(event: MatrixEvent): void {
+        const content = event.getWireContent();
+        const senderKey = content.sender_key;
+        const sessionId = content.session_id;
+
+        const senderPendingEvents = this.eventsPendingKey.get(senderKey);
+        if (!senderPendingEvents) return;
+
+        const sessionPendingEvents = senderPendingEvents.get(sessionId);
+        if (!sessionPendingEvents) return;
+
+        sessionPendingEvents.delete(event);
+
+        // also clean up the higher-level maps if they are now empty
+        if (sessionPendingEvents.size === 0) {
+            senderPendingEvents.delete(sessionId);
+            if (senderPendingEvents.size === 0) {
+                this.eventsPendingKey.delete(senderKey);
+            }
         }
     }
 }

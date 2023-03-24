@@ -624,7 +624,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(decryptedEvent.getContent().body).toEqual("42");
     });
 
-    oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
+    it("Alice receives a megolm message before the session keys", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
 
