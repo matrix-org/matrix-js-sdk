@@ -626,8 +626,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-
-        // https://github.com/vector-im/element-web/issues/2273
         await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
@@ -667,7 +665,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await syncPromise(aliceClient);
 
         const room = aliceClient.getRoom(ROOM_ID)!;
-        expect(room.getLiveTimeline().getEvents()[0].getContent().msgtype).toEqual("m.bad.encrypted");
+        const event = room.getLiveTimeline().getEvents()[0];
+
+        // wait for a first attempt at decryption: should fail
+        await testUtils.awaitDecryption(event);
+        expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
 
         // now she gets the room_key event
         syncResponder.sendOrQueueSyncResponse({
@@ -678,20 +680,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         await syncPromise(aliceClient);
 
-        const event = room.getLiveTimeline().getEvents()[0];
-
-        let decryptedEvent: MatrixEvent;
-        if (event.getContent().msgtype != "m.bad.encrypted") {
-            decryptedEvent = event;
-        } else {
-            decryptedEvent = await new Promise<MatrixEvent>((resolve) => {
-                event.once(MatrixEventEvent.Decrypted, (ev) => {
-                    logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-                    resolve(ev);
-                });
-            });
-        }
-        expect(decryptedEvent.getContent().body).toEqual("42");
+        await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
+        expect(event.getContent().body).toEqual("42");
     });
 
     it("Alice gets a second room_key message", async () => {

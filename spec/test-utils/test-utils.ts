@@ -375,17 +375,17 @@ export async function awaitDecryption(
     // already
     if (event.getClearContent() !== null) {
         if (waitOnDecryptionFailure && event.isDecryptionFailure()) {
-            logger.log(`${Date.now()} event ${event.getId()} got decryption error; waiting`);
+            logger.log(`${Date.now()}: event ${event.getId()} got decryption error; waiting`);
         } else {
             return event;
         }
     } else {
-        logger.log(`${Date.now()} event ${event.getId()} is not yet decrypted; waiting`);
+        logger.log(`${Date.now()}: event ${event.getId()} is not yet decrypted; waiting`);
     }
 
     return new Promise((resolve) => {
-        event.once(MatrixEventEvent.Decrypted, (ev) => {
-            logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
+        event.once(MatrixEventEvent.Decrypted, (ev, err) => {
+            logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
             resolve(ev);
         });
     });
