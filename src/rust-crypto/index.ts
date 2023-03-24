@@ -39,6 +39,9 @@ export async function initRustCrypto(
     // TODO: use the pickle key for the passphrase
     const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, RUST_SDK_STORE_PREFIX, "test pass");
     const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId);
+    await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
+        rustCrypto.onRoomKeysUpdated(sessions),
+    );
 
     logger.info("Completed rust crypto-sdk setup");
     return rustCrypto;
