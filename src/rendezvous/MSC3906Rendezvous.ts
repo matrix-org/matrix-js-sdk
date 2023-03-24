@@ -100,9 +100,15 @@ export class MSC3906Rendezvous {
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
+        // in r1 of MSC3882 the availability is exposed as a capability
+        const capabilities = await this.client.getCapabilities();
+        // in r0 of MSC3882 the availability is exposed as a feature flag
         const features = await buildFeatureSupportMap(await this.client.getVersions());
         // determine available protocols
-        if (features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
+        if (
+            !capabilities["org.matrix.msc3882.get_logintoken"]?.enabled &&
+            features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported
+        ) {
             logger.info("Server doesn't support MSC3882");
             await this.send({ type: PayloadType.Finish, outcome: Outcome.Unsupported });
             await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
