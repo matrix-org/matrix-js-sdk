@@ -737,7 +737,7 @@ describe("Call", function () {
 
         const dataChannel = call.createDataChannel("data_channel_label", { id: 123 });
 
-        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel);
+        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel, call);
         expect(dataChannel.label).toBe("data_channel_label");
         expect(dataChannel.id).toBe(123);
     });
@@ -1604,7 +1604,7 @@ describe("Call", function () {
             hasAdvancedBy += advanceBy;
 
             expect(lengthChangedListener).toHaveBeenCalledTimes(hasAdvancedBy);
-            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy);
+            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy, call);
         }
     });
 
