@@ -202,4 +202,23 @@ describe("IndexedDBStore", () => {
         store.startup();
         await deferred.promise;
     });
+
+    it("remote worker should pass closed event", async () => {
+        const worker = new (class MockWorker {
+            postMessage(data: any) {}
+        })() as Worker;
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => worker,
+        });
+        store.startup();
+
+        const deferred = defer<void>();
+        store.on("closed", deferred.resolve);
+        (worker as any).onmessage({ data: { command: "closed" } });
+        await deferred.promise;
+    });
 });
