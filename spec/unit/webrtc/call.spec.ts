@@ -432,9 +432,6 @@ describe("Call", function () {
     });
 
     it("should handle error on call upgrade", async () => {
-        const mockGetUserMediaStream = jest.fn().mockRejectedValue(new Error("Test error"));
-        client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
-
         const onError = jest.fn();
         call.on(CallEvent.Error, onError);
 
@@ -451,6 +448,9 @@ describe("Call", function () {
                 [SDPStreamMetadataKey]: {},
             }),
         );
+
+        const mockGetUserMediaStream = jest.fn().mockRejectedValue(new Error("Test error"));
+        client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
 
         // then unmute which should cause an upgrade
         await call.setLocalVideoMuted(false);
