@@ -36,6 +36,7 @@ import {
     PushRuleCondition,
     PushRuleKind,
     PushRuleSet,
+    RuleId,
     TweakName,
 } from "./@types/PushRules";
 import { EventType } from "./@types/event";
@@ -69,6 +70,36 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [PushRuleActionName.DontNotify],
+    },
+    {
+        rule_id: RuleId.IsUserMention,
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyContains,
+                key: "content.org\\.matrix\\.msc3952\\.mentions.user_ids",
+                value: "", // The user ID is dynamically added in rewriteDefaultRules.
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
+    },
+    {
+        rule_id: RuleId.IsRoomMention,
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyIs,
+                key: "content.org\\.matrix\\.msc3952\\.mentions.room",
+                value: true,
+            },
+            {
+                kind: ConditionKind.SenderNotificationPermission,
+                key: "room",
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
     },
     {
         // For homeservers which don't support MSC3786 yet
@@ -160,9 +191,10 @@ export class PushProcessor {
      * where applicable. Useful for upgrading push rules to more strict
      * conditions when the server is falling behind on defaults.
      * @param incomingRules - The client's existing push rules
+     * @param userId - The Matrix ID of the client.
      * @returns The rewritten rules
      */
-    public static rewriteDefaultRules(incomingRules: IPushRules): IPushRules {
+    public static rewriteDefaultRules(incomingRules: IPushRules, userId: string | undefined = undefined): IPushRules {
         let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
 
         // These lines are mostly to make the tests happy. We shouldn't run into these
@@ -174,8 +206,22 @@ export class PushProcessor {
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
-        for (const override of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
+        for (const originalOverride of DEFAULT_OVERRIDE_RULES) {
+            const existingRule = globalOverrides.find((r) => r.rule_id === originalOverride.rule_id);
+
+            // Dynamically add the user ID as the value for the is_user_mention rule.
+            let override: IPushRule;
+            if (originalOverride.rule_id === RuleId.IsUserMention) {
+                // If the user ID wasn't provided, skip the rule.
+                if (!userId) {
+                    continue;
+                }
+
+                override = JSON.parse(JSON.stringify(originalOverride)); // deep clone
+                override.conditions![0].value = userId;
+            } else {
+                override = originalOverride;
+            }
 
             if (existingRule) {
                 // Copy over the actions, default, and conditions. Don't touch the user's preference.
@@ -668,6 +714,17 @@ export class PushProcessor {
     }
 
     public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
+        // Disable the deprecated mentions push rules if the new mentions property exists.
+        if (
+            this.client.supportsIntentionalMentions() &&
+            ev.getContent()["org.matrix.msc3952.mentions"] !== undefined &&
+            (rule.rule_id === RuleId.ContainsUserName ||
+                rule.rule_id === RuleId.ContainsDisplayName ||
+                rule.rule_id === RuleId.AtRoomNotification)
+        ) {
+            return false;
+        }
+
         return !rule.conditions?.some((cond) => !this.eventFulfillsCondition(cond, ev));
     }
 

@@ -461,6 +461,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * @experimental
+     */
+    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -837,7 +842,7 @@ interface IRoomHierarchy {
     next_batch?: string;
 }
 
-interface ITimestampToEventResponse {
+export interface TimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
@@ -8575,7 +8580,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPushRules(rules: IPushRules): void {
         // Fix-up defaults, if applicable.
-        this.pushRules = PushProcessor.rewriteDefaultRules(rules);
+        this.pushRules = PushProcessor.rewriteDefaultRules(rules, this.getUserId()!);
         // Pre-calculate any necessary caches.
         this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }
@@ -9473,6 +9478,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * A helper to determine intentional mentions support
+     * @returns a boolean to determine if intentional mentions are enabled
+     * @experimental
+     */
+    public supportsIntentionalMentions(): boolean {
+        return this.clientOpts?.intentionalMentions || false;
+    }
+
+    /**
      * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
      * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
@@ -9541,7 +9555,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         timestamp: number,
         dir: Direction,
-    ): Promise<ITimestampToEventResponse> {
+    ): Promise<TimestampToEventResponse> {
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });

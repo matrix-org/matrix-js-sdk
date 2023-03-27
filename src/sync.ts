@@ -1523,22 +1523,17 @@ export class SyncApi {
         }
 
         // Handle one_time_keys_count
-        if (this.syncOpts.crypto && data.device_one_time_keys_count) {
-            const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
-            this.syncOpts.crypto.updateOneTimeKeyCount(currentCount);
+        if (data.device_one_time_keys_count) {
+            const map = new Map<string, number>(Object.entries(data.device_one_time_keys_count));
+            this.syncOpts.cryptoCallbacks?.preprocessOneTimeKeyCounts(map);
         }
-        if (
-            this.syncOpts.crypto &&
-            (data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"])
-        ) {
+        if (data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
             const unusedFallbackKeys =
                 data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.syncOpts.crypto.setNeedsNewFallback(
-                Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
-            );
+            this.syncOpts.cryptoCallbacks?.preprocessUnusedFallbackKeys(new Set<string>(unusedFallbackKeys || null));
         }
     }
 
