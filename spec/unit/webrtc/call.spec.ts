@@ -1634,4 +1634,24 @@ describe("Call", function () {
             expect(call.hangup).not.toHaveBeenCalled();
         });
     });
+
+    describe("Call replace", () => {
+        it("Fires event when call replaced", async () => {
+            const onReplace = jest.fn();
+            call.on(CallEvent.Replaced, onReplace);
+
+            await call.placeVoiceCall();
+
+            const call2 = new MatrixCall({
+                client: client.client,
+                roomId: FAKE_ROOM_ID,
+            });
+            call2.on(CallEvent.Error, errorListener);
+            await fakeIncomingCall(client, call2);
+
+            call.replacedBy(call2);
+
+            expect(onReplace).toHaveBeenCalled();
+        });
+    });
 });
