@@ -27,7 +27,6 @@ import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
 import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
-
 export enum GroupCallIntent {
     Ring = "m.ring",
     Prompt = "m.prompt",

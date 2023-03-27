@@ -79,14 +79,15 @@ describe("GroupCallStats", () => {
         it("starting processing and calling the collectors", async () => {
             stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection());
             const collector = stats.getStatsCollector("CALL_ID");
+            let processStatsSpy;
             if (collector) {
-                const processStatsSpy = jest.spyOn(collector, "processStats");
+                processStatsSpy = jest.spyOn(collector, "processStats");
                 stats.start();
                 jest.advanceTimersByTime(TIME_INTERVAL);
-                expect(processStatsSpy).toHaveBeenCalledWith(GROUP_CALL_ID, LOCAL_USER_ID);
             } else {
                 throw new Error("Test failed, because no Collector found!");
             }
+            expect(processStatsSpy).toHaveBeenCalledWith(GROUP_CALL_ID, LOCAL_USER_ID);
         });
 
         it("doing nothing if process already running", async () => {
