@@ -488,8 +488,7 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        this.forEachCall((call) => this.disposeCall(call, CallErrorCode.UserHangup));
-        this.calls.clear();
+        this.forEachCall((call) => call.hangup(CallErrorCode.UserHangup, false));
 
         this.activeSpeaker = undefined;
         clearInterval(this.activeSpeakerLoopInterval);
@@ -816,7 +815,7 @@ export class GroupCall extends TypedEventEmitter<
             `GroupCall ${this.groupCallId} onIncomingCall() incoming call (userId=${opponentUserId}, callId=${newCall.callId})`,
         );
 
-        if (prevCall) this.disposeCall(prevCall, CallErrorCode.Replaced);
+        if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
 
         this.initCall(newCall);
         newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
@@ -866,7 +865,7 @@ export class GroupCall extends TypedEventEmitter<
                         logger.debug(
                             `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
                         );
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
+                        prevCall.hangup(CallErrorCode.NewSession, false);
                     }
 
                     const newCall = createNewMatrixCall(this.client, this.room.roomId, {
@@ -917,7 +916,7 @@ export class GroupCall extends TypedEventEmitter<
                                     );
                                 }
 
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                                newCall.hangup(CallErrorCode.SignallingFailed, false);
                                 if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
                             });
                     }
@@ -1037,10 +1036,6 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        if (call.state !== CallState.Ended) {
-            call.hangup(hangupReason, false);
-        }
-
         const usermediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
 
         if (usermediaFeed) {
@@ -1092,6 +1087,8 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
+        if (state === CallState.Ended) return;
+
         const audioMuted = this.localCallFeed!.isAudioMuted();
 
         if (call.localUsermediaStream && call.isMicrophoneMuted() !== audioMuted) {
@@ -1136,7 +1133,7 @@ export class GroupCall extends TypedEventEmitter<
             this.calls.set(opponentUserId, deviceMap);
         }
 
-        this.disposeCall(prevCall, CallErrorCode.Replaced);
+        prevCall.hangup(CallErrorCode.Replaced, false);
         this.initCall(newCall);
         deviceMap.set(prevCall.getOpponentDeviceId()!, newCall);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
