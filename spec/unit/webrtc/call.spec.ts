@@ -431,6 +431,33 @@ describe("Call", function () {
         expect(transceivers.get("m.usermedia:video")!.sender.track!.id).toBe("usermedia_video_track");
     });
 
+    it("should handle error on call upgrade", async () => {
+        const mockGetUserMediaStream = jest.fn().mockRejectedValue(new Error("Test error"));
+        client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+        const onError = jest.fn();
+        call.on(CallEvent.Error, onError);
+
+        await startVoiceCall(client, call);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        expect(onError).toHaveBeenCalled();
+    });
+
     it("should unmute video after upgrading to video call", async () => {
         // Regression test for https://github.com/vector-im/element-call/issues/925
         await startVoiceCall(client, call);
