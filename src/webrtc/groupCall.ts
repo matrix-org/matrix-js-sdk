@@ -24,6 +24,9 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { GroupCallStats } from "./stats/groupCallStats";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
+
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -83,10 +86,24 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
+export enum GroupCallStatsReportEvent {
+    ConnectionStats = "GroupCall.connection_stats",
+    ByteSentStats = "GroupCall.byte_sent_stats",
+}
+
+export type GroupCallStatsReportEventHandlerMap = {
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
+};
+
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",
+}
+
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+    report: T;
 }
 
 export class GroupCallError extends Error {
@@ -180,8 +197,8 @@ function getCallUserId(call: MatrixCall): string | null {
 }
 
 export class GroupCall extends TypedEventEmitter<
-    GroupCallEvent | CallEvent,
-    GroupCallEventHandlerMap & CallEventHandlerMap
+    GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
 > {
     // Config
     public activeSpeakerInterval = 1000;
@@ -211,6 +228,8 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
+    private readonly stats: GroupCallStats;
+
     public constructor(
         private client: MatrixClient,
         public room: Room,
@@ -234,7 +253,22 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
+
+        const userID = this.client.getUserId() || "unknown";
+        this.stats = new GroupCallStats(this.groupCallId, userID);
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
+
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
+    };
+
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
@@ -1004,6 +1038,8 @@ export class GroupCall extends TypedEventEmitter<
         call.isPtt = this.isPtt;
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
+
+        call.initStats(this.stats);
 
         onCallFeedsChanged();
     }
