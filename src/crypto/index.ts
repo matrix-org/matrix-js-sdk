@@ -414,6 +414,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private sendKeyRequestsImmediately = false;
 
     private oneTimeKeyCount?: number;
+    private initKeyCount?: number;
     private needsNewFallback?: boolean;
     private fallbackCleanup?: ReturnType<typeof setTimeout>;
 
@@ -561,13 +562,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 : "Crypto: initialising Olm device...",
         );
         await this.olmDevice.init({ fromExportedDevice: exportedOlmDevice, pickleKey });
+        await this.mlsProvider.init();
         logger.log("Crypto: loading device list...");
         await this.deviceList.load();
 
         // build our device keys: these will later be uploaded
         this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key!;
         this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key!;
-        this.deviceKeys["org.matrix.msc2883.v0.mls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential.tls_serialize());
+        this.deviceKeys["org.matrix.msc2883.v0.mls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential!.tls_serialize());
 
         logger.log("Crypto: fetching own devices...");
         let myDevices = this.deviceList.getRawStoredDevicesForUser(this.userId);
@@ -1834,9 +1836,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param currentCount - The current count of one_time_keys to be stored
      */
-    public updateOneTimeKeyCount(currentCount: number): void {
-        if (isFinite(currentCount)) {
-            this.oneTimeKeyCount = currentCount;
+    public updateOneTimeKeyCount(oneTimeKeyCount: number, initKeyCount: number): void {
+        if (isFinite(oneTimeKeyCount) && isFinite(initKeyCount)) {
+            this.oneTimeKeyCount = oneTimeKeyCount;
+            this.initKeyCount = initKeyCount;
         } else {
             throw new TypeError("Parameter for updateOneTimeKeyCount has to be a number");
         }
@@ -1895,12 +1898,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // out stale private keys that won't receive a message.
         const keyLimit = Math.floor(maxOneTimeKeys / 2);
 
-        const uploadLoop = async (keyCount: number): Promise<void> => {
-            while (keyLimit > keyCount || this.getNeedsNewFallback()) {
+        const uploadLoop = async (otkKeyCount: number, initKeyCount: number): Promise<void> => {
+            while (keyLimit > otkKeyCount || this.getNeedsNewFallback() || keyLimit > initKeyCount) {
                 // Ask olm to generate new one time keys, then upload them to synapse.
-                if (keyLimit > keyCount) {
+                if (keyLimit > otkKeyCount) {
                     logger.info("generating oneTimeKeys");
-                    const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
+                    const keysThisLoop = Math.min(keyLimit - otkKeyCount, maxKeysPerCycle);
                     await this.olmDevice.generateOneTimeKeys(keysThisLoop);
                 }
 
@@ -1923,39 +1926,54 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     }
                 }
 
+                let initKeys: string[] = [];
+                if (keyLimit > initKeyCount) {
+                    logger.info("generating initKeys");
+                    const keysThisLoop = Math.min(keyLimit - initKeyCount, maxKeysPerCycle);
+                    initKeys = this.mlsProvider.backend!.make_init_keys(
+                        this.mlsProvider.credential!,
+                        keysThisLoop,
+                    )
+                        .map((keyArr: number[]) => olmlib.encodeUnpaddedBase64(Uint8Array.from(keyArr)));
+                }
+
                 logger.info("calling uploadOneTimeKeys");
-                const res = await this.uploadOneTimeKeys();
+                const res = await this.uploadOneTimeKeys(initKeys);
                 if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                     // if the response contains a more up to date value use this
                     // for the next loop
-                    keyCount = res.one_time_key_counts.signed_curve25519;
+                    otkKeyCount = res.one_time_key_counts.signed_curve25519;
                 } else {
                     throw new Error(
                         "response for uploading keys does not contain " + "one_time_key_counts.signed_curve25519",
                     );
                 }
+                initKeyCount = (res.one_time_key_counts && res.one_time_key_counts [dmls.INIT_KEY_ALGORITHM.name]) || 0;
             }
         };
 
         this.oneTimeKeyCheckInProgress = true;
         Promise.resolve()
             .then(() => {
-                if (this.oneTimeKeyCount !== undefined) {
+                if (this.oneTimeKeyCount !== undefined && this.initKeyCount !== undefined) {
                     // We already have the current one_time_key count from a /sync response.
                     // Use this value instead of asking the server for the current key count.
-                    return Promise.resolve(this.oneTimeKeyCount);
+                    return Promise.resolve([this.oneTimeKeyCount, this.initKeyCount]);
                 }
                 // ask the server how many keys we have
                 return this.baseApis.uploadKeysRequest({}).then((res) => {
-                    return res.one_time_key_counts.signed_curve25519 || 0;
+                    return [
+                        res.one_time_key_counts.signed_curve25519 || 0,
+                        res.one_time_key_counts[dmls.INIT_KEY_ALGORITHM.name] || 0,
+                    ];
                 });
             })
-            .then((keyCount) => {
+            .then(([otkKeyCount, initKeyCount]) => {
                 // Start the uploadLoop with the current keyCount. The function checks if
                 // we need to upload new keys or not.
                 // If there are too many keys on the server then we don't need to
                 // create any more keys.
-                return uploadLoop(keyCount);
+                return uploadLoop(otkKeyCount, initKeyCount);
             })
             .catch((e) => {
                 logger.error("Error uploading one-time keys", e.stack || e);
@@ -1964,12 +1982,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 // reset oneTimeKeyCount to prevent start uploading based on old data.
                 // it will be set again on the next /sync-response
                 this.oneTimeKeyCount = undefined;
+                this.initKeyCount = undefined;
                 this.oneTimeKeyCheckInProgress = false;
             });
     }
 
     // returns a promise which resolves to the response
-    private async uploadOneTimeKeys(): Promise<IKeysUploadResponse> {
+    private async uploadOneTimeKeys(initKeys: string[]): Promise<IKeysUploadResponse> {
         const promises: Promise<unknown>[] = [];
 
         let fallbackJson: Record<string, IOneTimeKey> | undefined;
@@ -1985,7 +2004,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         const oneTimeKeys = await this.olmDevice.getOneTimeKeys();
-        const oneTimeJson: Record<string, { key: string }> = {};
+        const oneTimeJson: Record<string, { key: string } | string> = {};
 
         for (const keyId in oneTimeKeys.curve25519) {
             if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
@@ -1998,6 +2017,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         await Promise.all(promises);
+
+        for (const key of initKeys) {
+            oneTimeJson[dmls.INIT_KEY_ALGORITHM.name + ":" + key] = key;
+        }
 
         const requestBody: Record<string, any> = {
             one_time_keys: oneTimeJson,
@@ -3210,7 +3233,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return events.filter((toDevice) => {
             if (
                 toDevice.type === EventType.RoomMessageEncrypted &&
-                !["m.olm.v1.curve25519-aes-sha2"].includes(toDevice.content?.algorithm)
+                !["m.olm.v1.curve25519-aes-sha2", dmls.WELCOME_PACKAGE.name].includes(toDevice.content?.algorithm)
             ) {
                 logger.log("Ignoring invalid encrypted to-device event from " + toDevice.sender);
                 return false;

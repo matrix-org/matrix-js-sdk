@@ -61,6 +61,7 @@ import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
 import { Crypto } from "./crypto";
+import { INIT_KEY_ALGORITHM } from "./crypto/algorithms/dmls";
 
 const DEBUG = true;
 
@@ -1525,7 +1526,8 @@ export class SyncApi {
         // Handle one_time_keys_count
         if (this.syncOpts.crypto && data.device_one_time_keys_count) {
             const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
-            this.syncOpts.crypto.updateOneTimeKeyCount(currentCount);
+            const initKeyCount = data.device_one_time_keys_count[INIT_KEY_ALGORITHM.name] || 0;
+            this.syncOpts.crypto.updateOneTimeKeyCount(currentCount, initKeyCount);
         }
         if (
             this.syncOpts.crypto &&

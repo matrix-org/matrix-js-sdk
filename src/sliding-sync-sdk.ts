@@ -45,6 +45,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
+import { INIT_KEY_ALGORITHM } from "./crypto/algorithms/dmls";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -97,7 +98,8 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
         // Handle one_time_keys_count
         if (data["device_one_time_keys_count"]) {
             const currentCount = data["device_one_time_keys_count"].signed_curve25519 || 0;
-            this.crypto.updateOneTimeKeyCount(currentCount);
+            const initKeyCount = data["device_one_time_keys_count"][INIT_KEY_ALGORITHM.name] || 0;
+            this.crypto.updateOneTimeKeyCount(currentCount, initKeyCount);
         }
         if (data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
             // The presence of device_unused_fallback_key_types indicates that the
