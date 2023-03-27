@@ -182,4 +182,24 @@ describe("IndexedDBStore", () => {
         (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
         await deferred.promise;
     });
+
+    it("should use remote backend if workerFactory passed", async () => {
+        const deferred = defer<void>();
+        class MockWorker {
+            postMessage(data: any) {
+                if (data.command === "setupWorker") {
+                    deferred.resolve();
+                }
+            }
+        }
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => new MockWorker() as Worker,
+        });
+        store.startup();
+        await deferred.promise;
+    });
 });
