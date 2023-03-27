@@ -514,6 +514,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
     public hangup = jest.fn<void, []>();
+    public initStats = jest.fn<void, []>();
 
     public sendMetadataUpdate = jest.fn<void, []>();
 
