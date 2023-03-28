@@ -61,7 +61,7 @@ export class EncryptionSetupBuilder {
      * @param accountData - pre-existing account data, will only be read, not written.
      * @param delegateCryptoCallbacks - crypto callbacks to delegate to if the key isn't in cache yet
      */
-    public constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
+    public constructor(accountData: Map<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
@@ -246,7 +246,7 @@ class AccountDataClientAdapter
     /**
      * @param existingValues - existing account data
      */
-    public constructor(private readonly existingValues: Record<string, MatrixEvent>) {
+    public constructor(private readonly existingValues: Map<string, MatrixEvent>) {
         super();
     }
 
@@ -265,7 +265,7 @@ class AccountDataClientAdapter
         if (modifiedValue) {
             return modifiedValue;
         }
-        const existingValue = this.existingValues[type];
+        const existingValue = this.existingValues.get(type);
         if (existingValue) {
             return existingValue.getContent();
         }

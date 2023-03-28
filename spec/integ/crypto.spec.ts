@@ -560,7 +560,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -620,7 +620,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -688,7 +688,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1071,8 +1071,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
-            expect(Object.keys((e as any).devices)).toEqual([aliceClient.getUserId()!]);
-            expect(Object.keys((e as any)?.devices[aliceClient.getUserId()!])).toEqual(["DEVICE_ID"]);
+            expect([...(e as any).devices.keys()]).toEqual([aliceClient.getUserId()!]);
+            expect((e as any).devices.get(aliceClient.getUserId()!).has("DEVICE_ID"));
         }
 
         // mark the device as known, and resend.
@@ -1140,7 +1140,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1296,7 +1296,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1363,7 +1363,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
             aliceClient.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
         }

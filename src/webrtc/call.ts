@@ -609,7 +609,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!userId) throw new Error("Couldn't find opponent user ID to init crypto");
 
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
-        this.opponentDeviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
+        this.opponentDeviceInfo = deviceInfoMap.get(userId)?.get(this.opponentDeviceId);
         if (this.opponentDeviceInfo === undefined) {
             throw new GroupCallUnknownDeviceError(userId);
         }
@@ -2408,11 +2408,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     },
                 );
             } else {
-                await this.client.sendToDevice(eventType, {
-                    [userId]: {
-                        [this.opponentDeviceId]: content,
-                    },
-                });
+                await this.client.sendToDevice(
+                    eventType,
+                    new Map<string, any>([[userId, new Map([[this.opponentDeviceId, content]])]]),
+                );
             }
         } else {
             this.emit(CallEvent.SendVoipEvent, {
