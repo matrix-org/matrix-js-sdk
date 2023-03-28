@@ -585,6 +585,7 @@ export function makeMockGroupCallStateEvent(
         "m.type": GroupCallType.Video,
         "m.intent": GroupCallIntent.Prompt,
     },
+    redacted?: boolean,
 ): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
@@ -592,6 +593,7 @@ export function makeMockGroupCallStateEvent(
         getTs: jest.fn().mockReturnValue(0),
         getContent: jest.fn().mockReturnValue(content),
         getStateKey: jest.fn().mockReturnValue(groupCallId),
+        isRedacted: jest.fn().mockReturnValue(redacted ?? false),
     } as unknown as MatrixEvent;
 }
 

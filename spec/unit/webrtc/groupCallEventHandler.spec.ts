@@ -98,6 +98,23 @@ describe("Group Call Event Handler", function () {
 
             expect(groupCall.state).toBe(GroupCallState.Ended);
         });
+
+        it("terminates call when redacted", async () => {
+            await groupCallEventHandler.start();
+            mockClient.emitRoomState(makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID), {
+                roomId: FAKE_ROOM_ID,
+            } as unknown as RoomState);
+
+            const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)!;
+
+            expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
+
+            mockClient.emitRoomState(makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, undefined, true), {
+                roomId: FAKE_ROOM_ID,
+            } as unknown as RoomState);
+
+            expect(groupCall.state).toBe(GroupCallState.Ended);
+        });
     });
 
     it("waits until client starts syncing", async () => {
@@ -222,9 +239,9 @@ describe("Group Call Event Handler", function () {
             jest.clearAllMocks();
         });
 
-        const setupCallAndStart = async (content?: IContent) => {
+        const setupCallAndStart = async (content?: IContent, redacted?: boolean) => {
             mocked(mockRoom.currentState.getStateEvents).mockReturnValue([
-                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, content),
+                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, content, redacted),
             ] as unknown as MatrixEvent);
             mockClient.getRooms.mockReturnValue([mockRoom]);
             await groupCallEventHandler.start();
@@ -277,6 +294,25 @@ describe("Group Call Event Handler", function () {
             mockClient.getRoom.mockReturnValue(undefined);
 
             await setupCallAndStart();
+
+            expect(mockClientEmit).not.toHaveBeenCalledWith(
+                GroupCallEventHandlerEvent.Incoming,
+                expect.objectContaining({
+                    groupCallId: FAKE_GROUP_CALL_ID,
+                }),
+            );
+        });
+
+        it("ignores redacted calls", async () => {
+            await setupCallAndStart(
+                {
+                    // Real event contents to make sure that it's specifically the
+                    // event being redacted that causes it to be ignored
+                    "m.type": GroupCallType.Video,
+                    "m.intent": GroupCallIntent.Prompt,
+                },
+                true,
+            );
 
             expect(mockClientEmit).not.toHaveBeenCalledWith(
                 GroupCallEventHandlerEvent.Incoming,
