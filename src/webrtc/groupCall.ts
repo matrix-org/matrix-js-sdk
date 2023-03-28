@@ -1541,4 +1541,8 @@ export class GroupCall extends TypedEventEmitter<
             );
         }
     };
+
+    public getGroupCallStats(): GroupCallStats {
+        return this.stats;
+    }
 }
