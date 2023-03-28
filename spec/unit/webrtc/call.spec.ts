@@ -769,6 +769,17 @@ describe("Call", function () {
         expect(dataChannel.id).toBe(123);
     });
 
+    it("should emit a data channel event when the other side adds a data channel", async () => {
+        await startVoiceCall(client, call);
+
+        const dataChannelCallback = jest.fn();
+        call.on(CallEvent.DataChannel, dataChannelCallback);
+
+        (call.peerConn as unknown as MockRTCPeerConnection).triggerIncomingDataChannel();
+
+        expect(dataChannelCallback).toHaveBeenCalled();
+    });
+
     describe("supportsMatrixCall", () => {
         it("should return true when the environment is right", () => {
             expect(supportsMatrixCall()).toBe(true);
