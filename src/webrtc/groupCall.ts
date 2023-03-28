@@ -526,6 +526,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
+        this.stats.stop();
     }
 
     public leave(): void {

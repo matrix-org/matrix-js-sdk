@@ -985,6 +985,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     if (this.peerConn!.signalingState != "closed") {
                         this.peerConn!.close();
                     }
+                    this.stats?.removeStatsCollector(this.callId);
                     this.emit(CallEvent.Hangup, this);
                 }
             }, invite.lifetime - event.getLocalAge());
@@ -2595,6 +2596,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.peerConn && this.peerConn.signalingState !== "closed") {
             this.peerConn.close();
         }
+        this.stats?.removeStatsCollector(this.callId);
+
         if (shouldEmit) {
             this.emit(CallEvent.Hangup, this);
         }
