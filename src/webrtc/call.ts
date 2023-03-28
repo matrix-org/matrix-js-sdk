@@ -2055,6 +2055,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async wrappedGotLocalOffer(): Promise<void> {
         this.makingOffer = true;
         try {
+            // XXX: in what situations do we believe gotLocalOffer actually throws? It appears
+            // to handle most of its exceptions itself and terminate the call. I'm not entirely
+            // sure it would ever throw, so I can't add a test for these lines.
+            // Also the tense is different between "gotLocalOffer" and "getLocalOfferFailed" so
+            // it's not entirely clear whether getLocalOfferFailed is just misnamed or whether
+            // they've been cross-polinated somehow at some point.
             await this.gotLocalOffer();
         } catch (e) {
             this.getLocalOfferFailed(e as Error);
