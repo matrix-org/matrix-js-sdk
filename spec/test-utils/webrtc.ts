@@ -499,12 +499,13 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public state = CallState.Ringing;
     public opponentUserId = FAKE_USER_ID_1;
     public opponentDeviceId = FAKE_DEVICE_ID_1;
+    public opponentSessionId = FAKE_SESSION_ID_1;
     public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
-    };
+    } as unknown as CallFeed;
     public remoteUsermediaFeed?: CallFeed;
     public remoteScreensharingFeed?: CallFeed;
 
@@ -520,6 +521,14 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 
     public getOpponentDeviceId(): string | undefined {
         return this.opponentDeviceId;
+    }
+
+    public getOpponentSessionId(): string | undefined {
+        return this.opponentSessionId;
+    }
+
+    public getLocalFeeds(): CallFeed[] {
+        return [this.localUsermediaFeed];
     }
 
     public typed(): MatrixCall {

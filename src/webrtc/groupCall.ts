@@ -351,6 +351,17 @@ export class GroupCall extends TypedEventEmitter<
         );
     }
 
+    /**
+     * Determines whether the given call is one that we were expecting to exist
+     * given our knowledge of who is participating in the group call.
+     */
+    private callExpected(call: MatrixCall): boolean {
+        const userId = getCallUserId(call);
+        const member = userId === null ? null : this.room.getMember(userId);
+        const deviceId = call.getOpponentDeviceId();
+        return member !== null && deviceId !== undefined && this.participants.get(member)?.get(deviceId) !== undefined;
+    }
+
     public async initLocalCallFeed(): Promise<void> {
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
@@ -630,7 +641,9 @@ export class GroupCall extends TypedEventEmitter<
             this.initWithAudioMuted = muted;
         }
 
-        this.forEachCall((call) => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
+        this.forEachCall((call) =>
+            setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted && this.callExpected(call)),
+        );
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
@@ -678,6 +691,12 @@ export class GroupCall extends TypedEventEmitter<
         const updates: Promise<unknown>[] = [];
         this.forEachCall((call) => updates.push(call.setLocalVideoMuted(muted)));
         await Promise.all(updates);
+
+        // We setTracksEnabled again, independently from the call doing it
+        // internally, since we might not be expecting the call
+        this.forEachCall((call) =>
+            setTracksEnabled(call.localUsermediaFeed!.stream.getVideoTracks(), !muted && this.callExpected(call)),
+        );
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
 
@@ -812,9 +831,18 @@ export class GroupCall extends TypedEventEmitter<
         );
 
         if (prevCall) this.disposeCall(prevCall, CallErrorCode.Replaced);
-
         this.initCall(newCall);
-        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
+
+        const feeds = this.getLocalFeeds().map((feed) => feed.clone());
+        if (!this.callExpected(newCall)) {
+            // Disable our tracks for users not explicitly participating in the
+            // call but trying to receive the feeds
+            for (const feed of feeds) {
+                setTracksEnabled(feed.stream.getAudioTracks(), false);
+                setTracksEnabled(feed.stream.getVideoTracks(), false);
+            }
+        }
+        newCall.answerWithCallFeeds(feeds);
 
         deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
         this.calls.set(opponentUserId, deviceMap);
@@ -1476,6 +1504,23 @@ export class GroupCall extends TypedEventEmitter<
     private onRoomState = (): void => this.updateParticipants();
 
     private onParticipantsChanged = (): void => {
+        // Re-run setTracksEnabled on all calls, so that participants that just
+        // left get denied access to our media, and participants that just
+        // joined get granted access
+        this.forEachCall((call) => {
+            const expected = this.callExpected(call);
+            for (const feed of call.getLocalFeeds()) {
+                setTracksEnabled(
+                    feed.stream.getAudioTracks(),
+                    !feed.isAudioMuted() && expected,
+                );
+                setTracksEnabled(
+                    feed.stream.getVideoTracks(),
+                    !feed.isVideoMuted() && expected,
+                );
+            }
+        });
+
         if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
     };
 
