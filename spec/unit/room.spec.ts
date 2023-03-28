@@ -3343,11 +3343,16 @@ describe("Room", function () {
             newRoomId: string,
             predecessorRoomId: string,
             tombstoneEventId: string | null = null,
+            viaServers: string[] = [],
         ): MatrixEvent {
             const content =
                 tombstoneEventId === null
-                    ? { predecessor_room_id: predecessorRoomId }
-                    : { predecessor_room_id: predecessorRoomId, last_known_event_id: tombstoneEventId };
+                    ? { predecessor_room_id: predecessorRoomId, via_servers: viaServers }
+                    : {
+                          predecessor_room_id: predecessorRoomId,
+                          last_known_event_id: tombstoneEventId,
+                          via_servers: viaServers,
+                      };
 
             return new MatrixEvent({
                 content,
@@ -3387,6 +3392,7 @@ describe("Room", function () {
             expect(room.findPredecessor(useMsc3946)).toEqual({
                 roomId: "otherreplacedroomid",
                 eventId: undefined, // m.predecessor did not include an event_id
+                viaServers: [],
             });
         });
 
@@ -3394,12 +3400,13 @@ describe("Room", function () {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([
                 roomCreateEvent("roomid", "replacedroomid"),
-                predecessorEvent("roomid", "otherreplacedroomid", "lstevtid"),
+                predecessorEvent("roomid", "otherreplacedroomid", "lstevtid", ["one.example.com", "two.example.com"]),
             ]);
             const useMsc3946 = true;
             expect(room.findPredecessor(useMsc3946)).toEqual({
                 roomId: "otherreplacedroomid",
                 eventId: "lstevtid",
+                viaServers: ["one.example.com", "two.example.com"],
             });
         });
 
