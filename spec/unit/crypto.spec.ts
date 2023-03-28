@@ -405,7 +405,7 @@ describe("Crypto", function () {
             // the first message can't be decrypted yet, but the second one
             // can
             let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
-            bobClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            bobClient.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
             bobClient.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             await decryptEventsPromise;
@@ -1039,7 +1039,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
-            ensureOlmSessionsForDevices.mockResolvedValue({});
+            ensureOlmSessionsForDevices.mockResolvedValue(new Map());
             encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
                 result.plaintext = { type: 0, body: JSON.stringify(payload) };
