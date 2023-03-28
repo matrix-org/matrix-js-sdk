@@ -1510,14 +1510,8 @@ export class GroupCall extends TypedEventEmitter<
         this.forEachCall((call) => {
             const expected = this.callExpected(call);
             for (const feed of call.getLocalFeeds()) {
-                setTracksEnabled(
-                    feed.stream.getAudioTracks(),
-                    !feed.isAudioMuted() && expected,
-                );
-                setTracksEnabled(
-                    feed.stream.getVideoTracks(),
-                    !feed.isVideoMuted() && expected,
-                );
+                setTracksEnabled(feed.stream.getAudioTracks(), !feed.isAudioMuted() && expected);
+                setTracksEnabled(feed.stream.getVideoTracks(), !feed.isVideoMuted() && expected);
             }
         });
 
