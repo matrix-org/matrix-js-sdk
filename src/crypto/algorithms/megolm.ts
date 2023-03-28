@@ -71,6 +71,19 @@ export interface IOlmDevice<T = DeviceInfo> {
     deviceInfo: T;
 }
 
+/**
+ * Tests whether an encrypted content has a ciphertext.
+ * Ciphertext can be a string or object depending on the content type {@link IEncryptedContent}.
+ *
+ * @param content - Encrypted content
+ * @returns true: has ciphertext, else false
+ */
+const hasCiphertext = (content: IEncryptedContent): boolean => {
+    return typeof content.ciphertext === "string"
+        ? !!content.ciphertext.length
+        : !!Object.keys(content.ciphertext).length;
+};
+
 /** The result of parsing the an `m.room_key` or `m.forwarded_room_key` to-device event */
 interface RoomKey {
     /**
@@ -2164,7 +2177,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             // since that's effectively a blank message.
             for (const [userId, deviceMessages] of contentMap) {
                 for (const [deviceId, content] of deviceMessages) {
-                    if (content.ciphertext.length === 0) {
+                    if (!hasCiphertext(content)) {
                         this.prefixedLogger.log("No ciphertext for device " + userId + ":" + deviceId + ": pruning");
                         deviceMessages.delete(deviceId);
                     }
