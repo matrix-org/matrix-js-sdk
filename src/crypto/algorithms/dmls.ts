@@ -185,13 +185,14 @@ export class MlsProvider {
         this.groups.set(room.roomId, group);
 
         const userId = baseApis.getUserId()!;
-        // FIXME: also get keys for invitees
-        const deviceMap = await this.crypto.deviceList.downloadKeys([userId], false);
+        const deviceMap = await this.crypto.deviceList.downloadKeys([userId].concat(invite), false);
         delete deviceMap[userId][baseApis.getDeviceId()!];
-        const devicesToClaim: [string, string][] =
-            Object.keys(deviceMap[userId]!).map((deviceId: string) => {
-                return [userId, deviceId];
-            });
+        const devicesToClaim: [string, string][] = [];
+        for (const [user, devices] of Object.entries(deviceMap)) {
+            for (const deviceId of Object.keys(devices)) {
+                devicesToClaim.push([user, deviceId]);
+            }
+        }
         console.log("Initial devices in group", devicesToClaim);
         if (devicesToClaim.length) {
             const otks = await baseApis.claimOneTimeKeys(devicesToClaim, INIT_KEY_ALGORITHM.name);
