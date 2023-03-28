@@ -25,7 +25,7 @@ import {
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import { normalize } from "../utils";
+import { normalize, noUnsafeEventProps } from "../utils";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
@@ -311,7 +311,7 @@ export type RoomEventHandlerMap = {
 
 export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
-    private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
+    private txnToEvent: Map<string, MatrixEvent> = new Map(); // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
@@ -356,7 +356,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * accountData Dict of per-room account_data events; the keys are the
      * event type and the values are the events.
      */
-    public accountData: Record<string, MatrixEvent> = {}; // $eventType: $event
+    public accountData: Map<string, MatrixEvent> = new Map(); // $eventType: $event
     /**
      * The room summary.
      */
@@ -902,7 +902,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
         }
-        const memberEvents = rawMembersEvents.map(this.client.getEventMapper());
+        const memberEvents = rawMembersEvents.filter(noUnsafeEventProps).map(this.client.getEventMapper());
         return { memberEvents, fromServer };
     }
 
@@ -2252,8 +2252,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const txnId = event.getUnsigned().transaction_id;
         if (!txnId && event.getSender() === this.myUserId) {
             // check the txn map for a matching event ID
-            for (const tid in this.txnToEvent) {
-                const localEvent = this.txnToEvent[tid];
+            for (const [tid, localEvent] of this.txnToEvent) {
                 if (localEvent.getId() === event.getId()) {
                     logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
                     // update the unsigned field so we can re-use the same codepaths
@@ -2328,7 +2327,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             throw new Error("addPendingEvent called on an event with status " + event.status);
         }
 
-        if (this.txnToEvent[txnId]) {
+        if (this.txnToEvent.get(txnId)) {
             throw new Error("addPendingEvent called on an event with known txnId " + txnId);
         }
 
@@ -2337,7 +2336,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // on the unfiltered timelineSet.
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS)!, false);
 
-        this.txnToEvent[txnId] = event;
+        this.txnToEvent.set(txnId, event);
         if (this.pendingEventList) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
@@ -2429,8 +2428,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.relations.aggregateChildEvent(event);
     }
 
-    public getEventForTxnId(txnId: string): MatrixEvent {
-        return this.txnToEvent[txnId];
+    public getEventForTxnId(txnId: string): MatrixEvent | undefined {
+        return this.txnToEvent.get(txnId);
     }
 
     /**
@@ -2457,7 +2456,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         logger.debug(`Got remote echo for event ${oldEventId} -> ${newEventId} old status ${oldStatus}`);
 
         // no longer pending
-        delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id!];
+        this.txnToEvent.delete(remoteEvent.getUnsigned().transaction_id!);
 
         // if it's in the pending list, remove it
         if (this.pendingEventList) {
@@ -2670,7 +2669,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.processLiveEvent(event);
 
             if (event.getUnsigned().transaction_id) {
-                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                const existingEvent = this.txnToEvent.get(event.getUnsigned().transaction_id!);
                 if (existingEvent) {
                     // remote echo of an event we sent earlier
                     this.handleRemoteEcho(event, existingEvent);
@@ -2939,8 +2938,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (event.getType() === "m.tag") {
                 this.addTags(event);
             }
-            const lastEvent = this.accountData[event.getType()];
-            this.accountData[event.getType()] = event;
+            const eventType = event.getType();
+            const lastEvent = this.accountData.get(eventType);
+            this.accountData.set(eventType, event);
             this.emit(RoomEvent.AccountData, event, this, lastEvent);
         }
     }
@@ -2951,7 +2951,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns the account_data event in question
      */
     public getAccountData(type: EventType | string): MatrixEvent | undefined {
-        return this.accountData[type];
+        return this.accountData.get(type);
     }
 
     /**

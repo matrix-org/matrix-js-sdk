@@ -90,6 +90,7 @@ import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
+import { MapWithDefault, recursiveMapToObject } from "../utils";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -399,7 +400,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     //         deviceId: 1234567890000,
     //     },
     // }
-    private lastNewSessionForced: Record<string, Record<string, number>> = {};
+    // Map: user Id → device Id → timestamp
+    private lastNewSessionForced: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
+        () => new MapWithDefault(() => 0),
+    );
 
     // This flag will be unset whilst the client processes a sync response
     // so that we don't start requesting keys until we've actually finished
@@ -2690,11 +2694,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public ensureOlmSessionsForUsers(
         users: string[],
         force?: boolean,
-    ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
+    ): Promise<Map<string, Map<string, olmlib.IOlmSessionResult>>> {
+        // map user Id → DeviceInfo[]
+        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
 
         for (const userId of users) {
-            devicesByUser[userId] = [];
+            const userDevices: DeviceInfo[] = [];
+            devicesByUser.set(userId, userDevices);
 
             const devices = this.getStoredDevicesForUser(userId) || [];
             for (const deviceInfo of devices) {
@@ -2708,7 +2714,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     continue;
                 }
 
-                devicesByUser[userId].push(deviceInfo);
+                userDevices.push(deviceInfo);
             }
         }
 
@@ -3146,7 +3152,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                         payload: encryptedContent,
                     });
 
-                    await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, { [userId]: [deviceInfo] });
+                    await olmlib.ensureOlmSessionsForDevices(
+                        this.olmDevice,
+                        this.baseApis,
+                        new Map([[userId, [deviceInfo]]]),
+                    );
                     await olmlib.encryptMessageForDevice(
                         encryptedContent.ciphertext,
                         this.userId,
@@ -3448,8 +3458,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // check when we last forced a new session with this device: if we've already done so
         // recently, don't do it again.
-        this.lastNewSessionForced[sender] = this.lastNewSessionForced[sender] || {};
-        const lastNewSessionForced = this.lastNewSessionForced[sender][deviceKey] || 0;
+        const lastNewSessionDevices = this.lastNewSessionForced.getOrCreate(sender);
+        const lastNewSessionForced = lastNewSessionDevices.getOrCreate(deviceKey);
         if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
             logger.debug(
                 "New session already forced with device " +
@@ -3482,11 +3492,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return;
             }
         }
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
-        devicesByUser[sender] = [device];
+        const devicesByUser = new Map([[sender, [device]]]);
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
-        this.lastNewSessionForced[sender][deviceKey] = Date.now();
+        lastNewSessionDevices.set(deviceKey, Date.now());
 
         // Now send a blank message on that session so the other side knows about it.
         // (The keyshare request is sent in the clear so that won't do)
@@ -3513,11 +3522,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
         retryDecryption();
 
-        await this.baseApis.sendToDevice("m.room.encrypted", {
-            [sender]: {
-                [device.deviceId]: encryptedContent,
-            },
-        });
+        await this.baseApis.sendToDevice(
+            "m.room.encrypted",
+            new Map([[sender, new Map([[device.deviceId, encryptedContent]])]]),
+        );
 
         // Most of the time this probably won't be necessary since we'll have queued up a key request when
         // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
@@ -3824,15 +3832,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param obj -  Object to which we will add a 'signatures' property
      */
     public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
-        const sigs = obj.signatures || {};
+        const sigs = new Map(Object.entries(obj.signatures || {}));
         const unsigned = obj.unsigned;
 
         delete obj.signatures;
         delete obj.unsigned;
 
-        sigs[this.userId] = sigs[this.userId] || {};
-        sigs[this.userId]["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
-        obj.signatures = sigs;
+        const userSignatures = sigs.get(this.userId) || {};
+        sigs.set(this.userId, userSignatures);
+        userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
+        obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
     }
 }

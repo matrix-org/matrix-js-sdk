@@ -30,6 +30,7 @@ import {
     RoomState,
     RoomStateEvent,
     RoomStateEventHandlerMap,
+    SendToDeviceContentMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -443,11 +444,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     >();
     public sendToDevice = jest.fn<
         Promise<{}>,
-        [
-            eventType: string,
-            contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-            txnId?: string,
-        ]
+        [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
 
     public isInitialSyncComplete(): boolean {

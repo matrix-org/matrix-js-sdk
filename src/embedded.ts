@@ -29,15 +29,16 @@ import { IEvent, IContent, EventStatus } from "./models/event";
 import { ISendEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
-import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts } from "./client";
+import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts, SendToDeviceContentMap } from "./client";
 import { SyncApi, SyncState } from "./sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { MatrixEvent } from "./models/event";
 import { User } from "./models/user";
 import { Room } from "./models/room";
-import { ToDeviceBatch } from "./models/ToDeviceMessage";
+import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
+import { MapWithDefault, recursiveMapToObject } from "./utils";
 
 interface IStateEventRequest {
     eventType: string;
@@ -234,35 +235,32 @@ export class RoomWidgetClient extends MatrixClient {
         return await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId);
     }
 
-    public async sendToDevice(
-        eventType: string,
-        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-    ): Promise<{}> {
-        await this.widgetApi.sendToDevice(eventType, false, contentMap);
+    public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {
+        await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
         return {};
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
-        const contentMap: { [userId: string]: { [deviceId: string]: object } } = {};
+        // map: user Id → device Id → payload
+        const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
         for (const { userId, deviceId, payload } of batch) {
-            if (!contentMap[userId]) contentMap[userId] = {};
-            contentMap[userId][deviceId] = payload;
+            contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 
-        await this.widgetApi.sendToDevice(eventType, false, contentMap);
+        await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
     }
 
     public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
-        const contentMap: { [userId: string]: { [deviceId: string]: object } } = {};
+        // map: user Id → device Id → payload
+        const contentMap: MapWithDefault<string, Map<string, object>> = new MapWithDefault(() => new Map());
         for (const {
             userId,
             deviceInfo: { deviceId },
         } of userDeviceInfoArr) {
-            if (!contentMap[userId]) contentMap[userId] = {};
-            contentMap[userId][deviceId] = payload;
+            contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 
-        await this.widgetApi.sendToDevice((payload as { type: string }).type, true, contentMap);
+        await this.widgetApi.sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap));
     }
 
     // Overridden since we get TURN servers automatically over the widget API,

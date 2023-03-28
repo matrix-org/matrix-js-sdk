@@ -688,15 +688,15 @@ describe("Group Call", function () {
                 expect(client1.sendToDevice.mock.calls[0][0]).toBe("m.call.invite");
 
                 const toDeviceCallContent = client1.sendToDevice.mock.calls[0][1];
-                expect(Object.keys(toDeviceCallContent).length).toBe(1);
-                expect(Object.keys(toDeviceCallContent)[0]).toBe(FAKE_USER_ID_2);
+                expect(toDeviceCallContent.size).toBe(1);
+                expect(toDeviceCallContent.has(FAKE_USER_ID_2)).toBe(true);
 
-                const toDeviceBobDevices = toDeviceCallContent[FAKE_USER_ID_2];
-                expect(Object.keys(toDeviceBobDevices).length).toBe(1);
-                expect(Object.keys(toDeviceBobDevices)[0]).toBe(FAKE_DEVICE_ID_2);
+                const toDeviceBobDevices = toDeviceCallContent.get(FAKE_USER_ID_2);
+                expect(toDeviceBobDevices?.size).toBe(1);
+                expect(toDeviceBobDevices?.has(FAKE_DEVICE_ID_2)).toBe(true);
 
-                const bobDeviceMessage = toDeviceBobDevices[FAKE_DEVICE_ID_2];
-                expect(bobDeviceMessage.conf_id).toBe(FAKE_CONF_ID);
+                const bobDeviceMessage = toDeviceBobDevices?.get(FAKE_DEVICE_ID_2);
+                expect(bobDeviceMessage?.conf_id).toBe(FAKE_CONF_ID);
             } finally {
                 await Promise.all([groupCall1.leave(), groupCall2.leave()]);
             }

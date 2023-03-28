@@ -603,14 +603,14 @@ describe("MatrixClient", function () {
                 });
 
             const prom = client!.downloadKeys(["boris", "chaz"]).then(function (res) {
-                assertObjectContains(res.boris.dev1, {
+                assertObjectContains(res.get("boris")!.get("dev1")!, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
                     algorithms: ["1"],
                     unsigned: { abc: "def" },
                 });
 
-                assertObjectContains(res.chaz.dev2, {
+                assertObjectContains(res.get("chaz")!.get("dev2")!, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev2": ed25519key },
                     algorithms: ["2"],

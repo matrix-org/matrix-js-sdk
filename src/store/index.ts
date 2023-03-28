@@ -36,7 +36,7 @@ export interface ISavedSync {
  * A store for most of the data js-sdk needs to store, apart from crypto data
  */
 export interface IStore {
-    readonly accountData: Record<string, MatrixEvent>; // type : content
+    readonly accountData: Map<string, MatrixEvent>; // type : content
 
     // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
     // for when it falls back to being a memory store due to errors.

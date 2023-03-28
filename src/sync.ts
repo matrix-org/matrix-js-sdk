@@ -29,7 +29,7 @@ import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import * as utils from "./utils";
-import { IDeferred } from "./utils";
+import { IDeferred, noUnsafeEventProps, unsafeProp } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { logger } from "./logger";
@@ -1133,22 +1133,24 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (Array.isArray(data.presence?.events)) {
-            data.presence!.events.map(client.getEventMapper()).forEach(function (presenceEvent) {
-                let user = client.store.getUser(presenceEvent.getSender()!);
-                if (user) {
-                    user.setPresenceEvent(presenceEvent);
-                } else {
-                    user = createNewUser(client, presenceEvent.getSender()!);
-                    user.setPresenceEvent(presenceEvent);
-                    client.store.storeUser(user);
-                }
-                client.emit(ClientEvent.Event, presenceEvent);
-            });
+            data.presence!.events.filter(noUnsafeEventProps)
+                .map(client.getEventMapper())
+                .forEach(function (presenceEvent) {
+                    let user = client.store.getUser(presenceEvent.getSender()!);
+                    if (user) {
+                        user.setPresenceEvent(presenceEvent);
+                    } else {
+                        user = createNewUser(client, presenceEvent.getSender()!);
+                        user.setPresenceEvent(presenceEvent);
+                        client.store.storeUser(user);
+                    }
+                    client.emit(ClientEvent.Event, presenceEvent);
+                });
         }
 
         // handle non-room account_data
         if (Array.isArray(data.account_data?.events)) {
-            const events = data.account_data.events.map(client.getEventMapper());
+            const events = data.account_data.events.filter(noUnsafeEventProps).map(client.getEventMapper());
             const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
@@ -1171,7 +1173,7 @@ export class SyncApi {
 
         // handle to-device events
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
-            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events;
+            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
 
             if (this.syncOpts.cryptoCallbacks) {
                 toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
@@ -1635,18 +1637,20 @@ export class SyncApi {
         // to
         // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
         const client = this.client;
-        return Object.keys(obj).map((roomId) => {
-            const arrObj = obj[roomId] as T & { room: Room; isBrandNewRoom: boolean };
-            let room = client.store.getRoom(roomId);
-            let isBrandNewRoom = false;
-            if (!room) {
-                room = this.createRoom(roomId);
-                isBrandNewRoom = true;
-            }
-            arrObj.room = room;
-            arrObj.isBrandNewRoom = isBrandNewRoom;
-            return arrObj;
-        });
+        return Object.keys(obj)
+            .filter((k) => !unsafeProp(k))
+            .map((roomId) => {
+                const arrObj = obj[roomId] as T & { room: Room; isBrandNewRoom: boolean };
+                let room = client.store.getRoom(roomId);
+                let isBrandNewRoom = false;
+                if (!room) {
+                    room = this.createRoom(roomId);
+                    isBrandNewRoom = true;
+                }
+                arrObj.room = room;
+                arrObj.isBrandNewRoom = isBrandNewRoom;
+                return arrObj;
+            });
     }
 
     private mapSyncEventsFormat(
@@ -1659,7 +1663,7 @@ export class SyncApi {
         }
         const mapper = this.client.getEventMapper({ decrypt });
         type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) & { room_id?: string };
-        return (obj.events as TaggedEvent[]).map(function (e) {
+        return (obj.events as TaggedEvent[]).filter(noUnsafeEventProps).map(function (e) {
             if (room) {
                 e.room_id = room.roomId;
             }
