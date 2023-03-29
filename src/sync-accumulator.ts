@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { logger } from "./logger";
-import { deepCopy, isSupportedReceiptType } from "./utils";
+import { deepCopy, isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
@@ -585,29 +585,31 @@ export class SyncAccumulator {
                 } as IContent,
             };
 
+            const receiptEventContent: MapWithDefault<
+                string,
+                MapWithDefault<ReceiptType, Map<string, object>>
+            > = new MapWithDefault(() => new MapWithDefault(() => new Map()));
+
             for (const [userId, receiptData] of Object.entries(roomData._readReceipts)) {
-                if (!receiptEvent.content[receiptData.eventId]) {
-                    receiptEvent.content[receiptData.eventId] = {};
-                }
-                if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
-                    receiptEvent.content[receiptData.eventId][receiptData.type] = {};
-                }
-                receiptEvent.content[receiptData.eventId][receiptData.type][userId] = receiptData.data;
+                receiptEventContent
+                    .getOrCreate(receiptData.eventId)
+                    .getOrCreate(receiptData.type)
+                    .set(userId, receiptData.data);
             }
 
             for (const threadReceipts of Object.values(roomData._threadReadReceipts)) {
                 for (const [userId, receiptData] of Object.entries(threadReceipts)) {
-                    if (!receiptEvent.content[receiptData.eventId]) {
-                        receiptEvent.content[receiptData.eventId] = {};
-                    }
-                    if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
-                        receiptEvent.content[receiptData.eventId][receiptData.type] = {};
-                    }
-                    receiptEvent.content[receiptData.eventId][receiptData.type][userId] = receiptData.data;
+                    receiptEventContent
+                        .getOrCreate(receiptData.eventId)
+                        .getOrCreate(receiptData.type)
+                        .set(userId, receiptData.data);
                 }
             }
+
+            receiptEvent.content = recursiveMapToObject(receiptEventContent);
+
             // add only if we have some receipt data
-            if (Object.keys(receiptEvent.content).length > 0) {
+            if (receiptEventContent.size > 0) {
                 roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);
             }
 

@@ -1,3 +1,9 @@
+Changes in [24.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.0.0) (2023-03-28)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Changes for matrix-js-sdk v24.0.0
+
 Changes in [23.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.5.0) (2023-03-15)
 ==================================================================================================
 

@@ -24,9 +24,12 @@ import {
     lexicographicCompare,
     nextString,
     prevString,
+    recursiveMapToObject,
     simpleRetryOperation,
     stringToBase,
     sortEventsByLatestContentTimestamp,
+    safeSet,
+    MapWithDefault,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 import { mkMessage } from "../test-utils/test-utils";
@@ -603,6 +606,105 @@ describe("utils", function () {
 
         it("should not support other receipt types", () => {
             expect(utils.isSupportedReceiptType("this is a receipt type")).toBeFalsy();
+        });
+    });
+
+    describe("recursiveMapToObject", () => {
+        it.each([
+            // empty map
+            {
+                map: new Map(),
+                expected: {},
+            },
+            // one level map
+            {
+                map: new Map<any, any>([
+                    ["key1", "value 1"],
+                    ["key2", 23],
+                    ["key3", undefined],
+                    ["key4", null],
+                    ["key5", [1, 2, 3]],
+                ]),
+                expected: { key1: "value 1", key2: 23, key3: undefined, key4: null, key5: [1, 2, 3] },
+            },
+            // two level map
+            {
+                map: new Map<any, any>([
+                    [
+                        "key1",
+                        new Map<any, any>([
+                            ["key1_1", "value 1"],
+                            ["key1_2", "value 1.2"],
+                        ]),
+                    ],
+                    ["key2", "value 2"],
+                ]),
+                expected: { key1: { key1_1: "value 1", key1_2: "value 1.2" }, key2: "value 2" },
+            },
+            // multi level map
+            {
+                map: new Map<any, any>([
+                    ["key1", new Map<any, any>([["key1_1", new Map<any, any>([["key1_1_1", "value 1.1.1"]])]])],
+                ]),
+                expected: { key1: { key1_1: { key1_1_1: "value 1.1.1" } } },
+            },
+            // list of maps
+            {
+                map: new Map<any, any>([
+                    [
+                        "key1",
+                        [new Map<any, any>([["key1_1", "value 1.1"]]), new Map<any, any>([["key1_2", "value 1.2"]])],
+                    ],
+                ]),
+                expected: { key1: [{ key1_1: "value 1.1" }, { key1_2: "value 1.2" }] },
+            },
+            // map → array → array → map
+            {
+                map: new Map<any, any>([["key1", [[new Map<any, any>([["key2", "value 2"]])]]]]),
+                expected: {
+                    key1: [
+                        [
+                            {
+                                key2: "value 2",
+                            },
+                        ],
+                    ],
+                },
+            },
+        ])("%# should convert the value", ({ map, expected }) => {
+            expect(recursiveMapToObject(map)).toStrictEqual(expected);
+        });
+    });
+
+    describe("safeSet", () => {
+        it("should set a value", () => {
+            const obj = {};
+            safeSet(obj, "testProp", "test value");
+            expect(obj).toEqual({ testProp: "test value" });
+        });
+
+        it.each(["__proto__", "prototype", "constructor"])("should raise an error when setting »%s«", (prop) => {
+            expect(() => {
+                safeSet({}, prop, "teset value");
+            }).toThrow("Trying to modify prototype or constructor");
+        });
+    });
+
+    describe("MapWithDefault", () => {
+        it("getOrCreate should create the value if it does not exist", () => {
+            const newValue = {};
+            const map = new MapWithDefault(() => newValue);
+
+            // undefined before getOrCreate
+            expect(map.get("test")).toBeUndefined();
+
+            expect(map.getOrCreate("test")).toBe(newValue);
+
+            // default value after getOrCreate
+            expect(map.get("test")).toBe(newValue);
+
+            // test that it always returns the same value
+            expect(map.getOrCreate("test")).toBe(newValue);
         });
     });
 

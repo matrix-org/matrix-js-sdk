@@ -25,7 +25,7 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
-import { sleep } from "../utils";
+import { safeSet, sleep } from "../utils";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { encodeRecoveryKey } from "./recoverykey";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
@@ -498,9 +498,7 @@ export class BackupManager {
         const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
             const roomId = session.sessionData!.room_id;
-            if (rooms[roomId] === undefined) {
-                rooms[roomId] = { sessions: {} };
-            }
+            safeSet(rooms, roomId, rooms[roomId] || { sessions: {} });
 
             const sessionData = this.baseApis.crypto!.olmDevice.exportInboundGroupSession(
                 session.senderKey,
@@ -517,12 +515,12 @@ export class BackupManager {
                 undefined;
             const verified = this.baseApis.crypto!.checkDeviceInfoTrust(userId!, device).isVerified();
 
-            rooms[roomId]["sessions"][session.sessionId] = {
+            safeSet(rooms[roomId]["sessions"], session.sessionId, {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
                 session_data: await this.algorithm!.encryptSession(sessionData),
-            };
+            });
         }
 
         await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo!.version, { rooms });

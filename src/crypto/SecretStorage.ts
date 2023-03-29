@@ -367,13 +367,11 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                 requesting_device_id: this.baseApis.deviceId,
                 request_id: requestId,
             };
-            const toDevice: Record<string, typeof cancelData> = {};
+            const toDevice: Map<string, typeof cancelData> = new Map();
             for (const device of devices) {
-                toDevice[device] = cancelData;
+                toDevice.set(device, cancelData);
             }
-            this.baseApis.sendToDevice("m.secret.request", {
-                [this.baseApis.getUserId()!]: toDevice,
-            });
+            this.baseApis.sendToDevice("m.secret.request", new Map([[this.baseApis.getUserId()!, toDevice]]));
 
             // and reject the promise so that anyone waiting on it will be
             // notified
@@ -388,14 +386,12 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
             request_id: requestId,
             [ToDeviceMessageId]: uuidv4(),
         };
-        const toDevice: Record<string, typeof requestData> = {};
+        const toDevice: Map<string, typeof requestData> = new Map();
         for (const device of devices) {
-            toDevice[device] = requestData;
+            toDevice.set(device, requestData);
         }
         logger.info(`Request secret ${name} from ${devices}, id ${requestId}`);
-        this.baseApis.sendToDevice("m.secret.request", {
-            [this.baseApis.getUserId()!]: toDevice,
-        });
+        this.baseApis.sendToDevice("m.secret.request", new Map([[this.baseApis.getUserId()!, toDevice]]));
 
         return {
             requestId,
@@ -469,9 +465,11 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                     ciphertext: {},
                     [ToDeviceMessageId]: uuidv4(),
                 };
-                await olmlib.ensureOlmSessionsForDevices(this.baseApis.crypto!.olmDevice, this.baseApis, {
-                    [sender]: [this.baseApis.getStoredDevice(sender, deviceId)!],
-                });
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.baseApis.crypto!.olmDevice,
+                    this.baseApis,
+                    new Map([[sender, [this.baseApis.getStoredDevice(sender, deviceId)!]]]),
+                );
                 await olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
                     this.baseApis.getUserId()!,
@@ -481,11 +479,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                     this.baseApis.getStoredDevice(sender, deviceId)!,
                     payload,
                 );
-                const contentMap = {
-                    [sender]: {
-                        [deviceId]: encryptedContent,
-                    },
-                };
+                const contentMap = new Map([[sender, new Map([[deviceId, encryptedContent]])]]);
 
                 logger.info(`Sending ${content.name} secret for ${deviceId}`);
                 this.baseApis.sendToDevice("m.room.encrypted", contentMap);

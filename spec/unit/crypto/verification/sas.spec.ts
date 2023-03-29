@@ -121,12 +121,12 @@ describe("SAS verification", function () {
 
             alice.client.crypto!.deviceList.storeDevicesForUser("@bob:example.com", BOB_DEVICES);
             alice.client.downloadKeys = () => {
-                return Promise.resolve({});
+                return Promise.resolve(new Map());
             };
 
             bob.client.crypto!.deviceList.storeDevicesForUser("@alice:example.com", ALICE_DEVICES);
             bob.client.downloadKeys = () => {
-                return Promise.resolve({});
+                return Promise.resolve(new Map());
             };
 
             aliceSasEvent = null;
@@ -176,6 +176,7 @@ describe("SAS verification", function () {
                 }
             });
         });
+
         afterEach(async () => {
             await Promise.all([alice.stop(), bob.stop()]);
 
@@ -186,10 +187,14 @@ describe("SAS verification", function () {
             let macMethod;
             let keyAgreement;
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
-            bob.client.sendToDevice = function (type, map) {
+            bob.client.sendToDevice = async (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!].message_authentication_code;
-                    keyAgreement = map[alice.client.getUserId()!][alice.client.deviceId!].key_agreement_protocol;
+                    macMethod = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.message_authentication_code;
+                    keyAgreement = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };
@@ -237,7 +242,7 @@ describe("SAS verification", function () {
                     // has, since it is the same object.  If this does not
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
-                    map[bob.client.getUserId()!][bob.client.deviceId!].message_authentication_codes = [
+                    map.get(bob.client.getUserId()!)!.get(bob.client.deviceId!)!.message_authentication_codes = [
                         "hkdf-hmac-sha256",
                     ];
                 }
@@ -246,7 +251,9 @@ describe("SAS verification", function () {
             const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!].message_authentication_code;
+                    macMethod = map
+                        .get(alice.client.getUserId()!)!
+                        .get(alice.client.deviceId!)!.message_authentication_code;
                 }
                 return bobOrigSendToDevice(type, map);
             };
@@ -291,14 +298,18 @@ describe("SAS verification", function () {
                     // has, since it is the same object.  If this does not
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
-                    map[bob.client.getUserId()!][bob.client.deviceId!].message_authentication_codes = ["hmac-sha256"];
+                    map.get(bob.client.getUserId()!)!.get(bob.client.deviceId!)!.message_authentication_codes = [
+                        "hmac-sha256",
+                    ];
                 }
                 return aliceOrigSendToDevice(type, map);
             };
             const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!].message_authentication_code;
+                    macMethod = map
+                        .get(alice.client.getUserId()!)!
+                        .get(alice.client.deviceId!)!.message_authentication_code;
                 }
                 return bobOrigSendToDevice(type, map);
             };
@@ -454,7 +465,7 @@ describe("SAS verification", function () {
                 );
             };
             alice.client.downloadKeys = () => {
-                return Promise.resolve({});
+                return Promise.resolve(new Map());
             };
 
             bob.client.crypto!.setDeviceVerification = jest.fn();
@@ -472,7 +483,7 @@ describe("SAS verification", function () {
                 return "bob+base64+ed25519+key";
             };
             bob.client.downloadKeys = () => {
-                return Promise.resolve({});
+                return Promise.resolve(new Map());
             };
 
             aliceSasEvent = null;
