@@ -144,6 +144,10 @@ describe("Group Call", function () {
             } as unknown as RoomMember;
         });
 
+        afterEach(() => {
+            groupCall.leave();
+        });
+
         it.each(Object.values(GroupCallState).filter((v) => v !== GroupCallState.LocalCallFeedUninitialized))(
             "throws when initializing local call feed in %s state",
             async (state: GroupCallState) => {

@@ -495,6 +495,11 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallLoopInterval = undefined;
         }
 
+        if (this.participantsExpirationTimer !== null) {
+            clearTimeout(this.participantsExpirationTimer);
+            this.participantsExpirationTimer = null;
+        }
+
         if (this.state !== GroupCallState.Entered) {
             return;
         }
