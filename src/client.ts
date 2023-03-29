@@ -3130,13 +3130,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param roomId - The ID of the room to discard the session for
      *
-     * This should not normally be necessary.
+     * @deprecated Prefer {@link CryptoApi.forceDiscardSession | `CryptoApi.forceDiscardSession`}:
+     *
      */
     public forceDiscardSession(roomId: string): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-End encryption disabled");
         }
-        this.crypto.forceDiscardSession(roomId);
+        this.cryptoBackend.forceDiscardSession(roomId);
     }
 
     /**
