@@ -40,6 +40,8 @@ export enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
 
+export type CallsByUserAndDevice = Map<string, Map<string, MatrixCall>>;
+
 /**
  * Because event names are just strings, they do need
  * to be unique over all event types of event emitter.
@@ -60,7 +62,7 @@ export enum GroupCallEvent {
 export type GroupCallEventHandlerMap = {
     [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
     [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: CallFeed | undefined) => void;
-    [GroupCallEvent.CallsChanged]: (calls: Map<string, Map<string, MatrixCall>>) => void;
+    [GroupCallEvent.CallsChanged]: (calls: CallsByUserAndDevice) => void;
     [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
