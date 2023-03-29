@@ -794,7 +794,7 @@ describe("Group Call", function () {
                 call.isLocalVideoMuted = jest.fn().mockReturnValue(true);
                 call.setLocalVideoMuted = jest.fn();
 
-                call.emit(CallEvent.State, CallState.Connected);
+                call.emit(CallEvent.State, CallState.Connected, CallState.InviteSent, call);
 
                 expect(call.setMicrophoneMuted).toHaveBeenCalledWith(false);
                 expect(call.setLocalVideoMuted).toHaveBeenCalledWith(false);
@@ -1154,7 +1154,7 @@ describe("Group Call", function () {
             });
 
             it("handles regular case", () => {
-                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed(), oldMockCall.typed());
 
                 expect(oldMockCall.hangup).toHaveBeenCalled();
                 expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);
@@ -1165,7 +1165,7 @@ describe("Group Call", function () {
             it("handles case where call is missing from the calls map", () => {
                 // @ts-ignore
                 groupCall.calls = new Map();
-                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed(), oldMockCall.typed());
 
                 expect(oldMockCall.hangup).toHaveBeenCalled();
                 expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);

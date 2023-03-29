@@ -40,6 +40,11 @@ export enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
 
+/**
+ * Because event names are just strings, they do need
+ * to be unique over all event types of event emitter.
+ * Some objects could emit more then one set of events.
+ */
 export enum GroupCallEvent {
     GroupCallStateChanged = "group_call_state_changed",
     ActiveSpeakerChanged = "active_speaker_changed",
@@ -49,7 +54,7 @@ export enum GroupCallEvent {
     LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
-    Error = "error",
+    Error = "group_call_error",
 }
 
 export type GroupCallEventHandlerMap = {
