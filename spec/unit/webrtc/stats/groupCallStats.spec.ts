@@ -27,35 +27,35 @@ describe("GroupCallStats", () => {
 
     describe("should on adding a stats collector", () => {
         it("creating a new one if not existing.", async () => {
-            expect(stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
+            expect(stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
         });
 
         it("creating only one when trying add the same collector multiple times.", async () => {
-            expect(stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
-            expect(stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeFalsy();
+            expect(stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
+            expect(stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeFalsy();
             // The User ID is not relevant! Because for stats the call is needed and the user id is for monitoring
-            expect(stats.addStatsCollector("CALL_ID", "SOME_OTHER_USER_ID", mockRTCPeerConnection())).toBeFalsy();
+            expect(stats.addStatsReportGatherer("CALL_ID", "SOME_OTHER_USER_ID", mockRTCPeerConnection())).toBeFalsy();
         });
     });
 
     describe("should on removing a stats collector", () => {
         it("returning `true` if the collector exists", async () => {
-            expect(stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
-            expect(stats.removeStatsCollector("CALL_ID")).toBeTruthy();
+            expect(stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
+            expect(stats.removeStatsReportGatherer("CALL_ID")).toBeTruthy();
         });
         it("returning false if the collector not exists", async () => {
-            expect(stats.removeStatsCollector("CALL_ID_NOT_EXIST")).toBeFalsy();
+            expect(stats.removeStatsReportGatherer("CALL_ID_NOT_EXIST")).toBeFalsy();
         });
     });
 
     describe("should on get stats collector", () => {
         it("returning `undefined` if collector not existing", async () => {
-            expect(stats.getStatsCollector("CALL_ID")).toBeUndefined();
+            expect(stats.getStatsReportGatherer("CALL_ID")).toBeUndefined();
         });
 
         it("returning Collector if collector existing", async () => {
-            expect(stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
-            expect(stats.getStatsCollector("CALL_ID")).toBeDefined();
+            expect(stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection())).toBeTruthy();
+            expect(stats.getStatsReportGatherer("CALL_ID")).toBeDefined();
         });
     });
 
@@ -77,8 +77,8 @@ describe("GroupCallStats", () => {
         });
 
         it("starting processing and calling the collectors", async () => {
-            stats.addStatsCollector("CALL_ID", "USER_ID", mockRTCPeerConnection());
-            const collector = stats.getStatsCollector("CALL_ID");
+            stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection());
+            const collector = stats.getStatsReportGatherer("CALL_ID");
             let processStatsSpy;
             if (collector) {
                 processStatsSpy = jest.spyOn(collector, "processStats");

@@ -26,7 +26,7 @@ import { TrackStatsReporter } from "./trackStatsReporter";
 import { StatsReportBuilder } from "./statsReportBuilder";
 import { StatsValueFormatter } from "./statsValueFormatter";
 
-export class StatsCollector {
+export class StatsReportGatherer {
     private isActive = true;
     private previousStatsReport: RTCStatsReport | undefined;
     private currentStatsReport: RTCStatsReport | undefined;

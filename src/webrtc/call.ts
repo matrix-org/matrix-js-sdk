@@ -985,7 +985,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     if (this.peerConn!.signalingState != "closed") {
                         this.peerConn!.close();
                     }
-                    this.stats?.removeStatsCollector(this.callId);
+                    this.stats?.removeStatsReportGatherer(this.callId);
                     this.emit(CallEvent.Hangup, this);
                 }
             }, invite.lifetime - event.getLocalAge());
@@ -2596,7 +2596,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.peerConn && this.peerConn.signalingState !== "closed") {
             this.peerConn.close();
         }
-        this.stats?.removeStatsCollector(this.callId);
+        this.stats?.removeStatsReportGatherer(this.callId);
 
         if (shouldEmit) {
             this.emit(CallEvent.Hangup, this);
@@ -2776,7 +2776,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener("negotiationneeded", this.onNegotiationNeeded);
         pc.addEventListener("datachannel", this.onDataChannel);
 
-        this.stats?.addStatsCollector(this.callId, "unknown", pc);
+        this.stats?.addStatsReportGatherer(this.callId, "unknown", pc);
         return pc;
     }
 

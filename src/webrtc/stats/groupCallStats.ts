@@ -13,12 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { StatsCollector } from "./statsCollector";
+import { StatsReportGatherer } from "./statsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
-    private readonly collectors: Map<string, StatsCollector> = new Map<string, StatsCollector>();
+    private readonly gatherers: Map<string, StatsReportGatherer> = new Map<string, StatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
@@ -34,31 +34,31 @@ export class GroupCallStats {
     public stop(): void {
         if (this.timer !== undefined) {
             clearInterval(this.timer);
-            this.collectors.forEach((c) => c.stopProcessingStats());
+            this.gatherers.forEach((c) => c.stopProcessingStats());
         }
     }
 
-    public hasStatsCollector(callId: string): boolean {
-        return this.collectors.has(callId);
+    public hasStatsReportGatherer(callId: string): boolean {
+        return this.gatherers.has(callId);
     }
 
-    public addStatsCollector(callId: string, userId: string, peerConnection: RTCPeerConnection): boolean {
-        if (this.hasStatsCollector(callId)) {
+    public addStatsReportGatherer(callId: string, userId: string, peerConnection: RTCPeerConnection): boolean {
+        if (this.hasStatsReportGatherer(callId)) {
             return false;
         }
-        this.collectors.set(callId, new StatsCollector(callId, userId, peerConnection, this.reports));
+        this.gatherers.set(callId, new StatsReportGatherer(callId, userId, peerConnection, this.reports));
         return true;
     }
 
-    public removeStatsCollector(callId: string): boolean {
-        return this.collectors.delete(callId);
+    public removeStatsReportGatherer(callId: string): boolean {
+        return this.gatherers.delete(callId);
     }
 
-    public getStatsCollector(callId: string): StatsCollector | undefined {
-        return this.hasStatsCollector(callId) ? this.collectors.get(callId) : undefined;
+    public getStatsReportGatherer(callId: string): StatsReportGatherer | undefined {
+        return this.hasStatsReportGatherer(callId) ? this.gatherers.get(callId) : undefined;
     }
 
     private processStats(): void {
-        this.collectors.forEach((c) => c.processStats(this.groupCallId, this.userId));
+        this.gatherers.forEach((c) => c.processStats(this.groupCallId, this.userId));
     }
 }
