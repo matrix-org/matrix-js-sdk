@@ -30,6 +30,7 @@ import {
     RoomState,
     RoomStateEvent,
     RoomStateEventHandlerMap,
+    SendToDeviceContentMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -122,6 +123,7 @@ export class MockRTCPeerConnection {
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     public iceConnectionStateChangeListener?: () => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
+    public onDataChannelListener?: (ev: RTCDataChannelEvent) => void;
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate?: () => void;
@@ -167,6 +169,8 @@ export class MockRTCPeerConnection {
             this.iceConnectionStateChangeListener = listener;
         } else if (type == "track") {
             this.onTrackListener = listener;
+        } else if (type == "datachannel") {
+            this.onDataChannelListener = listener;
         }
     }
     public createDataChannel(label: string, opts: RTCDataChannelInit) {
@@ -230,6 +234,10 @@ export class MockRTCPeerConnection {
             this.needsNegotiation = false;
             this.negotiationNeededListener();
         }
+    }
+
+    public triggerIncomingDataChannel(): void {
+        this.onDataChannelListener?.({ channel: {} } as RTCDataChannelEvent);
     }
 }
 
@@ -443,11 +451,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     >();
     public sendToDevice = jest.fn<
         Promise<{}>,
-        [
-            eventType: string,
-            contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-            txnId?: string,
-        ]
+        [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
 
     public isInitialSyncComplete(): boolean {
@@ -502,12 +506,13 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public state = CallState.Ringing;
     public opponentUserId = FAKE_USER_ID_1;
     public opponentDeviceId = FAKE_DEVICE_ID_1;
+    public opponentSessionId = FAKE_SESSION_ID_1;
     public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
-    };
+    } as unknown as CallFeed;
     public remoteUsermediaFeed?: CallFeed;
     public remoteScreensharingFeed?: CallFeed;
 
@@ -524,6 +529,14 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 
     public getOpponentDeviceId(): string | undefined {
         return this.opponentDeviceId;
+    }
+
+    public getOpponentSessionId(): string | undefined {
+        return this.opponentSessionId;
+    }
+
+    public getLocalFeeds(): CallFeed[] {
+        return [this.localUsermediaFeed];
     }
 
     public typed(): MatrixCall {
@@ -586,6 +599,7 @@ export function makeMockGroupCallStateEvent(
         "m.type": GroupCallType.Video,
         "m.intent": GroupCallIntent.Prompt,
     },
+    redacted?: boolean,
 ): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
@@ -593,6 +607,7 @@ export function makeMockGroupCallStateEvent(
         getTs: jest.fn().mockReturnValue(0),
         getContent: jest.fn().mockReturnValue(content),
         getStateKey: jest.fn().mockReturnValue(groupCallId),
+        isRedacted: jest.fn().mockReturnValue(redacted ?? false),
     } as unknown as MatrixEvent;
 }
 

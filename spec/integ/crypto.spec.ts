@@ -342,6 +342,11 @@ async function expectSendRoomKey(
                 resolve(onSendRoomKey(content));
                 return {};
             },
+            {
+                // append to the list of intercepts on this path (since we have some tests that call
+                // this function multiple times)
+                overwriteRoutes: false,
+            },
         );
     });
 }
@@ -360,12 +365,20 @@ async function expectSendMegolmMessage(
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
     const encryptedMessageContent = await new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(new RegExp("/send/m.room.encrypted/"), (url: string, opts: RequestInit): MockResponse => {
-            resolve(JSON.parse(opts.body as string));
-            return {
-                event_id: "$event_id",
-            };
-        });
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url: string, opts: RequestInit): MockResponse => {
+                resolve(JSON.parse(opts.body as string));
+                return {
+                    event_id: "$event_id",
+                };
+            },
+            {
+                // append to the list of intercepts on this path (since we have some tests that call
+                // this function multiple times)
+                overwriteRoutes: false,
+            },
+        );
     });
 
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
@@ -560,7 +573,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -620,7 +633,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -688,7 +701,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -806,6 +819,40 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendMegolmMessage(inboundGroupSessionPromise),
         ]);
+    });
+
+    it("We should start a new megolm session after forceDiscardSession", async () => {
+        aliceClient.setGlobalErrorOnUnknownDevices(false);
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        // Alice shares a room with Bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // ... and claim one of his OTKs ...
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+        // ... and send an m.room_key message
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+        // Send the first message, and check we can decrypt it.
+        await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
+        ]);
+
+        // Finally the interesting part: discard the session.
+        aliceClient.forceDiscardSession(ROOM_ID);
+
+        // Now when we send the next message, we should get a *new* megolm session.
+        const inboundGroupSessionPromise2 = expectSendRoomKey("@bob:xyz", testOlmAccount);
+        const p2 = expectSendMegolmMessage(inboundGroupSessionPromise2);
+        await Promise.all([aliceClient.sendTextMessage(ROOM_ID, "test2"), p2]);
     });
 
     oldBackendOnly("Alice sends a megolm message", async () => {
@@ -1071,8 +1118,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
-            expect(Object.keys((e as any).devices)).toEqual([aliceClient.getUserId()!]);
-            expect(Object.keys((e as any)?.devices[aliceClient.getUserId()!])).toEqual(["DEVICE_ID"]);
+            expect([...(e as any).devices.keys()]).toEqual([aliceClient.getUserId()!]);
+            expect((e as any).devices.get(aliceClient.getUserId()!).has("DEVICE_ID"));
         }
 
         // mark the device as known, and resend.
@@ -1140,7 +1187,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1296,7 +1343,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1363,7 +1410,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
             aliceClient.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
         }

@@ -472,7 +472,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -483,7 +483,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -545,7 +545,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
