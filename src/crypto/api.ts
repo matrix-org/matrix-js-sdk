@@ -16,10 +16,11 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import { PassphraseInfo } from "../secret-storage";
+import { AddSecretStorageKeyOpts } from "../secret-storage";
 
 /* re-exports for backwards compatibility. */
 export {
+    AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
     SecretStorageKeyDescription as ISecretStorageKeyInfo,
 } from "../secret-storage";
@@ -65,7 +66,7 @@ export interface IEncryptedEventInfo {
 }
 
 export interface IRecoveryKey {
-    keyInfo?: IAddSecretStorageKeyOpts;
+    keyInfo?: AddSecretStorageKeyOpts;
     privateKey: Uint8Array;
     encodedPrivateKey?: string;
 }
@@ -103,13 +104,6 @@ export interface ICreateSecretStorageOpts {
      * containing the key, or rejects if the key cannot be obtained.
      */
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
-}
-
-export interface IAddSecretStorageKeyOpts {
-    pubkey?: string;
-    passphrase?: PassphraseInfo;
-    name?: string;
-    key?: Uint8Array;
 }
 
 export interface IImportOpts {

@@ -86,3 +86,23 @@ export interface PassphraseInfo {
     /** The number of bits to generate. Defaults to 256. */
     bits?: number;
 }
+
+/**
+ * Options for {@link SecretStorage#addKey}.
+ */
+export interface AddSecretStorageKeyOpts {
+    pubkey?: string;
+    passphrase?: PassphraseInfo;
+    name?: string;
+    key?: Uint8Array;
+}
+
+/**
+ * Return type for {@link SecretStorage#getKey}.
+ */
+export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDescription];
+
+/**
+ * Return type for {@link SecretStorage#addKey}.
+ */
+export type SecretStorageKeyObject = { keyId: string; keyInfo: SecretStorageKeyDescription };

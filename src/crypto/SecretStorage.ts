@@ -16,6 +16,7 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
+import { SecretStorageKeyTuple, SecretStorageKeyObject } from "../secret-storage";
 import { logger } from "../logger";
 import * as olmlib from "./olmlib";
 import { randomString } from "../randomstring";
@@ -29,11 +30,10 @@ import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
 import { SecretStorageKeyDescription, SecretStorageKeyDescriptionAesV1 } from "../secret-storage";
 
-export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
+/* re-exports for backwards compatibility */
+export { SecretStorageKeyTuple, SecretStorageKeyObject } from "../secret-storage";
 
-// Some of the key functions use a tuple and some use an object...
-export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDescription];
-export type SecretStorageKeyObject = { keyId: string; keyInfo: SecretStorageKeyDescription };
+export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
 export interface ISecretRequest {
     requestId: string;
