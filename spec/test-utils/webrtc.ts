@@ -511,6 +511,8 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public callId = "1";
     public localUsermediaFeed = {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
+        isAudioMuted: jest.fn().mockReturnValue(false),
+        isVideoMuted: jest.fn().mockReturnValue(false),
         stream: new MockMediaStream("stream"),
     } as unknown as CallFeed;
     public remoteUsermediaFeed?: CallFeed;

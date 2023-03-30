@@ -42,6 +42,8 @@ export enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
 
+export type CallsByUserAndDevice = Map<string, Map<string, MatrixCall>>;
+
 /**
  * Because event names are just strings, they do need
  * to be unique over all event types of event emitter.
@@ -62,7 +64,7 @@ export enum GroupCallEvent {
 export type GroupCallEventHandlerMap = {
     [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
     [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: CallFeed | undefined) => void;
-    [GroupCallEvent.CallsChanged]: (calls: Map<string, Map<string, MatrixCall>>) => void;
+    [GroupCallEvent.CallsChanged]: (calls: CallsByUserAndDevice) => void;
     [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
@@ -528,12 +530,16 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallLoopInterval = undefined;
         }
 
+        if (this.participantsExpirationTimer !== null) {
+            clearTimeout(this.participantsExpirationTimer);
+            this.participantsExpirationTimer = null;
+        }
+
         if (this.state !== GroupCallState.Entered) {
             return;
         }
 
-        this.forEachCall((call) => this.disposeCall(call, CallErrorCode.UserHangup));
-        this.calls.clear();
+        this.forEachCall((call) => call.hangup(CallErrorCode.UserHangup, false));
 
         this.activeSpeaker = undefined;
         clearInterval(this.activeSpeakerLoopInterval);
@@ -869,7 +875,8 @@ export class GroupCall extends TypedEventEmitter<
             `GroupCall ${this.groupCallId} onIncomingCall() incoming call (userId=${opponentUserId}, callId=${newCall.callId})`,
         );
 
-        if (prevCall) this.disposeCall(prevCall, CallErrorCode.Replaced);
+        if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+
         this.initCall(newCall);
 
         const feeds = this.getLocalFeeds().map((feed) => feed.clone());
@@ -928,7 +935,7 @@ export class GroupCall extends TypedEventEmitter<
                         logger.debug(
                             `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
                         );
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
+                        prevCall.hangup(CallErrorCode.NewSession, false);
                     }
 
                     const newCall = createNewMatrixCall(this.client, this.room.roomId, {
@@ -979,7 +986,7 @@ export class GroupCall extends TypedEventEmitter<
                                     );
                                 }
 
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                                newCall.hangup(CallErrorCode.SignallingFailed, false);
                                 if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
                             });
                     }
@@ -1101,10 +1108,6 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        if (call.state !== CallState.Ended) {
-            call.hangup(hangupReason, false);
-        }
-
         const usermediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
 
         if (usermediaFeed) {
@@ -1156,6 +1159,8 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
+        if (state === CallState.Ended) return;
+
         const audioMuted = this.localCallFeed!.isAudioMuted();
 
         if (call.localUsermediaStream && call.isMicrophoneMuted() !== audioMuted) {
@@ -1200,7 +1205,7 @@ export class GroupCall extends TypedEventEmitter<
             this.calls.set(opponentUserId, deviceMap);
         }
 
-        this.disposeCall(prevCall, CallErrorCode.Replaced);
+        prevCall.hangup(CallErrorCode.Replaced, false);
         this.initCall(newCall);
         deviceMap.set(prevCall.getOpponentDeviceId()!, newCall);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
