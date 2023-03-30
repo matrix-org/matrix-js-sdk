@@ -814,10 +814,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // Matrix event.
                     const transceiver = this.transceivers.get(tKey)!;
 
-                    // this is what would allow us to use addTransceiver(), but it's not available
-                    // on Firefox yet. We call it anyway if we have it.
-                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream);
-
                     transceiver.sender.replaceTrack(track);
                     // set the direction to indicate we're going to start sending again
                     // (this will trigger the re-negotiation)
