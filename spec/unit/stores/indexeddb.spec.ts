@@ -221,4 +221,37 @@ describe("IndexedDBStore", () => {
         (worker as any).onmessage({ data: { command: "closed" } });
         await deferred.promise;
     });
+
+    it("remote worker should pass command failures", async () => {
+        const worker = new (class MockWorker {
+            private onmessage!: (data: any) => void;
+            postMessage(data: any) {
+                if (data.command === "setupWorker" || data.command === "connect") {
+                    this.onmessage({
+                        data: {
+                            command: "cmd_success",
+                            seq: data.seq,
+                        },
+                    });
+                    return;
+                }
+
+                this.onmessage({
+                    data: {
+                        command: "cmd_fail",
+                        seq: data.seq,
+                        error: new Error("Test"),
+                    },
+                });
+            }
+        })() as unknown as Worker;
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => worker,
+        });
+        await expect(store.startup()).rejects.toThrow("Test");
+    });
 });
