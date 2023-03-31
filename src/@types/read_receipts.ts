@@ -38,7 +38,7 @@ export interface CachedReceipt {
     data: Receipt;
 }
 
-export type ReceiptCache = { [eventId: string]: CachedReceipt[] };
+export type ReceiptCache = Map<string, CachedReceipt[]>;
 
 export interface ReceiptContent {
     [eventId: string]: {
@@ -49,11 +49,8 @@ export interface ReceiptContent {
 }
 
 // We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
-export type Receipts = {
-    [receiptType: string]: {
-        [userId: string]: [WrappedReceipt | null, WrappedReceipt | null]; // Pair<real receipt, synthetic receipt> (both nullable)
-    };
-};
+// map: receipt type → user Id → receipt
+export type Receipts = Map<string, Map<string, [real: WrappedReceipt | null, synthetic: WrappedReceipt | null]>>;
 
 export type CachedReceiptStructure = {
     eventId: string;

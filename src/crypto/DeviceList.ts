@@ -58,7 +58,8 @@ export enum TrackingStatus {
     UpToDate,
 }
 
-export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
+// user-Id → device-Id → DeviceInfo
+export type DeviceInfoMap = Map<string, Map<string, DeviceInfo>>;
 
 type EmittedEvents = CryptoEvent.WillUpdateDevices | CryptoEvent.DevicesUpdated | CryptoEvent.UserCrossSigningUpdated;
 
@@ -301,13 +302,13 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * @returns userId-\>deviceId-\>{@link DeviceInfo}.
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
-        const stored: DeviceInfoMap = {};
-        userIds.forEach((u) => {
-            stored[u] = {};
-            const devices = this.getStoredDevicesForUser(u) || [];
-            devices.forEach(function (dev) {
-                stored[u][dev.deviceId] = dev;
+        const stored: DeviceInfoMap = new Map();
+        userIds.forEach((userId) => {
+            const deviceMap = new Map();
+            this.getStoredDevicesForUser(userId)?.forEach(function (device) {
+                deviceMap.set(device.deviceId, device);
             });
+            stored.set(userId, deviceMap);
         });
         return stored;
     }

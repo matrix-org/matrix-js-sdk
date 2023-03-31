@@ -53,7 +53,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("to-device messages", () => {
+    describe("call preprocess methods", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
@@ -91,6 +91,16 @@ describe("RustCrypto", () => {
 
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
+        });
+
+        it("should pass through one time key counts", async () => {
+            const oneTimeKeyCounts = new Map<string, number>([["signed_curve25519", 50]]);
+            await expect(rustCrypto.preprocessOneTimeKeyCounts(oneTimeKeyCounts)).resolves.not.toBeDefined();
+        });
+
+        it("should pass through unused fallback keys", async () => {
+            const unusedFallbackKeys = new Set(["signed_curve25519"]);
+            await expect(rustCrypto.preprocessUnusedFallbackKeys(unusedFallbackKeys)).resolves.not.toBeDefined();
         });
     });
 

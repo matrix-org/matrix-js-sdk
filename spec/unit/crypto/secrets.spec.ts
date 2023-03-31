@@ -45,7 +45,7 @@ async function makeTestClient(
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue({});
+    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
 
     return client;
 }
@@ -274,7 +274,7 @@ describe("Secrets", function () {
             Object.values(otks)[0],
         );
 
-        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
         const request = await secretStorage.request("foo", ["VAX"]);

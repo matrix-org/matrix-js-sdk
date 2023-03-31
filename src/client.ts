@@ -37,7 +37,7 @@ import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -79,7 +79,7 @@ import {
     VerificationMethod,
     IRoomKeyRequestBody,
 } from "./crypto";
-import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
+import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
 import { keyFromAuthData } from "./crypto/key_passphrase";
 import { User, UserEvent, UserEventHandlerMap } from "./models/user";
@@ -207,6 +207,7 @@ import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { CryptoApi } from "./crypto-api";
+import { DeviceInfoMap } from "./crypto/DeviceList";
 
 export type Store = IStore;
 
@@ -461,6 +462,11 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * @experimental
+     */
+    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -505,6 +511,8 @@ enum CrossSigningKeyType {
 }
 
 export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+
+export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
 export interface ISignedKey {
     keys: Record<string, string>;
@@ -837,7 +845,7 @@ interface IRoomHierarchy {
     next_batch?: string;
 }
 
-interface ITimestampToEventResponse {
+export interface TimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
@@ -2263,7 +2271,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns A promise which resolves to a map userId-\>deviceId-\>{@link DeviceInfo}
      */
-    public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<Record<string, Record<string, IDevice>>> {
+    public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         if (!this.crypto) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
@@ -3813,9 +3821,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const deviceInfos = await this.crypto.downloadKeys(userIds);
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
-        for (const [userId, devices] of Object.entries(deviceInfos)) {
-            devicesByUser[userId] = Object.values(devices);
+        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
+        for (const [userId, devices] of deviceInfos) {
+            devicesByUser.set(userId, Array.from(devices.values()));
         }
 
         // XXX: Private member access
@@ -6030,6 +6038,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const token = res.next_token;
                     const matrixEvents: MatrixEvent[] = [];
 
+                    res.notifications = res.notifications.filter(noUnsafeEventProps);
+
                     for (let i = 0; i < res.notifications.length; i++) {
                         const notification = res.notifications[i];
                         const event = this.getEventMapper()(notification.event);
@@ -6076,11 +6086,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 .then((res) => {
                     if (res.state) {
                         const roomState = eventTimeline.getState(dir)!;
-                        const stateEvents = res.state.map(this.getEventMapper());
+                        const stateEvents = res.state.filter(noUnsafeEventProps).map(this.getEventMapper());
                         roomState.setUnknownStateEvents(stateEvents);
                     }
                     const token = res.end;
-                    const matrixEvents = res.chunk.map(this.getEventMapper());
+                    const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
@@ -6112,7 +6122,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
-                    const matrixEvents = res.chunk.map(mapper);
+                    const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(mapper);
 
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
@@ -6160,11 +6170,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 .then((res) => {
                     if (res.state) {
                         const roomState = eventTimeline.getState(dir)!;
-                        const stateEvents = res.state.map(this.getEventMapper());
+                        const stateEvents = res.state.filter(noUnsafeEventProps).map(this.getEventMapper());
                         roomState.setUnknownStateEvents(stateEvents);
                     }
                     const token = res.end;
-                    const matrixEvents = res.chunk.map(this.getEventMapper());
+                    const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
@@ -8575,7 +8585,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPushRules(rules: IPushRules): void {
         // Fix-up defaults, if applicable.
-        this.pushRules = PushProcessor.rewriteDefaultRules(rules);
+        this.pushRules = PushProcessor.rewriteDefaultRules(rules, this.getUserId()!);
         // Pre-calculate any necessary caches.
         this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }
@@ -9182,24 +9192,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    supplied.
      * @returns Promise which resolves: to an empty object `{}`
      */
-    public sendToDevice(
-        eventType: string,
-        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-        txnId?: string,
-    ): Promise<{}> {
+    public sendToDevice(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string): Promise<{}> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
             $eventType: eventType,
             $txnId: txnId ? txnId : this.makeTxnId(),
         });
 
         const body = {
-            messages: contentMap,
+            messages: utils.recursiveMapToObject(contentMap),
         };
 
-        const targets = Object.keys(contentMap).reduce<Record<string, string[]>>((obj, key) => {
-            obj[key] = Object.keys(contentMap[key]);
-            return obj;
-        }, {});
+        const targets = new Map<string, string[]>();
+
+        for (const [userId, deviceMessages] of contentMap) {
+            targets.set(userId, Array.from(deviceMessages.keys()));
+        }
+
         logger.log(`PUT ${path}`, targets);
 
         return this.http.authedRequest(Method.Put, path, undefined, body);
@@ -9473,6 +9481,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * A helper to determine intentional mentions support
+     * @returns a boolean to determine if intentional mentions are enabled
+     * @experimental
+     */
+    public supportsIntentionalMentions(): boolean {
+        return this.clientOpts?.intentionalMentions || false;
+    }
+
+    /**
      * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
      * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
@@ -9541,7 +9558,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         timestamp: number,
         dir: Direction,
-    ): Promise<ITimestampToEventResponse> {
+    ): Promise<TimestampToEventResponse> {
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });

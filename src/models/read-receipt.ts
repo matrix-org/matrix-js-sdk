@@ -16,7 +16,6 @@ import {
     MAIN_ROOM_TIMELINE,
     Receipt,
     ReceiptCache,
-    Receipts,
     ReceiptType,
     WrappedReceipt,
 } from "../@types/read_receipts";
@@ -25,6 +24,7 @@ import * as utils from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
+import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
@@ -56,8 +56,11 @@ export abstract class ReadReceipt<
     // the form of this structure. This is sub-optimal for the exposed APIs
     // which pass in an event ID and get back some receipts, so we also store
     // a pre-cached list for this purpose.
-    private receipts: Receipts = {}; // { receipt_type: { user_id: Receipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: CachedReceipt[] }
+    // Map: receipt type → user Id → receipt
+    private receipts = new MapWithDefault<string, Map<string, [WrappedReceipt | null, WrappedReceipt | null]>>(
+        () => new Map(),
+    );
+    private receiptCacheByEventId: ReceiptCache = new Map();
 
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
     public abstract timeline: MatrixEvent[];
@@ -74,7 +77,7 @@ export abstract class ReadReceipt<
         ignoreSynthesized = false,
         receiptType = ReceiptType.Read,
     ): WrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
+        const [realReceipt, syntheticReceipt] = this.receipts.get(receiptType)?.get(userId) ?? [null, null];
         if (ignoreSynthesized) {
             return realReceipt;
         }
@@ -126,14 +129,13 @@ export abstract class ReadReceipt<
         receipt: Receipt,
         synthetic: boolean,
     ): void {
-        if (!this.receipts[receiptType]) {
-            this.receipts[receiptType] = {};
-        }
-        if (!this.receipts[receiptType][userId]) {
-            this.receipts[receiptType][userId] = [null, null];
-        }
+        const receiptTypesMap = this.receipts.getOrCreate(receiptType);
+        let pair = receiptTypesMap.get(userId);
 
-        const pair = this.receipts[receiptType][userId];
+        if (!pair) {
+            pair = [null, null];
+            receiptTypesMap.set(userId, pair);
+        }
 
         let existingReceipt = pair[ReceiptPairRealIndex];
         if (synthetic) {
@@ -185,23 +187,26 @@ export abstract class ReadReceipt<
         if (cachedReceipt === newCachedReceipt) return;
 
         // clean up any previous cache entry
-        if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
+        if (cachedReceipt && this.receiptCacheByEventId.get(cachedReceipt.eventId)) {
             const previousEventId = cachedReceipt.eventId;
             // Remove the receipt we're about to clobber out of existence from the cache
-            this.receiptCacheByEventId[previousEventId] = this.receiptCacheByEventId[previousEventId].filter((r) => {
-                return r.type !== receiptType || r.userId !== userId;
-            });
+            this.receiptCacheByEventId.set(
+                previousEventId,
+                this.receiptCacheByEventId.get(previousEventId)!.filter((r) => {
+                    return r.type !== receiptType || r.userId !== userId;
+                }),
+            );
 
-            if (this.receiptCacheByEventId[previousEventId].length < 1) {
-                delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
+            if (this.receiptCacheByEventId.get(previousEventId)!.length < 1) {
+                this.receiptCacheByEventId.delete(previousEventId); // clean up the cache keys
             }
         }
 
         // cache the new one
-        if (!this.receiptCacheByEventId[eventId]) {
-            this.receiptCacheByEventId[eventId] = [];
+        if (!this.receiptCacheByEventId.get(eventId)) {
+            this.receiptCacheByEventId.set(eventId, []);
         }
-        this.receiptCacheByEventId[eventId].push({
+        this.receiptCacheByEventId.get(eventId)!.push({
             userId: userId,
             type: receiptType as ReceiptType,
             data: receipt,
@@ -215,7 +220,7 @@ export abstract class ReadReceipt<
      * an empty list.
      */
     public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
-        return this.receiptCacheByEventId[event.getId()!] || [];
+        return this.receiptCacheByEventId.get(event.getId()!) || [];
     }
 
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;

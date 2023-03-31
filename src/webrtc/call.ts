@@ -287,6 +287,15 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     return mods;
 }
 
+export interface VoipEvent {
+    type: "toDevice" | "sendEvent";
+    eventType: string;
+    userId?: string;
+    opponentDeviceId?: string;
+    roomId?: string;
+    content: Record<string, unknown>;
+}
+
 export type CallEventHandlerMap = {
     [CallEvent.DataChannel]: (channel: RTCDataChannel) => void;
     [CallEvent.FeedsChanged]: (feeds: CallFeed[]) => void;
@@ -300,7 +309,7 @@ export type CallEventHandlerMap = {
     [CallEvent.AssertedIdentityChanged]: () => void;
     /* @deprecated */
     [CallEvent.HoldUnhold]: (onHold: boolean) => void;
-    [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
+    [CallEvent.SendVoipEvent]: (event: VoipEvent) => void;
 };
 
 // The key of the transceiver map (purpose + media type, separated by ':')
@@ -600,7 +609,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!userId) throw new Error("Couldn't find opponent user ID to init crypto");
 
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
-        this.opponentDeviceInfo = deviceInfoMap[userId][this.opponentDeviceId];
+        this.opponentDeviceInfo = deviceInfoMap.get(userId)?.get(this.opponentDeviceId);
         if (this.opponentDeviceInfo === undefined) {
             throw new GroupCallUnknownDeviceError(userId);
         }
@@ -2399,11 +2408,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     },
                 );
             } else {
-                await this.client.sendToDevice(eventType, {
-                    [userId]: {
-                        [this.opponentDeviceId]: content,
-                    },
-                });
+                await this.client.sendToDevice(
+                    eventType,
+                    new Map<string, any>([[userId, new Map([[this.opponentDeviceId, content]])]]),
+                );
             }
         } else {
             this.emit(CallEvent.SendVoipEvent, {
