@@ -16,7 +16,6 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import { SecretStorageKeyTuple, SecretStorageKeyObject } from "../secret-storage";
 import { logger } from "../logger";
 import * as olmlib from "./olmlib";
 import { randomString } from "../randomstring";
@@ -24,11 +23,16 @@ import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./
 import { ICryptoCallbacks, IEncryptedContent } from ".";
 import { MatrixEvent } from "../models/event";
 import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
-import { IAddSecretStorageKeyOpts } from "./api";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
-import { SecretStorageKeyDescription, SecretStorageKeyDescriptionAesV1 } from "../secret-storage";
+import {
+    SecretStorageKeyDescription,
+    SecretStorageKeyDescriptionAesV1,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+    AddSecretStorageKeyOpts,
+} from "../secret-storage";
 
 /* re-exports for backwards compatibility */
 export { SecretStorageKeyTuple, SecretStorageKeyObject } from "../secret-storage";
@@ -124,7 +128,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      */
     public async addKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts = {},
+        opts: AddSecretStorageKeyOpts = {},
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
         if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {

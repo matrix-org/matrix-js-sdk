@@ -34,21 +34,8 @@ import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import {
-    IAccountDataClient,
-    ISecretRequest,
-    SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorage,
-    SecretStorageKeyObject,
-    SecretStorageKeyTuple,
-} from "./SecretStorage";
-import {
-    IAddSecretStorageKeyOpts,
-    ICreateSecretStorageOpts,
-    IEncryptedEventInfo,
-    IImportRoomKeysOpts,
-    IRecoveryKey,
-} from "./api";
+import { IAccountDataClient, ISecretRequest, SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from "./SecretStorage";
+import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
@@ -90,7 +77,12 @@ import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import {
+    AddSecretStorageKeyOpts,
+    SecretStorageKeyDescription,
+    SecretStorageKeyObject,
+    SecretStorageKeyTuple,
+} from "../secret-storage";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -910,7 +902,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
+        const createSSSS = async (opts: AddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
             if (privateKey) {
                 opts.key = privateKey;
             }
@@ -984,7 +976,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo = {} as IAddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
+            const { keyInfo = {} as AddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
             newKeyId = await createSSSS(keyInfo, privateKey);
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
@@ -995,7 +987,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const backupKey = (await this.getSessionBackupPrivateKey()) || (await getKeyBackupPassphrase?.());
 
             // create a new SSSS key and use the backup key as the new SSSS key
-            const opts = {} as IAddSecretStorageKeyOpts;
+            const opts = {} as AddSecretStorageKeyOpts;
 
             if (keyBackupInfo.auth_data.private_key_salt && keyBackupInfo.auth_data.private_key_iterations) {
                 // FIXME: ???
@@ -1111,7 +1103,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     public addSecretStorageKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts,
+        opts: AddSecretStorageKeyOpts,
         keyID?: string,
     ): Promise<SecretStorageKeyObject> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
