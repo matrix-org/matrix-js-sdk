@@ -25,7 +25,7 @@ import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummeryStatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -95,11 +95,13 @@ export type GroupCallEventHandlerMap = {
 export enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
+    SummeryStats = "GroupCall.summery_stats",
 }
 
 export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
+    [GroupCallStatsReportEvent.SummeryStats]: (report: GroupCallStatsReport<SummeryStatsReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -108,7 +110,7 @@ export enum GroupCallErrorCode {
     PlaceCallFailed = "place_call_failed",
 }
 
-export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport | SummeryStatsReport> {
     report: T;
 }
 
@@ -264,6 +266,7 @@ export class GroupCall extends TypedEventEmitter<
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
         this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
+        this.stats.reports.on(StatsReport.SUMMERY_STATS, this.onSummeryStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
@@ -274,6 +277,11 @@ export class GroupCall extends TypedEventEmitter<
     private onByteSentStats = (report: ByteSentStatsReport): void => {
         // @TODO: Implement data argumentation
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
+
+    private onSummeryStats = (report: SummeryStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.SummeryStats, { report });
     };
 
     public async create(): Promise<GroupCall> {
