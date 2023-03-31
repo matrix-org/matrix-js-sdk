@@ -21,7 +21,7 @@ import * as olmlib from "./olmlib";
 import { randomString } from "../randomstring";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { ICryptoCallbacks, IEncryptedContent } from ".";
-import { IContent, MatrixEvent } from "../models/event";
+import { MatrixEvent } from "../models/event";
 import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts } from "./api";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
@@ -44,7 +44,6 @@ export interface ISecretRequest {
 export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
     // Subset of MatrixClient (which also uses any for the event content)
     getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
-    getAccountData: (eventType: string) => IContent | null;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
