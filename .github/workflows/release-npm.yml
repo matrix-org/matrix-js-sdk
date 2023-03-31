@@ -20,7 +20,7 @@ jobs:
                   registry-url: "https://registry.npmjs.org"
 
             - name: 🔨 Install dependencies
-              run: "yarn install --pure-lockfile"
+              run: "yarn install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
               id: npm-publish
