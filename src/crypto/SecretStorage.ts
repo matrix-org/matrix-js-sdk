@@ -22,8 +22,7 @@ import { randomString } from "../randomstring";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { ICryptoCallbacks, IEncryptedContent } from ".";
 import { MatrixEvent } from "../models/event";
-import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { ClientEvent, MatrixClient } from "../client";
 import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
 import {
@@ -32,10 +31,15 @@ import {
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
+    AccountDataClient as IAccountDataClient,
 } from "../secret-storage";
 
 /* re-exports for backwards compatibility */
-export { SecretStorageKeyTuple, SecretStorageKeyObject } from "../secret-storage";
+export {
+    AccountDataClient as IAccountDataClient,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+} from "../secret-storage";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -43,12 +47,6 @@ export interface ISecretRequest {
     requestId: string;
     promise: Promise<string>;
     cancel: (reason: string) => void;
-}
-
-export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
-    // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
-    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
