@@ -428,8 +428,8 @@ export class MediaHandler extends TypedEventEmitter<
                 instead
                 XXX: Is this still true?
                 */
-                width: isWebkit ? {exact: 1280} : {ideal: 640},
-                height: isWebkit ? {exact: 640} : {ideal: 360},
+                width: isWebkit ? {exact: 640} : {ideal: 640},
+                height: isWebkit ? {exact: 360} : {ideal: 360},
                 ...included.video
             } : false
         };
