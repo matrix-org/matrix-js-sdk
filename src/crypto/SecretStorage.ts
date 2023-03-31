@@ -23,6 +23,7 @@ import {
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
     AccountDataClient,
+    ISecretStorage,
     SecretStorage as StorageImpl,
 } from "../secret-storage";
 import { ISecretRequest, SecretSharing } from "./SecretSharing";
@@ -40,7 +41,7 @@ export type { ISecretRequest } from "./SecretSharing";
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  */
-export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
+export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> implements ISecretStorage {
     private readonly storageImpl: StorageImpl;
     private readonly sharingImpl: SecretSharing;
 

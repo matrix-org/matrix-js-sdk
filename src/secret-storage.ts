@@ -163,6 +163,89 @@ interface Decryptors {
 }
 
 /**
+ * Interface provided by SecretStorage implementations
+ *
+ * Normally this will just be an {@link SecretStorage}, but for backwards-compatibility some methods allow other
+ * implementations.
+ */
+export interface ISecretStorage {
+    /**
+     * Add a key for encrypting secrets.
+     *
+     * @param algorithm - the algorithm used by the key.
+     * @param opts - the options for the algorithm.  The properties used
+     *     depend on the algorithm given.
+     * @param keyId - the ID of the key.  If not given, a random
+     *     ID will be generated.
+     *
+     * @returns An object with:
+     *     keyId: the ID of the key
+     *     keyInfo: details about the key (iv, mac, passphrase)
+     */
+    addKey(algorithm: string, opts: AddSecretStorageKeyOpts, keyId?: string): Promise<SecretStorageKeyObject>;
+
+    /**
+     * Get the key information for a given ID.
+     *
+     * @param keyId - The ID of the key to check
+     *     for. Defaults to the default key ID if not provided.
+     * @returns If the key was found, the return value is an array of
+     *     the form [keyId, keyInfo].  Otherwise, null is returned.
+     *     XXX: why is this an array when addKey returns an object?
+     */
+    getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null>;
+
+    /**
+     * Check whether we have a key with a given ID.
+     *
+     * @param keyId - The ID of the key to check
+     *     for. Defaults to the default key ID if not provided.
+     * @returns Whether we have the key.
+     */
+    hasKey(keyId?: string): Promise<boolean>;
+
+    /**
+     * Check whether a key matches what we expect based on the key info
+     *
+     * @param key - the key to check
+     * @param info - the key info
+     *
+     * @returns whether or not the key matches
+     */
+    checkKey(key: Uint8Array, info: SecretStorageKeyDescriptionAesV1): Promise<boolean>;
+
+    /**
+     * Store an encrypted secret on the server
+     *
+     * @param name - The name of the secret
+     * @param secret - The secret contents.
+     * @param keys - The IDs of the keys to use to encrypt the secret
+     *     or null/undefined to use the default key.
+     */
+    store(name: string, secret: string, keys?: string[] | null): Promise<void>;
+
+    /**
+     * Get a secret from storage.
+     *
+     * @param name - the name of the secret
+     *
+     * @returns the contents of the secret
+     */
+    get(name: string): Promise<string | undefined>;
+
+    /**
+     * Check if a secret is stored on the server.
+     *
+     * @param name - the name of the secret
+     *
+     * @returns map of key name to key info the secret is encrypted
+     *     with, or null if it is not present or not encrypted with a trusted
+     *     key
+     */
+    isStored(name: string): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
+}
+
+/**
  * Implementation of Server-side secret storage.
  *
  * Secret *sharing* is *not* implemented here: this class is strictly about the storage component of
@@ -170,7 +253,7 @@ interface Decryptors {
  *
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
-export class SecretStorage {
+export class SecretStorage implements ISecretStorage {
     /**
      * Construct a new `SecretStorage`.
      *
