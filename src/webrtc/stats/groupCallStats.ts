@@ -15,11 +15,14 @@ limitations under the License.
 */
 import { StatsReportGatherer } from "./statsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
+import { SummeryStatsReporter } from "./summeryStatsReporter";
+import { SummeryStats } from "./summeryStats";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
     private readonly gatherers: Map<string, StatsReportGatherer> = new Map<string, StatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
+    private readonly summeryReporter = new SummeryStatsReporter(this.reports);
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
@@ -59,6 +62,10 @@ export class GroupCallStats {
     }
 
     private processStats(): void {
-        this.gatherers.forEach((c) => c.processStats(this.groupCallId, this.userId));
+        const summery: Promise<SummeryStats>[] = [];
+        this.gatherers.forEach((c) => {
+            summery.push(c.processStats(this.groupCallId, this.userId));
+        });
+        Promise.all(summery).then((s: Awaited<SummeryStats>[]) => this.summeryReporter.build(s));
     }
 }

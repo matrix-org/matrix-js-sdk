@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "../../../../src/webrtc/stats/statsReport";
+import {
+    ByteSentStatsReport,
+    ConnectionStatsReport,
+    StatsReport,
+    SummeryStatsReport,
+} from "../../../../src/webrtc/stats/statsReport";
 
 describe("StatsReportEmitter", () => {
     let emitter: StatsReportEmitter;
@@ -43,6 +48,18 @@ describe("StatsReportEmitter", () => {
                 return;
             });
             emitter.emitConnectionStatsReport(report);
+        });
+    });
+
+    it("should emit and receive SummeryStatsReport", async () => {
+        const report = {} as SummeryStatsReport;
+        return new Promise((resolve, _) => {
+            emitter.on(StatsReport.SUMMERY_STATS, (r) => {
+                expect(r).toBe(report);
+                resolve(null);
+                return;
+            });
+            emitter.emitSummeryStatsReport(report);
         });
     });
 });

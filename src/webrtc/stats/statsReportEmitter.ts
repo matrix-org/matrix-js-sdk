@@ -15,11 +15,12 @@ limitations under the License.
 */
 
 import { TypedEventEmitter } from "../../models/typed-event-emitter";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./statsReport";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummeryStatsReport } from "./statsReport";
 
 export type StatsReportHandlerMap = {
     [StatsReport.BYTE_SENT_STATS]: (report: ByteSentStatsReport) => void;
     [StatsReport.CONNECTION_STATS]: (report: ConnectionStatsReport) => void;
+    [StatsReport.SUMMERY_STATS]: (report: SummeryStatsReport) => void;
 };
 
 export class StatsReportEmitter extends TypedEventEmitter<StatsReport, StatsReportHandlerMap> {
@@ -29,5 +30,9 @@ export class StatsReportEmitter extends TypedEventEmitter<StatsReport, StatsRepo
 
     public emitConnectionStatsReport(report: ConnectionStatsReport): void {
         this.emit(StatsReport.CONNECTION_STATS, report);
+    }
+
+    public emitSummeryStatsReport(report: SummeryStatsReport): void {
+        this.emit(StatsReport.SUMMERY_STATS, report);
     }
 }
