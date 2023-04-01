@@ -1129,7 +1129,7 @@ describe("MatrixClient", function () {
         it("should hit the expected API endpoint with UIA", async () => {
             httpBackend!
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_logintoken": { enabled: true } } });
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client!.requestLoginToken(uiaData);
@@ -1143,7 +1143,7 @@ describe("MatrixClient", function () {
         it("should hit the expected API endpoint without UIA", async () => {
             httpBackend!
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_logintoken": { enabled: true } } });
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client!.requestLoginToken();
             httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
@@ -1155,7 +1155,7 @@ describe("MatrixClient", function () {
         it("should hit the r1 endpoint when capability is disabled", async () => {
             httpBackend!
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_logintoken": { enabled: false } } });
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client!.requestLoginToken();
             httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);

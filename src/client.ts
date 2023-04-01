@@ -496,7 +496,7 @@ interface ICapabilities {
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
     "io.element.thread"?: IThreadsCapability;
-    "org.matrix.msc3882.get_logintoken"?: IMSC3882GetLoginTokenCapability;
+    "org.matrix.msc3882.get_login_token"?: IMSC3882GetLoginTokenCapability;
 }
 
 /* eslint-disable camelcase */
@@ -7816,7 +7816,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
-        const endpoint = capabilities["org.matrix.msc3882.get_logintoken"]
+        const endpoint = capabilities["org.matrix.msc3882.get_login_token"]
             ? "/org.matrix.msc3882/login/get_token" // r1 endpoint
             : "/org.matrix.msc3882/login/token"; // r0 endpoint
 

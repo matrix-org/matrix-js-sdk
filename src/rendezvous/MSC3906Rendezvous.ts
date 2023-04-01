@@ -106,7 +106,7 @@ export class MSC3906Rendezvous {
         const features = await buildFeatureSupportMap(await this.client.getVersions());
         // determine available protocols
         if (
-            !capabilities["org.matrix.msc3882.get_logintoken"]?.enabled &&
+            !capabilities["org.matrix.msc3882.get_login_token"]?.enabled &&
             features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported
         ) {
             logger.info("Server doesn't support MSC3882");

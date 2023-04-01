@@ -64,7 +64,7 @@ function makeMockClient(opts: {
                 ? {}
                 : {
                       capabilities: {
-                          "org.matrix.msc3882.get_logintoken": {
+                          "org.matrix.msc3882.get_login_token": {
                               enabled: opts.msc3882Enabled,
                           },
                       },
