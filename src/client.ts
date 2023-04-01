@@ -491,12 +491,15 @@ export interface IThreadsCapability extends ICapability {}
 
 export interface IMSC3882GetLoginTokenCapability extends ICapability {}
 
+export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
+
 interface ICapabilities {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
     "io.element.thread"?: IThreadsCapability;
-    "org.matrix.msc3882.get_login_token"?: IMSC3882GetLoginTokenCapability;
+    [UNSTABLE_MSC3882_CAPABILITY.name]?: IMSC3882GetLoginTokenCapability;
+    [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
 }
 
 /* eslint-disable camelcase */
@@ -7816,7 +7819,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
-        const endpoint = capabilities["org.matrix.msc3882.get_login_token"]
+        const endpoint = UNSTABLE_MSC3882_CAPABILITY.findIn(capabilities)
             ? "/org.matrix.msc3882/login/get_token" // r1 endpoint
             : "/org.matrix.msc3882/login/token"; // r0 endpoint
 
