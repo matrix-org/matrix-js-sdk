@@ -77,7 +77,7 @@ export class StatsReportGatherer {
             }
             this.isActive = false;
         }
-        return summary;
+        return Promise.resolve(summary);
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {

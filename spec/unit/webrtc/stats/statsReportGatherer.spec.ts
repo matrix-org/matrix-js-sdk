@@ -35,8 +35,9 @@ describe("StatsReportGatherer", () => {
         it("if active calculate stats reports", async () => {
             const getStats = jest.spyOn(rtcSpy, "getStats");
             getStats.mockResolvedValue({} as RTCStatsReport);
-            await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+            const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
+            expect(actual).toEqual({ receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 });
         });
 
         it("if not active do not calculate stats reports", async () => {
@@ -55,14 +56,14 @@ describe("StatsReportGatherer", () => {
             expect(collector.getActive()).toBeFalsy();
         });
 
-        // it("if active an RTCStatsReport not a promise the collector becomes inactive", async () => {
-        //     const getStats = jest.spyOn(rtcSpy, "getStats");
-        //     // @ts-ignore
-        //     getStats.mockReturnValue({});
-        //     const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
-        //     expect(actual).toBeFalsy();
-        //     expect(getStats).toHaveBeenCalled();
-        //     expect(collector.getActive()).toBeFalsy();
-        // });
+        it("if active an RTCStatsReport not a promise the collector becomes inactive", async () => {
+            const getStats = jest.spyOn(rtcSpy, "getStats");
+            // @ts-ignore
+            getStats.mockReturnValue({});
+            const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+            expect(actual).toEqual({ receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 });
+            expect(getStats).toHaveBeenCalled();
+            expect(collector.getActive()).toBeFalsy();
+        });
     });
 });
