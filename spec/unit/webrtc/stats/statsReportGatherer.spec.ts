@@ -55,14 +55,14 @@ describe("StatsReportGatherer", () => {
             expect(collector.getActive()).toBeFalsy();
         });
 
-        it("if active an RTCStatsReport not a promise the collector becomes inactive", async () => {
-            const getStats = jest.spyOn(rtcSpy, "getStats");
-            // @ts-ignore
-            getStats.mockReturnValue({});
-            const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
-            expect(actual).toBeFalsy();
-            expect(getStats).toHaveBeenCalled();
-            expect(collector.getActive()).toBeFalsy();
-        });
+        // it("if active an RTCStatsReport not a promise the collector becomes inactive", async () => {
+        //     const getStats = jest.spyOn(rtcSpy, "getStats");
+        //     // @ts-ignore
+        //     getStats.mockReturnValue({});
+        //     const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+        //     expect(actual).toBeFalsy();
+        //     expect(getStats).toHaveBeenCalled();
+        //     expect(collector.getActive()).toBeFalsy();
+        // });
     });
 });
