@@ -34,10 +34,13 @@ describe("StatsReportGatherer", () => {
     describe("on process stats", () => {
         it("if active calculate stats reports", async () => {
             const getStats = jest.spyOn(rtcSpy, "getStats");
-            getStats.mockResolvedValue({} as RTCStatsReport);
+            const report = {} as RTCStatsReport;
+            report.forEach = jest.fn().mockReturnValue([]);
+            getStats.mockResolvedValue(report);
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
             expect(actual).toEqual({ receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 });
+            expect(collector.getActive()).toBeTruthy();
         });
 
         it("if not active do not calculate stats reports", async () => {
