@@ -1897,35 +1897,57 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.threadsReady = true;
     }
 
+    /**
+     * Calls {@link processPollEvent} for a list of events.
+     *
+     * @param events - List of events
+     */
     public async processPollEvents(events: MatrixEvent[]): Promise<void> {
-        const processPollStartEvent = (event: MatrixEvent): void => {
-            if (!M_POLL_START.matches(event.getType())) return;
+        for (const event of events) {
+            try {
+                /**
+                 * Try to decrypt the event. Promise resolution does not guarantee a successful decryption.
+                 * Retry is handled in {@link processPollEvent}.
+                 */
+                await this.client.decryptEventIfNeeded(event);
+                this.processPollEvent(event);
+            } catch {}
+        }
+    }
+
+    /**
+     * Processes poll events:
+     * If the event has a decryption failure, it will listen for decryption and tries again.
+     * If it is a poll start event ({@link M_POLL_START}),
+     * it creates and stores a Poll model and emits a PollEvent.New event.
+     * If the event is related to a poll, it will add it to the poll.
+     * Noop for other cases.
+     *
+     * @param event - Event that could be a poll event
+     */
+    private async processPollEvent(event: MatrixEvent): Promise<void> {
+        if (event.isDecryptionFailure()) {
+            event.once(MatrixEventEvent.Decrypted, (maybeDecryptedEvent: MatrixEvent) => {
+                this.processPollEvent(maybeDecryptedEvent);
+            });
+            return;
+        }
+
+        if (M_POLL_START.matches(event.getType())) {
             try {
                 const poll = new Poll(event, this.client, this);
                 this.polls.set(event.getId()!, poll);
                 this.emit(PollEvent.New, poll);
             } catch {}
             // poll creation can fail for malformed poll start events
-        };
+            return;
+        }
 
-        const processPollRelationEvent = (event: MatrixEvent): void => {
-            const relationEventId = event.relationEventId;
-            if (relationEventId && this.polls.has(relationEventId)) {
-                const poll = this.polls.get(relationEventId);
-                poll?.onNewRelation(event);
-            }
-        };
+        const relationEventId = event.relationEventId;
 
-        const processPollEvent = (event: MatrixEvent): void => {
-            processPollStartEvent(event);
-            processPollRelationEvent(event);
-        };
-
-        for (const event of events) {
-            try {
-                await this.client.decryptEventIfNeeded(event);
-                processPollEvent(event);
-            } catch {}
+        if (relationEventId && this.polls.has(relationEventId)) {
+            const poll = this.polls.get(relationEventId);
+            poll?.onNewRelation(event);
         }
     }
 

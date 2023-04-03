@@ -3298,6 +3298,30 @@ describe("Room", function () {
             // only called on poll with relation
             expect(poll2.onNewRelation).not.toHaveBeenCalled();
         });
+
+        it("should retry on decryption", async () => {
+            const pollStartEventId = "poll1";
+            const pollStartEvent = makePollStart(pollStartEventId);
+            // simulate decryption failure
+            const isDecryptionFailureSpy = jest.spyOn(pollStartEvent, "isDecryptionFailure").mockReturnValue(true);
+
+            await room.processPollEvents([pollStartEvent]);
+            // do not expect a poll to show up for the room
+            expect(room.polls.get(pollStartEventId)).toBeUndefined();
+
+            // now emit a Decrypted event but keep the decryption failure
+            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent);
+            // still do not expect a poll to show up for the room
+            expect(room.polls.get(pollStartEventId)).toBeUndefined();
+
+            // clear decryption failure and emit a Decrypted event again
+            isDecryptionFailureSpy.mockRestore();
+            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent);
+
+            // the poll should now show up in the room's polls
+            const poll = room.polls.get(pollStartEventId);
+            expect(poll?.pollId).toBe(pollStartEventId);
+        });
     });
 
     describe("findPredecessorRoomId", () => {
