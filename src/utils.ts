@@ -22,7 +22,7 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixEvent } from "./models/event";
+import { IEvent, MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
 
@@ -702,4 +702,69 @@ export function mapsEqual<K, V>(x: Map<K, V>, y: Map<K, V>, eq = (v1: V, v2: V):
         if (v2 === undefined || !eq(v1, v2)) return false;
     }
     return true;
+}
+
+function processMapToObjectValue(value: any): any {
+    if (value instanceof Map) {
+        // Value is a Map. Recursively map it to an object.
+        return recursiveMapToObject(value);
+    } else if (Array.isArray(value)) {
+        // Value is an Array. Recursively map the value (e.g. to cover Array of Arrays).
+        return value.map((v) => processMapToObjectValue(v));
+    } else {
+        return value;
+    }
+}
+
+/**
+ * Recursively converts Maps to plain objects.
+ * Also supports sub-lists of Maps.
+ */
+export function recursiveMapToObject(map: Map<any, any>): any {
+    const targetMap = new Map();
+
+    for (const [key, value] of map) {
+        targetMap.set(key, processMapToObjectValue(value));
+    }
+
+    return Object.fromEntries(targetMap.entries());
+}
+
+export function unsafeProp<K extends keyof any | undefined>(prop: K): boolean {
+    return prop === "__proto__" || prop === "prototype" || prop === "constructor";
+}
+
+export function safeSet<K extends keyof any>(obj: Record<any, any>, prop: K, value: any): void {
+    if (unsafeProp(prop)) {
+        throw new Error("Trying to modify prototype or constructor");
+    }
+
+    obj[prop] = value;
+}
+
+export function noUnsafeEventProps(event: Partial<IEvent>): boolean {
+    return !(
+        unsafeProp(event.room_id) ||
+        unsafeProp(event.sender) ||
+        unsafeProp(event.user_id) ||
+        unsafeProp(event.event_id)
+    );
+}
+
+export class MapWithDefault<K, V> extends Map<K, V> {
+    public constructor(private createDefault: () => V) {
+        super();
+    }
+
+    /**
+     * Returns the value if the key already exists.
+     * If not, it creates a new value under that key using the ctor callback and returns it.
+     */
+    public getOrCreate(key: K): V {
+        if (!this.has(key)) {
+            this.set(key, this.createDefault());
+        }
+
+        return this.get(key)!;
+    }
 }

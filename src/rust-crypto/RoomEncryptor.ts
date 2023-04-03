@@ -117,6 +117,16 @@ export class RoomEncryptor {
     }
 
     /**
+     * Discard any existing group session for this room
+     */
+    public async forceDiscardSession(): Promise<void> {
+        const r = await this.olmMachine.invalidateGroupSession(new RoomId(this.room.roomId));
+        if (r) {
+            this.prefixedLogger.info("Discarded existing group session");
+        }
+    }
+
+    /**
      * Encrypt an event for this room
      *
      * This will ensure that we have a megolm session for this room, share it with the devices in the room, and

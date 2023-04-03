@@ -48,7 +48,6 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKeyInfo,
 } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
@@ -90,6 +89,8 @@ import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
+import { MapWithDefault, recursiveMapToObject } from "../utils";
+import { SecretStorageKeyDescription } from "../secret-storage";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -141,10 +142,10 @@ export interface ICryptoCallbacks {
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
     getSecretStorageKey?: (
-        keys: { keys: Record<string, ISecretStorageKeyInfo> },
+        keys: { keys: Record<string, SecretStorageKeyDescription> },
         name: string,
     ) => Promise<[string, Uint8Array] | null>;
-    cacheSecretStorageKey?: (keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
     onSecretRequested?: (
         userId: string,
         deviceId: string,
@@ -152,7 +153,10 @@ export interface ICryptoCallbacks {
         secretName: string,
         deviceTrust: DeviceTrustLevel,
     ) => Promise<string | undefined>;
-    getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
+    getDehydrationKey?: (
+        keyInfo: SecretStorageKeyDescription,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
@@ -399,7 +403,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     //         deviceId: 1234567890000,
     //     },
     // }
-    private lastNewSessionForced: Record<string, Record<string, number>> = {};
+    // Map: user Id → device Id → timestamp
+    private lastNewSessionForced: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
+        () => new MapWithDefault(() => 0),
+    );
 
     // This flag will be unset whilst the client processes a sync response
     // so that we don't start requesting keys until we've actually finished
@@ -919,7 +926,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return keyId;
         };
 
-        const ensureCanCheckPassphrase = async (keyId: string, keyInfo: ISecretStorageKeyInfo): Promise<void> => {
+        const ensureCanCheckPassphrase = async (keyId: string, keyInfo: SecretStorageKeyDescription): Promise<void> => {
             if (!keyInfo.mac) {
                 const key = await this.baseApis.cryptoCallbacks.getSecretStorageKey?.(
                     { keys: { [keyId]: keyInfo } },
@@ -1126,7 +1133,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 
@@ -1145,7 +1152,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.setDefaultKeyId(k);
     }
 
-    public checkSecretStorageKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
+    public checkSecretStorageKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
         return this.secretStorage.checkKey(key, info);
     }
 
@@ -2488,13 +2495,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * This should not normally be necessary.
      */
-    public forceDiscardSession(roomId: string): void {
+    public forceDiscardSession(roomId: string): Promise<void> {
         const alg = this.roomEncryptors.get(roomId);
         if (alg === undefined) throw new Error("Room not encrypted");
         if (alg.forceDiscardSession === undefined) {
             throw new Error("Room encryption algorithm doesn't support session discarding");
         }
         alg.forceDiscardSession();
+        return Promise.resolve();
     }
 
     /**
@@ -2690,11 +2698,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public ensureOlmSessionsForUsers(
         users: string[],
         force?: boolean,
-    ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
+    ): Promise<Map<string, Map<string, olmlib.IOlmSessionResult>>> {
+        // map user Id → DeviceInfo[]
+        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
 
         for (const userId of users) {
-            devicesByUser[userId] = [];
+            const userDevices: DeviceInfo[] = [];
+            devicesByUser.set(userId, userDevices);
 
             const devices = this.getStoredDevicesForUser(userId) || [];
             for (const deviceInfo of devices) {
@@ -2708,7 +2718,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     continue;
                 }
 
-                devicesByUser[userId].push(deviceInfo);
+                userDevices.push(deviceInfo);
             }
         }
 
@@ -3146,7 +3156,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                         payload: encryptedContent,
                     });
 
-                    await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, { [userId]: [deviceInfo] });
+                    await olmlib.ensureOlmSessionsForDevices(
+                        this.olmDevice,
+                        this.baseApis,
+                        new Map([[userId, [deviceInfo]]]),
+                    );
                     await olmlib.encryptMessageForDevice(
                         encryptedContent.ciphertext,
                         this.userId,
@@ -3460,8 +3474,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // check when we last forced a new session with this device: if we've already done so
         // recently, don't do it again.
-        this.lastNewSessionForced[sender] = this.lastNewSessionForced[sender] || {};
-        const lastNewSessionForced = this.lastNewSessionForced[sender][deviceKey] || 0;
+        const lastNewSessionDevices = this.lastNewSessionForced.getOrCreate(sender);
+        const lastNewSessionForced = lastNewSessionDevices.getOrCreate(deviceKey);
         if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
             logger.debug(
                 "New session already forced with device " +
@@ -3494,11 +3508,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return;
             }
         }
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
-        devicesByUser[sender] = [device];
+        const devicesByUser = new Map([[sender, [device]]]);
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
-        this.lastNewSessionForced[sender][deviceKey] = Date.now();
+        lastNewSessionDevices.set(deviceKey, Date.now());
 
         // Now send a blank message on that session so the other side knows about it.
         // (The keyshare request is sent in the clear so that won't do)
@@ -3525,11 +3538,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
         retryDecryption();
 
-        await this.baseApis.sendToDevice("m.room.encrypted", {
-            [sender]: {
-                [device.deviceId]: encryptedContent,
-            },
-        });
+        await this.baseApis.sendToDevice(
+            "m.room.encrypted",
+            new Map([[sender, new Map([[device.deviceId, encryptedContent]])]]),
+        );
 
         // Most of the time this probably won't be necessary since we'll have queued up a key request when
         // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
@@ -3836,15 +3848,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param obj -  Object to which we will add a 'signatures' property
      */
     public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
-        const sigs = obj.signatures || {};
+        const sigs = new Map(Object.entries(obj.signatures || {}));
         const unsigned = obj.unsigned;
 
         delete obj.signatures;
         delete obj.unsigned;
 
-        sigs[this.userId] = sigs[this.userId] || {};
-        sigs[this.userId]["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
-        obj.signatures = sigs;
+        const userSignatures = sigs.get(this.userId) || {};
+        sigs.set(this.userId, userSignatures);
+        userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
+        obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
     }
 }

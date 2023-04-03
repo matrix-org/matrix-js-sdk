@@ -21,6 +21,7 @@ import { MatrixError } from "./http-api";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
 import { MatrixScheduler } from "./scheduler";
 import { SyncState } from "./sync";
+import { MapWithDefault } from "./utils";
 
 const MAX_BATCH_SIZE = 20;
 
@@ -122,12 +123,9 @@ export class ToDeviceMessageQueue {
      * Attempts to send a batch of to-device messages.
      */
     private async sendBatch(batch: IndexedToDeviceBatch): Promise<void> {
-        const contentMap: Record<string, Record<string, ToDevicePayload>> = {};
+        const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
         for (const item of batch.batch) {
-            if (!contentMap[item.userId]) {
-                contentMap[item.userId] = {};
-            }
-            contentMap[item.userId][item.deviceId] = item.payload;
+            contentMap.getOrCreate(item.userId).set(item.deviceId, item.payload);
         }
 
         logger.info(

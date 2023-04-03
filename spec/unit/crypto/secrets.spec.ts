@@ -25,10 +25,10 @@ import { encryptAES } from "../../../src/crypto/aes";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
-import { ISecretStorageKeyInfo } from "../../../src/crypto/api";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
+import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -45,7 +45,7 @@ async function makeTestClient(
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue({});
+    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
 
     return client;
 }
@@ -274,7 +274,7 @@ describe("Secrets", function () {
             Object.values(otks)[0],
         );
 
-        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
         const request = await secretStorage.request("foo", ["VAX"]);
@@ -541,7 +541,9 @@ describe("Secrets", function () {
             await alice.bootstrapSecretStorage({});
 
             expect(alice.getAccountData("m.secret_storage.default_key")!.getContent()).toEqual({ key: "key_id" });
-            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")!.getContent<ISecretStorageKeyInfo>();
+            const keyInfo = alice
+                .getAccountData("m.secret_storage.key.key_id")!
+                .getContent<SecretStorageKeyDescription>();
             expect(keyInfo.algorithm).toEqual("m.secret_storage.v1.aes-hmac-sha2");
             expect(keyInfo.passphrase).toEqual({
                 algorithm: "m.pbkdf2",

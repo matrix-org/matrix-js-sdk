@@ -24,6 +24,8 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { GroupCallStats } from "./stats/groupCallStats";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -40,6 +42,13 @@ export enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
 
+export type CallsByUserAndDevice = Map<string, Map<string, MatrixCall>>;
+
+/**
+ * Because event names are just strings, they do need
+ * to be unique over all event types of event emitter.
+ * Some objects could emit more then one set of events.
+ */
 export enum GroupCallEvent {
     GroupCallStateChanged = "group_call_state_changed",
     ActiveSpeakerChanged = "active_speaker_changed",
@@ -49,13 +58,13 @@ export enum GroupCallEvent {
     LocalScreenshareStateChanged = "local_screenshare_state_changed",
     LocalMuteStateChanged = "local_mute_state_changed",
     ParticipantsChanged = "participants_changed",
-    Error = "error",
+    Error = "group_call_error",
 }
 
 export type GroupCallEventHandlerMap = {
     [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
     [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: CallFeed | undefined) => void;
-    [GroupCallEvent.CallsChanged]: (calls: Map<string, Map<string, MatrixCall>>) => void;
+    [GroupCallEvent.CallsChanged]: (calls: CallsByUserAndDevice) => void;
     [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
@@ -83,10 +92,24 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
+export enum GroupCallStatsReportEvent {
+    ConnectionStats = "GroupCall.connection_stats",
+    ByteSentStats = "GroupCall.byte_sent_stats",
+}
+
+export type GroupCallStatsReportEventHandlerMap = {
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
+};
+
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",
+}
+
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+    report: T;
 }
 
 export class GroupCallError extends Error {
@@ -180,8 +203,8 @@ function getCallUserId(call: MatrixCall): string | null {
 }
 
 export class GroupCall extends TypedEventEmitter<
-    GroupCallEvent | CallEvent,
-    GroupCallEventHandlerMap & CallEventHandlerMap
+    GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
 > {
     // Config
     public activeSpeakerInterval = 1000;
@@ -211,6 +234,8 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
+    private readonly stats: GroupCallStats;
+
     public constructor(
         private client: MatrixClient,
         public room: Room,
@@ -234,7 +259,22 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
+
+        const userID = this.client.getUserId() || "unknown";
+        this.stats = new GroupCallStats(this.groupCallId, userID);
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
+
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
+    };
+
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
@@ -349,6 +389,17 @@ export class GroupCall extends TypedEventEmitter<
             this.participants.get(this.room.getMember(this.client.getUserId()!)!)?.has(this.client.getDeviceId()!) ??
             false
         );
+    }
+
+    /**
+     * Determines whether the given call is one that we were expecting to exist
+     * given our knowledge of who is participating in the group call.
+     */
+    private callExpected(call: MatrixCall): boolean {
+        const userId = getCallUserId(call);
+        const member = userId === null ? null : this.room.getMember(userId);
+        const deviceId = call.getOpponentDeviceId();
+        return member !== null && deviceId !== undefined && this.participants.get(member)?.get(deviceId) !== undefined;
     }
 
     public async initLocalCallFeed(): Promise<void> {
@@ -479,12 +530,16 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallLoopInterval = undefined;
         }
 
+        if (this.participantsExpirationTimer !== null) {
+            clearTimeout(this.participantsExpirationTimer);
+            this.participantsExpirationTimer = null;
+        }
+
         if (this.state !== GroupCallState.Entered) {
             return;
         }
 
-        this.forEachCall((call) => this.disposeCall(call, CallErrorCode.UserHangup));
-        this.calls.clear();
+        this.forEachCall((call) => call.hangup(CallErrorCode.UserHangup, false));
 
         this.activeSpeaker = undefined;
         clearInterval(this.activeSpeakerLoopInterval);
@@ -493,6 +548,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
+        this.stats.stop();
     }
 
     public leave(): void {
@@ -630,7 +686,9 @@ export class GroupCall extends TypedEventEmitter<
             this.initWithAudioMuted = muted;
         }
 
-        this.forEachCall((call) => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
+        this.forEachCall((call) =>
+            setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted && this.callExpected(call)),
+        );
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
@@ -678,6 +736,12 @@ export class GroupCall extends TypedEventEmitter<
         const updates: Promise<unknown>[] = [];
         this.forEachCall((call) => updates.push(call.setLocalVideoMuted(muted)));
         await Promise.all(updates);
+
+        // We setTracksEnabled again, independently from the call doing it
+        // internally, since we might not be expecting the call
+        this.forEachCall((call) =>
+            setTracksEnabled(call.localUsermediaFeed!.stream.getVideoTracks(), !muted && this.callExpected(call)),
+        );
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
 
@@ -811,10 +875,20 @@ export class GroupCall extends TypedEventEmitter<
             `GroupCall ${this.groupCallId} onIncomingCall() incoming call (userId=${opponentUserId}, callId=${newCall.callId})`,
         );
 
-        if (prevCall) this.disposeCall(prevCall, CallErrorCode.Replaced);
+        if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
 
         this.initCall(newCall);
-        newCall.answerWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
+
+        const feeds = this.getLocalFeeds().map((feed) => feed.clone());
+        if (!this.callExpected(newCall)) {
+            // Disable our tracks for users not explicitly participating in the
+            // call but trying to receive the feeds
+            for (const feed of feeds) {
+                setTracksEnabled(feed.stream.getAudioTracks(), false);
+                setTracksEnabled(feed.stream.getVideoTracks(), false);
+            }
+        }
+        newCall.answerWithCallFeeds(feeds);
 
         deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
         this.calls.set(opponentUserId, deviceMap);
@@ -861,7 +935,7 @@ export class GroupCall extends TypedEventEmitter<
                         logger.debug(
                             `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
                         );
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
+                        prevCall.hangup(CallErrorCode.NewSession, false);
                     }
 
                     const newCall = createNewMatrixCall(this.client, this.room.roomId, {
@@ -912,7 +986,7 @@ export class GroupCall extends TypedEventEmitter<
                                     );
                                 }
 
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                                newCall.hangup(CallErrorCode.SignallingFailed, false);
                                 if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
                             });
                     }
@@ -1005,6 +1079,8 @@ export class GroupCall extends TypedEventEmitter<
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
 
+        call.initStats(this.stats);
+
         onCallFeedsChanged();
     }
 
@@ -1030,10 +1106,6 @@ export class GroupCall extends TypedEventEmitter<
 
         if (call.hangupReason === CallErrorCode.Replaced) {
             return;
-        }
-
-        if (call.state !== CallState.Ended) {
-            call.hangup(hangupReason, false);
         }
 
         const usermediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
@@ -1087,6 +1159,8 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
+        if (state === CallState.Ended) return;
+
         const audioMuted = this.localCallFeed!.isAudioMuted();
 
         if (call.localUsermediaStream && call.isMicrophoneMuted() !== audioMuted) {
@@ -1131,7 +1205,7 @@ export class GroupCall extends TypedEventEmitter<
             this.calls.set(opponentUserId, deviceMap);
         }
 
-        this.disposeCall(prevCall, CallErrorCode.Replaced);
+        prevCall.hangup(CallErrorCode.Replaced, false);
         this.initCall(newCall);
         deviceMap.set(prevCall.getOpponentDeviceId()!, newCall);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
@@ -1476,6 +1550,17 @@ export class GroupCall extends TypedEventEmitter<
     private onRoomState = (): void => this.updateParticipants();
 
     private onParticipantsChanged = (): void => {
+        // Re-run setTracksEnabled on all calls, so that participants that just
+        // left get denied access to our media, and participants that just
+        // joined get granted access
+        this.forEachCall((call) => {
+            const expected = this.callExpected(call);
+            for (const feed of call.getLocalFeeds()) {
+                setTracksEnabled(feed.stream.getAudioTracks(), !feed.isAudioMuted() && expected);
+                setTracksEnabled(feed.stream.getVideoTracks(), !feed.isVideoMuted() && expected);
+            }
+        });
+
         if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
     };
 
@@ -1506,4 +1591,8 @@ export class GroupCall extends TypedEventEmitter<
             );
         }
     };
+
+    public getGroupCallStats(): GroupCallStats {
+        return this.stats;
+    }
 }

@@ -51,6 +51,19 @@ export interface CryptoApi {
     prepareToEncrypt(room: Room): void;
 
     /**
+     * Discard any existing megolm session for the given room.
+     *
+     * This will ensure that a new session is created on the next call to {@link prepareToEncrypt},
+     * or the next time a message is sent.
+     *
+     * This should not normally be necessary: it should only be used as a debugging tool if there has been a
+     * problem with encryption.
+     *
+     * @param roomId - the room to discard sessions for
+     */
+    forceDiscardSession(roomId: string): Promise<void>;
+
+    /**
      * Get a list containing all of the room keys
      *
      * This should be encrypted before returning it to the user.

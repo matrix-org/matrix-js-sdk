@@ -118,7 +118,7 @@ export class GroupCallEventHandler {
         for (const callEvent of sortedCallEvents) {
             const content = callEvent.getContent();
 
-            if (content["m.terminated"]) {
+            if (content["m.terminated"] || callEvent.isRedacted()) {
                 continue;
             }
 
@@ -210,10 +210,10 @@ export class GroupCallEventHandler {
 
             const currentGroupCall = this.groupCalls.get(state.roomId);
 
-            if (!currentGroupCall && !content["m.terminated"]) {
+            if (!currentGroupCall && !content["m.terminated"] && !event.isRedacted()) {
                 this.createGroupCallFromRoomStateEvent(event);
             } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
-                if (content["m.terminated"]) {
+                if (content["m.terminated"] || event.isRedacted()) {
                     currentGroupCall.terminate(false);
                 } else if (content["m.type"] !== currentGroupCall.type) {
                     // TODO: Handle the callType changing when the room state changes

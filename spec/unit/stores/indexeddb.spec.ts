@@ -166,4 +166,92 @@ describe("IndexedDBStore", () => {
 
         await expect(store.isNewlyCreated()).resolves.toBeFalsy();
     });
+
+    it("should emit 'closed' if database is unexpectedly closed", async () => {
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+        await store.startup();
+
+        const deferred = defer<void>();
+        store.on("closed", deferred.resolve);
+
+        // @ts-ignore - private field access
+        (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
+        await deferred.promise;
+    });
+
+    it("should use remote backend if workerFactory passed", async () => {
+        const deferred = defer<void>();
+        class MockWorker {
+            postMessage(data: any) {
+                if (data.command === "setupWorker") {
+                    deferred.resolve();
+                }
+            }
+        }
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => new MockWorker() as Worker,
+        });
+        store.startup();
+        await deferred.promise;
+    });
+
+    it("remote worker should pass closed event", async () => {
+        const worker = new (class MockWorker {
+            postMessage(data: any) {}
+        })() as Worker;
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => worker,
+        });
+        store.startup();
+
+        const deferred = defer<void>();
+        store.on("closed", deferred.resolve);
+        (worker as any).onmessage({ data: { command: "closed" } });
+        await deferred.promise;
+    });
+
+    it("remote worker should pass command failures", async () => {
+        const worker = new (class MockWorker {
+            private onmessage!: (data: any) => void;
+            postMessage(data: any) {
+                if (data.command === "setupWorker" || data.command === "connect") {
+                    this.onmessage({
+                        data: {
+                            command: "cmd_success",
+                            seq: data.seq,
+                        },
+                    });
+                    return;
+                }
+
+                this.onmessage({
+                    data: {
+                        command: "cmd_fail",
+                        seq: data.seq,
+                        error: new Error("Test"),
+                    },
+                });
+            }
+        })() as unknown as Worker;
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => worker,
+        });
+        await expect(store.startup()).rejects.toThrow("Test");
+    });
 });

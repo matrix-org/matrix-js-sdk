@@ -169,6 +169,10 @@ export class RustCrypto implements CryptoBackend {
         }
     }
 
+    public forceDiscardSession(roomId: string): Promise<void> {
+        return this.roomEncryptors[roomId]?.forceDiscardSession();
+    }
+
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
