@@ -95,13 +95,13 @@ export type GroupCallEventHandlerMap = {
 export enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
-    SummeryStats = "GroupCall.summery_stats",
+    SummaryStats = "GroupCall.summary_stats",
 }
 
 export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
-    [GroupCallStatsReportEvent.SummeryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
+    [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -266,7 +266,7 @@ export class GroupCall extends TypedEventEmitter<
         this.stats = new GroupCallStats(this.groupCallId, userID);
         this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
         this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
-        this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummeryStats);
+        this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
@@ -279,9 +279,9 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
-    private onSummeryStats = (report: SummaryStatsReport): void => {
+    private onSummaryStats = (report: SummaryStatsReport): void => {
         // @TODO: Implement data argumentation
-        this.emit(GroupCallStatsReportEvent.SummeryStats, { report });
+        this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
     };
 
     public async create(): Promise<GroupCall> {
