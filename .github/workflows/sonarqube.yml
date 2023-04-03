@@ -11,26 +11,15 @@ jobs:
     # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
     prepare:
         name: Prepare
+        if: github.event.workflow_run.event != 'merge_group'
         runs-on: ubuntu-latest
         outputs:
             reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
             testExecutionReportPaths: ${{ steps.extra_args.outputs.testExecutionReportPaths }}
         steps:
-            - name: Skip on merge queue
-              if: github.event.workflow_run.event == 'merge_group'
-              uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
-              with:
-                  authToken: ${{ secrets.GITHUB_TOKEN }}
-                  state: success
-                  description: SonarCloud skipped
-                  context: SonarCloud Code Analysis
-                  sha: ${{ github.event.workflow_run.head_sha }}
-                  target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
             # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
             # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
             - name: 📥 Download artifact
-              if: github.event.workflow_run.event != 'merge_group'
               uses: dawidd6/action-download-artifact@5e780fc7bbd0cac69fc73271ed86edf5dcb72d67 # v2
               with:
                   workflow: tests.yaml
@@ -39,7 +28,6 @@ jobs:
                   path: coverage
 
             - id: extra_args
-              if: github.event.workflow_run.event != 'merge_group'
               run: |
                   coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',' | sed 's/,$//g')
                   echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
