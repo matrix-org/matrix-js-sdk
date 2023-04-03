@@ -18,7 +18,7 @@ import {
     ByteSentStatsReport,
     ConnectionStatsReport,
     StatsReport,
-    SummeryStatsReport,
+    SummaryStatsReport,
 } from "../../../../src/webrtc/stats/statsReport";
 
 describe("StatsReportEmitter", () => {
@@ -51,15 +51,15 @@ describe("StatsReportEmitter", () => {
         });
     });
 
-    it("should emit and receive SummeryStatsReport", async () => {
-        const report = {} as SummeryStatsReport;
+    it("should emit and receive SummaryStatsReport", async () => {
+        const report = {} as SummaryStatsReport;
         return new Promise((resolve, _) => {
-            emitter.on(StatsReport.SUMMERY_STATS, (r) => {
+            emitter.on(StatsReport.SUMMARY_STATS, (r) => {
                 expect(r).toBe(report);
                 resolve(null);
                 return;
             });
-            emitter.emitSummeryStatsReport(report);
+            emitter.emitSummaryStatsReport(report);
         });
     });
 });

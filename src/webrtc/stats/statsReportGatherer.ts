@@ -25,7 +25,7 @@ import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
 import { TrackStatsReporter } from "./trackStatsReporter";
 import { StatsReportBuilder } from "./statsReportBuilder";
 import { StatsValueFormatter } from "./statsValueFormatter";
-import { SummeryStats } from "./summeryStats";
+import { SummaryStats } from "./summaryStats";
 
 export class StatsReportGatherer {
     private isActive = true;
@@ -48,8 +48,8 @@ export class StatsReportGatherer {
         this.trackStats = new MediaTrackStatsHandler(new MediaSsrcHandler(), new MediaTrackHandler(pc));
     }
 
-    public async processStats(groupCallId: string, localUserId: string): Promise<SummeryStats> {
-        const summery = { receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 } as SummeryStats;
+    public async processStats(groupCallId: string, localUserId: string): Promise<SummaryStats> {
+        const summary = { receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 } as SummaryStats;
         if (this.isActive) {
             const statsPromise = this.pc.getStats();
             if (typeof statsPromise?.then === "function") {
@@ -61,23 +61,23 @@ export class StatsReportGatherer {
                             this.processStatsReport(groupCallId, localUserId);
                         } catch (error) {
                             this.isActive = false;
-                            return summery;
+                            return summary;
                         }
 
                         this.previousStatsReport = this.currentStatsReport;
-                        summery.receivedMedia = this.connectionStats.bitrate.download;
-                        summery.receivedAudioMedia = this.connectionStats.bitrate.audio?.download || 0;
-                        summery.receivedVideoMedia = this.connectionStats.bitrate.video?.download || 0;
-                        return summery;
+                        summary.receivedMedia = this.connectionStats.bitrate.download;
+                        summary.receivedAudioMedia = this.connectionStats.bitrate.audio?.download || 0;
+                        summary.receivedVideoMedia = this.connectionStats.bitrate.video?.download || 0;
+                        return summary;
                     })
                     .catch((error) => {
                         this.handleError(error);
-                        return summery;
+                        return summary;
                     });
             }
             this.isActive = false;
         }
-        return Promise.resolve(summery);
+        return summary;
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {

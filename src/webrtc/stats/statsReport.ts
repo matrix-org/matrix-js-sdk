@@ -21,7 +21,7 @@ import { Resolution } from "./media/mediaTrackStats";
 export enum StatsReport {
     CONNECTION_STATS = "StatsReport.connection_stats",
     BYTE_SENT_STATS = "StatsReport.byte_sent_stats",
-    SUMMERY_STATS = "StatsReport.summery_stats",
+    SUMMARY_STATS = "StatsReport.summary_stats",
 }
 
 export type TrackID = string;
@@ -56,7 +56,7 @@ export interface CodecMap {
     remote: Map<TrackID, string>;
 }
 
-export interface SummeryStatsReport {
+export interface SummaryStatsReport {
     /**
      * Aggregated the information for percentage of received media
      *

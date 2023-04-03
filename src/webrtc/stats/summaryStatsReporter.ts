@@ -11,25 +11,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { SummeryStats } from "./summeryStats";
-import { SummeryStatsReport } from "./statsReport";
+import { SummaryStats } from "./summaryStats";
+import { SummaryStatsReport } from "./statsReport";
 
-export class SummeryStatsReporter {
+export class SummaryStatsReporter {
     public constructor(private emitter: StatsReportEmitter) {}
 
-    public build(summery: SummeryStats[]): void {
-        const entirety = summery.length;
+    public build(summary: SummaryStats[]): void {
+        const entirety = summary.length;
         if (entirety === 0) {
             return;
         }
-        const report = {} as SummeryStatsReport;
+        const report = {} as SummaryStatsReport;
         report.percentageReceivedVideoMedia =
-            Math.round((summery.filter((s) => s.receivedVideoMedia > 0).length / entirety) * 100) / 100;
+            Math.round((summary.filter((s) => s.receivedVideoMedia > 0).length / entirety) * 100) / 100;
         report.percentageReceivedAudioMedia =
-            Math.round((summery.filter((s) => s.receivedAudioMedia > 0).length / entirety) * 100) / 100;
+            Math.round((summary.filter((s) => s.receivedAudioMedia > 0).length / entirety) * 100) / 100;
         report.percentageReceivedMedia =
-            Math.round((summery.filter((s) => s.receivedMedia > 0).length / entirety) * 100) / 100;
+            Math.round((summary.filter((s) => s.receivedMedia > 0).length / entirety) * 100) / 100;
 
-        this.emitter.emitSummeryStatsReport(report);
+        this.emitter.emitSummaryStatsReport(report);
     }
 }
