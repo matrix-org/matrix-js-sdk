@@ -106,7 +106,6 @@ import {
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
     IRecoveryKey,
-    ISecretStorageKeyInfo,
 } from "./crypto/api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
@@ -208,6 +207,7 @@ import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { CryptoApi } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
+import { SecretStorageKeyDescription } from "./secret-storage";
 
 export type Store = IStore;
 
@@ -2463,7 +2463,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.crypto.beginKeyVerification(method, userId, deviceId);
     }
 
-    public checkSecretStorageKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
+    public checkSecretStorageKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2863,7 +2863,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         algorithm: string,
         opts: IAddSecretStorageKeyOpts,
         keyName?: string,
-    ): Promise<{ keyId: string; keyInfo: ISecretStorageKeyInfo }> {
+    ): Promise<{ keyId: string; keyInfo: SecretStorageKeyDescription }> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2929,7 +2929,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3306,7 +3306,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     encrypted with, or null if it is not present or not encrypted with a
      *     trusted key
      */
-    public isKeyBackupKeyStored(): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isKeyBackupKeyStored(): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
     }
 
