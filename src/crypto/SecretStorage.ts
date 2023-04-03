@@ -32,6 +32,7 @@ import {
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
     AccountDataClient,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
 } from "../secret-storage";
 
 /* re-exports for backwards compatibility */
@@ -39,9 +40,8 @@ export {
     AccountDataClient as IAccountDataClient,
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
 } from "../secret-storage";
-
-export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
 export interface ISecretRequest {
     requestId: string;
