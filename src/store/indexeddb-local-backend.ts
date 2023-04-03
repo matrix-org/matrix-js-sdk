@@ -153,7 +153,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * grant permission.
      * @returns Promise which resolves if successfully connected.
      */
-    public connect(): Promise<void> {
+    public connect(onClose?: () => void): Promise<void> {
         if (!this.disconnected) {
             logger.log(`LocalIndexedDBStoreBackend.connect: already connected or connecting`);
             return Promise.resolve();
@@ -188,7 +188,15 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             // add a poorly-named listener for when deleteDatabase is called
             // so we can close our db connections.
             this.db.onversionchange = (): void => {
-                this.db?.close();
+                this.db?.close(); // this does not call onclose
+                this.disconnected = true;
+                this.db = undefined;
+                onClose?.();
+            };
+            this.db.onclose = (): void => {
+                this.disconnected = true;
+                this.db = undefined;
+                onClose?.();
             };
 
             await this.init();

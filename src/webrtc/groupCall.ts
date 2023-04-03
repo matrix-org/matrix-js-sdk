@@ -24,6 +24,8 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { GroupCallStats } from "./stats/groupCallStats";
+import { ByteSentStatsReport, ConnectionStatsReport, StatsReport } from "./stats/statsReport";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -39,6 +41,8 @@ export enum GroupCallType {
 export enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
+
+export type CallsByUserAndDevice = Map<string, Map<string, MatrixCall>>;
 
 /**
  * Because event names are just strings, they do need
@@ -60,7 +64,7 @@ export enum GroupCallEvent {
 export type GroupCallEventHandlerMap = {
     [GroupCallEvent.GroupCallStateChanged]: (newState: GroupCallState, oldState: GroupCallState) => void;
     [GroupCallEvent.ActiveSpeakerChanged]: (activeSpeaker: CallFeed | undefined) => void;
-    [GroupCallEvent.CallsChanged]: (calls: Map<string, Map<string, MatrixCall>>) => void;
+    [GroupCallEvent.CallsChanged]: (calls: CallsByUserAndDevice) => void;
     [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
@@ -88,10 +92,24 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
+export enum GroupCallStatsReportEvent {
+    ConnectionStats = "GroupCall.connection_stats",
+    ByteSentStats = "GroupCall.byte_sent_stats",
+}
+
+export type GroupCallStatsReportEventHandlerMap = {
+    [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
+    [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
+};
+
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",
+}
+
+export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport> {
+    report: T;
 }
 
 export class GroupCallError extends Error {
@@ -185,8 +203,8 @@ function getCallUserId(call: MatrixCall): string | null {
 }
 
 export class GroupCall extends TypedEventEmitter<
-    GroupCallEvent | CallEvent,
-    GroupCallEventHandlerMap & CallEventHandlerMap
+    GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
+    GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
 > {
     // Config
     public activeSpeakerInterval = 1000;
@@ -216,6 +234,8 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
+    private readonly stats: GroupCallStats;
+
     public constructor(
         private client: MatrixClient,
         public room: Room,
@@ -239,7 +259,22 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
+
+        const userID = this.client.getUserId() || "unknown";
+        this.stats = new GroupCallStats(this.groupCallId, userID);
+        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
     }
+
+    private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
+    };
+
+    private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // @TODO: Implement data argumentation
+        this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
+    };
 
     public async create(): Promise<GroupCall> {
         this.creationTs = Date.now();
@@ -495,12 +530,16 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallLoopInterval = undefined;
         }
 
+        if (this.participantsExpirationTimer !== null) {
+            clearTimeout(this.participantsExpirationTimer);
+            this.participantsExpirationTimer = null;
+        }
+
         if (this.state !== GroupCallState.Entered) {
             return;
         }
 
-        this.forEachCall((call) => this.disposeCall(call, CallErrorCode.UserHangup));
-        this.calls.clear();
+        this.forEachCall((call) => call.hangup(CallErrorCode.UserHangup, false));
 
         this.activeSpeaker = undefined;
         clearInterval(this.activeSpeakerLoopInterval);
@@ -509,6 +548,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
+        this.stats.stop();
     }
 
     public leave(): void {
@@ -835,7 +875,8 @@ export class GroupCall extends TypedEventEmitter<
             `GroupCall ${this.groupCallId} onIncomingCall() incoming call (userId=${opponentUserId}, callId=${newCall.callId})`,
         );
 
-        if (prevCall) this.disposeCall(prevCall, CallErrorCode.Replaced);
+        if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+
         this.initCall(newCall);
 
         const feeds = this.getLocalFeeds().map((feed) => feed.clone());
@@ -894,7 +935,7 @@ export class GroupCall extends TypedEventEmitter<
                         logger.debug(
                             `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
                         );
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
+                        prevCall.hangup(CallErrorCode.NewSession, false);
                     }
 
                     const newCall = createNewMatrixCall(this.client, this.room.roomId, {
@@ -945,7 +986,7 @@ export class GroupCall extends TypedEventEmitter<
                                     );
                                 }
 
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                                newCall.hangup(CallErrorCode.SignallingFailed, false);
                                 if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
                             });
                     }
@@ -1038,6 +1079,8 @@ export class GroupCall extends TypedEventEmitter<
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
 
+        call.initStats(this.stats);
+
         onCallFeedsChanged();
     }
 
@@ -1063,10 +1106,6 @@ export class GroupCall extends TypedEventEmitter<
 
         if (call.hangupReason === CallErrorCode.Replaced) {
             return;
-        }
-
-        if (call.state !== CallState.Ended) {
-            call.hangup(hangupReason, false);
         }
 
         const usermediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
@@ -1120,6 +1159,8 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
+        if (state === CallState.Ended) return;
+
         const audioMuted = this.localCallFeed!.isAudioMuted();
 
         if (call.localUsermediaStream && call.isMicrophoneMuted() !== audioMuted) {
@@ -1164,7 +1205,7 @@ export class GroupCall extends TypedEventEmitter<
             this.calls.set(opponentUserId, deviceMap);
         }
 
-        this.disposeCall(prevCall, CallErrorCode.Replaced);
+        prevCall.hangup(CallErrorCode.Replaced, false);
         this.initCall(newCall);
         deviceMap.set(prevCall.getOpponentDeviceId()!, newCall);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
@@ -1550,4 +1591,8 @@ export class GroupCall extends TypedEventEmitter<
             );
         }
     };
+
+    public getGroupCallStats(): GroupCallStats {
+        return this.stats;
+    }
 }

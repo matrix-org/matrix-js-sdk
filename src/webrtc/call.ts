@@ -52,6 +52,7 @@ import { DeviceInfo } from "../crypto/deviceinfo";
 import { GroupCallUnknownDeviceError } from "./groupCall";
 import { IScreensharingOpts } from "./mediaHandler";
 import { MatrixError } from "../http-api";
+import { GroupCallStats } from "./stats/groupCallStats";
 
 interface CallOpts {
     // The room ID for this call.
@@ -416,6 +417,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // Used to allow connection without Video and Audio. To establish a webrtc connection without media a Data channel is
     // needed At the moment this property is true if we allow MatrixClient with isVoipWithNoMediaAllowed = true
     private readonly isOnlyDataChannelAllowed: boolean;
+    private stats: GroupCallStats | undefined;
 
     /**
      * Construct a new Matrix Call.
@@ -993,6 +995,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     if (this.peerConn!.signalingState != "closed") {
                         this.peerConn!.close();
                     }
+                    this.stats?.removeStatsReportGatherer(this.callId);
                     this.emit(CallEvent.Hangup, this);
                 }
             }, invite.lifetime - event.getLocalAge());
@@ -2622,6 +2625,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.peerConn && this.peerConn.signalingState !== "closed") {
             this.peerConn.close();
         }
+        this.stats?.removeStatsReportGatherer(this.callId);
+
         if (shouldEmit) {
             this.emit(CallEvent.Hangup, this);
         }
@@ -2800,6 +2805,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener("negotiationneeded", this.onNegotiationNeeded);
         pc.addEventListener("datachannel", this.onDataChannel);
 
+        this.stats?.addStatsReportGatherer(this.callId, "unknown", pc);
         return pc;
     }
 
@@ -2871,6 +2877,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public get hasPeerConnection(): boolean {
         return Boolean(this.peerConn);
+    }
+
+    public initStats(stats: GroupCallStats, peerId = "unknown"): void {
+        this.stats = stats;
+        this.stats.start();
     }
 }
 

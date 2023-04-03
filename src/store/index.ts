@@ -38,9 +38,10 @@ export interface ISavedSync {
 export interface IStore {
     readonly accountData: Map<string, MatrixEvent>; // type : content
 
-    // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
-    // for when it falls back to being a memory store due to errors.
-    on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
+    // XXX: The indexeddb store exposes a non-standard emitter for:
+    // "degraded" event for when it falls back to being a memory store due to errors.
+    // "closed" event for when the database closes unexpectedly
+    on?: (event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void) => void;
 
     /** @returns whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;

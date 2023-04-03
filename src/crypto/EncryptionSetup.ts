@@ -28,10 +28,10 @@ import {
     ISignedKey,
     KeySignatures,
 } from "../client";
-import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IAccountDataClient } from "./SecretStorage";
+import { SecretStorageKeyDescription } from "../secret-storage";
 
 interface ICrossSigningKeys {
     authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -326,7 +326,7 @@ class SSSSCryptoCallbacks {
     public constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
-        { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
+        { keys }: { keys: Record<string, SecretStorageKeyDescription> },
         name: string,
     ): Promise<[string, Uint8Array] | null> {
         for (const keyId of Object.keys(keys)) {
@@ -348,7 +348,7 @@ class SSSSCryptoCallbacks {
         return null;
     }
 
-    public addPrivateKey(keyId: string, keyInfo: ISecretStorageKeyInfo, privKey: Uint8Array): void {
+    public addPrivateKey(keyId: string, keyInfo: SecretStorageKeyDescription, privKey: Uint8Array): void {
         this.privateKeys.set(keyId, privKey);
         // Also pass along to application to cache if it wishes
         this.delegateCryptoCallbacks?.cacheSecretStorageKey?.(keyId, keyInfo, privKey);
