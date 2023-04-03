@@ -27,7 +27,12 @@ import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
-import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import {
+    SecretStorageKeyDescription,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    AccountDataClient,
+} from "../../../src/secret-storage";
+import { SecretStorage } from "../../../src/crypto/SecretStorage";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -74,6 +79,22 @@ describe("Secrets", function () {
 
     beforeAll(function () {
         return global.Olm.init();
+    });
+
+    it("should allow storing a default key", async function () {
+        const accountDataAdapter = {
+            getAccountDataFromServer: jest.fn().mockResolvedValue(null),
+            setAccountData: jest.fn().mockResolvedValue({}),
+        };
+        const secretStorage = new SecretStorage(accountDataAdapter as unknown as AccountDataClient, {}, undefined);
+        const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
+
+        // it should have made up a 32-character key id
+        expect(result.keyId.length).toEqual(32);
+        expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+            `m.secret_storage.key.${result.keyId}`,
+            result.keyInfo,
+        );
     });
 
     it("should store and retrieve a secret", async function () {
