@@ -18,21 +18,18 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "../logger";
 import * as olmlib from "./olmlib";
-import { randomString } from "../randomstring";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { ICryptoCallbacks, IEncryptedContent } from ".";
 import { MatrixEvent } from "../models/event";
-import { ClientEvent, MatrixClient } from "../client";
+import { MatrixClient } from "../client";
 import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
 import {
     SecretStorageKeyDescription,
-    SecretStorageKeyDescriptionAesV1,
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
     AccountDataClient,
-    SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorage as StorageImpl,
 } from "../secret-storage";
 
 /* re-exports for backwards compatibility */
@@ -55,22 +52,12 @@ interface ISecretRequestInternal {
     deferred: IDeferred<string>;
 }
 
-interface IDecryptors {
-    encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
-    decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
-}
-
-interface ISecretInfo {
-    encrypted: {
-        [keyId: string]: IEncryptedPayload;
-    };
-}
-
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  */
 export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     private requests = new Map<string, ISecretRequestInternal>();
+    private readonly storageImpl: StorageImpl;
 
     // In it's pure javascript days, this was relying on some proper Javascript-style
     // type-abuse where sometimes we'd pass in a fake client object with just the account
@@ -81,273 +68,72 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
     public constructor(
-        private readonly accountDataAdapter: AccountDataClient,
+        accountDataAdapter: AccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
         private readonly baseApis: B,
-    ) {}
+    ) {
+        this.storageImpl = new StorageImpl(accountDataAdapter, cryptoCallbacks);
+    }
 
-    public async getDefaultKeyId(): Promise<string | null> {
-        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
-            "m.secret_storage.default_key",
-        );
-        if (!defaultKey) return null;
-        return defaultKey.key;
+    public getDefaultKeyId(): Promise<string | null> {
+        return this.storageImpl.getDefaultKeyId();
     }
 
     public setDefaultKeyId(keyId: string): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const listener = (ev: MatrixEvent): void => {
-                if (ev.getType() === "m.secret_storage.default_key" && ev.getContent().key === keyId) {
-                    this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
-                    resolve();
-                }
-            };
-            this.accountDataAdapter.on(ClientEvent.AccountData, listener);
-
-            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", { key: keyId }).catch((e) => {
-                this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
-                reject(e);
-            });
-        });
+        return this.storageImpl.setDefaultKeyId(keyId);
     }
 
     /**
      * Add a key for encrypting secrets.
-     *
-     * @param algorithm - the algorithm used by the key.
-     * @param opts - the options for the algorithm.  The properties used
-     *     depend on the algorithm given.
-     * @param keyId - the ID of the key.  If not given, a random
-     *     ID will be generated.
-     *
-     * @returns An object with:
-     *     keyId: the ID of the key
-     *     keyInfo: details about the key (iv, mac, passphrase)
      */
-    public async addKey(
+    public addKey(
         algorithm: string,
         opts: AddSecretStorageKeyOpts = {},
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
-        if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
-            throw new Error(`Unknown key algorithm ${algorithm}`);
-        }
-
-        const keyInfo = { algorithm } as SecretStorageKeyDescriptionAesV1;
-
-        if (opts.name) {
-            keyInfo.name = opts.name;
-        }
-
-        if (opts.passphrase) {
-            keyInfo.passphrase = opts.passphrase;
-        }
-        if (opts.key) {
-            const { iv, mac } = await calculateKeyCheck(opts.key);
-            keyInfo.iv = iv;
-            keyInfo.mac = mac;
-        }
-
-        if (!keyId) {
-            do {
-                keyId = randomString(32);
-            } while (
-                await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-                    `m.secret_storage.key.${keyId}`,
-                )
-            );
-        }
-
-        await this.accountDataAdapter.setAccountData(`m.secret_storage.key.${keyId}`, keyInfo);
-
-        return {
-            keyId,
-            keyInfo,
-        };
+        return this.storageImpl.addKey(algorithm, opts, keyId);
     }
 
     /**
      * Get the key information for a given ID.
-     *
-     * @param keyId - The ID of the key to check
-     *     for. Defaults to the default key ID if not provided.
-     * @returns If the key was found, the return value is an array of
-     *     the form [keyId, keyInfo].  Otherwise, null is returned.
-     *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null> {
-        if (!keyId) {
-            keyId = await this.getDefaultKeyId();
-        }
-        if (!keyId) {
-            return null;
-        }
-
-        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-            "m.secret_storage.key." + keyId,
-        );
-        return keyInfo ? [keyId, keyInfo] : null;
+    public getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null> {
+        return this.storageImpl.getKey(keyId);
     }
 
     /**
      * Check whether we have a key with a given ID.
-     *
-     * @param keyId - The ID of the key to check
-     *     for. Defaults to the default key ID if not provided.
-     * @returns Whether we have the key.
      */
-    public async hasKey(keyId?: string): Promise<boolean> {
-        return Boolean(await this.getKey(keyId));
+    public hasKey(keyId?: string): Promise<boolean> {
+        return this.storageImpl.hasKey(keyId);
     }
 
     /**
      * Check whether a key matches what we expect based on the key info
-     *
-     * @param key - the key to check
-     * @param info - the key info
-     *
-     * @returns whether or not the key matches
      */
-    public async checkKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
-        if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-            if (info.mac) {
-                const { mac } = await calculateKeyCheck(key, info.iv);
-                return info.mac.replace(/=+$/g, "") === mac.replace(/=+$/g, "");
-            } else {
-                // if we have no information, we have to assume the key is right
-                return true;
-            }
-        } else {
-            throw new Error("Unknown algorithm");
-        }
+    public checkKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
+        return this.storageImpl.checkKey(key, info);
     }
 
     /**
      * Store an encrypted secret on the server
-     *
-     * @param name - The name of the secret
-     * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret
-     *     or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
-        const encrypted: Record<string, IEncryptedPayload> = {};
-
-        if (!keys) {
-            const defaultKeyId = await this.getDefaultKeyId();
-            if (!defaultKeyId) {
-                throw new Error("No keys specified and no default key present");
-            }
-            keys = [defaultKeyId];
-        }
-
-        if (keys.length === 0) {
-            throw new Error("Zero keys given to encrypt with!");
-        }
-
-        for (const keyId of keys) {
-            // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-                "m.secret_storage.key." + keyId,
-            );
-            if (!keyInfo) {
-                throw new Error("Unknown key: " + keyId);
-            }
-
-            // encrypt secret, based on the algorithm
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                const keys = { [keyId]: keyInfo };
-                const [, encryption] = await this.getSecretStorageKey(keys, name);
-                encrypted[keyId] = await encryption.encrypt(secret);
-            } else {
-                logger.warn("unknown algorithm for secret storage key " + keyId + ": " + keyInfo.algorithm);
-                // do nothing if we don't understand the encryption algorithm
-            }
-        }
-
-        // save encrypted secret
-        await this.accountDataAdapter.setAccountData(name, { encrypted });
+    public store(name: string, secret: string, keys?: string[] | null): Promise<void> {
+        return this.storageImpl.store(name, secret, keys);
     }
 
     /**
      * Get a secret from storage.
-     *
-     * @param name - the name of the secret
-     *
-     * @returns the contents of the secret
      */
-    public async get(name: string): Promise<string | undefined> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
-        if (!secretInfo) {
-            return;
-        }
-        if (!secretInfo.encrypted) {
-            throw new Error("Content is not encrypted!");
-        }
-
-        // get possible keys to decrypt
-        const keys: Record<string, SecretStorageKeyDescription> = {};
-        for (const keyId of Object.keys(secretInfo.encrypted)) {
-            // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-                "m.secret_storage.key." + keyId,
-            );
-            const encInfo = secretInfo.encrypted[keyId];
-            // only use keys we understand the encryption algorithm of
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
-                    keys[keyId] = keyInfo;
-                }
-            }
-        }
-
-        if (Object.keys(keys).length === 0) {
-            throw new Error(
-                `Could not decrypt ${name} because none of ` +
-                    `the keys it is encrypted with are for a supported algorithm`,
-            );
-        }
-
-        // fetch private key from app
-        const [keyId, decryption] = await this.getSecretStorageKey(keys, name);
-        const encInfo = secretInfo.encrypted[keyId];
-
-        return decryption.decrypt(encInfo);
+    public get(name: string): Promise<string | undefined> {
+        return this.storageImpl.get(name);
     }
 
     /**
      * Check if a secret is stored on the server.
-     *
-     * @param name - the name of the secret
-     *
-     * @returns map of key name to key info the secret is encrypted
-     *     with, or null if it is not present or not encrypted with a trusted
-     *     key
      */
     public async isStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
-        // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
-        if (!secretInfo?.encrypted) return null;
-
-        const ret: Record<string, SecretStorageKeyDescription> = {};
-
-        // filter secret encryption keys with supported algorithm
-        for (const keyId of Object.keys(secretInfo.encrypted)) {
-            // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-                "m.secret_storage.key." + keyId,
-            );
-            if (!keyInfo) continue;
-            const encInfo = secretInfo.encrypted[keyId];
-
-            // only use keys we understand the encryption algorithm of
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
-                    ret[keyId] = keyInfo;
-                }
-            }
-        }
-        return Object.keys(ret).length ? ret : null;
+        return this.storageImpl.isStored(name);
     }
 
     /**
@@ -542,43 +328,6 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
 
             logger.log(`Successfully received secret ${requestControl.name} ` + `from ${deviceInfo.deviceId}`);
             requestControl.deferred.resolve(content.secret);
-        }
-    }
-
-    private async getSecretStorageKey(
-        keys: Record<string, SecretStorageKeyDescription>,
-        name: string,
-    ): Promise<[string, IDecryptors]> {
-        if (!this.cryptoCallbacks.getSecretStorageKey) {
-            throw new Error("No getSecretStorageKey callback supplied");
-        }
-
-        const returned = await this.cryptoCallbacks.getSecretStorageKey({ keys }, name);
-
-        if (!returned) {
-            throw new Error("getSecretStorageKey callback returned falsey");
-        }
-        if (returned.length < 2) {
-            throw new Error("getSecretStorageKey callback returned invalid data");
-        }
-
-        const [keyId, privateKey] = returned;
-        if (!keys[keyId]) {
-            throw new Error("App returned unknown key from getSecretStorageKey!");
-        }
-
-        if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-            const decryption = {
-                encrypt: function (secret: string): Promise<IEncryptedPayload> {
-                    return encryptAES(secret, privateKey, name);
-                },
-                decrypt: function (encInfo: IEncryptedPayload): Promise<string> {
-                    return decryptAES(encInfo, privateKey, name);
-                },
-            };
-            return [keyId, decryption];
-        } else {
-            throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
     }
 }
