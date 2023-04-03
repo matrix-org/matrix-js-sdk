@@ -17,7 +17,6 @@ limitations under the License.
 import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { IObject } from "../../../src/crypto/olmlib";
-import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
@@ -28,7 +27,7 @@ import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
-import { SecretStorageKeyDescription } from "../../../src/secret-storage";
+import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },

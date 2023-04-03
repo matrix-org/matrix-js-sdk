@@ -34,7 +34,7 @@ import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { ISecretRequest, SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from "./SecretStorage";
+import { ISecretRequest, SecretStorage } from "./SecretStorage";
 import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
@@ -83,6 +83,7 @@ import {
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
 } from "../secret-storage";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
