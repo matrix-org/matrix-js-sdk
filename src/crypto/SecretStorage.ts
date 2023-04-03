@@ -31,7 +31,7 @@ import {
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
-    AccountDataClient as IAccountDataClient,
+    AccountDataClient,
 } from "../secret-storage";
 
 /* re-exports for backwards compatibility */
@@ -81,7 +81,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
     public constructor(
-        private readonly accountDataAdapter: IAccountDataClient,
+        private readonly accountDataAdapter: AccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
         private readonly baseApis: B,
     ) {}

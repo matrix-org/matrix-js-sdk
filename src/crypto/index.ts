@@ -34,7 +34,7 @@ import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { IAccountDataClient, ISecretRequest, SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from "./SecretStorage";
+import { ISecretRequest, SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage } from "./SecretStorage";
 import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
@@ -78,6 +78,7 @@ import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBacke
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
+    AccountDataClient,
     AddSecretStorageKeyOpts,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
@@ -521,7 +522,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
         // Yes, we pass the client twice here: see SecretStorage
-        this.secretStorage = new SecretStorage(baseApis as IAccountDataClient, cryptoCallbacks, baseApis);
+        this.secretStorage = new SecretStorage(baseApis as AccountDataClient, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.

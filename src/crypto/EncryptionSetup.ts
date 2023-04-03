@@ -30,8 +30,7 @@ import {
 } from "../client";
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IAccountDataClient } from "./SecretStorage";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
 
 interface ICrossSigningKeys {
     authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -238,7 +237,7 @@ export class EncryptionSetupOperation {
  */
 class AccountDataClientAdapter
     extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
-    implements IAccountDataClient
+    implements AccountDataClient
 {
     //
     public readonly values = new Map<string, MatrixEvent>();
