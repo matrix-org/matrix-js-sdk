@@ -70,14 +70,14 @@ jobs:
         runs-on: ubuntu-latest
         needs: jest
         steps:
-            - name: Skip on merge queue
+            - name: Skip SonarCloud
               uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success
                   description: SonarCloud skipped
                   context: SonarCloud Code Analysis
-                  sha: ${{ github.event.workflow_run.head_sha }}
+                  sha: ${{ github.sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     matrix-react-sdk:
