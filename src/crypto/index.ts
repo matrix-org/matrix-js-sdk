@@ -84,6 +84,7 @@ import {
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
     SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageCallbacks,
 } from "../secret-storage";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
@@ -131,14 +132,10 @@ export interface IBootstrapCrossSigningOpts {
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
-export interface ICryptoCallbacks {
+export interface ICryptoCallbacks extends SecretStorageCallbacks {
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
-    getSecretStorageKey?: (
-        keys: { keys: Record<string, SecretStorageKeyDescription> },
-        name: string,
-    ) => Promise<[string, Uint8Array] | null>;
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
     onSecretRequested?: (
         userId: string,

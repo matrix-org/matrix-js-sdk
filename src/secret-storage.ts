@@ -136,3 +136,13 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      */
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
+
+/**
+ *  Application callbacks for use with {@link SecretStorage}
+ */
+export interface SecretStorageCallbacks {
+    getSecretStorageKey?: (
+        keys: { keys: Record<string, SecretStorageKeyDescription> },
+        name: string,
+    ) => Promise<[string, Uint8Array] | null>;
+}
