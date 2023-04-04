@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -53,6 +53,7 @@ import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../..
 import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
+import { logger } from "../../src/logger";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -171,6 +172,8 @@ describe("Room", function () {
         room.oldState = room.getLiveTimeline().startState = utils.mock(RoomState, "oldState");
         // @ts-ignore
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
+
+        jest.spyOn(logger, "warn");
     });
 
     describe("getCreator", () => {
@@ -3261,7 +3264,7 @@ describe("Room", function () {
             expect(room.emit).toHaveBeenCalledWith(PollEvent.New, pollInstance);
         });
 
-        it("adds related events to poll models", async () => {
+        it("adds related events to poll models and log errors", async () => {
             const pollStartEvent = makePollStart("1");
             const pollStartEvent2 = makePollStart("2");
             const events = [pollStartEvent, pollStartEvent2];
@@ -3274,11 +3277,25 @@ describe("Room", function () {
                     },
                 },
             });
+
             const messageEvent = new MatrixEvent({
                 type: "m.room.messsage",
                 content: {
                     text: "hello",
                 },
+            });
+
+            const errorEvent = new MatrixEvent({
+                type: M_POLL_START.name,
+                content: {
+                    text: "Error!!!!",
+                },
+            });
+
+            const error = new Error("Test error");
+
+            mocked(client.decryptEventIfNeeded).mockImplementation(async (event: MatrixEvent) => {
+                if (event === errorEvent) throw error;
             });
 
             // init poll
@@ -3289,7 +3306,7 @@ describe("Room", function () {
             jest.spyOn(poll, "onNewRelation");
             jest.spyOn(poll2, "onNewRelation");
 
-            await room.processPollEvents([pollResponseEvent, messageEvent]);
+            await room.processPollEvents([errorEvent, messageEvent, pollResponseEvent]);
 
             // only called for relevant event
             expect(poll.onNewRelation).toHaveBeenCalledTimes(1);
@@ -3297,6 +3314,8 @@ describe("Room", function () {
 
             // only called on poll with relation
             expect(poll2.onNewRelation).not.toHaveBeenCalled();
+
+            expect(logger.warn).toHaveBeenCalledWith("Error processing poll event", errorEvent.getId(), error);
         });
 
         it("should retry on decryption", async () => {

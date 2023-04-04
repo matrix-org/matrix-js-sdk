@@ -64,7 +64,7 @@ import {
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { Poll, PollEvent } from "./poll";
+import { isPollEvent, Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1905,13 +1905,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public async processPollEvents(events: MatrixEvent[]): Promise<void> {
         for (const event of events) {
             try {
+                // Continue if the event is a clear text, non-poll event.
+                if (!event.isEncrypted() && !isPollEvent(event)) continue;
+
                 /**
                  * Try to decrypt the event. Promise resolution does not guarantee a successful decryption.
                  * Retry is handled in {@link processPollEvent}.
                  */
                 await this.client.decryptEventIfNeeded(event);
                 this.processPollEvent(event);
-            } catch {}
+            } catch (err) {
+                logger.warn("Error processing poll event", event.getId(), err);
+            }
         }
     }
 
