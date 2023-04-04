@@ -270,17 +270,14 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
-        // @TODO: Implement data argumentation
         this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
     };
 
     private onByteSentStats = (report: ByteSentStatsReport): void => {
-        // @TODO: Implement data argumentation
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
     private onSummaryStats = (report: SummaryStatsReport): void => {
-        // @TODO: Implement data argumentation
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
     };
 

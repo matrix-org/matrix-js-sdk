@@ -61,7 +61,7 @@ export interface SummaryStatsReport {
      * Aggregated the information for percentage of received media
      *
      * This measure whether the current user receive data from a call participants.
-     * As soon as a participant sends min a bite media to this user, this counts as one measurement unit.
+     * As soon as a participant sends at least a byte media to this user, this counts as one measurement unit.
      * The units of measure divided by the total number of participants is a value between 0 and 1.
      */
     percentageReceivedMedia: number;
