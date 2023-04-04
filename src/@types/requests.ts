@@ -186,6 +186,7 @@ export interface IRelationsRequestOpts {
     to?: string;
     limit?: number;
     dir?: Direction;
+    recurse?: boolean;
 }
 
 export interface IRelationsResponse {

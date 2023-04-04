@@ -31,6 +31,7 @@ export enum Feature {
     LoginTokenRequest = "LoginTokenRequest",
     RelationBasedRedactions = "RelationBasedRedactions",
     AccountDataDeletion = "AccountDataDeletion",
+    RelationsRecursion = "RelationsRecursion",
 }
 
 type FeatureSupportCondition = {
@@ -55,6 +56,9 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.AccountDataDeletion]: {
         unstablePrefixes: ["org.matrix.msc3391"],
+    },
+    [Feature.RelationsRecursion]: {
+        unstablePrefixes: ["org.matrix.msc3981"],
     },
 };
 

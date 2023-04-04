@@ -5748,14 +5748,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start },
+                    { dir: Direction.Backward, from: res.start, recurse: true },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Forward, from: res.end },
+                    { dir: Direction.Forward, from: res.end, recurse: true },
                 );
                 const events = [
                     // Order events from most recent to oldest (reverse-chronological).
@@ -5803,7 +5803,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start },
+                    { dir: Direction.Backward, from: res.start, recurse: true },
                 );
                 const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
@@ -5813,7 +5813,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         thread.id,
                         THREAD_RELATION_TYPE.name,
                         null,
-                        { dir: Direction.Forward, from: nextBatch },
+                        { dir: Direction.Forward, from: nextBatch, recurse: true },
                     );
                     nextBatch = resNewer.next_batch ?? null;
                     eventsNewer.push(...resNewer.chunk);
@@ -5889,7 +5889,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 timelineSet.thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
-                { dir: Direction.Backward, limit: 1 },
+                { dir: Direction.Backward, limit: 1, recurse: true },
             );
             event = res.chunk?.[0];
         } else {
@@ -6168,6 +6168,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
+                recurse: true,
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
@@ -7955,6 +7956,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let params = opts as QueryDict;
         if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
             params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+        }
+        if (this.canSupport.get(Feature.RelationsRecursion) === ServerSupport.Unstable) {
+            params = replaceParam("recurse", "org.matrix.msc3981.recurse", params);
         }
         const queryString = utils.encodeParams(params);
 
