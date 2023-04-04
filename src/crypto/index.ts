@@ -1828,6 +1828,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * onSyncCompleted). The count is e.g. coming from a /sync response.
      *
      * @param currentCount - The current count of one_time_keys to be stored
+     *
+     * TODO This method is called in `processKeyCounts` method and in the `sliding-sync-sdk`.
+     * TODO The `sliding-sync-sdk` should call `processKeyCounts` directly instead of `updateOneTimeKeyCount`
+     * TODO Move the content of `updateOneTimeKeyCount` in `processKeyCounts` after the `sliding-sync-sdk` change
      */
     public updateOneTimeKeyCount(currentCount: number): void {
         if (isFinite(currentCount)) {
@@ -1837,6 +1841,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
+    // TODO This method is called in `processKeyCounts`, `uploadOneTimeKeys` methods and in the `sliding-sync-sdk`.
+    // TODO The `sliding-sync-sdk` should call `processKeyCounts` directly instead of `setNeedsNewFallback`
+    // TODO Move the content of `setNeedsNewFallback` in `processKeyCounts` after the `sliding-sync-sdk` change
     public setNeedsNewFallback(needsNewFallback: boolean): void {
         this.needsNewFallback = needsNewFallback;
     }
