@@ -129,4 +129,98 @@ describe("TrackStatsReporter", () => {
             expect(trackStats.getLoss()).toEqual({ packetsTotal: 280, packetsLost: 80, isDownloadStream: true });
         });
     });
+
+    describe("should set alive state of a TrackStats", () => {
+        it("to false if Transceiver undefindet", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.setTrackAliveState(trackStats, undefined);
+            expect(trackStats.getAlive()).toBeFalsy();
+        });
+
+        it("to false if Transceiver has no local track", async () => {
+            const trackStats = new MediaTrackStats("1", "local", "video");
+            const ts = {
+                sender: {
+                    track: null,
+                } as RTCRtpSender,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackAliveState(trackStats, ts);
+            expect(trackStats.getAlive()).toBeFalsy();
+        });
+
+        it("to true if Transceiver remote and track is alive", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            trackStats.setAlive(false);
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "live",
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackAliveState(trackStats, ts);
+            expect(trackStats.getAlive()).toBeTruthy();
+        });
+
+        it("to true if Transceiver local and track is alive", async () => {
+            const trackStats = new MediaTrackStats("1", "local", "video");
+            trackStats.setAlive(false);
+            const ts = {
+                sender: {
+                    track: {
+                        readyState: "live",
+                    } as MediaStreamTrack,
+                } as RTCRtpSender,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackAliveState(trackStats, ts);
+            expect(trackStats.getAlive()).toBeTruthy();
+        });
+
+        it("to false if Transceiver track is ended", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "ended",
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackAliveState(trackStats, ts);
+            expect(trackStats.getAlive()).toBeFalsy();
+        });
+    });
+
+    describe("should build Track Summary", () => {
+        it("and returns empty summary if stats list empty", () => {
+            const summary = TrackStatsReporter.buildTrackSummary([]);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+            });
+        });
+
+        it("and returns  summary if stats list not empty", () => {
+            const summary = TrackStatsReporter.buildTrackSummary([]);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+            });
+        });
+    });
 });

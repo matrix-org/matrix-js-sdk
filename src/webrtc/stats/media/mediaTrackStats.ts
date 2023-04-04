@@ -46,6 +46,7 @@ export class MediaTrackStats {
     private resolution: Resolution = { width: -1, height: -1 };
     private framerate = 0;
     private codec = "";
+    private isAlive = true;
 
     public constructor(
         public readonly trackId: TrackId,
@@ -100,5 +101,13 @@ export class MediaTrackStats {
 
     public resetBitrate(): void {
         this.bitrate = { download: 0, upload: 0 };
+    }
+
+    public setAlive(isAlive: boolean): void {
+        this.isAlive = isAlive;
+    }
+
+    public getAlive(): boolean {
+        return this.isAlive;
     }
 }

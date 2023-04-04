@@ -97,6 +97,20 @@ describe("TrackHandler", () => {
             expect(handler.getActiveSimulcastStreams()).toEqual(3);
         });
     });
+
+    describe("should get Transceiver by Track ID", () => {
+        it("and returns remote Transceiver if exits", () => {
+            expect(handler.getTransceiverByTrackId(`receiver-track-1`)?.mid).toEqual("1");
+        });
+
+        it("and returns local Transceiver if exits", () => {
+            expect(handler.getTransceiverByTrackId(`sender-track-2`)?.mid).toEqual("2");
+        });
+
+        it("returns undefined if Transceiver not  exits", () => {
+            expect(handler.getTransceiverByTrackId("22")).toBeUndefined();
+        });
+    });
 });
 
 const mockTransceiver = (mid: string, kind: "video" | "audio"): RTCRtpTransceiver => {

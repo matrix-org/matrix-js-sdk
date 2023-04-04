@@ -80,4 +80,17 @@ describe("MediaTrackStatsHandler", () => {
             expect(statsHandler.findTrack2Stats(report, "remote")?.trackId).toBeUndefined();
         });
     });
+
+    describe("should find a Transceiver by Track id", () => {
+        it("and returns undefined if Transceiver not existing", () => {
+            trackHandler.getTransceiverByTrackId = jest.fn().mockReturnValue(undefined);
+            expect(statsHandler.findTransceiverByTrackId("12")).toBeUndefined();
+        });
+
+        it("and returns Transceiver if existing", () => {
+            const ts = {} as RTCRtpTransceiver;
+            trackHandler.getTransceiverByTrackId = jest.fn().mockReturnValue(ts);
+            expect(statsHandler.findTransceiverByTrackId("12")).toEqual(ts);
+        });
+    });
 });

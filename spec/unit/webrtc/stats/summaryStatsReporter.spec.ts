@@ -33,10 +33,34 @@ describe("SummaryStatsReporter", () => {
 
         it("should trigger new summary report", async () => {
             const summary = [
-                { receivedMedia: 10, receivedAudioMedia: 4, receivedVideoMedia: 6 },
-                { receivedMedia: 13, receivedAudioMedia: 0, receivedVideoMedia: 13 },
-                { receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 },
-                { receivedMedia: 15, receivedAudioMedia: 6, receivedVideoMedia: 9 },
+                {
+                    receivedMedia: 10,
+                    receivedAudioMedia: 4,
+                    receivedVideoMedia: 6,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 13,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 13,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 0,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 15,
+                    receivedAudioMedia: 6,
+                    receivedVideoMedia: 9,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
             ];
             reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({

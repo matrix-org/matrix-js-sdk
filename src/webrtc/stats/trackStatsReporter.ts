@@ -1,5 +1,6 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
 import { StatsValueFormatter } from "./statsValueFormatter";
+import { TrackSummary } from "./summaryStats";
 
 export class TrackStatsReporter {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
@@ -108,10 +109,45 @@ export class TrackStatsReporter {
         let bitrateKbps = 0;
 
         if (timeMs > 0) {
-            // TODO is there any reason to round here?
             bitrateKbps = Math.round((bytesProcessed * 8) / timeMs);
         }
 
         return bitrateKbps;
+    }
+
+    public static setTrackAliveState(trackStats: MediaTrackStats, transceiver: RTCRtpTransceiver | undefined): void {
+        if (transceiver === undefined) {
+            trackStats.setAlive(false);
+            return;
+        }
+
+        const track = trackStats.getType() === "remote" ? transceiver.receiver.track : transceiver?.sender?.track;
+        if (track === undefined || track === null) {
+            trackStats.setAlive(false);
+            return;
+        }
+
+        if (track.readyState === "ended") {
+            trackStats.setAlive(false);
+            return;
+        }
+
+        trackStats.setAlive(true);
+    }
+
+    public static buildTrackSummary(trackStatsList: MediaTrackStats[]): {
+        audioTrackSummary: TrackSummary;
+        videoTrackSummary: TrackSummary;
+    } {
+        const audioTrackSummary = { count: 0, muted: 0 };
+        const videoTrackSummary = { count: 0, muted: 0 };
+        trackStatsList.forEach((stats) => {
+            const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+            trackSummary.count++;
+            if (!stats.getAlive()) {
+                trackSummary.muted++;
+            }
+        });
+        return { audioTrackSummary, videoTrackSummary };
     }
 }
