@@ -125,7 +125,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      * @param eventType - The type of account data
      * @returns The contents of the given account data event.
      */
-    getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
+    getAccountDataFromServer: <T extends Record<string, any>>(eventType: string) => Promise<T>;
 
     /**
      * Set account data event for the current user, with retries
