@@ -81,7 +81,13 @@ describe("GroupCallStats", () => {
             stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection());
             const collector = stats.getStatsReportGatherer("CALL_ID");
             stats.reports.emitSummaryStatsReport = jest.fn();
-            const summaryStats = {} as SummaryStats;
+            const summaryStats = {
+                receivedMedia: 0,
+                receivedAudioMedia: 0,
+                receivedVideoMedia: 0,
+                audioTrackSummary: { count: 0, muted: 0 },
+                videoTrackSummary: { count: 0, muted: 0 },
+            } as SummaryStats;
             let processStatsSpy;
             if (collector) {
                 processStatsSpy = jest.spyOn(collector, "processStats").mockResolvedValue(summaryStats);
