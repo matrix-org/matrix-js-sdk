@@ -5736,6 +5736,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return undefined;
         }
 
+        const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
         if (Thread.hasServerSideSupport) {
             if (Thread.hasServerSideFwdPaginationSupport) {
                 if (!timelineSet.thread) {
@@ -5748,14 +5749,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start, recurse: true },
+                    { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Forward, from: res.end, recurse: true },
+                    { dir: Direction.Forward, from: res.end, recurse: recurse || undefined },
                 );
                 const events = [
                     // Order events from most recent to oldest (reverse-chronological).
@@ -5803,7 +5804,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start, recurse: true },
+                    { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
@@ -5813,7 +5814,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         thread.id,
                         THREAD_RELATION_TYPE.name,
                         null,
-                        { dir: Direction.Forward, from: nextBatch, recurse: true },
+                        { dir: Direction.Forward, from: nextBatch, recurse: recurse || undefined },
                     );
                     nextBatch = resNewer.next_batch ?? null;
                     eventsNewer.push(...resNewer.chunk);
@@ -5884,12 +5885,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
             event = res.chunk?.[0];
         } else if (timelineSet.thread && Thread.hasServerSideSupport) {
+            const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
             const res = await this.fetchRelations(
                 timelineSet.room.roomId,
                 timelineSet.thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
-                { dir: Direction.Backward, limit: 1, recurse: true },
+                { dir: Direction.Backward, limit: 1, recurse: recurse || undefined },
             );
             event = res.chunk?.[0];
         } else {
@@ -6164,11 +6166,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
             }
 
+            const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
             promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, THREAD_RELATION_TYPE.name, null, {
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
-                recurse: true,
+                recurse: recurse || undefined,
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
