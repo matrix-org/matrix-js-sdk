@@ -1982,7 +1982,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             await syncPromise(aliceClient);
 
-            // Verify than `/upload` is called on Alice's home sever
+            // Verify that `/upload` is called on Alice's homesever
             const { keysCount, fallbackKeysCount } = await uploadPromise;
             expect(keysCount).toBeGreaterThan(0);
             expect(fallbackKeysCount).toBe(0);
@@ -2000,8 +2000,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             await syncPromise(aliceClient);
 
-            // After set device_one_time_keys_count to 0
-            // A `/upload` is expected
+            // After we set device_one_time_keys_count to 0
+            // a `/upload` is expected
             const res = await uploadPromise;
             expect(res.keysCount).toBeGreaterThan(0);
             expect(res.fallbackKeysCount).toBeGreaterThan(0);

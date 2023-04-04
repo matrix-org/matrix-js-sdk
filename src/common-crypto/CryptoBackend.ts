@@ -106,11 +106,11 @@ export interface SyncCryptoCallbacks {
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
 
     /**
-     * Called by the /sync loop whenever there are incoming to-device messages.
+     * Called by the /sync loop when one time keys and unused fallback keys are received.
      *
-
-     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
-     * messages, rather than the results of any decryption attempts.
+     * The presence of device_unused_fallback_key_types indicates that the
+     * server supports fallback keys. If there's no unused
+     * signed_curve25519 fallback key we need a new one.
      *
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys

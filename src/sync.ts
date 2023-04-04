@@ -1527,9 +1527,6 @@ export class SyncApi {
         // Handle one_time_keys_count and unused fallback keys
         this.syncOpts.cryptoCallbacks?.processKeyCounts(
             data.device_one_time_keys_count,
-            // The presence of device_unused_fallback_key_types indicates that the
-            // server supports fallback keys. If there's no unused
-            // signed_curve25519 fallback key we need a new one.
             data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
         );
     }

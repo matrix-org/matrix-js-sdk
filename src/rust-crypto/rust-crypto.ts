@@ -222,7 +222,7 @@ export class RustCrypto implements CryptoBackend {
         return this.receiveSyncChanges({ events });
     }
 
-    /** called by the sync loop to preprocess one time key counts
+    /** called by the sync loop to process one time key counts and unused fallback keys
      *
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys

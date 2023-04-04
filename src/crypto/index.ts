@@ -3223,7 +3223,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     public processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void> {
         if (oneTimeKeysCounts) {
-            this.updateOneTimeKeyCount(oneTimeKeysCounts["signed_curve25519"]);
+            this.updateOneTimeKeyCount(oneTimeKeysCounts["signed_curve25519"] || 0);
         }
 
         if (unusedFallbackKeys) {
