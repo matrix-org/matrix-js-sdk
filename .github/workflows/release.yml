@@ -17,7 +17,7 @@ jobs:
                   cache: "yarn"
 
             - name: 🔨 Install dependencies
-              run: "yarn install --pure-lockfile"
+              run: "yarn install --frozen-lockfile"
 
             - name: 📖 Generate JSDoc
               run: "yarn gendoc"
