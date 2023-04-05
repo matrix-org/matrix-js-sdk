@@ -1514,14 +1514,12 @@ export class SyncApi {
         }
 
         // Handle device list updates
-        if (data.device_lists) {
-            if (this.syncOpts.crypto) {
-                await this.syncOpts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
-            } else {
-                // FIXME if we *don't* have a crypto module, we still need to
-                // invalidate the device lists. But that would require a
-                // substantial bit of rework :/.
-            }
+        if (this.syncOpts.cryptoCallbacks) {
+            await this.syncOpts.cryptoCallbacks.processDeviceLists(syncEventData, data.device_lists);
+        } else {
+            // FIXME if we *don't* have a crypto module, we still need to
+            // invalidate the device lists. But that would require a
+            // substantial bit of rework :/.
         }
 
         // Handle one_time_keys_count and unused fallback keys

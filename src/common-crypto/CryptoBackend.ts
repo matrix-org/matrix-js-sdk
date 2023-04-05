@@ -21,6 +21,8 @@ import { CryptoApi } from "../crypto-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
+import { ISyncStateData } from "../sync";
+import { ISyncResponse } from "../sync-accumulator";
 
 /**
  * Common interface for the crypto implementations
@@ -112,6 +114,16 @@ export interface SyncCryptoCallbacks {
      * @param unusedFallbackKeys - the received unused fallback keys
      */
     processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
+
+    /**
+     * Handle the notification from /sync or /keys/changes that device lists have
+     * been changed.
+     *
+     * @param syncData - Object containing sync tokens associated with this sync
+     * @param deviceLists - device_lists field from /sync, or response from
+     * /keys/changes
+     */
+    processDeviceLists(syncData: ISyncStateData, deviceLists?: Required<ISyncResponse>["device_lists"]): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.

@@ -662,24 +662,28 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("can update device lists", () => {
+            client!.crypto!.processDeviceLists = jest.fn();
             ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
                     left: ["@bob:localhost"],
                 },
             });
-            // TODO: more assertions?
+            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith(
+                { oldSyncToken: "yep" },
+                { changed: ["@alice:localhost"], left: ["@bob:localhost"] },
+            );
         });
 
-        it("can update OTK counts", () => {
+        it("can update OTK counts", async () => {
             client!.crypto!.updateOneTimeKeyCount = jest.fn();
-            ext.onResponse({
+            await ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
             });
             expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
-            ext.onResponse({
+            await ext.onResponse({
                 device_one_time_keys_count: {
                     not_signed_curve25519: 42,
                     // missing field -> default to 0
@@ -688,12 +692,12 @@ describe("SlidingSyncSdk", () => {
             expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
         });
 
-        it("can update fallback keys", () => {
-            ext.onResponse({
+        it("can update fallback keys", async () => {
+            await ext.onResponse({
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
             expect(client!.crypto!.getNeedsNewFallback()).toEqual(false);
-            ext.onResponse({
+            await ext.onResponse({
                 device_unused_fallback_key_types: ["not_signed_curve25519"],
             });
             expect(client!.crypto!.getNeedsNewFallback()).toEqual(true);

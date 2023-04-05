@@ -85,14 +85,12 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
 
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
         // Handle device list updates
-        if (data["device_lists"]) {
-            await this.crypto.handleDeviceListChanges(
-                {
-                    oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
-                },
-                data["device_lists"],
-            );
-        }
+        await this.crypto.processDeviceLists(
+            {
+                oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
+            },
+            data["device_lists"],
+        );
 
         // Handle one_time_keys_count
         if (data["device_one_time_keys_count"]) {

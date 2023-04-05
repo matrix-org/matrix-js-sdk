@@ -29,6 +29,8 @@ import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
+import { ISyncResponse } from "../sync-accumulator";
+import { ISyncStateData } from "../sync";
 import { MapWithDefault } from "../utils";
 
 /**
@@ -176,20 +178,23 @@ export class RustCrypto implements CryptoBackend {
      * @param events - the received to-device messages
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys
+     * @param devices - the received devices
      * @returns A list of preprocessed to-device messages.
      */
     private async receiveSyncChanges({
         events,
         oneTimeKeysCounts = new Map<string, number>(),
         unusedFallbackKeys = new Set<string>(),
+        devices = new RustSdkCryptoJs.DeviceLists(),
     }: {
         events?: IToDeviceEvent[];
         oneTimeKeysCounts?: Map<string, number>;
         unusedFallbackKeys?: Set<string>;
+        devices?: RustSdkCryptoJs.DeviceLists;
     }): Promise<IToDeviceEvent[]> {
         const result = await this.olmMachine.receiveSyncChanges(
             events ? JSON.stringify(events) : "[]",
-            new RustSdkCryptoJs.DeviceLists(),
+            devices,
             oneTimeKeysCounts,
             unusedFallbackKeys,
         );
@@ -227,6 +232,23 @@ export class RustCrypto implements CryptoBackend {
                 unusedFallbackKeys: setUnusedFallbackKeys,
             });
         }
+    }
+
+    /** called by the sync loop to process
+     *
+     * @param syncData - Object containing sync tokens associated with this sync
+     * @param deviceLists - device_lists field from /sync, or response from
+     */
+    public async processDeviceLists(
+        syncData: ISyncStateData,
+        deviceLists: Required<ISyncResponse>["device_lists"],
+    ): Promise<void> {
+        // Initial syncs don't have device change lists. We'll either get the complete list
+        // of changes for the interval or will have invalidated everything in willProcessSync
+        if (!syncData.oldSyncToken || !deviceLists) return;
+
+        const devices = new RustSdkCryptoJs.DeviceLists(deviceLists.changed, deviceLists.left);
+        await this.receiveSyncChanges({ devices });
     }
 
     /** called by the sync loop on m.room.encrypted events

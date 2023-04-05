@@ -2922,16 +2922,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * been changed.
      *
      * @param syncData - Object containing sync tokens associated with this sync
-     * @param syncDeviceLists - device_lists field from /sync, or response from
+     * @param deviceLists - device_lists field from /sync, or response from
      * /keys/changes
      */
-    public async handleDeviceListChanges(
+    public async processDeviceLists(
         syncData: ISyncStateData,
-        syncDeviceLists: Required<ISyncResponse>["device_lists"],
+        deviceLists?: Required<ISyncResponse>["device_lists"],
     ): Promise<void> {
         // Initial syncs don't have device change lists. We'll either get the complete list
         // of changes for the interval or will have invalidated everything in willProcessSync
-        if (!syncData.oldSyncToken) return;
+        if (!syncData.oldSyncToken || !deviceLists) return;
 
         // Here, we're relying on the fact that we only ever save the sync data after
         // sucessfully saving the device list data, so we're guaranteed that the device
@@ -2941,7 +2941,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // If we didn't make this assumption, we'd have to use the /keys/changes API
         // to get key changes between the sync token in the device list and the 'old'
         // sync token used here to make sure we didn't miss any.
-        await this.evalDeviceListChanges(syncDeviceLists);
+        await this.evalDeviceListChanges(deviceLists);
     }
 
     /**
