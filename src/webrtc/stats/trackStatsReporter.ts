@@ -115,24 +115,25 @@ export class TrackStatsReporter {
         return bitrateKbps;
     }
 
-    public static setTrackAliveState(trackStats: MediaTrackStats, transceiver: RTCRtpTransceiver | undefined): void {
+    public static setTrackStatsState(trackStats: MediaTrackStats, transceiver: RTCRtpTransceiver | undefined): void {
         if (transceiver === undefined) {
-            trackStats.setAlive(false);
+            trackStats.alive = false;
             return;
         }
 
         const track = trackStats.getType() === "remote" ? transceiver.receiver.track : transceiver?.sender?.track;
         if (track === undefined || track === null) {
-            trackStats.setAlive(false);
+            trackStats.alive = false;
             return;
         }
 
         if (track.readyState === "ended") {
-            trackStats.setAlive(false);
+            trackStats.alive = false;
             return;
         }
-
-        trackStats.setAlive(true);
+        trackStats.muted = track.muted;
+        trackStats.enabled = track.enabled;
+        trackStats.alive = true;
     }
 
     public static buildTrackSummary(trackStatsList: MediaTrackStats[]): {
@@ -141,13 +142,15 @@ export class TrackStatsReporter {
     } {
         const audioTrackSummary = { count: 0, muted: 0 };
         const videoTrackSummary = { count: 0, muted: 0 };
-        trackStatsList.forEach((stats) => {
-            const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
-            trackSummary.count++;
-            if (!stats.getAlive()) {
-                trackSummary.muted++;
-            }
-        });
+        trackStatsList
+            .filter((t) => t.getType() === "remote")
+            .forEach((stats) => {
+                const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+                trackSummary.count++;
+                if (stats.alive && stats.muted) {
+                    trackSummary.muted++;
+                }
+            });
         return { audioTrackSummary, videoTrackSummary };
     }
 }

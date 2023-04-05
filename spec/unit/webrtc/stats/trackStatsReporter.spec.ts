@@ -130,14 +130,14 @@ describe("TrackStatsReporter", () => {
         });
     });
 
-    describe("should set alive state of a TrackStats", () => {
-        it("to false if Transceiver undefindet", async () => {
+    describe("should set state of a TrackStats", () => {
+        it("to not alive if Transceiver undefined", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.setTrackAliveState(trackStats, undefined);
-            expect(trackStats.getAlive()).toBeFalsy();
+            TrackStatsReporter.setTrackStatsState(trackStats, undefined);
+            expect(trackStats.alive).toBeFalsy();
         });
 
-        it("to false if Transceiver has no local track", async () => {
+        it("to not alive if Transceiver has no local track", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
             const ts = {
                 sender: {
@@ -145,52 +145,75 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpSender,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackAliveState(trackStats, ts);
-            expect(trackStats.getAlive()).toBeFalsy();
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeFalsy();
         });
 
-        it("to true if Transceiver remote and track is alive", async () => {
+        it("to alive if Transceiver remote and track is alive", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            trackStats.setAlive(false);
+            trackStats.alive = false;
             const ts = {
                 receiver: {
                     track: {
                         readyState: "live",
+                        enabled: false,
+                        muted: false,
                     } as MediaStreamTrack,
                 } as RTCRtpReceiver,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackAliveState(trackStats, ts);
-            expect(trackStats.getAlive()).toBeTruthy();
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
         });
 
-        it("to true if Transceiver local and track is alive", async () => {
+        it("to alive if Transceiver local and track is live", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
-            trackStats.setAlive(false);
+            trackStats.alive = false;
             const ts = {
                 sender: {
                     track: {
                         readyState: "live",
+                        enabled: false,
+                        muted: false,
                     } as MediaStreamTrack,
                 } as RTCRtpSender,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackAliveState(trackStats, ts);
-            expect(trackStats.getAlive()).toBeTruthy();
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
         });
 
-        it("to false if Transceiver track is ended", async () => {
+        it("to not alive if Transceiver track is ended", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
             const ts = {
                 receiver: {
                     track: {
                         readyState: "ended",
+                        enabled: false,
+                        muted: false,
                     } as MediaStreamTrack,
                 } as RTCRtpReceiver,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackAliveState(trackStats, ts);
-            expect(trackStats.getAlive()).toBeFalsy();
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeFalsy();
+        });
+
+        it("to not alive and muted if Transceiver track is live and muted", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "live",
+                        enabled: false,
+                        muted: true,
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
+            expect(trackStats.muted).toBeTruthy();
         });
     });
 

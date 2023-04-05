@@ -136,7 +136,7 @@ export class StatsReportGatherer {
                         TrackStatsReporter.buildBitrateReceived(trackStats, now, before);
                     }
                     const ts = this.trackStats.findTransceiverByTrackId(trackStats.trackId);
-                    TrackStatsReporter.setTrackAliveState(trackStats, ts);
+                    TrackStatsReporter.setTrackStatsState(trackStats, ts);
                 } else if (before) {
                     byteSentStats.set(trackStats.trackId, StatsValueFormatter.getNonNegativeValue(now.bytesSent));
                     TrackStatsReporter.buildBitrateSend(trackStats, now, before);

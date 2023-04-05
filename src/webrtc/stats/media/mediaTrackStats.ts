@@ -47,6 +47,8 @@ export class MediaTrackStats {
     private framerate = 0;
     private codec = "";
     private isAlive = true;
+    private isMuted = false;
+    private isEnabled = true;
 
     public constructor(
         public readonly trackId: TrackId,
@@ -103,11 +105,27 @@ export class MediaTrackStats {
         this.bitrate = { download: 0, upload: 0 };
     }
 
-    public setAlive(isAlive: boolean): void {
+    public set alive(isAlive: boolean) {
         this.isAlive = isAlive;
     }
 
-    public getAlive(): boolean {
+    public get alive(): boolean {
         return this.isAlive;
+    }
+
+    public set muted(isMuted: boolean) {
+        this.isMuted = isMuted;
+    }
+
+    public get muted(): boolean {
+        return this.isMuted;
+    }
+
+    public set enabled(isEnabled: boolean) {
+        this.isEnabled = isEnabled;
+    }
+
+    public get enabled(): boolean {
+        return this.isEnabled;
     }
 }
