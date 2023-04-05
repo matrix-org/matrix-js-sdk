@@ -234,7 +234,7 @@ export class RustCrypto implements CryptoBackend {
         const mapOneTimeKeysCount = oneTimeKeysCounts && new Map<string, number>(Object.entries(oneTimeKeysCounts));
         const setUnusedFallbackKeys = unusedFallbackKeys && new Set<string>(unusedFallbackKeys);
 
-        if (mapOneTimeKeysCount || setUnusedFallbackKeys) {
+        if (mapOneTimeKeysCount !== undefined || setUnusedFallbackKeys !== undefined) {
             await this.receiveSyncChanges({
                 oneTimeKeysCounts: mapOneTimeKeysCount,
                 unusedFallbackKeys: setUnusedFallbackKeys,

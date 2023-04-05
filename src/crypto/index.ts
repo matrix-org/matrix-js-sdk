@@ -3229,11 +3229,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     public processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void> {
-        if (oneTimeKeysCounts) {
+        if (oneTimeKeysCounts !== undefined) {
             this.updateOneTimeKeyCount(oneTimeKeysCounts["signed_curve25519"] || 0);
         }
 
-        if (unusedFallbackKeys) {
+        if (unusedFallbackKeys !== undefined) {
+            // If `unusedFallbackKeys` is truthy, that means `device_unused_fallback_key_types`
+            // is present in the sync response, which indicates that the server supports fallback keys.
+            //
+            // If there's no unused signed_curve25519 fallback key, we need a new one.
             this.setNeedsNewFallback(!unusedFallbackKeys.includes("signed_curve25519"));
         }
 
