@@ -22,7 +22,7 @@ import {
     RendezvousCode,
     RendezvousFailureReason,
     RendezvousIntent,
-    SETUP_ADDITIONAL_DEVICE_FLOW_V2,
+    SETUP_ADDITIONAL_DEVICE_FLOW,
 } from "../../../src/rendezvous";
 import {
     ECDHv2RendezvousCode as ECDHRendezvousCode,
@@ -245,7 +245,7 @@ describe("RendezvousV2", function () {
         const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
         expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-        expect(code.flow).toEqual(SETUP_ADDITIONAL_DEVICE_FLOW_V2.name);
+        expect(code.flow).toEqual(SETUP_ADDITIONAL_DEVICE_FLOW.name);
         expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v2.curve25519-aes-sha256");
         expect(code.rendezvous?.transport.type).toEqual("org.matrix.msc3886.http.v1");
         expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri).toEqual(

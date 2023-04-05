@@ -31,18 +31,48 @@ import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
 
+/**
+ * These are the possible types of payload that are used in
+ * [MSC3906](https://github.com/matrix-org/matrix-spec-proposals/pull/3906) payloads.
+ * The values are used in the `type` field.
+ */
 enum PayloadType {
     /**
      * @deprecated Only used in MSC3906 v1
      */
     Finish = "m.login.finish",
+    /**
+     * Indicates that a new device is ready to proceed with the setup process.
+     */
     Progress = "m.login.progress",
+    /**
+     * Used by the new device to indicate which protocol to use.
+     */
     Protocol = "m.login.protocol",
+    /**
+     * Used for the new device to indicate which protocols are supported by the existing device and
+     * homeserver.
+     */
     Protocols = "m.login.protocols",
+    /**
+     * Indicates that the sign of the new device was approved by the user on the existing device.
+     */
     Approved = "m.login.approved",
+    /**
+     * Indicates that the new device has signed in successfully.
+     */
     Success = "m.login.success",
+    /**
+     * Indicates that the new device has been successfully verified by the existing device.
+     */
     Verified = "m.login.verified",
+    /**
+     * Indicates that the login failed.
+     */
     Failure = "m.login.failure",
+    /**
+     * Indicates that the user declined the login on the existing device.
+     */
     Declined = "m.login.declined",
 }
 
@@ -57,6 +87,9 @@ enum Outcome {
     Unsupported = "unsupported",
 }
 
+/**
+ * Used in the `reason` field of the `m.login.failure` payload.
+ */
 enum FailureReason {
     Cancelled = "cancelled",
     Unsupported = "unsupported",
@@ -64,7 +97,11 @@ enum FailureReason {
     IncompatibleIntent = "incompatible_intent",
 }
 
+/**
+ * This represents an [MSC3906](https://github.com/matrix-org/matrix-spec-proposals/pull/3906) payload.
+ */
 export interface MSC3906RendezvousPayload {
+    /** The type of the payload */
     type: PayloadType;
     intent?: RendezvousIntent;
     /**
@@ -83,25 +120,35 @@ export interface MSC3906RendezvousPayload {
     homeserver?: string;
 }
 
+/**
+ * Represents the use of an `m.login.token` obtained from an existing device to sign in on a new device.
+ */
 const LOGIN_TOKEN_PROTOCOL = new UnstableValue("login_token", "org.matrix.msc3906.login_token");
 
 /**
- * Implements MSC3906 to allow a user to sign in on a new device using QR code.
- * This implementation only supports generating a QR code on a device that is already signed in.
+ * This class can be used to complete a "rendezvous flow" as defined in MSC3906.
+ *
+ * Currently it only supports being used on a device that is already signed in that wishes to help sign in
+ * another device.
+ *
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC3906Rendezvous {
     private newDeviceId?: string;
     private newDeviceKey?: string;
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
-    private v1FallbackEnabled: boolean;
+    // if true then we follow the v1 flow, otherwise we follow the v2 flow
+    private usingV1Flow: boolean;
     private _code?: string;
 
     /**
-     * @param channel - The secure channel used for communication
-     * @param client - The Matrix client in used on the device already logged in
-     * @param onFailure - Callback for when the rendezvous fails
-     * @param flow - The flow to use. Defaults to MSC3906 v1 for backwards compatibility.
+     * Creates an instance that can be used to manage the execution of a rendezvous flow.
+     *
+     * @param channel - The rendezvous channel that should be used for communication with the other device
+     * @param client - The Matrix client that should be used.
+     * @param onFailure - Optional callback function to be notified of rendezvous failures.
+     * @param flow - The rendezvous flow to use. Defaults to setting up an additional device using MSC3906 v1,
+     * for backwards compatibility.
      */
     public constructor(
         private channel: RendezvousChannel<MSC3906RendezvousPayload>,
@@ -109,31 +156,36 @@ export class MSC3906Rendezvous {
         public onFailure?: RendezvousFailureListener,
         private flow: RendezvousFlow = SETUP_ADDITIONAL_DEVICE_FLOW_V1,
     ) {
-        this.v1FallbackEnabled = flow === SETUP_ADDITIONAL_DEVICE_FLOW_V1;
+        this.usingV1Flow = flow === SETUP_ADDITIONAL_DEVICE_FLOW_V1;
     }
 
     /**
-     * Returns the code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
+     * @returns The code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
      */
     public get code(): string | undefined {
         return this._code;
     }
 
     /**
-     * Generate the code including doing partial set up of the channel where required.
+     * Generate the code including doing partial set up of the channel where required. This code could be encoded in a QR.
      */
     public async generateCode(): Promise<void> {
         if (this._code) {
             return;
         }
 
-        const raw = this.v1FallbackEnabled
+        const raw = this.usingV1Flow
             ? await this.channel.generateCode(this.ourIntent)
             : await this.channel.generateCode(this.ourIntent, this.flow);
         this._code = JSON.stringify(raw);
     }
 
     /**
+     * Call this after the code has been shown to the user (perhaps in a QR). It will poll for the other device
+     * at the rendezvous point and start the process of setting up the new device.
+     *
+     * If successful then the user should be asked to approve the login of the other device whilst displaying the
+     * returned checksum code which the user should verify matches the code shown on the other device.
      *
      * @returns the checksum of the secure channel if the rendezvous set up was successful, otherwise undefined
      */
@@ -147,7 +199,7 @@ export class MSC3906Rendezvous {
         if (features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
             logger.info("Server doesn't support MSC3882");
             await this.send(
-                this.v1FallbackEnabled
+                this.usingV1Flow
                     ? { type: PayloadType.Finish, outcome: Outcome.Unsupported }
                     : { type: PayloadType.Failure, reason: FailureReason.Unsupported },
             );
@@ -156,16 +208,21 @@ export class MSC3906Rendezvous {
         }
 
         await this.send({
-            type: this.v1FallbackEnabled ? PayloadType.Progress : PayloadType.Protocols,
+            type: this.usingV1Flow ? PayloadType.Progress : PayloadType.Protocols,
             protocols: [LOGIN_TOKEN_PROTOCOL.name],
         });
 
         logger.info("Waiting for other device to chose protocol");
         const nextPayload = await this.receive();
 
-        this.checkForV1Fallback(nextPayload);
+        // even if we didn't start in v1 mode we might detect that the other device is v1:
+        // - the finish payload is only used in v1
+        // - a progress payload is only sent at this point in v1, in v2 the use of it is different
+        if (nextPayload.type === PayloadType.Finish || nextPayload.type === PayloadType.Progress) {
+            this.usingV1Flow = true;
+        }
 
-        const protocol = this.v1FallbackEnabled
+        const protocol = this.usingV1Flow
             ? await this.handleV1ProtocolPayload(nextPayload)
             : await this.handleV2ProtocolPayload(nextPayload);
 
@@ -178,18 +235,6 @@ export class MSC3906Rendezvous {
         return checksum;
     }
 
-    private checkForV1Fallback({ type }: MSC3906RendezvousPayload): void {
-        // even if we didn't start in v1 fallback we might detect that the other device is v1
-        if (type === PayloadType.Finish || type === PayloadType.Progress) {
-            // this is a PDU from a v1 flow so use fallback mode
-            this.v1FallbackEnabled = true;
-        }
-    }
-
-    /**
-     *
-     * @returns true if the protocol was received successfully, false otherwise
-     */
     private async handleV1ProtocolPayload({
         type,
         protocol,
@@ -223,10 +268,6 @@ export class MSC3906Rendezvous {
         return protocol;
     }
 
-    /**
-     *
-     * @returns true if the protocol was received successfully, false otherwise
-     */
     private async handleV2ProtocolPayload({
         type,
         protocol,
@@ -275,18 +316,26 @@ export class MSC3906Rendezvous {
         await this.channel.send(payload);
     }
 
+    /**
+     * Call this if the user has declined the login.
+     */
     public async declineLoginOnExistingDevice(): Promise<void> {
         logger.info("User declined sign in");
         await this.send(
-            this.v1FallbackEnabled
-                ? { type: PayloadType.Finish, outcome: Outcome.Declined }
-                : { type: PayloadType.Declined },
+            this.usingV1Flow ? { type: PayloadType.Finish, outcome: Outcome.Declined } : { type: PayloadType.Declined },
         );
     }
 
+    /**
+     * Call this if the user has approved the login.
+     *
+     * @param loginToken - the login token to send to the new device for it to complete the login flow
+     * @returns if the new device successfully completed the login flow and provided their device id then the device id is
+     * returned, otherwise undefined
+     */
     public async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
         await this.channel.send({
-            type: this.v1FallbackEnabled ? PayloadType.Progress : PayloadType.Approved,
+            type: this.usingV1Flow ? PayloadType.Progress : PayloadType.Approved,
             login_token: loginToken,
             homeserver: this.client.baseUrl,
         });
@@ -298,10 +347,7 @@ export class MSC3906Rendezvous {
         }
         const { type, outcome, device_id: deviceId, device_key: deviceKey } = res;
 
-        if (
-            (this.v1FallbackEnabled && outcome !== "success") ||
-            (!this.v1FallbackEnabled && type !== PayloadType.Success)
-        ) {
+        if ((this.usingV1Flow && outcome !== "success") || (!this.usingV1Flow && type !== PayloadType.Success)) {
             throw new Error("Linking failed");
         }
 
@@ -339,8 +385,8 @@ export class MSC3906Rendezvous {
         const masterPublicKey = this.client.crypto.crossSigningInfo.getId("master")!;
 
         await this.send({
-            type: this.v1FallbackEnabled ? PayloadType.Finish : PayloadType.Verified,
-            outcome: this.v1FallbackEnabled ? Outcome.Verified : undefined,
+            type: this.usingV1Flow ? PayloadType.Finish : PayloadType.Verified,
+            outcome: this.usingV1Flow ? Outcome.Verified : undefined,
             verifying_device_id: this.client.getDeviceId()!,
             verifying_device_key: this.client.getDeviceEd25519Key()!,
             master_key: masterPublicKey,
@@ -350,7 +396,8 @@ export class MSC3906Rendezvous {
     }
 
     /**
-     * Verify the device and cross-sign it.
+     * Wait for a device to be visible via the homeserver and then verify/cross-sign it.
+     *
      * @param timeout - time in milliseconds to wait for device to come online
      * @returns the new device info if the device was verified
      */
