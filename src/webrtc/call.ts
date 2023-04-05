@@ -152,6 +152,10 @@ export enum CallEvent {
     DataChannel = "datachannel",
 
     SendVoipEvent = "send_voip_event",
+
+    // When the call instantiates its peer connection
+    // For apps that want to access the underlying peer connection, eg for debugging
+    PeerConnectionCreated = "peer_connection_created",
 }
 
 export enum CallErrorCode {
@@ -325,6 +329,7 @@ export type CallEventHandlerMap = {
     /* @deprecated */
     [CallEvent.HoldUnhold]: (onHold: boolean) => void;
     [CallEvent.SendVoipEvent]: (event: VoipEvent, call: MatrixCall) => void;
+    [CallEvent.PeerConnectionCreated]: (peerConn: RTCPeerConnection, call: MatrixCall) => void;
 };
 
 // The key of the transceiver map (purpose + media type, separated by ':')
@@ -816,10 +821,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // Matrix event.
                     const transceiver = this.transceivers.get(tKey)!;
 
-                    // this is what would allow us to use addTransceiver(), but it's not available
-                    // on Firefox yet. We call it anyway if we have it.
-                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream);
-
                     transceiver.sender.replaceTrack(track);
                     // set the direction to indicate we're going to start sending again
                     // (this will trigger the re-negotiation)
@@ -955,6 +956,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         this.peerConn = this.createPeerConnection();
+        this.emit(CallEvent.PeerConnectionCreated, this.peerConn, this);
         // we must set the party ID before await-ing on anything: the call event
         // handler will start giving us more call events (eg. candidates) so if
         // we haven't set the party ID, we'll ignore them.
@@ -2789,6 +2791,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // create the peer connection now so it can be gathering candidates while we get user
         // media (assuming a candidate pool size is configured)
         this.peerConn = this.createPeerConnection();
+        this.emit(CallEvent.PeerConnectionCreated, this.peerConn, this);
         this.gotCallFeedsForInvite(callFeeds, requestScreenshareFeed);
     }
 

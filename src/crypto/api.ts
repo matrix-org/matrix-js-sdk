@@ -16,10 +16,10 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import { PassphraseInfo } from "../secret-storage";
+import type { PassphraseInfo } from "../secret-storage";
 
 /* re-exports for backwards compatibility. */
-export {
+export type {
     PassphraseInfo as IPassphraseInfo,
     SecretStorageKeyDescription as ISecretStorageKeyInfo,
 } from "../secret-storage";
