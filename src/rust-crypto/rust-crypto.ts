@@ -209,22 +209,24 @@ export class RustCrypto implements CryptoBackend {
         return this.receiveSyncChanges({ events });
     }
 
-    /** called by the sync loop to preprocess one time key counts
+    /** called by the sync loop to process one time key counts and unused fallback keys
      *
      * @param oneTimeKeysCounts - the received one time key counts
-     * @returns A list of preprocessed to-device messages.
-     */
-    public async preprocessOneTimeKeyCounts(oneTimeKeysCounts: Map<string, number>): Promise<void> {
-        await this.receiveSyncChanges({ oneTimeKeysCounts });
-    }
-
-    /** called by the sync loop to preprocess unused fallback keys
-     *
      * @param unusedFallbackKeys - the received unused fallback keys
-     * @returns A list of preprocessed to-device messages.
      */
-    public async preprocessUnusedFallbackKeys(unusedFallbackKeys: Set<string>): Promise<void> {
-        await this.receiveSyncChanges({ unusedFallbackKeys });
+    public async processKeyCounts(
+        oneTimeKeysCounts?: Record<string, number>,
+        unusedFallbackKeys?: string[],
+    ): Promise<void> {
+        const mapOneTimeKeysCount = oneTimeKeysCounts && new Map<string, number>(Object.entries(oneTimeKeysCounts));
+        const setUnusedFallbackKeys = unusedFallbackKeys && new Set<string>(unusedFallbackKeys);
+
+        if (mapOneTimeKeysCount !== undefined || setUnusedFallbackKeys !== undefined) {
+            await this.receiveSyncChanges({
+                oneTimeKeysCounts: mapOneTimeKeysCount,
+                unusedFallbackKeys: setUnusedFallbackKeys,
+            });
+        }
     }
 
     /** called by the sync loop on m.room.encrypted events
