@@ -112,6 +112,12 @@ export interface LoginTokenPostResponse {
     login_token: string;
     /**
      * Expiration in seconds.
+     *
+     * @deprecated this is only provided for compatibility with original revision of the MSC.
      */
     expires_in: number;
+    /**
+     * Expiration in milliseconds.
+     */
+    expires_in_ms: number;
 }
