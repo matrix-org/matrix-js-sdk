@@ -218,7 +218,7 @@ describe("TrackStatsReporter", () => {
     });
 
     describe("should build Track Summary", () => {
-        it("and returns empty summary if stats list empty", () => {
+        it("and returns empty summary if stats list empty", async () => {
             const summary = TrackStatsReporter.buildTrackSummary([]);
             expect(summary).toEqual({
                 audioTrackSummary: {
@@ -232,7 +232,7 @@ describe("TrackStatsReporter", () => {
             });
         });
 
-        it("and returns  summary if stats list not empty", () => {
+        it("and returns  summary if stats list not empty", async () => {
             const summary = TrackStatsReporter.buildTrackSummary([]);
             expect(summary).toEqual({
                 audioTrackSummary: {
