@@ -34,7 +34,7 @@ import { IStoredClientOpts } from "../client";
  * Construct a stub store. This does no-ops on most store methods.
  */
 export class StubStore implements IStore {
-    public readonly accountData = {}; // stub
+    public readonly accountData = new Map(); // stub
     private fromToken: string | null = null;
 
     /** @returns whether or not the database was newly created in this session. */

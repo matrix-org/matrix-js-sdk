@@ -26,6 +26,7 @@ import { IContent, MatrixEvent, RoomMember } from "../../matrix";
 import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
+import { DeviceInfoMap } from "../DeviceList";
 
 /**
  * Map of registered encryption algorithm classes. A map from string to {@link EncryptionAlgorithm} class
@@ -195,7 +196,7 @@ export abstract class DecryptionAlgorithm {
     }
 
     public onRoomKeyWithheldEvent?(event: MatrixEvent): Promise<void>;
-    public sendSharedHistoryInboundSessions?(devicesByUser: Record<string, DeviceInfo[]>): Promise<void>;
+    public sendSharedHistoryInboundSessions?(devicesByUser: Map<string, DeviceInfo[]>): Promise<void>;
 }
 
 /**
@@ -241,11 +242,7 @@ export class UnknownDeviceError extends Error {
      * @param msg - message describing the problem
      * @param devices - set of unknown devices per user we're warning about
      */
-    public constructor(
-        msg: string,
-        public readonly devices: Record<string, Record<string, object>>,
-        public event?: MatrixEvent,
-    ) {
+    public constructor(msg: string, public readonly devices: DeviceInfoMap, public event?: MatrixEvent) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;

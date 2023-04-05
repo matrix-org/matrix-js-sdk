@@ -20,7 +20,7 @@ jobs:
 
             - name: Create Pull Request
               id: cpr
-              uses: peter-evans/create-pull-request@v4
+              uses: peter-evans/create-pull-request@2b011faafdcbc9ceb11414d64d0573f37c774b04 # v4
               with:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   branch: actions/upgrade-deps
@@ -31,7 +31,7 @@ jobs:
                       T-Task
 
             - name: Enable automerge
-              uses: peter-evans/enable-pull-request-automerge@v2
+              uses: peter-evans/enable-pull-request-automerge@684fed02ccc9b5eefcf7d40b65b3cd44255bd5bc # v2
               if: steps.cpr.outputs.pull-request-operation == 'created'
               with:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}

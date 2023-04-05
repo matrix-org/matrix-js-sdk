@@ -33,6 +33,7 @@ import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { safeSet } from "../../utils";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -375,11 +376,11 @@ export class MemoryCryptoStore implements CryptoStore {
             if (userId in notifiedErrorDevices) {
                 if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
                     ret.push(device);
-                    notifiedErrorDevices[userId][deviceInfo.deviceId] = true;
+                    safeSet(notifiedErrorDevices[userId], deviceInfo.deviceId, true);
                 }
             } else {
                 ret.push(device);
-                notifiedErrorDevices[userId] = { [deviceInfo.deviceId]: true };
+                safeSet(notifiedErrorDevices, userId, { [deviceInfo.deviceId]: true });
             }
         }
 

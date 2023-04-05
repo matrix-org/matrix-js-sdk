@@ -22,6 +22,7 @@ import { Room } from "../models/room";
 import { logger, PrefixedLogger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -38,6 +39,7 @@ export class RoomEncryptor {
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly keyClaimManager: KeyClaimManager,
+        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
@@ -97,10 +99,31 @@ export class RoomEncryptor {
         const userList = members.map((u) => new UserId(u.userId));
         await this.keyClaimManager.ensureSessionsForUsers(userList);
 
+        this.prefixedLogger.debug("Sessions for users are ready; now sharing room key");
+
         const rustEncryptionSettings = new EncryptionSettings();
         /* FIXME historyVisibility, rotation, etc */
 
-        await this.olmMachine.shareRoomKey(new RoomId(this.room.roomId), userList, rustEncryptionSettings);
+        const shareMessages = await this.olmMachine.shareRoomKey(
+            new RoomId(this.room.roomId),
+            userList,
+            rustEncryptionSettings,
+        );
+        if (shareMessages) {
+            for (const m of shareMessages) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(m);
+            }
+        }
+    }
+
+    /**
+     * Discard any existing group session for this room
+     */
+    public async forceDiscardSession(): Promise<void> {
+        const r = await this.olmMachine.invalidateGroupSession(new RoomId(this.room.roomId));
+        if (r) {
+            this.prefixedLogger.info("Discarded existing group session");
+        }
     }
 
     /**

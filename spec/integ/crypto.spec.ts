@@ -19,7 +19,7 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { MockResponse } from "fetch-mock";
+import { MockResponse, MockResponseFunction } from "fetch-mock";
 
 import type { IDeviceKeys } from "../../src/@types/crypto";
 import * as testUtils from "../test-utils/test-utils";
@@ -47,6 +47,7 @@ import {
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
+import { escapeRegExp } from "../../src/utils";
 
 const ROOM_ID = "!room:id";
 
@@ -341,6 +342,11 @@ async function expectSendRoomKey(
                 resolve(onSendRoomKey(content));
                 return {};
             },
+            {
+                // append to the list of intercepts on this path (since we have some tests that call
+                // this function multiple times)
+                overwriteRoutes: false,
+            },
         );
     });
 }
@@ -359,12 +365,20 @@ async function expectSendMegolmMessage(
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
     const encryptedMessageContent = await new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(new RegExp("/send/m.room.encrypted/"), (url: string, opts: RequestInit): MockResponse => {
-            resolve(JSON.parse(opts.body as string));
-            return {
-                event_id: "$event_id",
-            };
-        });
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url: string, opts: RequestInit): MockResponse => {
+                resolve(JSON.parse(opts.body as string));
+                return {
+                    event_id: "$event_id",
+                };
+            },
+            {
+                // append to the list of intercepts on this path (since we have some tests that call
+                // this function multiple times)
+                overwriteRoutes: false,
+            },
+        );
     });
 
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
@@ -438,14 +452,26 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
             return response;
         }
+        const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
         fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/query", aliceClient.getHomeserverUrl()).toString(),
+            new RegExp(rootRegexp + "(r0|v3)/keys/query"),
             (url: string, opts: RequestInit) => onQueryRequest(JSON.parse(opts.body as string)),
             {
                 // append to the list of intercepts on this path
                 overwriteRoutes: false,
             },
         );
+    }
+
+    /**
+     * Add an expectation for a /keys/claim request for the MatrixClient under test
+     *
+     * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
+     *   (or a function that returns one).
+     */
+    function expectAliceKeyClaim(response: MockResponse | MockResponseFunction) {
+        const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
+        fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
     }
 
     /**
@@ -536,6 +562,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         fetchMock.mockReset();
     });
 
+    it("MatrixClient.getCrypto returns a CryptoApi", () => {
+        expect(aliceClient.getCrypto()).toHaveProperty("globalBlacklistUnverifiedDevices");
+    });
+
     it("Alice receives a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -543,7 +573,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -594,16 +624,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(decryptedEvent.getContent().body).toEqual("42");
     });
 
-    oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
+    it("Alice receives a megolm message before the session keys", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-
-        // https://github.com/vector-im/element-web/issues/2273
         await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -637,7 +665,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await syncPromise(aliceClient);
 
         const room = aliceClient.getRoom(ROOM_ID)!;
-        expect(room.getLiveTimeline().getEvents()[0].getContent().msgtype).toEqual("m.bad.encrypted");
+        const event = room.getLiveTimeline().getEvents()[0];
+
+        // wait for a first attempt at decryption: should fail
+        await testUtils.awaitDecryption(event);
+        expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
 
         // now she gets the room_key event
         syncResponder.sendOrQueueSyncResponse({
@@ -648,20 +680,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         await syncPromise(aliceClient);
 
-        const event = room.getLiveTimeline().getEvents()[0];
-
-        let decryptedEvent: MatrixEvent;
-        if (event.getContent().msgtype != "m.bad.encrypted") {
-            decryptedEvent = event;
-        } else {
-            decryptedEvent = await new Promise<MatrixEvent>((resolve) => {
-                event.once(MatrixEventEvent.Decrypted, (ev) => {
-                    logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-                    resolve(ev);
-                });
-            });
-        }
-        expect(decryptedEvent.getContent().body).toEqual("42");
+        await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
+        expect(event.getContent().body).toEqual("42");
     });
 
     it("Alice gets a second room_key message", async () => {
@@ -671,7 +691,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -738,7 +758,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(event.getContent().body).toEqual("42");
     });
 
-    oldBackendOnly("prepareToEncrypt", async () => {
+    it("prepareToEncrypt", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         aliceClient.setGlobalErrorOnUnknownDevices(false);
@@ -751,10 +771,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         // ... and then claim one of his OTKs
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            getTestKeysClaimResponse("@bob:xyz"),
-        );
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
         const room = aliceClient.getRoom(ROOM_ID);
@@ -768,7 +785,71 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await p;
     });
 
+    it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
+        aliceClient.setGlobalErrorOnUnknownDevices(false);
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        // Alice shares a room with Bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // ... and claim one of his OTKs ...
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+        // ... and send an m.room_key message
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+        // Finally, send the message, and expect to get an `m.room.encrypted` event that we can decrypt.
+        await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
+        ]);
+    });
+
+    it("We should start a new megolm session after forceDiscardSession", async () => {
+        aliceClient.setGlobalErrorOnUnknownDevices(false);
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        // Alice shares a room with Bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // ... and claim one of his OTKs ...
+        expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+        // ... and send an m.room_key message
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+        // Send the first message, and check we can decrypt it.
+        await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
+        ]);
+
+        // Finally the interesting part: discard the session.
+        aliceClient.forceDiscardSession(ROOM_ID);
+
+        // Now when we send the next message, we should get a *new* megolm session.
+        const inboundGroupSessionPromise2 = expectSendRoomKey("@bob:xyz", testOlmAccount);
+        const p2 = expectSendMegolmMessage(inboundGroupSessionPromise2);
+        await Promise.all([aliceClient.sendTextMessage(ROOM_ID, "test2"), p2]);
+    });
+
     oldBackendOnly("Alice sends a megolm message", async () => {
+        // TODO: do something about this for the rust backend.
+        //   Currently it fails because we don't respect the default GlobalErrorOnUnknownDevices and
+        //   send messages to unknown devices.
+
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
@@ -1027,20 +1108,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
-            expect(Object.keys((e as any).devices)).toEqual([aliceClient.getUserId()!]);
-            expect(Object.keys((e as any)?.devices[aliceClient.getUserId()!])).toEqual(["DEVICE_ID"]);
+            expect([...(e as any).devices.keys()]).toEqual([aliceClient.getUserId()!]);
+            expect((e as any).devices.get(aliceClient.getUserId()!).has("DEVICE_ID"));
         }
 
         // mark the device as known, and resend.
         aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
-        fetchMock.postOnce(
-            new URL("/_matrix/client/r0/keys/claim", aliceClient.getHomeserverUrl()).toString(),
-            (url: string, opts: RequestInit): MockResponse => {
-                const content = JSON.parse(opts.body as string);
-                expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
-                return getTestKeysClaimResponse(aliceClient.getUserId()!);
-            },
-        );
+        expectAliceKeyClaim((url: string, opts: RequestInit): MockResponse => {
+            const content = JSON.parse(opts.body as string);
+            expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
+            return getTestKeysClaimResponse(aliceClient.getUserId()!);
+        });
 
         const inboundGroupSessionPromise = expectSendRoomKey(aliceClient.getUserId()!, testOlmAccount);
 
@@ -1099,7 +1177,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1255,7 +1333,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
@@ -1322,7 +1400,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
         if (aliceClient.crypto) {
-            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
             aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
             aliceClient.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
         }
@@ -1847,6 +1925,76 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // finally: the message should still be a regular decryption failure, not a withheld notification.
             expect(event.getContent().body).not.toContain("withheld");
+        });
+    });
+
+    describe("key upload request", () => {
+        beforeEach(() => {
+            jest.useFakeTimers();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
+            return new Promise((resolve) => {
+                const listener = (url: string, options: RequestInit) => {
+                    const content = JSON.parse(options.body as string);
+                    const keysCount = Object.keys(content?.one_time_keys || {}).length;
+                    const fallbackKeysCount = Object.keys(content?.fallback_keys || {}).length;
+                    if (keysCount) resolve({ keysCount, fallbackKeysCount });
+                    return {
+                        one_time_key_counts: {
+                            // The matrix client does `/upload` requests until 50 keys are uploaded
+                            // We return here 60 to avoid the `/upload` request loop
+                            signed_curve25519: keysCount ? 60 : keysCount,
+                        },
+                    };
+                };
+
+                for (const path of ["/_matrix/client/r0/keys/upload", "/_matrix/client/v3/keys/upload"]) {
+                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener, {
+                        // These routes are already defined in the E2EKeyReceiver
+                        // We want to overwrite the behaviour of the E2EKeyReceiver
+                        overwriteRoutes: true,
+                    });
+                }
+            });
+        }
+
+        it("should make key upload request after sync", async () => {
+            let uploadPromise = awaitKeyUploadRequest();
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([]));
+
+            await syncPromise(aliceClient);
+
+            // Verify that `/upload` is called on Alice's homesever
+            const { keysCount, fallbackKeysCount } = await uploadPromise;
+            expect(keysCount).toBeGreaterThan(0);
+            expect(fallbackKeysCount).toBe(0);
+
+            uploadPromise = awaitKeyUploadRequest();
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 2,
+                device_one_time_keys_count: { signed_curve25519: 0 },
+                device_unused_fallback_key_types: [],
+            });
+
+            // Advance local date to 2 minutes
+            // The old crypto only runs the upload every 60 seconds
+            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+
+            await syncPromise(aliceClient);
+
+            // After we set device_one_time_keys_count to 0
+            // a `/upload` is expected
+            const res = await uploadPromise;
+            expect(res.keysCount).toBeGreaterThan(0);
+            expect(res.fallbackKeysCount).toBeGreaterThan(0);
         });
     });
 });

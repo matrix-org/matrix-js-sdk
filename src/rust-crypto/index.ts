@@ -30,7 +30,7 @@ export async function initRustCrypto(
     await RustSdkCryptoJs.initAsync();
 
     // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
+    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Trace).turnOn();
 
     const u = new RustSdkCryptoJs.UserId(userId);
     const d = new RustSdkCryptoJs.DeviceId(deviceId);
@@ -39,6 +39,9 @@ export async function initRustCrypto(
     // TODO: use the pickle key for the passphrase
     const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, RUST_SDK_STORE_PREFIX, "test pass");
     const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId);
+    await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
+        rustCrypto.onRoomKeysUpdated(sessions),
+    );
 
     logger.info("Completed rust crypto-sdk setup");
     return rustCrypto;

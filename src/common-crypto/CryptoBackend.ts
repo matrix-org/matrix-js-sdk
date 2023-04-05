@@ -14,31 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
-import type { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
+import { CryptoApi } from "../crypto-api";
+import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
+import { IEventDecryptionResult } from "../@types/crypto";
 
 /**
  * Common interface for the crypto implementations
  */
-export interface CryptoBackend extends SyncCryptoCallbacks {
-    /**
-     * Global override for whether the client should ever send encrypted
-     * messages to unverified devices. This provides the default for rooms which
-     * do not specify a value.
-     *
-     * If true, all unverified devices will be blacklisted by default
-     */
-    globalBlacklistUnverifiedDevices: boolean;
-
+export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
      * Whether sendMessage in a room with unknown and unverified devices
      * should throw an error and not send the message. This has 'Global' for
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
+     *
+     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
+     * going to support it in the rust crypto implementation.
      */
     globalErrorOnUnknownDevices: boolean;
 
@@ -46,16 +41,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
      * Shut down any background processes related to crypto
      */
     stop(): void;
-
-    /**
-     * Checks if the user has previously published cross-signing keys
-     *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
-
-     * @returns true if the user has previously published cross-signing keys
-     */
-    userHasCrossSigningKeys(): Promise<boolean>;
 
     /**
      * Get the verification level for a given user
@@ -75,14 +60,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
      * @param deviceId - device to be checked
      */
     checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
-
-    /**
-     * Perform any background tasks that can be done before a message is ready to
-     * send, in order to speed up sending of the message.
-     *
-     * @param room - the room the event is in
-     */
-    prepareToEncrypt(room: Room): void;
 
     /**
      * Encrypt an event according to the configuration of the room.
@@ -110,16 +87,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
      * @param event - event to be checked
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
-
-    /**
-     * Get a list containing all of the room keys
-     *
-     * This should be encrypted before returning it to the user.
-     *
-     * @returns a promise which resolves to a list of
-     *    session export objects
-     */
-    exportRoomKeys(): Promise<IMegolmSessionData[]>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api */
@@ -137,6 +104,14 @@ export interface SyncCryptoCallbacks {
      * @returns A list of preprocessed to-device messages.
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop when one time key counts and unused fallback key details are received.
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     */
+    processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.

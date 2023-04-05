@@ -269,12 +269,12 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     private async sendToDevices(type: string, content: Record<string, any>, devices: string[]): Promise<void> {
         if (devices.length) {
-            const msgMap: Record<string, Record<string, any>> = {};
+            const deviceMessages: Map<string, Record<string, any>> = new Map();
             for (const deviceId of devices) {
-                msgMap[deviceId] = content;
+                deviceMessages.set(deviceId, content);
             }
 
-            await this.client.sendToDevice(type, { [this.userId]: msgMap });
+            await this.client.sendToDevice(type, new Map([[this.userId, deviceMessages]]));
         }
     }
 

@@ -431,6 +431,58 @@ describe("Call", function () {
         expect(transceivers.get("m.usermedia:video")!.sender.track!.id).toBe("usermedia_video_track");
     });
 
+    it("should handle error on call upgrade", async () => {
+        const onError = jest.fn();
+        call.on(CallEvent.Error, onError);
+
+        await startVoiceCall(client, call);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        const mockGetUserMediaStream = jest.fn().mockRejectedValue(new Error("Test error"));
+        client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        expect(onError).toHaveBeenCalled();
+    });
+
+    it("should unmute video after upgrading to video call", async () => {
+        // Regression test for https://github.com/vector-im/element-call/issues/925
+        await startVoiceCall(client, call);
+        // start off with video muted
+        await call.setLocalVideoMuted(true);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        // video should now be unmuted
+        expect(call.isLocalVideoMuted()).toBe(false);
+    });
+
     it("should handle SDPStreamMetadata changes", async () => {
         await startVoiceCall(client, call);
 
@@ -712,9 +764,20 @@ describe("Call", function () {
 
         const dataChannel = call.createDataChannel("data_channel_label", { id: 123 });
 
-        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel);
+        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel, call);
         expect(dataChannel.label).toBe("data_channel_label");
         expect(dataChannel.id).toBe(123);
+    });
+
+    it("should emit a data channel event when the other side adds a data channel", async () => {
+        await startVoiceCall(client, call);
+
+        const dataChannelCallback = jest.fn();
+        call.on(CallEvent.DataChannel, dataChannelCallback);
+
+        (call.peerConn as unknown as MockRTCPeerConnection).triggerIncomingDataChannel();
+
+        expect(dataChannelCallback).toHaveBeenCalled();
     });
 
     describe("supportsMatrixCall", () => {
@@ -1579,7 +1642,7 @@ describe("Call", function () {
             hasAdvancedBy += advanceBy;
 
             expect(lengthChangedListener).toHaveBeenCalledTimes(hasAdvancedBy);
-            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy);
+            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy, call);
         }
     });
 
@@ -1607,6 +1670,26 @@ describe("Call", function () {
             mockPeerConn.iceConnectionStateChangeListener!();
             jest.advanceTimersByTime(31 * 1000);
             expect(call.hangup).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("Call replace", () => {
+        it("Fires event when call replaced", async () => {
+            const onReplace = jest.fn();
+            call.on(CallEvent.Replaced, onReplace);
+
+            await call.placeVoiceCall();
+
+            const call2 = new MatrixCall({
+                client: client.client,
+                roomId: FAKE_ROOM_ID,
+            });
+            call2.on(CallEvent.Error, errorListener);
+            await fakeIncomingCall(client, call2);
+
+            call.replacedBy(call2);
+
+            expect(onReplace).toHaveBeenCalled();
         });
     });
 });
