@@ -27,21 +27,27 @@ export class SummaryStatsReporter {
         let receivedAudioMedia = 0;
 
         summary.forEach((stats) => {
-            if (stats.receivedMedia > 0) {
-                receivedMedia++;
-            }
+            let hasReceivedAudio = false;
+            let hasReceivedVideo = false;
             if (stats.receivedAudioMedia > 0) {
                 receivedAudioMedia++;
+                hasReceivedAudio = true;
             }
             if (stats.receivedVideoMedia > 0) {
                 receivedVideoMedia++;
+                hasReceivedVideo = true;
             } else {
                 if (
                     stats.videoTrackSummary.muted > 0 &&
                     stats.videoTrackSummary.muted === stats.videoTrackSummary.count
                 ) {
                     receivedVideoMedia++;
+                    hasReceivedVideo = true;
                 }
+            }
+
+            if (stats.receivedMedia > 0 && hasReceivedVideo && hasReceivedAudio) {
+                receivedMedia++;
             }
         });
 

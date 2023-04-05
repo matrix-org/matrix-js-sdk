@@ -64,7 +64,7 @@ describe("SummaryStatsReporter", () => {
             ];
             reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
-                percentageReceivedMedia: 0.75,
+                percentageReceivedMedia: 0.5,
                 percentageReceivedAudioMedia: 0.5,
                 percentageReceivedVideoMedia: 0.75,
             });
@@ -100,7 +100,7 @@ describe("SummaryStatsReporter", () => {
             ];
             reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
-                percentageReceivedMedia: 1,
+                percentageReceivedMedia: 0,
                 percentageReceivedAudioMedia: 1,
                 percentageReceivedVideoMedia: 0,
             });
@@ -118,7 +118,7 @@ describe("SummaryStatsReporter", () => {
             ];
             reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
-                percentageReceivedMedia: 1,
+                percentageReceivedMedia: 0,
                 percentageReceivedAudioMedia: 0,
                 percentageReceivedVideoMedia: 1,
             });
