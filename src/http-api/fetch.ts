@@ -47,7 +47,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ) {
         utils.checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
-        opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
+        opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? false;
     }
 
     public abort(): void {
