@@ -46,7 +46,8 @@ jobs:
 
             - name: Run tests
               run: |
-                  yarn ${{ github.event_name == 'merge_group' && 'test' || 'coverage' }} \
+                  yarn test \
+                      --coverage=${{ github.event_name == 'merge_group' && 'true' || 'false' }} \
                       --ci \
                       --reporters github-actions ${{ steps.metrics.outputs.extra-reporter }} \
                       --max-workers ${{ steps.cpu-cores.outputs.count }} \
@@ -67,13 +68,25 @@ jobs:
                       coverage
                       !coverage/lcov-report
 
-    skip_sonar:
-        name: Skip SonarCloud on merge_queue
+    matrix-react-sdk:
+        name: Downstream test matrix-react-sdk
         if: github.event_name == 'merge_group'
+        uses: matrix-org/matrix-react-sdk/.github/workflows/tests.yml@develop
+        with:
+            disable_coverage: true
+            matrix-js-sdk-sha: ${{ github.sha }}
+
+    # Hook for branch protection to skip downstream testing outside of merge queues
+    # and skip sonarcloud coverage within merge queues
+    downstream:
+        name: Downstream tests
         runs-on: ubuntu-latest
-        needs: jest
+        if: always()
+        needs:
+            - matrix-react-sdk
         steps:
-            - name: Skip SonarCloud
+            - name: Skip SonarCloud on merge queues
+              if: needs.matrix-react-sdk.result != 'skipped'
               uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
@@ -83,21 +96,5 @@ jobs:
                   sha: ${{ github.sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-    matrix-react-sdk:
-        name: Downstream test matrix-react-sdk
-        if: github.event_name == 'merge_group'
-        uses: matrix-org/matrix-react-sdk/.github/workflows/tests.yml@develop
-        with:
-            disable_coverage: true
-            matrix-js-sdk-sha: ${{ github.sha }}
-
-    # Hook for branch protection to work outside merge queues
-    downstream:
-        name: Downstream tests
-        runs-on: ubuntu-latest
-        if: always()
-        needs:
-            - matrix-react-sdk
-        steps:
             - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
               run: exit 1
