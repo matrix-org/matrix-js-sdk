@@ -20,6 +20,11 @@ limitations under the License.
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
 
+import { TypedEventEmitter } from "./models/typed-event-emitter";
+import { ClientEvent, ClientEventHandlerMap } from "./client";
+
+export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
+
 /**
  * Common base interface for Secret Storage Keys.
  *
@@ -85,4 +90,49 @@ export interface PassphraseInfo {
 
     /** The number of bits to generate. Defaults to 256. */
     bits?: number;
+}
+
+/**
+ * Options for {@link SecretStorage#addKey}.
+ */
+export interface AddSecretStorageKeyOpts {
+    pubkey?: string;
+    passphrase?: PassphraseInfo;
+    name?: string;
+    key?: Uint8Array;
+}
+
+/**
+ * Return type for {@link SecretStorage#getKey}.
+ */
+export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDescription];
+
+/**
+ * Return type for {@link SecretStorage#addKey}.
+ */
+export type SecretStorageKeyObject = { keyId: string; keyInfo: SecretStorageKeyDescription };
+
+/** Interface for managing account data on the server.
+ *
+ * A subset of {@link MatrixClient}.
+ */
+export interface AccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
+    /**
+     * Get account data event of given type for the current user. This variant
+     * gets account data directly from the homeserver if the local store is not
+     * ready, which can be useful very early in startup before the initial sync.
+     *
+     * @param eventType - The type of account data
+     * @returns The contents of the given account data event.
+     */
+    getAccountDataFromServer: <T extends Record<string, any>>(eventType: string) => Promise<T>;
+
+    /**
+     * Set account data event for the current user, with retries
+     *
+     * @param eventType - The type of account data
+     * @param content - the content object to be set
+     * @returns an empty object
+     */
+    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }

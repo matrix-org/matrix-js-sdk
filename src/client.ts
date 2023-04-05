@@ -101,7 +101,6 @@ import { IAuthData, IAuthDict } from "./interactive-auth";
 import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
 import {
     CrossSigningKey,
-    IAddSecretStorageKeyOpts,
     ICreateSecretStorageOpts,
     IEncryptedEventInfo,
     IImportRoomKeysOpts,
@@ -207,7 +206,7 @@ import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { CryptoApi } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
-import { SecretStorageKeyDescription } from "./secret-storage";
+import { AddSecretStorageKeyOpts, SecretStorageKeyDescription } from "./secret-storage";
 
 export type Store = IStore;
 
@@ -2861,7 +2860,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public addSecretStorageKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts,
+        opts: AddSecretStorageKeyOpts,
         keyName?: string,
     ): Promise<{ keyId: string; keyInfo: SecretStorageKeyDescription }> {
         if (!this.crypto) {

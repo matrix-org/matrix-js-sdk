@@ -21,31 +21,32 @@ import * as olmlib from "./olmlib";
 import { randomString } from "../randomstring";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { ICryptoCallbacks, IEncryptedContent } from ".";
-import { IContent, MatrixEvent } from "../models/event";
-import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
-import { IAddSecretStorageKeyOpts } from "./api";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { MatrixEvent } from "../models/event";
+import { ClientEvent, MatrixClient } from "../client";
 import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
-import { SecretStorageKeyDescription, SecretStorageKeyDescriptionAesV1 } from "../secret-storage";
+import {
+    SecretStorageKeyDescription,
+    SecretStorageKeyDescriptionAesV1,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+    AddSecretStorageKeyOpts,
+    AccountDataClient,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+} from "../secret-storage";
 
-export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
-
-// Some of the key functions use a tuple and some use an object...
-export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDescription];
-export type SecretStorageKeyObject = { keyId: string; keyInfo: SecretStorageKeyDescription };
+/* re-exports for backwards compatibility */
+export {
+    AccountDataClient as IAccountDataClient,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+} from "../secret-storage";
 
 export interface ISecretRequest {
     requestId: string;
     promise: Promise<string>;
     cancel: (reason: string) => void;
-}
-
-export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
-    // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
-    getAccountData: (eventType: string) => IContent | null;
-    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
@@ -80,7 +81,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
     public constructor(
-        private readonly accountDataAdapter: IAccountDataClient,
+        private readonly accountDataAdapter: AccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
         private readonly baseApis: B,
     ) {}
@@ -125,7 +126,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      */
     public async addKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts = {},
+        opts: AddSecretStorageKeyOpts = {},
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
         if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
