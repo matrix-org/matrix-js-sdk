@@ -49,7 +49,7 @@ jobs:
             - name: Run tests
               run: |
                   yarn test \
-                      --coverage=${{ env.ENABLE_COVERAGE && 'true' || 'false' }} \
+                      --coverage=${{ env.ENABLE_COVERAGE }} \
                       --ci \
                       --reporters github-actions ${{ steps.metrics.outputs.extra-reporter }} \
                       --max-workers ${{ steps.cpu-cores.outputs.count }} \
@@ -58,11 +58,11 @@ jobs:
                   JEST_SONAR_UNIQUE_OUTPUT_NAME: true
 
             - name: Move coverage files into place
-              if: env.ENABLE_COVERAGE
+              if: env.ENABLE_COVERAGE == 'true'
               run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
 
             - name: Upload Artifact
-              if: env.ENABLE_COVERAGE
+              if: env.ENABLE_COVERAGE == 'true'
               uses: actions/upload-artifact@v3
               with:
                   name: coverage
@@ -88,7 +88,7 @@ jobs:
             - matrix-react-sdk
         steps:
             - name: Skip SonarCloud on merge queues
-              if: env.ENABLE_COVERAGE == false
+              if: env.ENABLE_COVERAGE == 'false'
               uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
