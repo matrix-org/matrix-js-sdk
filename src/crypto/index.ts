@@ -3234,7 +3234,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         if (unusedFallbackKeys !== undefined) {
-            // If `unusedFallbackKeys` is truthy, that means `device_unused_fallback_key_types`
+            // If `unusedFallbackKeys` is defined, that means `device_unused_fallback_key_types`
             // is present in the sync response, which indicates that the server supports fallback keys.
             //
             // If there's no unused signed_curve25519 fallback key, we need a new one.
