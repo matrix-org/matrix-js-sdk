@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { GroupCallStats } from "../../../../src/webrtc/stats/groupCallStats";
+import { SummaryStats } from "../../../../src/webrtc/stats/summaryStats";
 
 const GROUP_CALL_ID = "GROUP_ID";
 const LOCAL_USER_ID = "LOCAL_USER_ID";
@@ -79,9 +80,11 @@ describe("GroupCallStats", () => {
         it("starting processing and calling the collectors", async () => {
             stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection());
             const collector = stats.getStatsReportGatherer("CALL_ID");
+            stats.reports.emitSummaryStatsReport = jest.fn();
+            const summaryStats = {} as SummaryStats;
             let processStatsSpy;
             if (collector) {
-                processStatsSpy = jest.spyOn(collector, "processStats");
+                processStatsSpy = jest.spyOn(collector, "processStats").mockResolvedValue(summaryStats);
                 stats.start();
                 jest.advanceTimersByTime(TIME_INTERVAL);
             } else {

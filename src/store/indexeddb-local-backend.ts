@@ -130,7 +130,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private db?: IDBDatabase;
     private disconnected = true;
     private _isNewlyCreated = false;
-    private isPersisting = false;
+    private syncToDatabasePromise?: Promise<void>;
     private pendingUserPresenceData: UserTuple[] = [];
 
     /**
@@ -396,26 +396,34 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
+    /**
+     * Sync users and all accumulated sync data to the database.
+     * If a previous sync is in flight, the new data will be added to the
+     * next sync and the current sync's promise will be returned.
+     * @param userTuples - The user tuples
+     * @returns Promise which resolves if the data was persisted.
+     */
     public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
-        if (this.isPersisting) {
+        if (this.syncToDatabasePromise) {
             logger.warn("Skipping syncToDatabase() as persist already in flight");
             this.pendingUserPresenceData.push(...userTuples);
-            return;
-        } else {
-            userTuples.unshift(...this.pendingUserPresenceData);
-            this.isPersisting = true;
+            return this.syncToDatabasePromise;
         }
+        userTuples.unshift(...this.pendingUserPresenceData);
+        this.syncToDatabasePromise = this.doSyncToDatabase(userTuples);
+        return this.syncToDatabasePromise;
+    }
 
+    private async doSyncToDatabase(userTuples: UserTuple[]): Promise<void> {
         try {
             const syncData = this.syncAccumulator.getJSON(true);
-
             await Promise.all([
                 this.persistUserPresenceEvents(userTuples),
                 this.persistAccountData(syncData.accountData),
                 this.persistSyncData(syncData.nextBatch, syncData.roomsData),
             ]);
         } finally {
-            this.isPersisting = false;
+            this.syncToDatabasePromise = undefined;
         }
     }
 
