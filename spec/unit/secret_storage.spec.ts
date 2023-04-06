@@ -14,22 +14,68 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AccountDataClient, SecretStorage } from "../../src/secret-storage";
+import { AccountDataClient, PassphraseInfo, SecretStorage } from "../../src/secret-storage";
 
 describe("SecretStorage", function () {
-    it("should allow storing a default key", async function () {
-        const accountDataAdapter = {
-            getAccountDataFromServer: jest.fn().mockResolvedValue(null),
-            setAccountData: jest.fn().mockResolvedValue({}),
-        };
-        const secretStorage = new SecretStorage(accountDataAdapter as unknown as AccountDataClient, {});
-        const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
+    describe(".addKey", function () {
+        it("should allow storing a default key", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
 
-        // it should have made up a 32-character key id
-        expect(result.keyId.length).toEqual(32);
-        expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
-            `m.secret_storage.key.${result.keyId}`,
-            result.keyInfo,
-        );
+            // it should have made up a 32-character key id
+            expect(result.keyId.length).toEqual(32);
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+                `m.secret_storage.key.${result.keyId}`,
+                result.keyInfo,
+            );
+        });
+
+        it("should allow storing a key with a name", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", { name: "mykey" });
+
+            expect(result.keyInfo.name).toEqual("mykey");
+
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+                `m.secret_storage.key.${result.keyId}`,
+                result.keyInfo,
+            );
+        });
+
+        it("should allow storing a key with a passphrase", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const passphrase: PassphraseInfo = {
+                algorithm: "m.pbkdf2",
+                iterations: 125,
+                salt: "saltygoodness",
+                bits: 256,
+            };
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {
+                passphrase,
+            });
+
+            expect(result.keyInfo.passphrase).toEqual(passphrase);
+
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+                `m.secret_storage.key.${result.keyId}`,
+                result.keyInfo,
+            );
+        });
+
+        it("should complain about invalid algorithm", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            await expect(() => secretStorage.addKey("bad_alg")).rejects.toThrow("Unknown key algorithm");
+        });
     });
 });
+
+function mockAccountDataClient(): AccountDataClient {
+    return {
+        getAccountDataFromServer: jest.fn().mockResolvedValue(null),
+        setAccountData: jest.fn().mockResolvedValue({}),
+    } as unknown as AccountDataClient;
+}
