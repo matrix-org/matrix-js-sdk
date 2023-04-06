@@ -85,6 +85,7 @@ import {
     SecretStorageKeyTuple,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorageCallbacks,
+    SecretStorage,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
 
@@ -826,11 +827,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // done as part of setting up secret storage later.
         const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
         if (crossSigningPrivateKeys.size && !this.baseApis.cryptoCallbacks.saveCrossSigningKeys) {
-            const secretStorage = new LegacySecretStorage(
-                builder.accountDataClientAdapter,
-                builder.ssssCryptoCallbacks,
-                undefined,
-            );
+            const secretStorage = new SecretStorage(builder.accountDataClientAdapter, builder.ssssCryptoCallbacks);
             if (await secretStorage.hasKey()) {
                 logger.log("Storing new cross-signing private keys in secret storage");
                 // This is writing to in-memory account data in
@@ -892,11 +889,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.log("Bootstrapping Secure Secret Storage");
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
         const builder = new EncryptionSetupBuilder(this.baseApis.store.accountData, delegateCryptoCallbacks);
-        const secretStorage = new LegacySecretStorage(
-            builder.accountDataClientAdapter,
-            builder.ssssCryptoCallbacks,
-            undefined,
-        );
+        const secretStorage = new SecretStorage(builder.accountDataClientAdapter, builder.ssssCryptoCallbacks);
 
         // the ID of the new SSSS key, if we create one
         let newKeyId: string | null = null;
