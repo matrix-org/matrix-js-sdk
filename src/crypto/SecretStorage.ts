@@ -40,20 +40,23 @@ export type { ISecretRequest } from "./SecretSharing";
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
+ *
+ * @deprecated this is just a backwards-compatibility hack which will be removed soon.
+ *    Use `SecretStorage` from `../secret-storage` and/or `SecretSharing` from `./SecretSharing`.
  */
 export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> implements ISecretStorage {
     private readonly storageImpl: StorageImpl;
     private readonly sharingImpl: SecretSharing;
 
-    // In it's pure javascript days, this was relying on some proper Javascript-style
+    // In its pure javascript days, this was relying on some proper Javascript-style
     // type-abuse where sometimes we'd pass in a fake client object with just the account
     // data methods implemented, which is all this class needs unless you use the secret
-    // sharing code, so it was fine. As a low-touch TypeScript migration, this now has
+    // sharing code, so it was fine. As a low-touch TypeScript migration, we added
     // an extra, optional param for a real matrix client, so you can not pass it as long
     // as you don't request any secrets.
-    // A better solution would probably be to split this class up into secret storage and
-    // secret sharing which are really two separate things, even though they share an MSC.
-
+    //
+    // Nowadays, the whole class is scheduled for destruction, once we get rid of the legacy
+    // Crypto impl that exposes it.
     public constructor(accountDataAdapter: AccountDataClient, cryptoCallbacks: ICryptoCallbacks, baseApis: B) {
         this.storageImpl = new StorageImpl(accountDataAdapter, cryptoCallbacks);
         this.sharingImpl = new SecretSharing(baseApis as MatrixClient, cryptoCallbacks);
