@@ -38,6 +38,7 @@ function makeMockClient(opts: {
     deviceId: string;
     deviceKey?: string;
     msc3882Enabled: boolean;
+    msc3882r0Only: boolean;
     msc3886Enabled: boolean;
     devices?: Record<string, Partial<DeviceInfo>>;
     verificationFunction?: (
@@ -57,6 +58,17 @@ function makeMockClient(opts: {
                     "org.matrix.msc3886": opts.msc3886Enabled,
                 },
             };
+        },
+        getCapabilities() {
+            return opts.msc3882r0Only
+                ? {}
+                : {
+                      capabilities: {
+                          "org.matrix.msc3882.get_login_token": {
+                              enabled: opts.msc3882Enabled,
+                          },
+                      },
+                  };
         },
         getUserId() {
             return opts.userId;
@@ -111,6 +123,7 @@ describe("Rendezvous", function () {
             deviceId: "DEVICEID",
             msc3886Enabled: false,
             msc3882Enabled: true,
+            msc3882r0Only: true,
         });
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
@@ -166,7 +179,13 @@ describe("Rendezvous", function () {
         await aliceRz.close();
     });
 
-    it("no protocols", async function () {
+    async function testNoProtocols({
+        msc3882Enabled,
+        msc3882r0Only,
+    }: {
+        msc3882Enabled: boolean;
+        msc3882r0Only: boolean;
+    }) {
         const aliceTransport = makeTransport("Alice");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -178,8 +197,9 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: false,
             msc3886Enabled: false,
+            msc3882Enabled,
+            msc3882r0Only,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
@@ -218,6 +238,14 @@ describe("Rendezvous", function () {
 
         await aliceStartProm;
         await bobStartPromise;
+    }
+
+    it("no protocols - r0", async function () {
+        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: true });
+    });
+
+    it("no protocols - r1", async function () {
+        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: false });
     });
 
     it("new device declines protocol with outcome unsupported", async function () {
@@ -233,6 +261,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
@@ -291,6 +320,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
@@ -349,6 +379,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
@@ -409,6 +440,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
@@ -477,6 +509,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
             devices,
             deviceKey: "aaaa",
