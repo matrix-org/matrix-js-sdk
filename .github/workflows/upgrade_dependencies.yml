@@ -31,8 +31,8 @@ jobs:
                       T-Task
 
             - name: Enable automerge
-              uses: peter-evans/enable-pull-request-automerge@684fed02ccc9b5eefcf7d40b65b3cd44255bd5bc # v2
+              run: gh pr merge --merge --auto "$PR_NUMBER"
               if: steps.cpr.outputs.pull-request-operation == 'created'
-              with:
-                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
-                  pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+              env:
+                  GH_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
