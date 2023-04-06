@@ -22,7 +22,12 @@ import { ToDeviceMessageId } from "../@types/event";
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import * as olmlib from "./olmlib";
-import { ISecretRequest } from "./SecretStorage";
+
+export interface ISecretRequest {
+    requestId: string;
+    promise: Promise<string>;
+    cancel: (reason: string) => void;
+}
 
 interface ISecretRequestInternal {
     name: string;

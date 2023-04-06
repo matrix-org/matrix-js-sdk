@@ -25,7 +25,7 @@ import {
     AccountDataClient,
     SecretStorage as StorageImpl,
 } from "../secret-storage";
-import { SecretSharing } from "./SecretSharing";
+import { ISecretRequest, SecretSharing } from "./SecretSharing";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -35,11 +35,7 @@ export type {
     SECRET_STORAGE_ALGORITHM_V1_AES,
 } from "../secret-storage";
 
-export interface ISecretRequest {
-    requestId: string;
-    promise: Promise<string>;
-    cancel: (reason: string) => void;
-}
+export type { ISecretRequest } from "./SecretSharing";
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
