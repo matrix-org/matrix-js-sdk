@@ -33,16 +33,94 @@ describe("SummaryStatsReporter", () => {
 
         it("should trigger new summary report", async () => {
             const summary = [
-                { receivedMedia: 10, receivedAudioMedia: 4, receivedVideoMedia: 6 },
-                { receivedMedia: 13, receivedAudioMedia: 0, receivedVideoMedia: 13 },
-                { receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 },
-                { receivedMedia: 15, receivedAudioMedia: 6, receivedVideoMedia: 9 },
+                {
+                    receivedMedia: 10,
+                    receivedAudioMedia: 4,
+                    receivedVideoMedia: 6,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 13,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 13,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 0,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+                {
+                    receivedMedia: 15,
+                    receivedAudioMedia: 6,
+                    receivedVideoMedia: 9,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
             ];
             reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
-                percentageReceivedMedia: 0.75,
+                percentageReceivedMedia: 0.5,
                 percentageReceivedAudioMedia: 0.5,
                 percentageReceivedVideoMedia: 0.75,
+            });
+        });
+
+        it("as received video Media, although video was not received, but because video muted", async () => {
+            const summary = [
+                {
+                    receivedMedia: 10,
+                    receivedAudioMedia: 10,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 1, muted: 1 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+            });
+        });
+
+        it("as received no video Media, because only on video was muted", async () => {
+            const summary = [
+                {
+                    receivedMedia: 10,
+                    receivedAudioMedia: 10,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 1, muted: 0 },
+                    videoTrackSummary: { count: 2, muted: 1 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 0,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 0,
+            });
+        });
+
+        it("as received no audio Media, although audio not received and audio muted", async () => {
+            const summary = [
+                {
+                    receivedMedia: 100,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 100,
+                    audioTrackSummary: { count: 1, muted: 1 },
+                    videoTrackSummary: { count: 1, muted: 0 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 0,
+                percentageReceivedAudioMedia: 0,
+                percentageReceivedVideoMedia: 1,
             });
         });
     });

@@ -14,4 +14,11 @@ export interface SummaryStats {
     receivedMedia: number;
     receivedAudioMedia: number;
     receivedVideoMedia: number;
+    audioTrackSummary: TrackSummary;
+    videoTrackSummary: TrackSummary;
+}
+
+export interface TrackSummary {
+    count: number;
+    muted: number;
 }

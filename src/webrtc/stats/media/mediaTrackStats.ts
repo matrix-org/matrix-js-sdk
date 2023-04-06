@@ -46,6 +46,9 @@ export class MediaTrackStats {
     private resolution: Resolution = { width: -1, height: -1 };
     private framerate = 0;
     private codec = "";
+    private isAlive = true;
+    private isMuted = false;
+    private isEnabled = true;
 
     public constructor(
         public readonly trackId: TrackId,
@@ -100,5 +103,41 @@ export class MediaTrackStats {
 
     public resetBitrate(): void {
         this.bitrate = { download: 0, upload: 0 };
+    }
+
+    public set alive(isAlive: boolean) {
+        this.isAlive = isAlive;
+    }
+
+    /**
+     * A MediaTrackState is alive if the corresponding MediaStreamTrack track bound to a transceiver and the
+     * MediaStreamTrack is in state MediaStreamTrack.readyState === live
+     */
+    public get alive(): boolean {
+        return this.isAlive;
+    }
+
+    public set muted(isMuted: boolean) {
+        this.isMuted = isMuted;
+    }
+
+    /**
+     * A MediaTrackState.isMuted corresponding to MediaStreamTrack.muted.
+     * But these values only match if MediaTrackState.isAlive.
+     */
+    public get muted(): boolean {
+        return this.isMuted;
+    }
+
+    public set enabled(isEnabled: boolean) {
+        this.isEnabled = isEnabled;
+    }
+
+    /**
+     * A MediaTrackState.isEnabled corresponding to MediaStreamTrack.enabled.
+     * But these values only match if MediaTrackState.isAlive.
+     */
+    public get enabled(): boolean {
+        return this.isEnabled;
     }
 }
