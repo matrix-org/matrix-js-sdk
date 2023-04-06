@@ -109,6 +109,10 @@ export class MediaTrackStats {
         this.isAlive = isAlive;
     }
 
+    /**
+     * A MediaTrackState is alive if the corresponding MediaStreamTrack track bound to a transceiver and the
+     * MediaStreamTrack is in state MediaStreamTrack.readyState === live
+     */
     public get alive(): boolean {
         return this.isAlive;
     }
@@ -117,6 +121,10 @@ export class MediaTrackStats {
         this.isMuted = isMuted;
     }
 
+    /**
+     * A MediaTrackState.isMuted corresponding to MediaStreamTrack.muted.
+     * But these values only match if MediaTrackState.isAlive.
+     */
     public get muted(): boolean {
         return this.isMuted;
     }
@@ -125,6 +133,10 @@ export class MediaTrackStats {
         this.isEnabled = isEnabled;
     }
 
+    /**
+     * A MediaTrackState.isEnabled corresponding to MediaStreamTrack.enabled.
+     * But these values only match if MediaTrackState.isAlive.
+     */
     public get enabled(): boolean {
         return this.isEnabled;
     }
