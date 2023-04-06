@@ -492,7 +492,11 @@ export interface IMSC3882GetLoginTokenCapability extends ICapability {}
 
 export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
 
-interface ICapabilities {
+/**
+ * A representation of the capabilities advertised by a homeserver as defined by
+ * [Capabilities negotiation](https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3capabilities).
+ */
+export interface ICapabilitiesAdvertised {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
@@ -1231,7 +1235,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected serverVersionsPromise?: Promise<IServerVersions>;
 
     public cachedCapabilities?: {
-        capabilities: ICapabilities;
+        capabilities: ICapabilitiesAdvertised;
         expiration: number;
     };
     protected clientWellKnown?: IClientWellKnown;
@@ -2050,7 +2054,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to the capabilities of the homeserver
      * @returns Rejects: with an error response.
      */
-    public getCapabilities(fresh = false): Promise<ICapabilities> {
+    public getCapabilities(fresh = false): Promise<ICapabilitiesAdvertised> {
         const now = new Date().getTime();
 
         if (this.cachedCapabilities && !fresh) {
@@ -2061,7 +2065,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         type Response = {
-            capabilities?: ICapabilities;
+            capabilities?: ICapabilitiesAdvertised;
         };
         return this.http
             .authedRequest<Response>(Method.Get, "/capabilities")
