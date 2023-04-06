@@ -669,15 +669,15 @@ describe("SlidingSyncSdk", () => {
                     left: ["@bob:localhost"],
                 },
             });
-            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith(
-                { oldSyncToken: "yep" },
-                { changed: ["@alice:localhost"], left: ["@bob:localhost"] },
-            );
+            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith({
+                changed: ["@alice:localhost"],
+                left: ["@bob:localhost"],
+            });
         });
 
-        it("can update OTK counts and unused fallback keys", async () => {
+        it("can update OTK counts and unused fallback keys", () => {
             client!.crypto!.processKeyCounts = jest.fn();
-            await ext.onResponse({
+            ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },

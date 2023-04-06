@@ -17,7 +17,7 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
-import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
@@ -29,8 +29,6 @@ import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { ISyncResponse } from "../sync-accumulator";
-import { ISyncStateData } from "../sync";
 import { MapWithDefault } from "../utils";
 
 /**
@@ -234,19 +232,12 @@ export class RustCrypto implements CryptoBackend {
         }
     }
 
-    /** called by the sync loop to process
+    /** called by the sync loop to process the notification that device lists have
+     * been changed.
      *
-     * @param syncData - Object containing sync tokens associated with this sync
      * @param deviceLists - device_lists field from /sync, or response from
      */
-    public async processDeviceLists(
-        syncData: ISyncStateData,
-        deviceLists: Required<ISyncResponse>["device_lists"],
-    ): Promise<void> {
-        // Initial syncs don't have device change lists. We'll either get the complete list
-        // of changes for the interval or will have invalidated everything in willProcessSync
-        if (!syncData.oldSyncToken || !deviceLists) return;
-
+    public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
         const devices = new RustSdkCryptoJs.DeviceLists(deviceLists.changed, deviceLists.left);
         await this.receiveSyncChanges({ devices });
     }

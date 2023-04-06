@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
-import { ISyncStateData } from "../sync";
-import { ISyncResponse } from "../sync-accumulator";
 
 /**
  * Common interface for the crypto implementations
@@ -116,14 +114,12 @@ export interface SyncCryptoCallbacks {
     processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
 
     /**
-     * Handle the notification from /sync or /keys/changes that device lists have
+     * Handle the notification from /sync that device lists have
      * been changed.
      *
-     * @param syncData - Object containing sync tokens associated with this sync
-     * @param deviceLists - device_lists field from /sync, or response from
-     * /keys/changes
+     * @param deviceLists - device_lists field from /sync
      */
-    processDeviceLists(syncData: ISyncStateData, deviceLists?: Required<ISyncResponse>["device_lists"]): Promise<void>;
+    processDeviceLists(deviceLists: IDeviceLists): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.

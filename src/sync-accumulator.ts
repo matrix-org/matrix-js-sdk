@@ -132,7 +132,7 @@ interface IToDevice {
     events: IToDeviceEvent[];
 }
 
-interface IDeviceLists {
+export interface IDeviceLists {
     changed?: string[];
     left?: string[];
 }
