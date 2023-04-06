@@ -14,7 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AccountDataClient, PassphraseInfo, SecretStorage } from "../../src/secret-storage";
+import { Mocked } from "jest-mock";
+
+import {
+    AccountDataClient,
+    PassphraseInfo,
+    SecretStorage,
+    SecretStorageKeyDescriptionAesV1,
+} from "../../src/secret-storage";
+import { calculateKeyCheck } from "../../src/crypto/aes";
+import { randomString } from "../../src/randomstring";
 
 describe("SecretStorage", function () {
     describe(".addKey", function () {
@@ -27,6 +36,19 @@ describe("SecretStorage", function () {
             expect(result.keyId.length).toEqual(32);
             expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
                 `m.secret_storage.key.${result.keyId}`,
+                result.keyInfo,
+            );
+        });
+
+        it("should allow storing a key with an explicit id", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {}, "myKeyId");
+
+            // it should have made up a 32-character key id
+            expect(result.keyId).toEqual("myKeyId");
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+                "m.secret_storage.key.myKeyId",
                 result.keyInfo,
             );
         });
@@ -71,11 +93,128 @@ describe("SecretStorage", function () {
             await expect(() => secretStorage.addKey("bad_alg")).rejects.toThrow("Unknown key algorithm");
         });
     });
+
+    describe("getKey", function () {
+        it("should return the specified key", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+
+            const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+                if (eventType === "m.secret_storage.key.my_key") {
+                    return storedKey as unknown as T;
+                } else {
+                    throw new Error(`unexpected eventType ${eventType}`);
+                }
+            }
+            accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
+
+            const result = await secretStorage.getKey("my_key");
+            expect(result).toEqual(["my_key", storedKey]);
+        });
+
+        it("should return the default key if none is specified", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+
+            const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+                if (eventType === "m.secret_storage.default_key") {
+                    return { key: "default_key_id" } as unknown as T;
+                } else if (eventType === "m.secret_storage.key.default_key_id") {
+                    return storedKey as unknown as T;
+                } else {
+                    throw new Error(`unexpected eventType ${eventType}`);
+                }
+            }
+            accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
+
+            const result = await secretStorage.getKey("mock");
+            expect(result).toEqual(["default_key_id", storedKey]);
+        });
+
+        it("should return null if the key is not found", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            // @ts-ignore
+            accountDataAdapter.getAccountDataFromServer.mockResolvedValue(null);
+
+            const result = await secretStorage.getKey("my_key");
+            expect(result).toEqual(null);
+        });
+    });
+
+    describe("checkKey", function () {
+        it("should return true for a correct key check", async function () {
+            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+
+            const myKey = new TextEncoder().encode(randomString(32));
+            const { iv, mac } = await calculateKeyCheck(myKey);
+
+            const keyInfo: SecretStorageKeyDescriptionAesV1 = {
+                name: "my key",
+                passphrase: {} as PassphraseInfo,
+                algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                iv,
+                mac,
+            };
+
+            const result = await secretStorage.checkKey(myKey, keyInfo);
+            expect(result).toBe(true);
+        });
+
+        it("should return false for an incorrect key check", async function () {
+            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+
+            const { iv, mac } = await calculateKeyCheck(new TextEncoder().encode("badkey"));
+
+            const keyInfo: SecretStorageKeyDescriptionAesV1 = {
+                name: "my key",
+                passphrase: {} as PassphraseInfo,
+                algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                iv,
+                mac,
+            };
+
+            const result = await secretStorage.checkKey(new TextEncoder().encode("goodkey"), keyInfo);
+            expect(result).toBe(false);
+        });
+
+        it("should raise for an unknown algorithm", async function () {
+            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const keyInfo: SecretStorageKeyDescriptionAesV1 = {
+                name: "my key",
+                passphrase: {} as PassphraseInfo,
+                algorithm: "bad_alg",
+                iv: "iv",
+                mac: "mac",
+            };
+
+            await expect(() => secretStorage.checkKey(new TextEncoder().encode("goodkey"), keyInfo)).rejects.toThrow(
+                "Unknown algorithm",
+            );
+        });
+
+        // XXX: really???
+        it("should return true for an absent mac", async function () {
+            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const keyInfo: SecretStorageKeyDescriptionAesV1 = {
+                name: "my key",
+                passphrase: {} as PassphraseInfo,
+                algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                iv: "iv",
+                mac: "",
+            };
+
+            const result = await secretStorage.checkKey(new TextEncoder().encode("goodkey"), keyInfo);
+            expect(result).toBe(true);
+        });
+    });
 });
 
-function mockAccountDataClient(): AccountDataClient {
+function mockAccountDataClient(): Mocked<AccountDataClient> {
     return {
         getAccountDataFromServer: jest.fn().mockResolvedValue(null),
         setAccountData: jest.fn().mockResolvedValue({}),
-    } as unknown as AccountDataClient;
+    } as unknown as Mocked<AccountDataClient>;
 }
