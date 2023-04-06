@@ -25,6 +25,9 @@ export enum ServerSupport {
 export enum Feature {
     Thread = "Thread",
     ThreadUnreadNotifications = "ThreadUnreadNotifications",
+    /**
+     * @deprecated this is now exposed as a capability not a feature
+     */
     LoginTokenRequest = "LoginTokenRequest",
     RelationBasedRedactions = "RelationBasedRedactions",
     AccountDataDeletion = "AccountDataDeletion",

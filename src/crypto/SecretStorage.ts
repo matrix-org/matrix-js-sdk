@@ -36,7 +36,7 @@ import {
 } from "../secret-storage";
 
 /* re-exports for backwards compatibility */
-export {
+export type {
     AccountDataClient as IAccountDataClient,
     SecretStorageKeyTuple,
     SecretStorageKeyObject,

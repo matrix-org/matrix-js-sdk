@@ -488,11 +488,17 @@ export interface IChangePasswordCapability extends ICapability {}
 
 export interface IThreadsCapability extends ICapability {}
 
+export interface IMSC3882GetLoginTokenCapability extends ICapability {}
+
+export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
+
 interface ICapabilities {
     [key: string]: any;
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
     "io.element.thread"?: IThreadsCapability;
+    [UNSTABLE_MSC3882_CAPABILITY.name]?: IMSC3882GetLoginTokenCapability;
+    [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
 }
 
 /* eslint-disable camelcase */
@@ -7808,15 +7814,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
+        // use capabilities to determine which revision of the MSC is being used
+        const capabilities = await this.getCapabilities();
+        // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
+        const endpoint = UNSTABLE_MSC3882_CAPABILITY.findIn(capabilities)
+            ? "/org.matrix.msc3882/login/get_token" // r1 endpoint
+            : "/org.matrix.msc3882/login/token"; // r0 endpoint
+
         const body: UIARequest<{}> = { auth };
-        return this.http.authedRequest(
+        const res = await this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
             Method.Post,
-            "/org.matrix.msc3882/login/token",
+            endpoint,
             undefined, // no query params
             body,
             { prefix: ClientPrefix.Unstable },
         );
+
+        // the representation of expires_in changed from revision 0 to revision 1 so we populate
+        if ("login_token" in res) {
+            if (typeof res.expires_in_ms === "number") {
+                res.expires_in = Math.floor(res.expires_in_ms / 1000);
+            } else if (typeof res.expires_in === "number") {
+                res.expires_in_ms = res.expires_in * 1000;
+            }
+        }
+
+        return res;
     }
 
     /**
