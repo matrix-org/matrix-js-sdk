@@ -95,7 +95,6 @@ class MlsDecryption extends DecryptionAlgorithm {
         );
         if (processed_message.is_application_message()) {
             const messageArr = processed_message.as_application_message();
-            console.log(messageArr);
             const clearEvent = JSON.parse(textDecoder.decode(Uint8Array.from(messageArr)));
             if (typeof(clearEvent.room_id) !== "string" ||
                 typeof(clearEvent.type) !== "string" ||
@@ -125,10 +124,12 @@ class WelcomeDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
         console.log("Got welcome", content);
         // FIXME: check that it's a to-device event
-        if (typeof(content.ciphertext) !== "string" || typeof(content.creator) !== "string") {
+        if (typeof(content.ciphertext) !== "string" ||
+            typeof(content.creator) !== "string" ||
+            !Array.isArray(content.resolves)) {
             throw new DecryptionError("MLS_WELCOME_MISSING_FIELDS", "Missing or invalid fields in input");
         }
-        this.crypto.mlsProvider.processWelcome(content.ciphertext, content.creator);
+        this.crypto.mlsProvider.processWelcome(content.ciphertext, content.creator, content.resolves);
         // welcome packages don't have any visible representation and don't get
         // processed further
         return {
@@ -156,7 +157,11 @@ export class MlsProvider {
 
     async init(): Promise<void> {
         await matrix_dmls.initAsync();
-        this.backend = new matrix_dmls.DmlsCryptoProvider(this.store.bind(this), this.read.bind(this));
+        this.backend = new matrix_dmls.DmlsCryptoProvider(
+            this.store.bind(this),
+            this.read.bind(this),
+            this.get_init_keys.bind(this),
+        );
         let baseApis = this.crypto.baseApis;
         this.credential = new matrix_dmls.Credential(
             this.backend!,
@@ -178,6 +183,39 @@ export class MlsProvider {
         return this.storage.get(MlsProvider.key_to_string(key));
     }
 
+    async get_init_keys(users: Uint8Array[]): Promise<(Uint8Array | undefined)[]> {
+        let baseApis = this.crypto.baseApis;
+
+        if (users.length) {
+            const devicesToClaim: [string, string][] = users.map((user) => {
+                const userStr = textDecoder.decode(Uint8Array.from(user));
+                // FIXME: this will do the wrong thing if the device ID has a "|"
+                return userStr.split("|", 2) as [string, string];
+            })
+
+            const otks = await baseApis.claimOneTimeKeys(devicesToClaim, INIT_KEY_ALGORITHM.name);
+
+            console.log("InitKeys", otks);
+
+            const keys: (Uint8Array | undefined)[] = [];
+
+            for (const [user, device] of devicesToClaim) {
+                if (user in otks.one_time_keys && device in otks.one_time_keys[user]) {
+                    const key = otks.one_time_keys[user][device];
+                    const initKeyB64 = Object.values(key)[0] as unknown as string;
+                    const initKey = olmlib.decodeBase64(initKeyB64);
+                    keys.push(initKey);
+                } else {
+                    keys.push(undefined);
+                }
+            }
+
+            return keys;
+        } else {
+            return [];
+        }
+    }
+
     async createGroup(room: Room, invite: string[]): Promise<matrix_dmls.DmlsGroup> {
         let baseApis = this.crypto.baseApis;
 
@@ -187,30 +225,19 @@ export class MlsProvider {
         const userId = baseApis.getUserId()!;
         const deviceMap = await this.crypto.deviceList.downloadKeys([userId].concat(invite), false);
         delete deviceMap[userId][baseApis.getDeviceId()!];
-        const devicesToClaim: [string, string][] = [];
+
+        let addedMembers = false;
+
         for (const [user, devices] of Object.entries(deviceMap)) {
             for (const deviceId of Object.keys(devices)) {
-                devicesToClaim.push([user, deviceId]);
+                addedMembers = true;
+                const mlsUser = user + "|" + deviceId;
+                group.add_member(textEncoder.encode(mlsUser), this.backend!);
             }
         }
-        console.log("Initial devices in group", devicesToClaim);
-        if (devicesToClaim.length) {
-            const otks = await baseApis.claimOneTimeKeys(devicesToClaim, INIT_KEY_ALGORITHM.name);
 
-            console.log("InitKeys", otks);
-
-            for (const [user, devices] of Object.entries(otks.one_time_keys) || []) {
-                for (const [device, key] of Object.entries(devices)) {
-                    const initKeyB64 = Object.values(key)[0] as unknown as string;
-                    // FIXME: sanity check that initKeyB64 exists and is a string
-                    const initKey = olmlib.decodeBase64(initKeyB64);
-                    const mlsUser = user + "|" + device;
-                    this.backend!.add_init_key(textEncoder.encode(mlsUser), initKey);
-                    group.add_member(textEncoder.encode(mlsUser), this.backend!);
-                }
-            }
-
-            const [_commit, _mls_epoch, creator, _resolves, [welcome, adds]] = group.resolve(this.backend!);
+        if (addedMembers) {
+            const [_commit, _mls_epoch, creator, resolves, [welcome, adds]] = await group.resolve(this.backend!);
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
             const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
@@ -221,6 +248,9 @@ export class MlsProvider {
                 algorithm: WELCOME_PACKAGE.name,
                 ciphertext: welcomeB64,
                 creator: creatorB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
             }
 
             for (const user of adds) {
@@ -243,9 +273,12 @@ export class MlsProvider {
         return group;
     }
 
-    processWelcome(welcomeB64: string, creatorB64: string): void {
+    processWelcome(welcomeB64: string, creatorB64: string, resolvesB64: [number, string][]): void {
         const welcome = olmlib.decodeBase64(welcomeB64);
         const creator = olmlib.decodeBase64(creatorB64);
+        const resolves = resolvesB64.map(([epochNum, creatorB64]) => {
+            return [epochNum, olmlib.decodeBase64(creatorB64)];
+        });
         const group = matrix_dmls.DmlsGroup.new_from_welcome(this.backend!, welcome, creator);
         const groupIdArr = group.group_id();
         const groupId = textDecoder.decode(groupIdArr);
@@ -253,7 +286,7 @@ export class MlsProvider {
         // FIXME: check that it's a valid room ID
         if (this.groups.has(groupId)) {
             const oldGroup = this.groups.get(groupId)!;
-            oldGroup.add_epoch_from_new_group(this.backend!, group);
+            oldGroup.add_epoch_from_new_group(this.backend!, group, resolves);
         } else {
             this.groups.set(groupId, group);
         }
