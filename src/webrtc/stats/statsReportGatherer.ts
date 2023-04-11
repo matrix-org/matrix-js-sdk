@@ -49,7 +49,13 @@ export class StatsReportGatherer {
     }
 
     public async processStats(groupCallId: string, localUserId: string): Promise<SummaryStats> {
-        const summary = { receivedMedia: 0, receivedAudioMedia: 0, receivedVideoMedia: 0 } as SummaryStats;
+        const summary = {
+            receivedMedia: 0,
+            receivedAudioMedia: 0,
+            receivedVideoMedia: 0,
+            audioTrackSummary: { count: 0, muted: 0 },
+            videoTrackSummary: { count: 0, muted: 0 },
+        } as SummaryStats;
         if (this.isActive) {
             const statsPromise = this.pc.getStats();
             if (typeof statsPromise?.then === "function") {
@@ -68,7 +74,14 @@ export class StatsReportGatherer {
                         summary.receivedMedia = this.connectionStats.bitrate.download;
                         summary.receivedAudioMedia = this.connectionStats.bitrate.audio?.download || 0;
                         summary.receivedVideoMedia = this.connectionStats.bitrate.video?.download || 0;
-                        return summary;
+                        const trackSummary = TrackStatsReporter.buildTrackSummary(
+                            Array.from(this.trackStats.getTrack2stats().values()),
+                        );
+                        return {
+                            ...summary,
+                            audioTrackSummary: trackSummary.audioTrackSummary,
+                            videoTrackSummary: trackSummary.videoTrackSummary,
+                        };
                     })
                     .catch((error) => {
                         this.handleError(error);
@@ -122,6 +135,8 @@ export class StatsReportGatherer {
                     if (before) {
                         TrackStatsReporter.buildBitrateReceived(trackStats, now, before);
                     }
+                    const ts = this.trackStats.findTransceiverByTrackId(trackStats.trackId);
+                    TrackStatsReporter.setTrackStatsState(trackStats, ts);
                 } else if (before) {
                     byteSentStats.set(trackStats.trackId, StatsValueFormatter.getNonNegativeValue(now.bytesSent));
                     TrackStatsReporter.buildBitrateSend(trackStats, now, before);

@@ -129,4 +129,121 @@ describe("TrackStatsReporter", () => {
             expect(trackStats.getLoss()).toEqual({ packetsTotal: 280, packetsLost: 80, isDownloadStream: true });
         });
     });
+
+    describe("should set state of a TrackStats", () => {
+        it("to not alive if Transceiver undefined", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.setTrackStatsState(trackStats, undefined);
+            expect(trackStats.alive).toBeFalsy();
+        });
+
+        it("to not alive if Transceiver has no local track", async () => {
+            const trackStats = new MediaTrackStats("1", "local", "video");
+            const ts = {
+                sender: {
+                    track: null,
+                } as RTCRtpSender,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeFalsy();
+        });
+
+        it("to alive if Transceiver remote and track is alive", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            trackStats.alive = false;
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "live",
+                        enabled: false,
+                        muted: false,
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
+        });
+
+        it("to alive if Transceiver local and track is live", async () => {
+            const trackStats = new MediaTrackStats("1", "local", "video");
+            trackStats.alive = false;
+            const ts = {
+                sender: {
+                    track: {
+                        readyState: "live",
+                        enabled: false,
+                        muted: false,
+                    } as MediaStreamTrack,
+                } as RTCRtpSender,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
+        });
+
+        it("to not alive if Transceiver track is ended", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "ended",
+                        enabled: false,
+                        muted: false,
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeFalsy();
+        });
+
+        it("to not alive and muted if Transceiver track is live and muted", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            const ts = {
+                receiver: {
+                    track: {
+                        readyState: "live",
+                        enabled: false,
+                        muted: true,
+                    } as MediaStreamTrack,
+                } as RTCRtpReceiver,
+            } as RTCRtpTransceiver;
+
+            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            expect(trackStats.alive).toBeTruthy();
+            expect(trackStats.muted).toBeTruthy();
+        });
+    });
+
+    describe("should build Track Summary", () => {
+        it("and returns empty summary if stats list empty", async () => {
+            const summary = TrackStatsReporter.buildTrackSummary([]);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+            });
+        });
+
+        it("and returns  summary if stats list not empty", async () => {
+            const summary = TrackStatsReporter.buildTrackSummary([]);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                },
+            });
+        });
+    });
 });

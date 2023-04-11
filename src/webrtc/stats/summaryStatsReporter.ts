@@ -22,14 +22,40 @@ export class SummaryStatsReporter {
         if (entirety === 0) {
             return;
         }
-        const report = {} as SummaryStatsReport;
-        report.percentageReceivedVideoMedia =
-            Math.round((summary.filter((s) => s.receivedVideoMedia > 0).length / entirety) * 100) / 100;
-        report.percentageReceivedAudioMedia =
-            Math.round((summary.filter((s) => s.receivedAudioMedia > 0).length / entirety) * 100) / 100;
-        report.percentageReceivedMedia =
-            Math.round((summary.filter((s) => s.receivedMedia > 0).length / entirety) * 100) / 100;
+        let receivedMedia = 0;
+        let receivedVideoMedia = 0;
+        let receivedAudioMedia = 0;
 
+        summary.forEach((stats) => {
+            let hasReceivedAudio = false;
+            let hasReceivedVideo = false;
+            if (stats.receivedAudioMedia > 0) {
+                receivedAudioMedia++;
+                hasReceivedAudio = true;
+            }
+            if (stats.receivedVideoMedia > 0) {
+                receivedVideoMedia++;
+                hasReceivedVideo = true;
+            } else {
+                if (
+                    stats.videoTrackSummary.muted > 0 &&
+                    stats.videoTrackSummary.muted === stats.videoTrackSummary.count
+                ) {
+                    receivedVideoMedia++;
+                    hasReceivedVideo = true;
+                }
+            }
+
+            if (stats.receivedMedia > 0 && hasReceivedVideo && hasReceivedAudio) {
+                receivedMedia++;
+            }
+        });
+
+        const report = {
+            percentageReceivedMedia: Math.round((receivedMedia / entirety) * 100) / 100,
+            percentageReceivedVideoMedia: Math.round((receivedVideoMedia / entirety) * 100) / 100,
+            percentageReceivedAudioMedia: Math.round((receivedAudioMedia / entirety) * 100) / 100,
+        } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
 }

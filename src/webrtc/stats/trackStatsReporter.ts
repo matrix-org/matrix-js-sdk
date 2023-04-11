@@ -1,5 +1,6 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
 import { StatsValueFormatter } from "./statsValueFormatter";
+import { TrackSummary } from "./summaryStats";
 
 export class TrackStatsReporter {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
@@ -108,10 +109,48 @@ export class TrackStatsReporter {
         let bitrateKbps = 0;
 
         if (timeMs > 0) {
-            // TODO is there any reason to round here?
             bitrateKbps = Math.round((bytesProcessed * 8) / timeMs);
         }
 
         return bitrateKbps;
+    }
+
+    public static setTrackStatsState(trackStats: MediaTrackStats, transceiver: RTCRtpTransceiver | undefined): void {
+        if (transceiver === undefined) {
+            trackStats.alive = false;
+            return;
+        }
+
+        const track = trackStats.getType() === "remote" ? transceiver.receiver.track : transceiver?.sender?.track;
+        if (track === undefined || track === null) {
+            trackStats.alive = false;
+            return;
+        }
+
+        if (track.readyState === "ended") {
+            trackStats.alive = false;
+            return;
+        }
+        trackStats.muted = track.muted;
+        trackStats.enabled = track.enabled;
+        trackStats.alive = true;
+    }
+
+    public static buildTrackSummary(trackStatsList: MediaTrackStats[]): {
+        audioTrackSummary: TrackSummary;
+        videoTrackSummary: TrackSummary;
+    } {
+        const audioTrackSummary = { count: 0, muted: 0 };
+        const videoTrackSummary = { count: 0, muted: 0 };
+        trackStatsList
+            .filter((t) => t.getType() === "remote")
+            .forEach((stats) => {
+                const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+                trackSummary.count++;
+                if (stats.alive && stats.muted) {
+                    trackSummary.muted++;
+                }
+            });
+        return { audioTrackSummary, videoTrackSummary };
     }
 }
