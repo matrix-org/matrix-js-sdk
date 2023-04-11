@@ -662,13 +662,17 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("can update device lists", () => {
+            client!.crypto!.processDeviceLists = jest.fn();
             ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
                     left: ["@bob:localhost"],
                 },
             });
-            // TODO: more assertions?
+            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith({
+                changed: ["@alice:localhost"],
+                left: ["@bob:localhost"],
+            });
         });
 
         it("can update OTK counts and unused fallback keys", () => {
