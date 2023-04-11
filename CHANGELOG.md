@@ -1,5 +1,5 @@
-Changes in [24.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.1.0-rc.1) (2023-04-04)
-============================================================================================================
+Changes in [24.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.1.0) (2023-04-11)
+==================================================================================================
 
 ## ✨ Features
  * Allow via_servers property in findPredecessor (update to MSC3946) ([\#3240](https://github.com/matrix-org/matrix-js-sdk/pull/3240)). Contributed by @andybalaam.
