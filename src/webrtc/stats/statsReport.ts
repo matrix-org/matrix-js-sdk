@@ -38,6 +38,7 @@ export interface ConnectionStatsReport {
     resolution: ResolutionMap;
     framerate: FramerateMap;
     codec: CodecMap;
+    jitter: Map<TrackID, number>;
     transport: TransportStats[];
 }
 

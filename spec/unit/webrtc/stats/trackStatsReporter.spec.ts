@@ -246,4 +246,30 @@ describe("TrackStatsReporter", () => {
             });
         });
     });
+
+    describe("should build jitter value in Track Stats", () => {
+        it("and returns track stats without jitter if report not 'inbound-rtp'", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.buildJitter(trackStats, { jitter: 0.01 });
+            expect(trackStats.getJitter()).toEqual(0);
+        });
+
+        it("and returns track stats with jitter", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.buildJitter(trackStats, { type: "inbount-rtp", jitter: 0.01 });
+            expect(trackStats.getJitter()).toEqual(10);
+        });
+
+        it("and returns negative jitter if stats has no jitter value", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.buildJitter(trackStats, { type: "inbount-rtp" });
+            expect(trackStats.getJitter()).toEqual(-1);
+        });
+
+        it("and returns jitter as number", async () => {
+            const trackStats = new MediaTrackStats("1", "remote", "video");
+            TrackStatsReporter.buildJitter(trackStats, { type: "inbount-rtp", jitter: "0.5" });
+            expect(trackStats.getJitter()).toEqual(500);
+        });
+    });
 });

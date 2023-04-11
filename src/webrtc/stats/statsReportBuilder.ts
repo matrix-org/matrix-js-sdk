@@ -37,6 +37,7 @@ export class StatsReportBuilder {
         };
         const framerates: FramerateMap = { local: new Map<TrackID, number>(), remote: new Map<TrackID, number>() };
         const codecs: CodecMap = { local: new Map<TrackID, string>(), remote: new Map<TrackID, string>() };
+        const jitter = new Map<TrackID, number>();
 
         let audioBitrateDownload = 0;
         let audioBitrateUpload = 0;
@@ -67,6 +68,9 @@ export class StatsReportBuilder {
             resolutions[trackStats.getType()].set(trackId, trackStats.getResolution());
             framerates[trackStats.getType()].set(trackId, trackStats.getFramerate());
             codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
+            if (trackStats.getType() === "remote") {
+                jitter.set(trackId, trackStats.getJitter());
+            }
 
             trackStats.resetBitrate();
         }
@@ -97,6 +101,7 @@ export class StatsReportBuilder {
         report.framerate = framerates;
         report.resolution = resolutions;
         report.codec = codecs;
+        report.jitter = jitter;
         return report;
     }
 
