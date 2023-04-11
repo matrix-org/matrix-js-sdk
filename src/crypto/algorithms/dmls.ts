@@ -23,7 +23,7 @@ import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
 import { Crypto, IEncryptedContent, IEventDecryptionResult } from "..";
 import { UnstableValue } from "../../NamespacedValue";
-import * as matrix_dmls from "matrix-dmls-wasm";
+import * as matrixDmls from "matrix-dmls-wasm";
 import * as olmlib from "../olmlib";
 
 export const MLS_ALGORITHM = new UnstableValue(
@@ -82,19 +82,19 @@ class MlsDecryption extends DecryptionAlgorithm {
             throw "No group available";
         }
         const ciphertext = olmlib.decodeBase64(content.ciphertext);
-        const epoch_creator = olmlib.decodeBase64(content.epoch_creator);
-        const unverified_message = group.parse_message(
+        const epochCreator = olmlib.decodeBase64(content.epoch_creator);
+        const unverifiedMessage = group.parse_message(
             ciphertext,
-            epoch_creator,
+            epochCreator,
             mlsProvider.backend!,
         );
-        const processed_message = group.process_unverified_message(
-            unverified_message,
-            epoch_creator,
+        const processedMessage = group.process_unverified_message(
+            unverifiedMessage,
+            epochCreator,
             mlsProvider.backend!,
         );
-        if (processed_message.is_application_message()) {
-            const messageArr = processed_message.as_application_message();
+        if (processedMessage.is_application_message()) {
+            const messageArr = processedMessage.as_application_message();
             const clearEvent = JSON.parse(textDecoder.decode(Uint8Array.from(messageArr)));
             if (typeof(clearEvent.room_id) !== "string" ||
                 typeof(clearEvent.type) !== "string" ||
@@ -104,7 +104,7 @@ class MlsDecryption extends DecryptionAlgorithm {
             return {
                 clearEvent
             }
-        } else if (processed_message.is_staged_commit()) {
+        } else if (processedMessage.is_staged_commit()) {
             // FIXME:
             throw new DecryptionError("MLS_MISSING_FIELDS", "Handling commits not implemented yet");
         } else {
@@ -142,10 +142,10 @@ class WelcomeDecryption extends DecryptionAlgorithm {
 }
 
 export class MlsProvider {
-    private readonly groups: Map<string, matrix_dmls.DmlsGroup>;
+    private readonly groups: Map<string, matrixDmls.DmlsGroup>;
     private readonly storage: Map<string, number[]> ;
-    public backend?: matrix_dmls.DmlsCryptoProvider;
-    public credential?: matrix_dmls.Credential;
+    public backend?: matrixDmls.DmlsCryptoProvider;
+    public credential?: matrixDmls.Credential;
 
     constructor(public readonly crypto: Crypto) {
         // FIXME: we should persist groups
@@ -156,34 +156,34 @@ export class MlsProvider {
     }
 
     async init(): Promise<void> {
-        await matrix_dmls.initAsync();
-        this.backend = new matrix_dmls.DmlsCryptoProvider(
+        await matrixDmls.initAsync();
+        this.backend = new matrixDmls.DmlsCryptoProvider(
             this.store.bind(this),
             this.read.bind(this),
-            this.get_init_keys.bind(this),
+            this.getInitKeys.bind(this),
         );
         let baseApis = this.crypto.baseApis;
-        this.credential = new matrix_dmls.Credential(
+        this.credential = new matrixDmls.Credential(
             this.backend!,
             textEncoder.encode(baseApis.getUserId() + "|" + baseApis.getDeviceId()),
         );
     }
 
-    static key_to_string([group_id_arr, epoch, creator_arr]: [number[], number, number[]]): string {
-        let group_id = new Uint8Array(group_id_arr);
-        let creator = new Uint8Array(creator_arr);
-        return olmlib.encodeUnpaddedBase64(group_id) + "|" + epoch + "|" + olmlib.encodeUnpaddedBase64(creator);
+    static keyToString([groupIdArr, epoch, creatorArr]: [number[], number, number[]]): string {
+        let groupId = new Uint8Array(groupIdArr);
+        let creator = new Uint8Array(creatorArr);
+        return olmlib.encodeUnpaddedBase64(groupId) + "|" + epoch + "|" + olmlib.encodeUnpaddedBase64(creator);
     }
 
     store(key: [number[], number, number[]], value: number[]): void {
-        this.storage.set(MlsProvider.key_to_string(key), value);
+        this.storage.set(MlsProvider.keyToString(key), value);
     }
 
     read(key: [number[], number, number[]]): number[] | undefined {
-        return this.storage.get(MlsProvider.key_to_string(key));
+        return this.storage.get(MlsProvider.keyToString(key));
     }
 
-    async get_init_keys(users: Uint8Array[]): Promise<(Uint8Array | undefined)[]> {
+    async getInitKeys(users: Uint8Array[]): Promise<(Uint8Array | undefined)[]> {
         let baseApis = this.crypto.baseApis;
 
         if (users.length) {
@@ -216,10 +216,10 @@ export class MlsProvider {
         }
     }
 
-    async createGroup(room: Room, invite: string[]): Promise<matrix_dmls.DmlsGroup> {
+    async createGroup(room: Room, invite: string[]): Promise<matrixDmls.DmlsGroup> {
         let baseApis = this.crypto.baseApis;
 
-        const group = new matrix_dmls.DmlsGroup(this.backend!, this.credential!, textEncoder.encode(room.roomId))
+        const group = new matrixDmls.DmlsGroup(this.backend!, this.credential!, textEncoder.encode(room.roomId))
         this.groups.set(room.roomId, group);
 
         const userId = baseApis.getUserId()!;
@@ -279,7 +279,7 @@ export class MlsProvider {
         const resolves = resolvesB64.map(([epochNum, creatorB64]) => {
             return [epochNum, olmlib.decodeBase64(creatorB64)];
         });
-        const group = matrix_dmls.DmlsGroup.new_from_welcome(this.backend!, welcome, creator);
+        const group = matrixDmls.DmlsGroup.new_from_welcome(this.backend!, welcome, creator);
         const groupIdArr = group.group_id();
         const groupId = textDecoder.decode(groupIdArr);
         console.log("Welcome message for", groupId);
@@ -292,7 +292,7 @@ export class MlsProvider {
         }
     }
 
-    getGroup(roomId: string): matrix_dmls.DmlsGroup | undefined {
+    getGroup(roomId: string): matrixDmls.DmlsGroup | undefined {
         return this.groups.get(roomId);
     }
 }
