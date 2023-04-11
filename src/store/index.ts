@@ -176,7 +176,7 @@ export interface IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    save(force?: boolean): void;
+    save(force?: boolean): Promise<void>;
 
     /**
      * Startup does nothing.

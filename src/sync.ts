@@ -953,7 +953,7 @@ export class SyncApi {
                 }
 
                 // tell databases that everything is now in a consistent state and can be saved.
-                this.client.store.save();
+                await this.client.store.save();
             }
         }
 
