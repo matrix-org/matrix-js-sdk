@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
@@ -104,6 +104,22 @@ export interface SyncCryptoCallbacks {
      * @returns A list of preprocessed to-device messages.
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop when one time key counts and unused fallback key details are received.
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     */
+    processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
+
+    /**
+     * Handle the notification from /sync that device lists have
+     * been changed.
+     *
+     * @param deviceLists - device_lists field from /sync
+     */
+    processDeviceLists(deviceLists: IDeviceLists): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.

@@ -34,22 +34,8 @@ import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import {
-    IAccountDataClient,
-    ISecretRequest,
-    SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorage,
-    SecretStorageKeyObject,
-    SecretStorageKeyTuple,
-} from "./SecretStorage";
-import {
-    IAddSecretStorageKeyOpts,
-    ICreateSecretStorageOpts,
-    IEncryptedEventInfo,
-    IImportRoomKeysOpts,
-    IRecoveryKey,
-    ISecretStorageKeyInfo,
-} from "./api";
+import { ISecretRequest, SecretStorage } from "./SecretStorage";
+import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
@@ -85,11 +71,20 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IContent } from "../models/event";
-import { ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
+import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
+import { MapWithDefault, recursiveMapToObject } from "../utils";
+import {
+    AccountDataClient,
+    AddSecretStorageKeyOpts,
+    SecretStorageKeyDescription,
+    SecretStorageKeyObject,
+    SecretStorageKeyTuple,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+} from "../secret-storage";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -141,10 +136,10 @@ export interface ICryptoCallbacks {
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
     getSecretStorageKey?: (
-        keys: { keys: Record<string, ISecretStorageKeyInfo> },
+        keys: { keys: Record<string, SecretStorageKeyDescription> },
         name: string,
     ) => Promise<[string, Uint8Array] | null>;
-    cacheSecretStorageKey?: (keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
     onSecretRequested?: (
         userId: string,
         deviceId: string,
@@ -152,7 +147,10 @@ export interface ICryptoCallbacks {
         secretName: string,
         deviceTrust: DeviceTrustLevel,
     ) => Promise<string | undefined>;
-    getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
+    getDehydrationKey?: (
+        keyInfo: SecretStorageKeyDescription,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
@@ -399,7 +397,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     //         deviceId: 1234567890000,
     //     },
     // }
-    private lastNewSessionForced: Record<string, Record<string, number>> = {};
+    // Map: user Id → device Id → timestamp
+    private lastNewSessionForced: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
+        () => new MapWithDefault(() => 0),
+    );
 
     // This flag will be unset whilst the client processes a sync response
     // so that we don't start requesting keys until we've actually finished
@@ -522,7 +523,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
         // Yes, we pass the client twice here: see SecretStorage
-        this.secretStorage = new SecretStorage(baseApis as IAccountDataClient, cryptoCallbacks, baseApis);
+        this.secretStorage = new SecretStorage(baseApis as AccountDataClient, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.
@@ -903,7 +904,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
+        const createSSSS = async (opts: AddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
             if (privateKey) {
                 opts.key = privateKey;
             }
@@ -919,7 +920,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return keyId;
         };
 
-        const ensureCanCheckPassphrase = async (keyId: string, keyInfo: ISecretStorageKeyInfo): Promise<void> => {
+        const ensureCanCheckPassphrase = async (keyId: string, keyInfo: SecretStorageKeyDescription): Promise<void> => {
             if (!keyInfo.mac) {
                 const key = await this.baseApis.cryptoCallbacks.getSecretStorageKey?.(
                     { keys: { [keyId]: keyInfo } },
@@ -977,7 +978,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo = {} as IAddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
+            const { keyInfo = {} as AddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
             newKeyId = await createSSSS(keyInfo, privateKey);
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
@@ -988,7 +989,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const backupKey = (await this.getSessionBackupPrivateKey()) || (await getKeyBackupPassphrase?.());
 
             // create a new SSSS key and use the backup key as the new SSSS key
-            const opts = {} as IAddSecretStorageKeyOpts;
+            const opts = {} as AddSecretStorageKeyOpts;
 
             if (keyBackupInfo.auth_data.private_key_salt && keyBackupInfo.auth_data.private_key_iterations) {
                 // FIXME: ???
@@ -1104,7 +1105,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     public addSecretStorageKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts,
+        opts: AddSecretStorageKeyOpts,
         keyID?: string,
     ): Promise<SecretStorageKeyObject> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
@@ -1126,7 +1127,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.get(name);
     }
 
-    public isSecretStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 
@@ -1145,7 +1146,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.setDefaultKeyId(k);
     }
 
-    public checkSecretStorageKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
+    public checkSecretStorageKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
         return this.secretStorage.checkKey(key, info);
     }
 
@@ -1816,24 +1817,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         });
     }
 
-    /**
-     * Stores the current one_time_key count which will be handled later (in a call of
-     * onSyncCompleted). The count is e.g. coming from a /sync response.
-     *
-     * @param currentCount - The current count of one_time_keys to be stored
-     */
-    public updateOneTimeKeyCount(currentCount: number): void {
-        if (isFinite(currentCount)) {
-            this.oneTimeKeyCount = currentCount;
-        } else {
-            throw new TypeError("Parameter for updateOneTimeKeyCount has to be a number");
-        }
-    }
-
-    public setNeedsNewFallback(needsNewFallback: boolean): void {
-        this.needsNewFallback = needsNewFallback;
-    }
-
     public getNeedsNewFallback(): boolean {
         return !!this.needsNewFallback;
     }
@@ -1969,7 +1952,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 fallbackJson["signed_curve25519:" + keyId] = k;
                 promises.push(this.signObject(k));
             }
-            this.setNeedsNewFallback(false);
+            this.needsNewFallback = false;
         }
 
         const oneTimeKeys = await this.olmDevice.getOneTimeKeys();
@@ -2488,13 +2471,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * This should not normally be necessary.
      */
-    public forceDiscardSession(roomId: string): void {
+    public forceDiscardSession(roomId: string): Promise<void> {
         const alg = this.roomEncryptors.get(roomId);
         if (alg === undefined) throw new Error("Room not encrypted");
         if (alg.forceDiscardSession === undefined) {
             throw new Error("Room encryption algorithm doesn't support session discarding");
         }
         alg.forceDiscardSession();
+        return Promise.resolve();
     }
 
     /**
@@ -2690,11 +2674,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public ensureOlmSessionsForUsers(
         users: string[],
         force?: boolean,
-    ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
+    ): Promise<Map<string, Map<string, olmlib.IOlmSessionResult>>> {
+        // map user Id → DeviceInfo[]
+        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
 
         for (const userId of users) {
-            devicesByUser[userId] = [];
+            const userDevices: DeviceInfo[] = [];
+            devicesByUser.set(userId, userDevices);
 
             const devices = this.getStoredDevicesForUser(userId) || [];
             for (const deviceInfo of devices) {
@@ -2708,7 +2694,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     continue;
                 }
 
-                devicesByUser[userId].push(deviceInfo);
+                userDevices.push(deviceInfo);
             }
         }
 
@@ -2907,21 +2893,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Handle the notification from /sync or /keys/changes that device lists have
+     * Handle the notification from /sync that device lists have
      * been changed.
      *
-     * @param syncData - Object containing sync tokens associated with this sync
-     * @param syncDeviceLists - device_lists field from /sync, or response from
-     * /keys/changes
+     * @param deviceLists - device_lists field from /sync
      */
-    public async handleDeviceListChanges(
-        syncData: ISyncStateData,
-        syncDeviceLists: Required<ISyncResponse>["device_lists"],
-    ): Promise<void> {
-        // Initial syncs don't have device change lists. We'll either get the complete list
-        // of changes for the interval or will have invalidated everything in willProcessSync
-        if (!syncData.oldSyncToken) return;
-
+    public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
         // Here, we're relying on the fact that we only ever save the sync data after
         // sucessfully saving the device list data, so we're guaranteed that the device
         // list store is at least as fresh as the sync token from the sync store, ie.
@@ -2930,7 +2907,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // If we didn't make this assumption, we'd have to use the /keys/changes API
         // to get key changes between the sync token in the device list and the 'old'
         // sync token used here to make sure we didn't miss any.
-        await this.evalDeviceListChanges(syncDeviceLists);
+        await this.evalDeviceListChanges(deviceLists);
     }
 
     /**
@@ -3146,7 +3123,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                         payload: encryptedContent,
                     });
 
-                    await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, { [userId]: [deviceInfo] });
+                    await olmlib.ensureOlmSessionsForDevices(
+                        this.olmDevice,
+                        this.baseApis,
+                        new Map([[userId, [deviceInfo]]]),
+                    );
                     await olmlib.encryptMessageForDevice(
                         encryptedContent.ciphertext,
                         this.userId,
@@ -3205,6 +3186,36 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
             return true;
         });
+    }
+
+    /**
+     * Stores the current one_time_key count which will be handled later (in a call of
+     * onSyncCompleted).
+     *
+     * @param currentCount - The current count of one_time_keys to be stored
+     */
+    private updateOneTimeKeyCount(currentCount: number): void {
+        if (isFinite(currentCount)) {
+            this.oneTimeKeyCount = currentCount;
+        } else {
+            throw new TypeError("Parameter for updateOneTimeKeyCount has to be a number");
+        }
+    }
+
+    public processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void> {
+        if (oneTimeKeysCounts !== undefined) {
+            this.updateOneTimeKeyCount(oneTimeKeysCounts["signed_curve25519"] || 0);
+        }
+
+        if (unusedFallbackKeys !== undefined) {
+            // If `unusedFallbackKeys` is defined, that means `device_unused_fallback_key_types`
+            // is present in the sync response, which indicates that the server supports fallback keys.
+            //
+            // If there's no unused signed_curve25519 fallback key, we need a new one.
+            this.needsNewFallback = !unusedFallbackKeys.includes("signed_curve25519");
+        }
+
+        return Promise.resolve();
     }
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
@@ -3448,8 +3459,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // check when we last forced a new session with this device: if we've already done so
         // recently, don't do it again.
-        this.lastNewSessionForced[sender] = this.lastNewSessionForced[sender] || {};
-        const lastNewSessionForced = this.lastNewSessionForced[sender][deviceKey] || 0;
+        const lastNewSessionDevices = this.lastNewSessionForced.getOrCreate(sender);
+        const lastNewSessionForced = lastNewSessionDevices.getOrCreate(deviceKey);
         if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
             logger.debug(
                 "New session already forced with device " +
@@ -3482,11 +3493,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return;
             }
         }
-        const devicesByUser: Record<string, DeviceInfo[]> = {};
-        devicesByUser[sender] = [device];
+        const devicesByUser = new Map([[sender, [device]]]);
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
-        this.lastNewSessionForced[sender][deviceKey] = Date.now();
+        lastNewSessionDevices.set(deviceKey, Date.now());
 
         // Now send a blank message on that session so the other side knows about it.
         // (The keyshare request is sent in the clear so that won't do)
@@ -3513,11 +3523,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
         retryDecryption();
 
-        await this.baseApis.sendToDevice("m.room.encrypted", {
-            [sender]: {
-                [device.deviceId]: encryptedContent,
-            },
-        });
+        await this.baseApis.sendToDevice(
+            "m.room.encrypted",
+            new Map([[sender, new Map([[device.deviceId, encryptedContent]])]]),
+        );
 
         // Most of the time this probably won't be necessary since we'll have queued up a key request when
         // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
@@ -3824,15 +3833,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param obj -  Object to which we will add a 'signatures' property
      */
     public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
-        const sigs = obj.signatures || {};
+        const sigs = new Map(Object.entries(obj.signatures || {}));
         const unsigned = obj.unsigned;
 
         delete obj.signatures;
         delete obj.unsigned;
 
-        sigs[this.userId] = sigs[this.userId] || {};
-        sigs[this.userId]["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
-        obj.signatures = sigs;
+        const userSignatures = sigs.get(this.userId) || {};
+        sigs.set(this.userId, userSignatures);
+        userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
+        obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
     }
 }

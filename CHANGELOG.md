@@ -1,3 +1,28 @@
+Changes in [24.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.1.0) (2023-04-11)
+==================================================================================================
+
+## ✨ Features
+ * Allow via_servers property in findPredecessor (update to MSC3946) ([\#3240](https://github.com/matrix-org/matrix-js-sdk/pull/3240)). Contributed by @andybalaam.
+ * Fire `closed` event when IndexedDB closes unexpectedly ([\#3218](https://github.com/matrix-org/matrix-js-sdk/pull/3218)).
+ * Implement MSC3952: intentional mentions ([\#3092](https://github.com/matrix-org/matrix-js-sdk/pull/3092)). Fixes vector-im/element-web#24376.
+ * Send one time key count and unused fallback keys for rust-crypto ([\#3215](https://github.com/matrix-org/matrix-js-sdk/pull/3215)). Fixes vector-im/element-web#24795. Contributed by @florianduros.
+ * Improve `processBeaconEvents` hotpath ([\#3200](https://github.com/matrix-org/matrix-js-sdk/pull/3200)).
+ * Implement MSC3966: a push rule condition to check if an array contains a value ([\#3180](https://github.com/matrix-org/matrix-js-sdk/pull/3180)).
+
+## 🐛 Bug Fixes
+ * indexddb-local-backend - return the current sync to database promise … ([\#3222](https://github.com/matrix-org/matrix-js-sdk/pull/3222)). Contributed by @texuf.
+ * Revert "Add the call object to Call events" ([\#3236](https://github.com/matrix-org/matrix-js-sdk/pull/3236)).
+ * Handle group call redaction ([\#3231](https://github.com/matrix-org/matrix-js-sdk/pull/3231)). Fixes vector-im/voip-internal#128.
+ * Stop doing O(n^2) work to find event's home (`eventShouldLiveIn`) ([\#3227](https://github.com/matrix-org/matrix-js-sdk/pull/3227)). Contributed by @jryans.
+ * Fix bug where video would not unmute if it started muted ([\#3213](https://github.com/matrix-org/matrix-js-sdk/pull/3213)). Fixes vector-im/element-call#925.
+ * Fixes to event encryption in the Rust Crypto implementation ([\#3202](https://github.com/matrix-org/matrix-js-sdk/pull/3202)).
+
+Changes in [24.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.0.0) (2023-03-28)
+==================================================================================================
+
+## 🔒 Security
+ * Fixes for [CVE-2023-28427](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE-2023-28427) / GHSA-mwq8-fjpf-c2gr
+
 Changes in [23.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.5.0) (2023-03-15)
 ==================================================================================================
 

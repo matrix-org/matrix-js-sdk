@@ -17,7 +17,6 @@ limitations under the License.
 import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { IObject } from "../../../src/crypto/olmlib";
-import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
@@ -25,10 +24,15 @@ import { encryptAES } from "../../../src/crypto/aes";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
-import { ISecretStorageKeyInfo } from "../../../src/crypto/api";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
+import {
+    SecretStorageKeyDescription,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    AccountDataClient,
+} from "../../../src/secret-storage";
+import { SecretStorage } from "../../../src/crypto/SecretStorage";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -45,7 +49,7 @@ async function makeTestClient(
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue({});
+    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
 
     return client;
 }
@@ -75,6 +79,22 @@ describe("Secrets", function () {
 
     beforeAll(function () {
         return global.Olm.init();
+    });
+
+    it("should allow storing a default key", async function () {
+        const accountDataAdapter = {
+            getAccountDataFromServer: jest.fn().mockResolvedValue(null),
+            setAccountData: jest.fn().mockResolvedValue({}),
+        };
+        const secretStorage = new SecretStorage(accountDataAdapter as unknown as AccountDataClient, {}, undefined);
+        const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
+
+        // it should have made up a 32-character key id
+        expect(result.keyId.length).toEqual(32);
+        expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith(
+            `m.secret_storage.key.${result.keyId}`,
+            result.keyInfo,
+        );
     });
 
     it("should store and retrieve a secret", async function () {
@@ -274,7 +294,7 @@ describe("Secrets", function () {
             Object.values(otks)[0],
         );
 
-        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
         const request = await secretStorage.request("foo", ["VAX"]);
@@ -541,7 +561,9 @@ describe("Secrets", function () {
             await alice.bootstrapSecretStorage({});
 
             expect(alice.getAccountData("m.secret_storage.default_key")!.getContent()).toEqual({ key: "key_id" });
-            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")!.getContent<ISecretStorageKeyInfo>();
+            const keyInfo = alice
+                .getAccountData("m.secret_storage.key.key_id")!
+                .getContent<SecretStorageKeyDescription>();
             expect(keyInfo.algorithm).toEqual("m.secret_storage.v1.aes-hmac-sha2");
             expect(keyInfo.passphrase).toEqual({
                 algorithm: "m.pbkdf2",

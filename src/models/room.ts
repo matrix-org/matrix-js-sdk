@@ -25,7 +25,7 @@ import {
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
-import { normalize } from "../utils";
+import { normalize, noUnsafeEventProps } from "../utils";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
@@ -64,7 +64,7 @@ import {
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { Poll, PollEvent } from "./poll";
+import { isPollEvent, Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -311,7 +311,7 @@ export type RoomEventHandlerMap = {
 
 export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
-    private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
+    private txnToEvent: Map<string, MatrixEvent> = new Map(); // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
@@ -356,7 +356,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * accountData Dict of per-room account_data events; the keys are the
      * event type and the values are the events.
      */
-    public accountData: Record<string, MatrixEvent> = {}; // $eventType: $event
+    public accountData: Map<string, MatrixEvent> = new Map(); // $eventType: $event
     /**
      * The room summary.
      */
@@ -902,7 +902,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
         }
-        const memberEvents = rawMembersEvents.map(this.client.getEventMapper());
+        const memberEvents = rawMembersEvents.filter(noUnsafeEventProps).map(this.client.getEventMapper());
         return { memberEvents, fromServer };
     }
 
@@ -1897,35 +1897,62 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.threadsReady = true;
     }
 
+    /**
+     * Calls {@link processPollEvent} for a list of events.
+     *
+     * @param events - List of events
+     */
     public async processPollEvents(events: MatrixEvent[]): Promise<void> {
-        const processPollStartEvent = (event: MatrixEvent): void => {
-            if (!M_POLL_START.matches(event.getType())) return;
+        for (const event of events) {
+            try {
+                // Continue if the event is a clear text, non-poll event.
+                if (!event.isEncrypted() && !isPollEvent(event)) continue;
+
+                /**
+                 * Try to decrypt the event. Promise resolution does not guarantee a successful decryption.
+                 * Retry is handled in {@link processPollEvent}.
+                 */
+                await this.client.decryptEventIfNeeded(event);
+                this.processPollEvent(event);
+            } catch (err) {
+                logger.warn("Error processing poll event", event.getId(), err);
+            }
+        }
+    }
+
+    /**
+     * Processes poll events:
+     * If the event has a decryption failure, it will listen for decryption and tries again.
+     * If it is a poll start event ({@link M_POLL_START}),
+     * it creates and stores a Poll model and emits a PollEvent.New event.
+     * If the event is related to a poll, it will add it to the poll.
+     * Noop for other cases.
+     *
+     * @param event - Event that could be a poll event
+     */
+    private async processPollEvent(event: MatrixEvent): Promise<void> {
+        if (event.isDecryptionFailure()) {
+            event.once(MatrixEventEvent.Decrypted, (maybeDecryptedEvent: MatrixEvent) => {
+                this.processPollEvent(maybeDecryptedEvent);
+            });
+            return;
+        }
+
+        if (M_POLL_START.matches(event.getType())) {
             try {
                 const poll = new Poll(event, this.client, this);
                 this.polls.set(event.getId()!, poll);
                 this.emit(PollEvent.New, poll);
             } catch {}
             // poll creation can fail for malformed poll start events
-        };
+            return;
+        }
 
-        const processPollRelationEvent = (event: MatrixEvent): void => {
-            const relationEventId = event.relationEventId;
-            if (relationEventId && this.polls.has(relationEventId)) {
-                const poll = this.polls.get(relationEventId);
-                poll?.onNewRelation(event);
-            }
-        };
+        const relationEventId = event.relationEventId;
 
-        const processPollEvent = (event: MatrixEvent): void => {
-            processPollStartEvent(event);
-            processPollRelationEvent(event);
-        };
-
-        for (const event of events) {
-            try {
-                await this.client.decryptEventIfNeeded(event);
-                processPollEvent(event);
-            } catch {}
+        if (relationEventId && this.polls.has(relationEventId)) {
+            const poll = this.polls.get(relationEventId);
+            poll?.onNewRelation(event);
         }
     }
 
@@ -2028,8 +2055,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const parentEventId = event.getAssociatedId()!;
-        const parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        const parentEventId = event.getAssociatedId();
+        let parentEvent: MatrixEvent | undefined;
+        if (parentEventId) {
+            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        }
 
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
         if (parentEvent && (event.isRelation() || event.isRedaction())) {
@@ -2252,8 +2282,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const txnId = event.getUnsigned().transaction_id;
         if (!txnId && event.getSender() === this.myUserId) {
             // check the txn map for a matching event ID
-            for (const tid in this.txnToEvent) {
-                const localEvent = this.txnToEvent[tid];
+            for (const [tid, localEvent] of this.txnToEvent) {
                 if (localEvent.getId() === event.getId()) {
                     logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
                     // update the unsigned field so we can re-use the same codepaths
@@ -2328,7 +2357,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             throw new Error("addPendingEvent called on an event with status " + event.status);
         }
 
-        if (this.txnToEvent[txnId]) {
+        if (this.txnToEvent.get(txnId)) {
             throw new Error("addPendingEvent called on an event with known txnId " + txnId);
         }
 
@@ -2337,7 +2366,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // on the unfiltered timelineSet.
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS)!, false);
 
-        this.txnToEvent[txnId] = event;
+        this.txnToEvent.set(txnId, event);
         if (this.pendingEventList) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
@@ -2429,8 +2458,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.relations.aggregateChildEvent(event);
     }
 
-    public getEventForTxnId(txnId: string): MatrixEvent {
-        return this.txnToEvent[txnId];
+    public getEventForTxnId(txnId: string): MatrixEvent | undefined {
+        return this.txnToEvent.get(txnId);
     }
 
     /**
@@ -2457,7 +2486,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         logger.debug(`Got remote echo for event ${oldEventId} -> ${newEventId} old status ${oldStatus}`);
 
         // no longer pending
-        delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id!];
+        this.txnToEvent.delete(remoteEvent.getUnsigned().transaction_id!);
 
         // if it's in the pending list, remove it
         if (this.pendingEventList) {
@@ -2670,7 +2699,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.processLiveEvent(event);
 
             if (event.getUnsigned().transaction_id) {
-                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                const existingEvent = this.txnToEvent.get(event.getUnsigned().transaction_id!);
                 if (existingEvent) {
                     // remote echo of an event we sent earlier
                     this.handleRemoteEcho(event, existingEvent);
@@ -2939,8 +2968,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (event.getType() === "m.tag") {
                 this.addTags(event);
             }
-            const lastEvent = this.accountData[event.getType()];
-            this.accountData[event.getType()] = event;
+            const eventType = event.getType();
+            const lastEvent = this.accountData.get(eventType);
+            this.accountData.set(eventType, event);
             this.emit(RoomEvent.AccountData, event, this, lastEvent);
         }
     }
@@ -2951,7 +2981,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns the account_data event in question
      */
     public getAccountData(type: EventType | string): MatrixEvent | undefined {
-        return this.accountData[type];
+        return this.accountData.get(type);
     }
 
     /**
@@ -3054,13 +3084,21 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param msc3946ProcessDynamicPredecessor - if true, look for an
      * m.room.predecessor state event and use it if found (MSC3946).
      * @returns null if this room has no predecessor. Otherwise, returns
-     * the roomId and last eventId of the predecessor room.
+     * the roomId, last eventId and viaServers of the predecessor room.
+     *
      * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
      * as well as m.room.create events to find predecessors.
+     *
      * Note: if an m.predecessor event is used, eventId may be undefined
      * since last_known_event_id is optional.
+     *
+     * Note: viaServers may be undefined, and will definitely be undefined if
+     * this predecessor comes from a RoomCreate event (rather than a
+     * RoomPredecessor, which has the optional via_servers property).
      */
-    public findPredecessor(msc3946ProcessDynamicPredecessor = false): { roomId: string; eventId?: string } | null {
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId?: string; viaServers?: string[] } | null {
         const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!currentState) {
             return null;

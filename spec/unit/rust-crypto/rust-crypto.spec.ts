@@ -53,7 +53,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("to-device messages", () => {
+    describe("call preprocess methods", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {

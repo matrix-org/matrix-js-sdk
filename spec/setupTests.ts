@@ -16,7 +16,7 @@ limitations under the License.
 
 import DOMException from "domexception";
 
-global.DOMException = DOMException;
+global.DOMException = DOMException as typeof global.DOMException;
 
 jest.mock("../src/http-api/utils", () => ({
     ...jest.requireActual("../src/http-api/utils"),

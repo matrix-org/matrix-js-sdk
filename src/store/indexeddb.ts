@@ -51,7 +51,12 @@ interface IOpts extends IBaseOpts {
 }
 
 type EventHandlerMap = {
+    // Fired when an IDB command fails on a degradable path, and the store falls back to MemoryStore
+    // This signals the potential for data volatility.
     degraded: (e: Error) => void;
+    // Fired when the IndexedDB gets closed unexpectedly, for example, if the underlying storage is removed or
+    // if the user clears the database in the browser's history preferences.
+    closed: () => void;
 };
 
 export class IndexedDBStore extends MemoryStore {
@@ -127,7 +132,7 @@ export class IndexedDBStore extends MemoryStore {
 
         logger.log(`IndexedDBStore.startup: connecting to backend`);
         return this.backend
-            .connect()
+            .connect(this.onClose)
             .then(() => {
                 logger.log(`IndexedDBStore.startup: loading presence events`);
                 return this.backend.getUserPresenceEvents();
@@ -142,8 +147,13 @@ export class IndexedDBStore extends MemoryStore {
                     this.userModifiedMap[u.userId] = u.getLastModifiedTime();
                     this.storeUser(u);
                 });
+                this.startedUp = true;
             });
     }
+
+    private onClose = (): void => {
+        this.emitter.emit("closed");
+    };
 
     /**
      * @returns Promise which resolves with a sync response to restore the

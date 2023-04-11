@@ -21,30 +21,32 @@ import * as olmlib from "./olmlib";
 import { randomString } from "../randomstring";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { ICryptoCallbacks, IEncryptedContent } from ".";
-import { IContent, MatrixEvent } from "../models/event";
-import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
-import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { MatrixEvent } from "../models/event";
+import { ClientEvent, MatrixClient } from "../client";
 import { defer, IDeferred } from "../utils";
 import { ToDeviceMessageId } from "../@types/event";
+import {
+    SecretStorageKeyDescription,
+    SecretStorageKeyDescriptionAesV1,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+    AddSecretStorageKeyOpts,
+    AccountDataClient,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+} from "../secret-storage";
 
-export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
-
-// Some of the key functions use a tuple and some use an object...
-export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
-export type SecretStorageKeyObject = { keyId: string; keyInfo: ISecretStorageKeyInfo };
+/* re-exports for backwards compatibility */
+export type {
+    AccountDataClient as IAccountDataClient,
+    SecretStorageKeyTuple,
+    SecretStorageKeyObject,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+} from "../secret-storage";
 
 export interface ISecretRequest {
     requestId: string;
     promise: Promise<string>;
     cancel: (reason: string) => void;
-}
-
-export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
-    // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
-    getAccountData: (eventType: string) => IContent | null;
-    setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
@@ -79,7 +81,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
     public constructor(
-        private readonly accountDataAdapter: IAccountDataClient,
+        private readonly accountDataAdapter: AccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
         private readonly baseApis: B,
     ) {}
@@ -124,33 +126,33 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      */
     public async addKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts = {},
+        opts: AddSecretStorageKeyOpts = {},
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
-        const keyInfo = { algorithm } as ISecretStorageKeyInfo;
+        if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
+            throw new Error(`Unknown key algorithm ${algorithm}`);
+        }
+
+        const keyInfo = { algorithm } as SecretStorageKeyDescriptionAesV1;
 
         if (opts.name) {
             keyInfo.name = opts.name;
         }
 
-        if (algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-            if (opts.passphrase) {
-                keyInfo.passphrase = opts.passphrase;
-            }
-            if (opts.key) {
-                const { iv, mac } = await calculateKeyCheck(opts.key);
-                keyInfo.iv = iv;
-                keyInfo.mac = mac;
-            }
-        } else {
-            throw new Error(`Unknown key algorithm ${algorithm}`);
+        if (opts.passphrase) {
+            keyInfo.passphrase = opts.passphrase;
+        }
+        if (opts.key) {
+            const { iv, mac } = await calculateKeyCheck(opts.key);
+            keyInfo.iv = iv;
+            keyInfo.mac = mac;
         }
 
         if (!keyId) {
             do {
                 keyId = randomString(32);
             } while (
-                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+                await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
                     `m.secret_storage.key.${keyId}`,
                 )
             );
@@ -181,7 +183,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
             return null;
         }
 
-        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
             "m.secret_storage.key." + keyId,
         );
         return keyInfo ? [keyId, keyInfo] : null;
@@ -206,7 +208,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      *
      * @returns whether or not the key matches
      */
-    public async checkKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
+    public async checkKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const { mac } = await calculateKeyCheck(key, info.iv);
@@ -245,7 +247,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
 
         for (const keyId of keys) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) {
@@ -284,10 +286,10 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
         }
 
         // get possible keys to decrypt
-        const keys: Record<string, ISecretStorageKeyInfo> = {};
+        const keys: Record<string, SecretStorageKeyDescription> = {};
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
                 "m.secret_storage.key." + keyId,
             );
             const encInfo = secretInfo.encrypted[keyId];
@@ -322,17 +324,17 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string): Promise<Record<string, ISecretStorageKeyInfo> | null> {
+    public async isStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo?.encrypted) return null;
 
-        const ret: Record<string, ISecretStorageKeyInfo> = {};
+        const ret: Record<string, SecretStorageKeyDescription> = {};
 
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) continue;
@@ -367,13 +369,11 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                 requesting_device_id: this.baseApis.deviceId,
                 request_id: requestId,
             };
-            const toDevice: Record<string, typeof cancelData> = {};
+            const toDevice: Map<string, typeof cancelData> = new Map();
             for (const device of devices) {
-                toDevice[device] = cancelData;
+                toDevice.set(device, cancelData);
             }
-            this.baseApis.sendToDevice("m.secret.request", {
-                [this.baseApis.getUserId()!]: toDevice,
-            });
+            this.baseApis.sendToDevice("m.secret.request", new Map([[this.baseApis.getUserId()!, toDevice]]));
 
             // and reject the promise so that anyone waiting on it will be
             // notified
@@ -388,14 +388,12 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
             request_id: requestId,
             [ToDeviceMessageId]: uuidv4(),
         };
-        const toDevice: Record<string, typeof requestData> = {};
+        const toDevice: Map<string, typeof requestData> = new Map();
         for (const device of devices) {
-            toDevice[device] = requestData;
+            toDevice.set(device, requestData);
         }
         logger.info(`Request secret ${name} from ${devices}, id ${requestId}`);
-        this.baseApis.sendToDevice("m.secret.request", {
-            [this.baseApis.getUserId()!]: toDevice,
-        });
+        this.baseApis.sendToDevice("m.secret.request", new Map([[this.baseApis.getUserId()!, toDevice]]));
 
         return {
             requestId,
@@ -469,9 +467,11 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                     ciphertext: {},
                     [ToDeviceMessageId]: uuidv4(),
                 };
-                await olmlib.ensureOlmSessionsForDevices(this.baseApis.crypto!.olmDevice, this.baseApis, {
-                    [sender]: [this.baseApis.getStoredDevice(sender, deviceId)!],
-                });
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.baseApis.crypto!.olmDevice,
+                    this.baseApis,
+                    new Map([[sender, [this.baseApis.getStoredDevice(sender, deviceId)!]]]),
+                );
                 await olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
                     this.baseApis.getUserId()!,
@@ -481,11 +481,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                     this.baseApis.getStoredDevice(sender, deviceId)!,
                     payload,
                 );
-                const contentMap = {
-                    [sender]: {
-                        [deviceId]: encryptedContent,
-                    },
-                };
+                const contentMap = new Map([[sender, new Map([[deviceId, encryptedContent]])]]);
 
                 logger.info(`Sending ${content.name} secret for ${deviceId}`);
                 this.baseApis.sendToDevice("m.room.encrypted", contentMap);
@@ -550,7 +546,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     }
 
     private async getSecretStorageKey(
-        keys: Record<string, ISecretStorageKeyInfo>,
+        keys: Record<string, SecretStorageKeyDescription>,
         name: string,
     ): Promise<[string, IDecryptors]> {
         if (!this.cryptoCallbacks.getSecretStorageKey) {

@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "23.5.0",
+    "version": "24.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=16.0.0"
@@ -55,13 +55,13 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-js": "^0.1.0-alpha.3",
+        "@matrix-org/matrix-sdk-crypto-js": "^0.1.0-alpha.6",
         "another-json": "^0.2.0",
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
         "loglevel": "^1.7.1",
         "matrix-events-sdk": "0.0.1",
-        "matrix-widget-api": "^1.0.0",
+        "matrix-widget-api": "^1.3.1",
         "p-retry": "4",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",
@@ -101,7 +101,7 @@
         "debug": "^4.3.4",
         "docdash": "^2.0.0",
         "domexception": "^4.0.0",
-        "eslint": "8.35.0",
+        "eslint": "8.37.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-import-resolver-typescript": "^3.5.1",
@@ -119,13 +119,13 @@
         "jest-localstorage-mock": "^2.4.6",
         "jest-mock": "^29.0.0",
         "matrix-mock-request": "^2.5.0",
-        "prettier": "2.8.4",
+        "prettier": "2.8.7",
         "rimraf": "^4.0.0",
         "terser": "^5.5.1",
         "tsify": "^5.0.2",
         "typedoc": "^0.23.20",
         "typedoc-plugin-missing-exports": "^1.0.0",
-        "typescript": "^4.5.3"
+        "typescript": "^5.0.0"
     },
     "jest": {
         "testEnvironment": "node",

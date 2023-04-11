@@ -85,30 +85,16 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
 
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
         // Handle device list updates
-        if (data["device_lists"]) {
-            await this.crypto.handleDeviceListChanges(
-                {
-                    oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
-                },
-                data["device_lists"],
-            );
+        if (data.device_lists) {
+            await this.crypto.processDeviceLists(data.device_lists);
         }
 
-        // Handle one_time_keys_count
-        if (data["device_one_time_keys_count"]) {
-            const currentCount = data["device_one_time_keys_count"].signed_curve25519 || 0;
-            this.crypto.updateOneTimeKeyCount(currentCount);
-        }
-        if (data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
-            // The presence of device_unused_fallback_key_types indicates that the
-            // server supports fallback keys. If there's no unused
-            // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys =
-                data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.crypto.setNeedsNewFallback(
-                Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
-            );
-        }
+        // Handle one_time_keys_count and unused_fallback_key_types
+        await this.crypto.processKeyCounts(
+            data.device_one_time_keys_count,
+            data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"],
+        );
+
         this.crypto.onSyncCompleted({});
     }
 }

@@ -59,7 +59,7 @@ describe("MemoryStore", () => {
             await store.deleteAllData();
 
             // empty object
-            expect(store.accountData).toEqual({});
+            expect(store.accountData).toEqual(new Map());
         });
     });
 });

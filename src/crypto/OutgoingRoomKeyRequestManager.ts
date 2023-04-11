@@ -21,6 +21,7 @@ import { MatrixClient } from "../client";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base";
 import { EventType, ToDeviceMessageId } from "../@types/event";
+import { MapWithDefault } from "../utils";
 
 /**
  * Internal module. Management of outgoing room key requests.
@@ -460,15 +461,13 @@ export class OutgoingRoomKeyRequestManager {
         recipients: IRoomKeyRequestRecipient[],
         txnId?: string,
     ): Promise<{}> {
-        const contentMap: Record<string, Record<string, Record<string, any>>> = {};
+        const contentMap = new MapWithDefault<string, Map<string, Record<string, any>>>(() => new Map());
         for (const recip of recipients) {
-            if (!contentMap[recip.userId]) {
-                contentMap[recip.userId] = {};
-            }
-            contentMap[recip.userId][recip.deviceId] = {
+            const userDeviceMap = contentMap.getOrCreate(recip.userId);
+            userDeviceMap.set(recip.deviceId, {
                 ...message,
                 [ToDeviceMessageId]: uuidv4(),
-            };
+            });
         }
 
         return this.baseApis.sendToDevice(EventType.RoomKeyRequest, contentMap, txnId);
