@@ -531,7 +531,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
             );
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
-            if (keyInfo !== null && keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+            if (keyInfo?.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
                     keys[keyId] = keyInfo;
                 }
