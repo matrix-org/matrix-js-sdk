@@ -324,7 +324,9 @@ export class MemoryStore implements IStore {
      * @param force - True to force a save (but the memory
      *     store still can't save anything)
      */
-    public save(force: boolean): void {}
+    public save(force: boolean): Promise<void> {
+        return Promise.resolve();
+    }
 
     /**
      * Startup does nothing as this store doesn't require starting up.

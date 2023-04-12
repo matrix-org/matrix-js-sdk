@@ -26,14 +26,14 @@ describe("MediaSsrcHandler", () => {
         handler = new MediaSsrcHandler();
     });
     describe("should parse description", () => {
-        it("and build mid ssrc map", () => {
+        it("and build mid ssrc map", async () => {
             handler.parse(REMOTE_SFU_DESCRIPTION, "remote");
             expect(handler.getSsrcToMidMap("remote")).toEqual(remoteMap);
         });
     });
 
     describe("should on find mid by ssrc", () => {
-        it("and return mid if mapping exists.", () => {
+        it("and return mid if mapping exists.", async () => {
             handler.parse(REMOTE_SFU_DESCRIPTION, "remote");
             expect(handler.findMidBySsrc("2963372119", "remote")).toEqual("0");
         });

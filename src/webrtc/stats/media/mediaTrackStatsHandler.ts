@@ -15,7 +15,7 @@ limitations under the License.
 */
 import { TrackID } from "../statsReport";
 import { MediaTrackStats } from "./mediaTrackStats";
-import { MediaTrackHandler } from "./mediaTrackHandler";
+import { MediaTrackHandler, TrackId } from "./mediaTrackHandler";
 import { MediaSsrcHandler } from "./mediaSsrcHandler";
 
 export class MediaTrackStatsHandler {
@@ -82,5 +82,9 @@ export class MediaTrackStatsHandler {
 
     public getTrack2stats(): Map<TrackID, MediaTrackStats> {
         return this.track2stats;
+    }
+
+    public findTransceiverByTrackId(trackID: TrackId): undefined | RTCRtpTransceiver {
+        return this.mediaTrackHandler.getTransceiverByTrackId(trackID);
     }
 }

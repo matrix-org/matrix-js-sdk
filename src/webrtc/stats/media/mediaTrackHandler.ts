@@ -68,4 +68,10 @@ export class MediaTrackHandler {
         //@TODO implement this right.. Check how many layer configured
         return 3;
     }
+
+    public getTransceiverByTrackId(trackId: TrackId): RTCRtpTransceiver | undefined {
+        return this.pc.getTransceivers().find((t) => {
+            return t.receiver.track.id === trackId || (t.sender.track !== null && t.sender.track.id === trackId);
+        });
+    }
 }

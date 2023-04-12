@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "24.0.0",
+    "version": "24.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=16.0.0"
@@ -122,27 +122,11 @@
         "prettier": "2.8.7",
         "rimraf": "^4.0.0",
         "terser": "^5.5.1",
+        "ts-node": "^10.9.1",
         "tsify": "^5.0.2",
         "typedoc": "^0.23.20",
         "typedoc-plugin-missing-exports": "^1.0.0",
-        "typescript": "^4.5.3"
-    },
-    "jest": {
-        "testEnvironment": "node",
-        "testMatch": [
-            "<rootDir>/spec/**/*.spec.{js,ts}"
-        ],
-        "setupFilesAfterEnv": [
-            "<rootDir>/spec/setupTests.ts"
-        ],
-        "collectCoverageFrom": [
-            "<rootDir>/src/**/*.{js,ts}"
-        ],
-        "coverageReporters": [
-            "text-summary",
-            "lcov"
-        ],
-        "testResultsProcessor": "@casualbot/jest-sonar-reporter"
+        "typescript": "^5.0.0"
     },
     "@casualbot/jest-sonar-reporter": {
         "outputDirectory": "coverage",

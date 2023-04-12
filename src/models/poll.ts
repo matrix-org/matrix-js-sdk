@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { M_POLL_START } from "matrix-events-sdk";
+
 import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls";
 import { MatrixClient } from "../client";
 import { PollStartEvent } from "../extensible_events_v1/PollStartEvent";
@@ -266,3 +268,14 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         );
     }
 }
+
+/**
+ * Tests whether the event is a start, response or end poll event.
+ *
+ * @param event - Event to test
+ * @returns true if the event is a poll event, else false
+ */
+export const isPollEvent = (event: MatrixEvent): boolean => {
+    const eventType = event.getType();
+    return M_POLL_START.matches(eventType) || M_POLL_RESPONSE.matches(eventType) || M_POLL_END.matches(eventType);
+};

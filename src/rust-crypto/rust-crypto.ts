@@ -17,7 +17,7 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
-import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
@@ -176,20 +176,23 @@ export class RustCrypto implements CryptoBackend {
      * @param events - the received to-device messages
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys
+     * @param devices - the received device list updates
      * @returns A list of preprocessed to-device messages.
      */
     private async receiveSyncChanges({
         events,
         oneTimeKeysCounts = new Map<string, number>(),
         unusedFallbackKeys = new Set<string>(),
+        devices = new RustSdkCryptoJs.DeviceLists(),
     }: {
         events?: IToDeviceEvent[];
         oneTimeKeysCounts?: Map<string, number>;
         unusedFallbackKeys?: Set<string>;
+        devices?: RustSdkCryptoJs.DeviceLists;
     }): Promise<IToDeviceEvent[]> {
         const result = await this.olmMachine.receiveSyncChanges(
             events ? JSON.stringify(events) : "[]",
-            new RustSdkCryptoJs.DeviceLists(),
+            devices,
             oneTimeKeysCounts,
             unusedFallbackKeys,
         );
@@ -227,6 +230,16 @@ export class RustCrypto implements CryptoBackend {
                 unusedFallbackKeys: setUnusedFallbackKeys,
             });
         }
+    }
+
+    /** called by the sync loop to process the notification that device lists have
+     * been changed.
+     *
+     * @param deviceLists - device_lists field from /sync
+     */
+    public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
+        const devices = new RustSdkCryptoJs.DeviceLists(deviceLists.changed, deviceLists.left);
+        await this.receiveSyncChanges({ devices });
     }
 
     /** called by the sync loop on m.room.encrypted events
