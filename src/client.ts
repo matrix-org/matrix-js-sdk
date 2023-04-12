@@ -7471,7 +7471,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set the identity server URL of this client
      * @param url - New identity server URL
      */
-    public setIdentityServerUrl(url: string): void {
+    public setIdentityServerUrl(url?: string): void {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
         this.http.setIdBaseUrl(this.idBaseUrl);
     }
