@@ -132,9 +132,9 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      * ready, which can be useful very early in startup before the initial sync.
      *
      * @param eventType - The type of account data
-     * @returns The contents of the given account data event.
+     * @returns The contents of the given account data event, or `null` if the event is not found
      */
-    getAccountDataFromServer: <T extends Record<string, any>>(eventType: string) => Promise<T>;
+    getAccountDataFromServer: <T extends Record<string, any>>(eventType: string) => Promise<T | null>;
 
     /**
      * Set account data event for the current user, with retries
@@ -531,7 +531,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
             );
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+            if (keyInfo !== null && keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
                 if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
                     keys[keyId] = keyInfo;
                 }

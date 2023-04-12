@@ -103,7 +103,7 @@ describe("ServerSideSecretStorageImpl", function () {
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
                 if (eventType === "m.secret_storage.key.my_key") {
                     return storedKey as unknown as T;
                 } else {
@@ -121,7 +121,7 @@ describe("ServerSideSecretStorageImpl", function () {
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
                 if (eventType === "m.secret_storage.default_key") {
                     return { key: "default_key_id" } as unknown as T;
                 } else if (eventType === "m.secret_storage.key.default_key_id") {
@@ -222,7 +222,7 @@ describe("ServerSideSecretStorageImpl", function () {
 
             // stub out getAccountData to return a key with an unknown algorithm
             const storedKey = { algorithm: "badalg" } as SecretStorageKeyDescriptionCommon;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
                 if (eventType === "m.secret_storage.key.keyid") {
                     return storedKey as unknown as T;
                 } else {
