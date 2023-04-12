@@ -19,7 +19,9 @@ import { Mocked } from "jest-mock";
 import {
     AccountDataClient,
     PassphraseInfo,
+    SecretStorageCallbacks,
     SecretStorageKeyDescriptionAesV1,
+    SecretStorageKeyDescriptionCommon,
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
@@ -209,6 +211,38 @@ describe("ServerSideSecretStorageImpl", function () {
 
             const result = await secretStorage.checkKey(new TextEncoder().encode("goodkey"), keyInfo);
             expect(result).toBe(true);
+        });
+    });
+
+    describe("store", () => {
+        it("should ignore keys with unknown algorithm", async function () {
+            const accountDataAdapter = mockAccountDataClient();
+            const mockCallbacks = { getSecretStorageKey: jest.fn() } as Mocked<SecretStorageCallbacks>;
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, mockCallbacks);
+
+            // stub out getAccountData to return a key with an unknown algorithm
+            const storedKey = { algorithm: "badalg" } as SecretStorageKeyDescriptionCommon;
+            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
+                if (eventType === "m.secret_storage.key.keyid") {
+                    return storedKey as unknown as T;
+                } else {
+                    throw new Error(`unexpected eventType ${eventType}`);
+                }
+            }
+            accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
+
+            // suppress the expected warning on the console
+            jest.spyOn(console, "warn").mockImplementation();
+
+            // now attempt the store
+            await secretStorage.store("mysecret", "supersecret", ["keyid"]);
+
+            // we should have stored... nothing
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith("mysecret", { encrypted: {} });
+
+            // ... and emitted a warning.
+            // eslint-disable-next-line no-console
+            expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unknown algorithm"));
         });
     });
 });
