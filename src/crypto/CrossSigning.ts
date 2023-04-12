@@ -25,13 +25,12 @@ import { logger } from "../logger";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
 import { DeviceInfo } from "./deviceinfo";
-import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -164,7 +163,7 @@ export class CrossSigningInfo {
      *     key
      */
     public async isStoredInSecretStorage(
-        secretStorage: SecretStorage<MatrixClient | undefined>,
+        secretStorage: ServerSideSecretStorage,
     ): Promise<Record<string, object> | null> {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = (await secretStorage.isStored("m.cross_signing.master")) || {};
@@ -192,7 +191,7 @@ export class CrossSigningInfo {
      */
     public static async storeInSecretStorage(
         keys: Map<string, Uint8Array>,
-        secretStorage: SecretStorage<undefined>,
+        secretStorage: ServerSideSecretStorage,
     ): Promise<void> {
         for (const [type, privateKey] of keys) {
             const encodedKey = encodeBase64(privateKey);
@@ -209,7 +208,10 @@ export class CrossSigningInfo {
      * @param secretStorage - The secret store using account data
      * @returns The private key
      */
-    public static async getFromSecretStorage(type: string, secretStorage: SecretStorage): Promise<Uint8Array | null> {
+    public static async getFromSecretStorage(
+        type: string,
+        secretStorage: ServerSideSecretStorage,
+    ): Promise<Uint8Array | null> {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
         if (!encodedKey) {
             return null;

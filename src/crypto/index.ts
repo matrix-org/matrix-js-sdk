@@ -34,7 +34,7 @@ import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { ISecretRequest, SecretStorage } from "./SecretStorage";
+import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
 import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
@@ -84,7 +84,10 @@ import {
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
     SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageCallbacks,
+    ServerSideSecretStorageImpl,
 } from "../secret-storage";
+import { ISecretRequest } from "./SecretSharing";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -131,14 +134,10 @@ export interface IBootstrapCrossSigningOpts {
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
-export interface ICryptoCallbacks {
+export interface ICryptoCallbacks extends SecretStorageCallbacks {
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
-    getSecretStorageKey?: (
-        keys: { keys: Record<string, SecretStorageKeyDescription> },
-        name: string,
-    ) => Promise<[string, Uint8Array] | null>;
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
     onSecretRequested?: (
         userId: string,
@@ -350,7 +349,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public readonly olmDevice: OlmDevice;
     public readonly deviceList: DeviceList;
     public readonly dehydrationManager: DehydrationManager;
-    public readonly secretStorage: SecretStorage;
+    public readonly secretStorage: LegacySecretStorage;
 
     private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
@@ -523,7 +522,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         this.crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks, cacheCallbacks);
         // Yes, we pass the client twice here: see SecretStorage
-        this.secretStorage = new SecretStorage(baseApis as AccountDataClient, cryptoCallbacks, baseApis);
+        this.secretStorage = new LegacySecretStorage(baseApis as AccountDataClient, cryptoCallbacks, baseApis);
         this.dehydrationManager = new DehydrationManager(this);
 
         // Assuming no app-supplied callback, default to getting from SSSS.
@@ -828,10 +827,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // done as part of setting up secret storage later.
         const crossSigningPrivateKeys = builder.crossSigningCallbacks.privateKeys;
         if (crossSigningPrivateKeys.size && !this.baseApis.cryptoCallbacks.saveCrossSigningKeys) {
-            const secretStorage = new SecretStorage(
+            const secretStorage = new ServerSideSecretStorageImpl(
                 builder.accountDataClientAdapter,
                 builder.ssssCryptoCallbacks,
-                undefined,
             );
             if (await secretStorage.hasKey()) {
                 logger.log("Storing new cross-signing private keys in secret storage");
@@ -894,10 +892,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.log("Bootstrapping Secure Secret Storage");
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
         const builder = new EncryptionSetupBuilder(this.baseApis.store.accountData, delegateCryptoCallbacks);
-        const secretStorage = new SecretStorage(
+        const secretStorage = new ServerSideSecretStorageImpl(
             builder.accountDataClientAdapter,
             builder.ssssCryptoCallbacks,
-            undefined,
         );
 
         // the ID of the new SSSS key, if we create one
