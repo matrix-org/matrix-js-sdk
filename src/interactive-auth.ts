@@ -97,7 +97,7 @@ export interface IAuthDict {
     token?: string;
 }
 
-class NoAuthFlowFoundError extends Error {
+export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
     // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
