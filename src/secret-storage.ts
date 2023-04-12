@@ -442,7 +442,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const { mac } = await calculateKeyCheck(key, info.iv);
-                return info.mac.replace(/=+$/g, "") === mac.replace(/=+$/g, "");
+                return trimTrailingEquals(info.mac) === trimTrailingEquals(mac);
             } else {
                 // if we have no information, we have to assume the key is right
                 return true;
@@ -622,5 +622,27 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         } else {
             throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
+    }
+}
+
+/** trim trailing instances of '=' from a string
+ *
+ * @internal
+ *
+ * @param input - input string
+ */
+export function trimTrailingEquals(input: string): string {
+    // according to Sonar and CodeQL, a regex such as /=+$/ is superlinear.
+    // Not sure I believe it, but it's easy enough to work around.
+
+    // find the number of characters before the trailing =
+    let i = input.length;
+    while (i >= 1 && input.charCodeAt(i - 1) == 0x3d) i--;
+
+    // trim to the calculated length
+    if (i < input.length) {
+        return input.substring(0, i);
+    } else {
+        return input;
     }
 }

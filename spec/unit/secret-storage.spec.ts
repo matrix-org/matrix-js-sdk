@@ -19,8 +19,9 @@ import { Mocked } from "jest-mock";
 import {
     AccountDataClient,
     PassphraseInfo,
-    ServerSideSecretStorageImpl,
     SecretStorageKeyDescriptionAesV1,
+    ServerSideSecretStorageImpl,
+    trimTrailingEquals,
 } from "../../src/secret-storage";
 import { calculateKeyCheck } from "../../src/crypto/aes";
 import { randomString } from "../../src/randomstring";
@@ -209,6 +210,21 @@ describe("ServerSideSecretStorageImpl", function () {
             const result = await secretStorage.checkKey(new TextEncoder().encode("goodkey"), keyInfo);
             expect(result).toBe(true);
         });
+    });
+});
+
+describe("trimTrailingEquals", () => {
+    it("should strip trailing =", () => {
+        expect(trimTrailingEquals("ab=c===")).toEqual("ab=c");
+    });
+
+    it("should leave strings without trailing = alone", () => {
+        expect(trimTrailingEquals("ab=c")).toEqual("ab=c");
+    });
+
+    it("should leave the empty string alone", () => {
+        const result = trimTrailingEquals("");
+        expect(result).toEqual("");
     });
 });
 
