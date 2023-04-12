@@ -41,8 +41,8 @@ export type { ISecretRequest } from "./SecretSharing";
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  *
- * @deprecated this is just a backwards-compatibility hack which will be removed soon.
- *    Use {@link ServerSideSecretStorageImpl} from `../secret-storage` and/or {@link SecretSharing} from `./SecretSharing`.
+ * @deprecated This is just a backwards-compatibility hack which will be removed soon.
+ *    Use {@link SecretStorage.ServerSideSecretStorageImpl} from `../secret-storage` and/or {@link SecretSharing} from `./SecretSharing`.
  */
 export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> implements ServerSideSecretStorage {
     private readonly storageImpl: ServerSideSecretStorageImpl;

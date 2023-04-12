@@ -147,7 +147,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
 }
 
 /**
- *  Application callbacks for use with {@link ServerSideSecretStorageImpl}
+ *  Application callbacks for use with {@link SecretStorage.ServerSideSecretStorageImpl}
  */
 export interface SecretStorageCallbacks {
     /**
@@ -160,7 +160,7 @@ export interface SecretStorageCallbacks {
      * Descriptions of the secret storage keys are also stored in server-side storage, per the
      * [matrix specification](https://spec.matrix.org/v1.6/client-server-api/#key-storage), so
      * before a key can be used in this way, it must have been stored on the server. This is
-     * done via {@link ServerSideSecretStorageImpl#addKey}.
+     * done via {@link SecretStorage.ServerSideSecretStorage#addKey}.
      *
      * Obviously the keys themselves are not stored server-side, so the js-sdk calls this callback
      * in order to retrieve a secret storage key from the application.
