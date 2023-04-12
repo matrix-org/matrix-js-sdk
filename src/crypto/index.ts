@@ -29,7 +29,7 @@ import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
-import { DeviceInfo, IDevice } from "./deviceinfo";
+import { DeviceInfo, DeviceMap, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
@@ -2014,6 +2014,52 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getStoredDevicesForUser(userId: string): Array<DeviceInfo> | null {
         return this.deviceList.getStoredDevicesForUser(userId);
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const iDeviceMapByUserId = new Map<string, Map<string, IDevice>>();
+        // Keep the users without device to download theirs keys
+        const usersWithoutDeviceInfo: string[] = [];
+
+        for (const userId of userIds) {
+            const deviceInfos = await this.getStoredDevicesForUser(userId);
+            // If there are device infos for a userId, we transform it into a map
+            // Else, the keys will be downloaded after
+            if (deviceInfos) {
+                const iDeviceMap = new Map(
+                    // Convert DeviceInfo to IDevice
+                    deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfo.toStorage()]),
+                );
+                iDeviceMapByUserId.set(userId, iDeviceMap);
+            } else {
+                usersWithoutDeviceInfo.push(userId);
+            }
+        }
+
+        // Download device info for users without device infos
+        if (downloadUncached && usersWithoutDeviceInfo.length > 0) {
+            const newDeviceInfoMap = await this.downloadKeys(usersWithoutDeviceInfo);
+
+            newDeviceInfoMap.forEach((deviceInfoMap, userId) => {
+                const iDeviceMap = new Map<string, IDevice>();
+                // Convert DeviceInfo to IDevice
+                deviceInfoMap.forEach((deviceInfo, deviceId) => iDeviceMap.set(deviceId, deviceInfo.toStorage()));
+
+                // Put the new device infos into the returned map
+                iDeviceMapByUserId.set(userId, iDeviceMap);
+            });
+        }
+
+        return iDeviceMapByUserId;
     }
 
     /**

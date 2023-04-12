@@ -30,6 +30,7 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
+import { DeviceMap } from "../crypto/deviceinfo";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -163,6 +164,19 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        return new Map();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
