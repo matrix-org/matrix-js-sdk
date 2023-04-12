@@ -66,7 +66,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * Sets the base URL for the identity server
      * @param url - The new base url
      */
-    public setIdBaseUrl(url: string): void {
+    public setIdBaseUrl(url?: string): void {
         this.opts.idBaseUrl = url;
     }
 
