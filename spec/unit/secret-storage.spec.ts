@@ -129,7 +129,7 @@ describe("ServerSideSecretStorageImpl", function () {
             }
             accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
 
-            const result = await secretStorage.getKey("mock");
+            const result = await secretStorage.getKey();
             expect(result).toEqual(["default_key_id", storedKey]);
         });
 
