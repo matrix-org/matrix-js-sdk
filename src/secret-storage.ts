@@ -114,7 +114,12 @@ export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDes
 /**
  * Return type for {@link SecretStorage#addKey}.
  */
-export type SecretStorageKeyObject = { keyId: string; keyInfo: SecretStorageKeyDescription };
+export type SecretStorageKeyObject = {
+    /** The ID of the key */
+    keyId: string;
+    /**  details about the key */
+    keyInfo: SecretStorageKeyDescription;
+};
 
 /** Interface for managing account data on the server.
  *
@@ -145,8 +150,48 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
  *  Application callbacks for use with {@link SecretStorage}
  */
 export interface SecretStorageCallbacks {
+    /**
+     * Called to retrieve a secret storage encryption key
+     *
+     * Before a secret can be stored in server-side storage, it must be encrypted with one or more
+     * keys. Similarly, after it has been retrieved from storage, it must be decrypted with one of
+     * the keys it was encrypted with. These encryption keys are known as "secret storage keys".
+     *
+     * Descriptions of the secret storage keys are also stored in server-side storage, per the
+     * [matrix specification](https://spec.matrix.org/v1.6/client-server-api/#key-storage), so
+     * before a key can be used in this way, it must have been stored on the server. This is
+     * done via {@link SecretStorage#addKey}.
+     *
+     * Obviously the keys themselves are not stored server-side, so the js-sdk calls this callback
+     * in order to retrieve a secret storage key from the application.
+     *
+     * @param keys - An options object, containing only the property `keys`.
+     *
+     * @param name - the name of the *secret* (NB: not the encryption key) being stored or retrieved.
+     *    This is the "event type" stored in account data.
+     *
+     * @returns a pair [`keyId`, `privateKey`], where `keyId` is one of the keys from the `keys` parameter,
+     *    and `privateKey` is the raw private encryption key, as appropriate for the encryption algorithm.
+     *    (For `m.secret_storage.v1.aes-hmac-sha2`, it is the input to an HKDF as defined in the
+     *    [specification](https://spec.matrix.org/v1.6/client-server-api/#msecret_storagev1aes-hmac-sha2).)
+     *
+     *    Alternatively, if none of the keys are known, may return `null` — in which case the original
+     *    storage/retrieval operation will fail with an exception.
+     */
     getSecretStorageKey?: (
-        keys: { keys: Record<string, SecretStorageKeyDescription> },
+        keys: {
+            /**
+             * details of the secret storage keys required: a map from the key ID
+             * (excluding the `m.secret_storage.key.` prefix) to details of the key.
+             *
+             * When storing a secret, `keys` will contain exactly one entry; this method will be called
+             * once for each secret storage key to be used for encryption.
+             *
+             * For secret retrieval, `keys` may contain several entries, and the application can return
+             * any one of the requested keys.
+             */
+            keys: Record<string, SecretStorageKeyDescription>;
+        },
         name: string,
     ) => Promise<[string, Uint8Array] | null>;
 }
@@ -178,9 +223,7 @@ export interface ISecretStorage {
      * @param keyId - the ID of the key.  If not given, a random
      *     ID will be generated.
      *
-     * @returns An object with:
-     *     keyId: the ID of the key
-     *     keyInfo: details about the key (iv, mac, passphrase)
+     * @returns details about the key.
      */
     addKey(algorithm: string, opts: AddSecretStorageKeyOpts, keyId?: string): Promise<SecretStorageKeyObject>;
 
@@ -215,21 +258,24 @@ export interface ISecretStorage {
     checkKey(key: Uint8Array, info: SecretStorageKeyDescriptionAesV1): Promise<boolean>;
 
     /**
-     * Store an encrypted secret on the server
+     * Store an encrypted secret on the server.
      *
-     * @param name - The name of the secret
+     * Details of the encryption keys to be used must previously have been stored in account data
+     * (for example, via {@link ISecretStorage#addKey}.
+     *
+     * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret
-     *     or null/undefined to use the default key.
+     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
     store(name: string, secret: string, keys?: string[] | null): Promise<void>;
 
     /**
-     * Get a secret from storage.
+     * Get a secret from storage, and decrypt it.
      *
-     * @param name - the name of the secret
+     * @param name - the name of the secret - i.e., the "event type" stored in the account data
      *
-     * @returns the contents of the secret
+     * @returns the decrypted contents of the secret, or "undefined" if `name` is not found in
+     *    the user's account data.
      */
     get(name: string): Promise<string | undefined>;
 
@@ -331,6 +377,7 @@ export class SecretStorage implements ISecretStorage {
             keyInfo.mac = mac;
         }
 
+        // Create a unique key id. XXX: this is racey.
         if (!keyId) {
             do {
                 keyId = randomString(32);
@@ -406,12 +453,15 @@ export class SecretStorage implements ISecretStorage {
     }
 
     /**
-     * Store an encrypted secret on the server
+     * Store an encrypted secret on the server.
      *
-     * @param name - The name of the secret
+     * Details of the encryption keys to be used must previously have been stored in account data
+     * (for example, via {@link SecretStorage#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
+     * key to decrypt the secret.
+     *
+     * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret
-     *     or null/undefined to use the default key.
+     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, IEncryptedPayload> = {};
@@ -453,11 +503,15 @@ export class SecretStorage implements ISecretStorage {
     }
 
     /**
-     * Get a secret from storage.
+     * Get a secret from storage, and decrypt it.
      *
-     * @param name - the name of the secret
+     * {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
+     * key to decrypt the secret.
      *
-     * @returns the contents of the secret
+     * @param name - the name of the secret - i.e., the "event type" stored in the account data
+     *
+     * @returns the decrypted contents of the secret, or "undefined" if `name` is not found in
+     *    the user's account data.
      */
     public async get(name: string): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretInfo>(name);
