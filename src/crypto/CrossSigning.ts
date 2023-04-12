@@ -30,7 +30,7 @@ import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ISecretStorage, SecretStorageKeyDescription } from "../secret-storage";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -162,7 +162,9 @@ export class CrossSigningInfo {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStoredInSecretStorage(secretStorage: ISecretStorage): Promise<Record<string, object> | null> {
+    public async isStoredInSecretStorage(
+        secretStorage: ServerSideSecretStorage,
+    ): Promise<Record<string, object> | null> {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = (await secretStorage.isStored("m.cross_signing.master")) || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
@@ -189,7 +191,7 @@ export class CrossSigningInfo {
      */
     public static async storeInSecretStorage(
         keys: Map<string, Uint8Array>,
-        secretStorage: ISecretStorage,
+        secretStorage: ServerSideSecretStorage,
     ): Promise<void> {
         for (const [type, privateKey] of keys) {
             const encodedKey = encodeBase64(privateKey);
@@ -206,7 +208,10 @@ export class CrossSigningInfo {
      * @param secretStorage - The secret store using account data
      * @returns The private key
      */
-    public static async getFromSecretStorage(type: string, secretStorage: ISecretStorage): Promise<Uint8Array | null> {
+    public static async getFromSecretStorage(
+        type: string,
+        secretStorage: ServerSideSecretStorage,
+    ): Promise<Uint8Array | null> {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
         if (!encodedKey) {
             return null;

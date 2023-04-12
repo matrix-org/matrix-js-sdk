@@ -23,8 +23,8 @@ import {
     SecretStorageKeyObject,
     AddSecretStorageKeyOpts,
     AccountDataClient,
-    ISecretStorage,
-    SecretStorage as StorageImpl,
+    ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest, SecretSharing } from "./SecretSharing";
 
@@ -42,10 +42,10 @@ export type { ISecretRequest } from "./SecretSharing";
  * Implements Secure Secret Storage and Sharing (MSC1946)
  *
  * @deprecated this is just a backwards-compatibility hack which will be removed soon.
- *    Use `SecretStorage` from `../secret-storage` and/or `SecretSharing` from `./SecretSharing`.
+ *    Use {@link ServerSideSecretStorageImpl} from `../secret-storage` and/or {@link SecretSharing} from `./SecretSharing`.
  */
-export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> implements ISecretStorage {
-    private readonly storageImpl: StorageImpl;
+export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> implements ServerSideSecretStorage {
+    private readonly storageImpl: ServerSideSecretStorageImpl;
     private readonly sharingImpl: SecretSharing;
 
     // In its pure javascript days, this was relying on some proper Javascript-style
@@ -58,7 +58,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> im
     // Nowadays, the whole class is scheduled for destruction, once we get rid of the legacy
     // Crypto impl that exposes it.
     public constructor(accountDataAdapter: AccountDataClient, cryptoCallbacks: ICryptoCallbacks, baseApis: B) {
-        this.storageImpl = new StorageImpl(accountDataAdapter, cryptoCallbacks);
+        this.storageImpl = new ServerSideSecretStorageImpl(accountDataAdapter, cryptoCallbacks);
         this.sharingImpl = new SecretSharing(baseApis as MatrixClient, cryptoCallbacks);
     }
 

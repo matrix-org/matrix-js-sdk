@@ -97,7 +97,7 @@ export interface PassphraseInfo {
 }
 
 /**
- * Options for {@link SecretStorage#addKey}.
+ * Options for {@link ServerSideSecretStorageImpl#addKey}.
  */
 export interface AddSecretStorageKeyOpts {
     pubkey?: string;
@@ -107,12 +107,12 @@ export interface AddSecretStorageKeyOpts {
 }
 
 /**
- * Return type for {@link SecretStorage#getKey}.
+ * Return type for {@link ServerSideSecretStorageImpl#getKey}.
  */
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: SecretStorageKeyDescription];
 
 /**
- * Return type for {@link SecretStorage#addKey}.
+ * Return type for {@link ServerSideSecretStorageImpl#addKey}.
  */
 export type SecretStorageKeyObject = {
     /** The ID of the key */
@@ -147,7 +147,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
 }
 
 /**
- *  Application callbacks for use with {@link SecretStorage}
+ *  Application callbacks for use with {@link ServerSideSecretStorageImpl}
  */
 export interface SecretStorageCallbacks {
     /**
@@ -160,7 +160,7 @@ export interface SecretStorageCallbacks {
      * Descriptions of the secret storage keys are also stored in server-side storage, per the
      * [matrix specification](https://spec.matrix.org/v1.6/client-server-api/#key-storage), so
      * before a key can be used in this way, it must have been stored on the server. This is
-     * done via {@link SecretStorage#addKey}.
+     * done via {@link ServerSideSecretStorageImpl#addKey}.
      *
      * Obviously the keys themselves are not stored server-side, so the js-sdk calls this callback
      * in order to retrieve a secret storage key from the application.
@@ -210,10 +210,10 @@ interface Decryptors {
 /**
  * Interface provided by SecretStorage implementations
  *
- * Normally this will just be an {@link SecretStorage}, but for backwards-compatibility some methods allow other
- * implementations.
+ * Normally this will just be an {@link ServerSideSecretStorageImpl}, but for backwards
+ * compatibility some methods allow other implementations.
  */
-export interface ISecretStorage {
+export interface ServerSideSecretStorage {
     /**
      * Add a key for encrypting secrets.
      *
@@ -261,7 +261,7 @@ export interface ISecretStorage {
      * Store an encrypted secret on the server.
      *
      * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link ISecretStorage#addKey}.
+     * (for example, via {@link ServerSideSecretStorage#addKey}.
      *
      * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
@@ -299,7 +299,7 @@ export interface ISecretStorage {
  *
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
-export class SecretStorage implements ISecretStorage {
+export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
     /**
      * Construct a new `SecretStorage`.
      *
@@ -456,7 +456,7 @@ export class SecretStorage implements ISecretStorage {
      * Store an encrypted secret on the server.
      *
      * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link SecretStorage#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
+     * (for example, via {@link ServerSideSecretStorageImpl#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
      * key to decrypt the secret.
      *
      * @param name - The name of the secret - i.e., the "event type" to be stored in the account data

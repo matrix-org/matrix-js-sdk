@@ -19,17 +19,17 @@ import { Mocked } from "jest-mock";
 import {
     AccountDataClient,
     PassphraseInfo,
-    SecretStorage,
+    ServerSideSecretStorageImpl,
     SecretStorageKeyDescriptionAesV1,
 } from "../../src/secret-storage";
 import { calculateKeyCheck } from "../../src/crypto/aes";
 import { randomString } from "../../src/randomstring";
 
-describe("SecretStorage", function () {
+describe("ServerSideSecretStorageImpl", function () {
     describe(".addKey", function () {
         it("should allow storing a default key", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
 
             // it should have made up a 32-character key id
@@ -42,7 +42,7 @@ describe("SecretStorage", function () {
 
         it("should allow storing a key with an explicit id", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {}, "myKeyId");
 
             // it should have made up a 32-character key id
@@ -55,7 +55,7 @@ describe("SecretStorage", function () {
 
         it("should allow storing a key with a name", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", { name: "mykey" });
 
             expect(result.keyInfo.name).toEqual("mykey");
@@ -68,7 +68,7 @@ describe("SecretStorage", function () {
 
         it("should allow storing a key with a passphrase", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             const passphrase: PassphraseInfo = {
                 algorithm: "m.pbkdf2",
                 iterations: 125,
@@ -89,7 +89,7 @@ describe("SecretStorage", function () {
 
         it("should complain about invalid algorithm", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             await expect(() => secretStorage.addKey("bad_alg")).rejects.toThrow("Unknown key algorithm");
         });
     });
@@ -97,7 +97,7 @@ describe("SecretStorage", function () {
     describe("getKey", function () {
         it("should return the specified key", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
             async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
@@ -115,7 +115,7 @@ describe("SecretStorage", function () {
 
         it("should return the default key if none is specified", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
             async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T> {
@@ -135,7 +135,7 @@ describe("SecretStorage", function () {
 
         it("should return null if the key is not found", async function () {
             const accountDataAdapter = mockAccountDataClient();
-            const secretStorage = new SecretStorage(accountDataAdapter, {});
+            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
             // @ts-ignore
             accountDataAdapter.getAccountDataFromServer.mockResolvedValue(null);
 
@@ -146,7 +146,7 @@ describe("SecretStorage", function () {
 
     describe("checkKey", function () {
         it("should return true for a correct key check", async function () {
-            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const secretStorage = new ServerSideSecretStorageImpl({} as AccountDataClient, {});
 
             const myKey = new TextEncoder().encode(randomString(32));
             const { iv, mac } = await calculateKeyCheck(myKey);
@@ -164,7 +164,7 @@ describe("SecretStorage", function () {
         });
 
         it("should return false for an incorrect key check", async function () {
-            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const secretStorage = new ServerSideSecretStorageImpl({} as AccountDataClient, {});
 
             const { iv, mac } = await calculateKeyCheck(new TextEncoder().encode("badkey"));
 
@@ -181,7 +181,7 @@ describe("SecretStorage", function () {
         });
 
         it("should raise for an unknown algorithm", async function () {
-            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const secretStorage = new ServerSideSecretStorageImpl({} as AccountDataClient, {});
             const keyInfo: SecretStorageKeyDescriptionAesV1 = {
                 name: "my key",
                 passphrase: {} as PassphraseInfo,
@@ -197,7 +197,7 @@ describe("SecretStorage", function () {
 
         // XXX: really???
         it("should return true for an absent mac", async function () {
-            const secretStorage = new SecretStorage({} as AccountDataClient, {});
+            const secretStorage = new ServerSideSecretStorageImpl({} as AccountDataClient, {});
             const keyInfo: SecretStorageKeyDescriptionAesV1 = {
                 name: "my key",
                 passphrase: {} as PassphraseInfo,
