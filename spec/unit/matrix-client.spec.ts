@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { Mocked, mocked } from "jest-mock";
 
 import { logger } from "../../src/logger";
 import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
@@ -63,6 +63,7 @@ import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
+import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 
 jest.useFakeTimers();
 
@@ -2702,6 +2703,44 @@ describe("MatrixClient", function () {
                 // So we get no history back
                 expect(history.map((room) => room.roomId)).toEqual([room3.roomId]);
             });
+        });
+    });
+
+    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
+    describe("SecretStorage wrappers", () => {
+        let mockSecretStorage: Mocked<ServerSideSecretStorageImpl>;
+
+        beforeEach(() => {
+            mockSecretStorage = {
+                getDefaultKeyId: jest.fn(),
+                hasKey: jest.fn(),
+                isStored: jest.fn(),
+            } as unknown as Mocked<ServerSideSecretStorageImpl>;
+            client["_secretStorage"] = mockSecretStorage;
+        });
+
+        it("hasSecretStorageKey", async () => {
+            mockSecretStorage.hasKey.mockResolvedValue(false);
+            expect(await client.hasSecretStorageKey("mykey")).toBe(false);
+            expect(mockSecretStorage.hasKey).toHaveBeenCalledWith("mykey");
+        });
+
+        it("isSecretStored", async () => {
+            const mockResult = { key: {} as SecretStorageKeyDescriptionAesV1 };
+            mockSecretStorage.isStored.mockResolvedValue(mockResult);
+            expect(await client.isSecretStored("mysecret")).toBe(mockResult);
+            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("mysecret");
+        });
+
+        it("getDefaultSecretStorageKeyId", async () => {
+            mockSecretStorage.getDefaultKeyId.mockResolvedValue("bzz");
+            expect(await client.getDefaultSecretStorageKeyId()).toEqual("bzz");
+        });
+
+        it("isKeyBackupKeyStored", async () => {
+            mockSecretStorage.isStored.mockResolvedValue(null);
+            expect(await client.isKeyBackupKeyStored()).toBe(null);
+            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
         });
     });
 });
