@@ -87,6 +87,10 @@ describe("StatsReportBuilder", () => {
                         ["REMOTE_VIDEO_TRACK_ID", { height: 960, width: 1080 }],
                     ]),
                 },
+                jitter: new Map([
+                    ["REMOTE_AUDIO_TRACK_ID", 0.1],
+                    ["REMOTE_VIDEO_TRACK_ID", 50],
+                ]),
             });
         });
     });
@@ -99,6 +103,7 @@ describe("StatsReportBuilder", () => {
         remoteAudioTrack.setCodec("opus");
         remoteAudioTrack.setLoss({ packetsTotal: 20, packetsLost: 0, isDownloadStream: true });
         remoteAudioTrack.setBitrate({ download: 4000, upload: 0 });
+        remoteAudioTrack.setJitter(0.1);
 
         localVideoTrack.setCodec("v8");
         localVideoTrack.setLoss({ packetsTotal: 30, packetsLost: 6, isDownloadStream: false });
@@ -111,5 +116,6 @@ describe("StatsReportBuilder", () => {
         remoteVideoTrack.setBitrate({ download: 5000000, upload: 0 });
         remoteVideoTrack.setFramerate(60);
         remoteVideoTrack.setResolution({ width: 1080, height: 960 });
+        remoteVideoTrack.setJitter(50);
     };
 });
