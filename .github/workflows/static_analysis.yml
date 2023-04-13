@@ -65,7 +65,7 @@ jobs:
               run: "yarn install"
 
             - name: Generate Docs
-              run: "yarn run gendoc"
+              run: "yarn run gendoc --treatWarningsAsErrors"
 
             - name: Upload Artifact
               uses: actions/upload-artifact@v3

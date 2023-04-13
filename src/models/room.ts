@@ -1923,7 +1923,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Processes poll events:
      * If the event has a decryption failure, it will listen for decryption and tries again.
-     * If it is a poll start event ({@link M_POLL_START}),
+     * If it is a poll start event (`m.poll.start`),
      * it creates and stores a Poll model and emits a PollEvent.New event.
      * If the event is related to a poll, it will add it to the poll.
      * Noop for other cases.

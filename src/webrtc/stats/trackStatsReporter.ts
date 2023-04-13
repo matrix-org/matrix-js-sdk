@@ -153,4 +153,18 @@ export class TrackStatsReporter {
             });
         return { audioTrackSummary, videoTrackSummary };
     }
+
+    public static buildJitter(trackStats: MediaTrackStats, statsReport: any): void {
+        if (statsReport.type !== "inbound-rtp") {
+            return;
+        }
+
+        const jitterStr = statsReport?.jitter;
+        if (jitterStr !== undefined) {
+            const jitter = StatsValueFormatter.getNonNegativeValue(jitterStr);
+            trackStats.setJitter(Math.round(jitter * 1000));
+        } else {
+            trackStats.setJitter(-1);
+        }
+    }
 }

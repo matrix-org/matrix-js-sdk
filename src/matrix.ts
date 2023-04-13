@@ -47,6 +47,7 @@ export * from "./store/memory";
 export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
+export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
 export * from "./content-repo";
 export * from "./@types/event";
 export * from "./@types/PushRules";
@@ -62,13 +63,14 @@ export type { MatrixCall } from "./webrtc/call";
 export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
 export type { CryptoApi } from "./crypto-api";
+export { CryptoEvent } from "./crypto";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
 /**
  * Configure a different factory to be used for creating crypto stores
  *
- * @param fac - a function which will return a new {@link CryptoStore}
+ * @param fac - a function which will return a new `CryptoStore`
  */
 export function setCryptoStoreFactory(fac: () => CryptoStore): void {
     cryptoStoreFactory = fac;

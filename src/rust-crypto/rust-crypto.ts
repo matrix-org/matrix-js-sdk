@@ -308,7 +308,10 @@ export class RustCrypto implements CryptoBackend {
      * @param deviceLists - device_lists field from /sync
      */
     public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
-        const devices = new RustSdkCryptoJs.DeviceLists(deviceLists.changed, deviceLists.left);
+        const devices = new RustSdkCryptoJs.DeviceLists(
+            deviceLists.changed?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+            deviceLists.left?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
         await this.receiveSyncChanges({ devices });
     }
 

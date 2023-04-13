@@ -59,10 +59,6 @@ export class TypedEventEmitter<
         return super.emit(event, ...args);
     }
 
-    public eventNames(): (Events | EventEmitterEvents)[] {
-        return super.eventNames() as Array<Events | EventEmitterEvents>;
-    }
-
     public listenerCount(event: Events | EventEmitterEvents): number {
         return super.listenerCount(event);
     }

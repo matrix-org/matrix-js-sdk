@@ -589,7 +589,7 @@ export class PushProcessor {
      * @internal
      */
     public static partsForDottedKey(str: string): string[] {
-        const result = [];
+        const result: string[] = [];
 
         // The current field and whether the previous character was the escape
         // character (a backslash).
