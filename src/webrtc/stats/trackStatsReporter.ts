@@ -155,7 +155,7 @@ export class TrackStatsReporter {
     }
 
     public static buildJitter(trackStats: MediaTrackStats, statsReport: any): void {
-        if (statsReport.type !== "inbount-rtp") {
+        if (statsReport.type !== "inbound-rtp") {
             return;
         }
         const jitterStr = statsReport?.jitter;
