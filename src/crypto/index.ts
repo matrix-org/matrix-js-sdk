@@ -476,15 +476,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             // try to get key from secret storage
-            const storedKey = await this.getSecret("m.megolm_backup.v1");
+            const storedKey = await this.secretStorage.get("m.megolm_backup.v1");
 
             if (storedKey) {
                 // ensure that the key is in the right format.  If not, fix the key and
                 // store the fixed version
                 const fixedKey = fixBackupKey(storedKey);
                 if (fixedKey) {
-                    const keys = await this.getSecretStorageKey();
-                    await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
+                    const keys = await this.secretStorage.getKey();
+                    await this.secretStorage.store("m.megolm_backup.v1", fixedKey, [keys![0]]);
                 }
 
                 return olmlib.decodeBase64(fixedKey || storedKey);
@@ -950,7 +950,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
         };
 
-        const oldSSSSKey = await this.getSecretStorageKey();
+        const oldSSSSKey = await this.secretStorage.getKey();
         const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
         const storageExists =
             !setupNewSecretStorage && oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES;

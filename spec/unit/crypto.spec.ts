@@ -1011,7 +1011,6 @@ describe("Crypto", function () {
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
-            client.crypto!.getSecretStorageKey = jest.fn().mockResolvedValue(null);
             client.crypto!.isCrossSigningReady = async () => false;
             client.crypto!.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto!.baseApis.setAccountData = jest.fn().mockResolvedValue(null);

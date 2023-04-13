@@ -3307,7 +3307,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             await this.crypto.backupManager.prepareKeyBackupVersion(password);
 
         if (opts.secureSecretStorage) {
-            await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
+            await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
             logger.info("Key backup private key stored in secret storage");
         }
 
@@ -3327,7 +3327,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trusted key
      */
     public isKeyBackupKeyStored(): Promise<Record<string, SecretStorageKeyDescription> | null> {
-        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
+        return Promise.resolve(this.secretStorage.isStored("m.megolm_backup.v1"));
     }
 
     /**
@@ -3592,14 +3592,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        const storedKey = await this.getSecret("m.megolm_backup.v1");
+        const storedKey = await this.secretStorage.get("m.megolm_backup.v1");
 
         // ensure that the key is in the right format.  If not, fix the key and
         // store the fixed version
         const fixedKey = fixBackupKey(storedKey);
         if (fixedKey) {
             const keys = await this.secretStorage.getKey();
-            await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
+            await this.secretStorage.store("m.megolm_backup.v1", fixedKey, [keys![0]]);
         }
 
         const privKey = decodeBase64(fixedKey || storedKey!);
