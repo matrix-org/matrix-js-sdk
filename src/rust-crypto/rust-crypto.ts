@@ -24,13 +24,15 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { DeviceMap } from "../crypto/deviceinfo";
+import { DeviceMap, IDevice } from "../crypto/deviceinfo";
+import { deviceKeysToIDeviceMap, rustDeviceToJsDevice } from "./device-convertor";
+import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -53,7 +55,7 @@ export class RustCrypto implements CryptoBackend {
 
     public constructor(
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         _userId: string,
         _deviceId: string,
     ) {
@@ -176,7 +178,61 @@ export class RustCrypto implements CryptoBackend {
      * @returns A map `{@link DeviceMap}`.
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
-        return new Map();
+        const iDeviceMapByUserId = new Map<string, Map<string, IDevice>>();
+        const trackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+
+        // Keep untracked user to download their keys after
+        const untrackedUsers: Set<string> = new Set();
+
+        for (const userId of userIds) {
+            const rustUserId = new RustSdkCryptoJs.UserId(userId);
+
+            // if this is a tracked user, we can just fetch the device list from the rust-sdk
+            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
+            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
+            if (trackedUsers.has(rustUserId)) {
+                iDeviceMapByUserId.set(userId, await this.getUserDevices(rustUserId));
+            } else {
+                untrackedUsers.add(userId);
+            }
+        }
+
+        // for any users whose device lists we are not tracking, fall back to downloading the device list
+        // over HTTP.
+        if (downloadUncached && untrackedUsers.size >= 1) {
+            const queryResult = await this.downloadDeviceList(untrackedUsers);
+            Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
+                iDeviceMapByUserId.set(userId, deviceKeysToIDeviceMap(deviceKeys)),
+            );
+        }
+
+        return iDeviceMapByUserId;
+    }
+
+    /**
+     * Get the user devices from the olm machine
+     * @param rustUserId - Rust SDK UserId
+     */
+    private async getUserDevices(rustUserId: RustSdkCryptoJs.UserId): Promise<Map<string, IDevice>> {
+        const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        return new Map(
+            devices
+                .devices()
+                .map((device: RustSdkCryptoJs.Device) => [device.deviceId.toString(), rustDeviceToJsDevice(device)]),
+        );
+    }
+
+    /**
+     * Download the given user keys by calling `/keys/query` request
+     * @param untrackedUsers - download keys of these users
+     */
+    private async downloadDeviceList(untrackedUsers: Set<string>): Promise<IDownloadKeyResult> {
+        const queryBody: IQueryKeysRequest = { device_keys: {} };
+        untrackedUsers.forEach((user) => (queryBody.device_keys[user] = []));
+
+        return await this.http.authedRequest(Method.Post, "/_matrix/client/v3/keys/query", undefined, queryBody, {
+            prefix: "",
+        });
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

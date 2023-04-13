@@ -28,7 +28,7 @@ export interface IDevice {
 // user-Id → device-Id → IDevice
 export type DeviceMap = Map<string, Map<string, IDevice>>;
 
-enum DeviceVerification {
+export enum DeviceVerification {
     Blocked = -1,
     Unverified = 0,
     Verified = 1,
