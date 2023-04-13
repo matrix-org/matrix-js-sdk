@@ -1971,7 +1971,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
         const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
 
-        if (!timelineSet) return;
+        if (timelineSet === undefined) return;
 
         const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
             this.roomId,
@@ -2013,7 +2013,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             logger.debug("onThreadDelete: Could not find root event in room timeline");
         }
         for (const timelineSet of this.threadsTimelineSets) {
-            timelineSet?.removeEvent(thread.id);
+            timelineSet.removeEvent(thread.id);
         }
     }
 
