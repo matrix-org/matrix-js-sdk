@@ -324,7 +324,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly polls: Map<string, Poll> = new Map<string, Poll>();
-    public readonly threadsTimelineSets: EventTimelineSet[] = [];
+
+    /**
+     * Empty array if the timeline sets have not been initialised. After initialisation:
+     * 0: All threads
+     * 1: Threads the current user has participated in
+     */
+    public readonly threadsTimelineSets: [] | [EventTimelineSet, EventTimelineSet] = [];
+
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private timelineNeedsRefresh = false;
@@ -490,7 +497,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     this.createThreadTimelineSet(ThreadFilterType.My),
                 ]);
                 const timelineSets = await this.threadTimelineSetsPromise;
-                this.threadsTimelineSets.push(...timelineSets);
+                this.threadsTimelineSets[0] = timelineSets[0];
+                this.threadsTimelineSets[1] = timelineSets[1];
                 return timelineSets;
             } catch (e) {
                 this.threadTimelineSetsPromise = null;
@@ -1963,6 +1971,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
         const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
 
+        if (!timelineSet) return;
+
         const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
             this.roomId,
             null,
@@ -2003,7 +2013,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             logger.debug("onThreadDelete: Could not find root event in room timeline");
         }
         for (const timelineSet of this.threadsTimelineSets) {
-            timelineSet.removeEvent(thread.id);
+            timelineSet?.removeEvent(thread.id);
         }
     }
 
