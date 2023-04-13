@@ -158,8 +158,9 @@ export class TrackStatsReporter {
         if (statsReport.type !== "inbound-rtp") {
             return;
         }
+
         const jitterStr = statsReport?.jitter;
-        if (jitterStr) {
+        if (jitterStr !== undefined) {
             const jitter = StatsValueFormatter.getNonNegativeValue(jitterStr);
             trackStats.setJitter(Math.round(jitter * 1000));
         } else {
