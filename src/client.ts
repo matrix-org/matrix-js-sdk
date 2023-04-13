@@ -110,7 +110,13 @@ import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
-import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
+import {
+    CrossSigningInfo,
+    DeviceTrustLevel,
+    ICacheCallbacks,
+    isCrossSigningStoredInSecretStorage,
+    UserTrustLevel,
+} from "./crypto/CrossSigning";
 import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
@@ -2841,11 +2847,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns True if secret storage is ready to be used on this device
      */
-    public isSecretStorageReady(): Promise<boolean> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.isSecretStorageReady();
+    public async isSecretStorageReady(): Promise<boolean> {
+        const secretStorageKeyInAccount = await this.secretStorage.hasKey();
+        const privateKeysInStorage = await isCrossSigningStoredInSecretStorage(this.secretStorage);
+        const sessionBackupInStorage = (await this.isKeyBackupKeyStored()) || !this.getKeyBackupEnabled();
+        return !!(secretStorageKeyInAccount && privateKeysInStorage && sessionBackupInStorage);
     }
 
     /**
@@ -3252,7 +3258,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getKeyBackupEnabled(): boolean | null {
         if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
+            return false;
         }
         return this.crypto.backupManager.getKeyBackupEnabled();
     }

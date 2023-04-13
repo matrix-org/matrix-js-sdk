@@ -722,13 +722,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns True if secret storage is ready to be used on this device
      */
-    public async isSecretStorageReady(): Promise<boolean> {
-        const secretStorageKeyInAccount = await this.secretStorage.hasKey();
-        const privateKeysInStorage = await this.crossSigningInfo.isStoredInSecretStorage(this.secretStorage);
-        const sessionBackupInStorage =
-            !this.backupManager.getKeyBackupEnabled() || (await this.baseApis.isKeyBackupKeyStored());
-
-        return !!(secretStorageKeyInAccount && privateKeysInStorage && sessionBackupInStorage);
+    public isSecretStorageReady(): Promise<boolean> {
+        return this.baseApis.isSecretStorageReady();
     }
 
     /**
