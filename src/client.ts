@@ -2278,7 +2278,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userIds - The users to fetch.
      * @param forceDownload - Always download the keys even if cached.
      *
-     * @returns A promise which resolves to a map userId-\>deviceId-\>{@link DeviceInfo}
+     * @returns A promise which resolves to a map userId-\>deviceId-\>`DeviceInfo`
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         if (!this.crypto) {
@@ -7471,7 +7471,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set the identity server URL of this client
      * @param url - New identity server URL
      */
-    public setIdentityServerUrl(url: string): void {
+    public setIdentityServerUrl(url?: string): void {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
         this.http.setIdBaseUrl(this.idBaseUrl);
     }

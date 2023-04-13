@@ -245,8 +245,8 @@ export enum CryptoEvent {
 export type CryptoEventHandlerMap = {
     /**
      * Fires when a device is marked as verified/unverified/blocked/unblocked by
-     * {@link MatrixClient#setDeviceVerified|MatrixClient.setDeviceVerified} or
-     * {@link MatrixClient#setDeviceBlocked|MatrixClient.setDeviceBlocked}.
+     * {@link MatrixClient#setDeviceVerified | MatrixClient.setDeviceVerified} or
+     * {@link MatrixClient#setDeviceBlocked | MatrixClient.setDeviceBlocked}.
      *
      * @param userId - the owner of the verified device
      * @param deviceId - the id of the verified device
@@ -1778,8 +1778,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param value - whether to blacklist all unverified devices by default
      *
-     * @deprecated For external code, use {@link MatrixClient#setGlobalBlacklistUnverifiedDevices}. For
-     *   internal code, set {@link MatrixClient#globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Set {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1788,8 +1787,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @returns whether to blacklist all unverified devices by default
      *
-     * @deprecated For external code, use {@link MatrixClient#getGlobalBlacklistUnverifiedDevices}. For
-     *   internal code, reference {@link MatrixClient#globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Reference {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
@@ -2666,7 +2664,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns resolves once the sessions are complete, to
      *    an Object mapping from userId to deviceId to
-     *    {@link OlmSessionResult}
+     *    `IOlmSessionResult`
      */
     public ensureOlmSessionsForUsers(
         users: string[],
@@ -3767,7 +3765,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param algorithm -  crypto algorithm
      *
-     * @throws {@link DecryptionError} if the algorithm is unknown
+     * @throws `DecryptionError` if the algorithm is unknown
      */
     public getRoomDecryptor(roomId: string | null, algorithm: string): DecryptionAlgorithm {
         let decryptors: Map<string, DecryptionAlgorithm> | undefined;
