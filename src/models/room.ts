@@ -1969,9 +1969,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
-        const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
+        if (this.threadsTimelineSets.length === 0) return;
 
-        if (timelineSet === undefined) return;
+        const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
 
         const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
             this.roomId,
