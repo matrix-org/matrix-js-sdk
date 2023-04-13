@@ -47,7 +47,7 @@ export * from "./store/memory";
 export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
-export { OutgoingRoomKeyRequest } from "./crypto/store/base";
+export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
 export * from "./content-repo";
 export * from "./@types/event";
 export * from "./@types/PushRules";
