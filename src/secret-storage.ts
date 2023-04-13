@@ -265,7 +265,8 @@ export interface ServerSideSecretStorage {
      *
      * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
+     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key
+     *     (will throw if no default key is set).
      */
     store(name: string, secret: string, keys?: string[] | null): Promise<void>;
 
@@ -289,6 +290,20 @@ export interface ServerSideSecretStorage {
      *     key
      */
     isStored(name: string): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
+
+    /**
+     * Get the current default key ID for encrypting secrets.
+     *
+     * @returns The default key ID or null if no default key ID is set
+     */
+    getDefaultKeyId(): Promise<string | null>;
+
+    /**
+     * Set the default key ID for encrypting secrets.
+     *
+     * @param keyId - The new default key ID
+     */
+    setDefaultKeyId(keyId: string): Promise<void>;
 }
 
 /**
@@ -315,6 +330,11 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         private readonly callbacks: SecretStorageCallbacks,
     ) {}
 
+    /**
+     * Get the current default key ID for encrypting secrets.
+     *
+     * @returns The default key ID or null if no default key ID is set
+     */
     public async getDefaultKeyId(): Promise<string | null> {
         const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
             "m.secret_storage.default_key",
@@ -323,6 +343,11 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         return defaultKey.key;
     }
 
+    /**
+     * Set the default key ID for encrypting secrets.
+     *
+     * @param keyId - The new default key ID
+     */
     public setDefaultKeyId(keyId: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev: MatrixEvent): void => {
