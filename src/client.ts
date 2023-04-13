@@ -2748,24 +2748,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Default: true
      *
      * @returns True if trusting cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.getTrustCrossSignedDevices | `CryptoApi.getTrustCrossSignedDevices`}.
      */
     public getCryptoTrustCrossSignedDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getCryptoTrustCrossSignedDevices();
+        return this.cryptoBackend.getTrustCrossSignedDevices();
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
      *
      * @param val - True to trust cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.setTrustCrossSignedDevices | `CryptoApi.setTrustCrossSignedDevices`}.
      */
     public setCryptoTrustCrossSignedDevices(val: boolean): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.setCryptoTrustCrossSignedDevices(val);
+        this.cryptoBackend.setTrustCrossSignedDevices(val);
     }
 
     /**

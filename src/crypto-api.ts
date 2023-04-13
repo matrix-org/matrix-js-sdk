@@ -72,4 +72,25 @@ export interface CryptoApi {
      *    session export objects
      */
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
+
+    /**
+     * Set whether to trust other user's signatures of their devices.
+     *
+     * If false, devices will only be considered 'verified' if we have
+     * verified that device individually (effectively disabling cross-signing).
+     *
+     * `true` by default.
+     *
+     * @param val - the new value
+     */
+    setTrustCrossSignedDevices(val: boolean): void;
+
+    /**
+     * Return whether we trust other user's signatures of their devices.
+     *
+     * @see {@link CryptoApi#setTrustCrossSignedDevices}
+     *
+     * @returns `true` if we trust cross-signed devices, otherwise `false`.
+     */
+    getTrustCrossSignedDevices(): boolean;
 }
