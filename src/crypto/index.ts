@@ -476,15 +476,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             // try to get key from secret storage
-            const storedKey = await this.getSecret("m.megolm_backup.v1");
+            const storedKey = await this.secretStorage.get("m.megolm_backup.v1");
 
             if (storedKey) {
                 // ensure that the key is in the right format.  If not, fix the key and
                 // store the fixed version
                 const fixedKey = fixBackupKey(storedKey);
                 if (fixedKey) {
-                    const keys = await this.getSecretStorageKey();
-                    await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
+                    const keys = await this.secretStorage.getKey();
+                    await this.secretStorage.store("m.megolm_backup.v1", fixedKey, [keys![0]]);
                 }
 
                 return olmlib.decodeBase64(fixedKey || storedKey);
@@ -950,7 +950,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
         };
 
-        const oldSSSSKey = await this.getSecretStorageKey();
+        const oldSSSSKey = await this.secretStorage.getKey();
         const [oldKeyId, oldKeyInfo] = oldSSSSKey || [null, null];
         const storageExists =
             !setupNewSecretStorage && oldKeyInfo && oldKeyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES;
@@ -1100,6 +1100,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.log("Secure Secret Storage ready");
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#addKey}.
+     */
     public addSecretStorageKey(
         algorithm: string,
         opts: AddSecretStorageKeyOpts,
@@ -1108,22 +1111,37 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.addKey(algorithm, opts, keyID);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#hasKey}.
+     */
     public hasSecretStorageKey(keyID?: string): Promise<boolean> {
         return this.secretStorage.hasKey(keyID);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#getKey}.
+     */
     public getSecretStorageKey(keyID?: string): Promise<SecretStorageKeyTuple | null> {
         return this.secretStorage.getKey(keyID);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#store}.
+     */
     public storeSecret(name: string, secret: string, keys?: string[]): Promise<void> {
         return this.secretStorage.store(name, secret, keys);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#get}.
+     */
     public getSecret(name: string): Promise<string | undefined> {
         return this.secretStorage.get(name);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
+     */
     public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
@@ -1135,14 +1153,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.request(name, devices);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#getDefaultKeyId}.
+     */
     public getDefaultSecretStorageKeyId(): Promise<string | null> {
         return this.secretStorage.getDefaultKeyId();
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#setDefaultKeyId}.
+     */
     public setDefaultSecretStorageKeyId(k: string): Promise<void> {
         return this.secretStorage.setDefaultKeyId(k);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#checkKey}.
+     */
     public checkSecretStorageKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
         return this.secretStorage.checkKey(key, info);
     }
