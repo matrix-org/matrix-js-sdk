@@ -452,7 +452,8 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @returns Whether we have the key.
      */
     public async hasKey(keyId?: string): Promise<boolean> {
-        return Boolean(await this.getKey(keyId));
+        const key = await this.getKey(keyId);
+        return Boolean(key);
     }
 
     /**

@@ -206,7 +206,12 @@ import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { CryptoApi } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
-import { AddSecretStorageKeyOpts, SecretStorageKeyDescription } from "./secret-storage";
+import {
+    AddSecretStorageKeyOpts,
+    SecretStorageKeyDescription,
+    ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
+} from "./secret-storage";
 
 export type Store = IStore;
 
@@ -1252,6 +1257,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
 
+    private _secretStorage: ServerSideSecretStorageImpl;
+
     // A manager for determining which invites should be ignored.
     public readonly ignoredInvites: IgnoredInvites;
 
@@ -1417,6 +1424,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
 
         this.ignoredInvites = new IgnoredInvites(this);
+        this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
     }
 
     /**
@@ -2227,6 +2235,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Access the server-side secret storage API for this client.
+     */
+    public get secretStorage(): ServerSideSecretStorage {
+        return this._secretStorage;
+    }
+
+    /**
      * Access the crypto API for this client.
      *
      * If end-to-end encryption has been enabled for this client (via {@link initCrypto} or {@link initRustCrypto}),
@@ -2472,11 +2487,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.crypto.beginKeyVerification(method, userId, deviceId);
     }
 
+    /**
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#checkKey}.
+     */
     public checkSecretStorageKey(key: Uint8Array, info: SecretStorageKeyDescription): Promise<boolean> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.checkSecretStorageKey(key, info);
+        return this.secretStorage.checkKey(key, info);
     }
 
     /**
@@ -2873,16 +2888,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns An object with:
      *     keyId: the ID of the key
      *     keyInfo: details about the key (iv, mac, passphrase)
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#addKey}.
      */
     public addSecretStorageKey(
         algorithm: string,
         opts: AddSecretStorageKeyOpts,
         keyName?: string,
     ): Promise<{ keyId: string; keyInfo: SecretStorageKeyDescription }> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.addSecretStorageKey(algorithm, opts, keyName);
+        return this.secretStorage.addKey(algorithm, opts, keyName);
     }
 
     /**
@@ -2893,12 +2907,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param keyId - The ID of the key to check
      *     for. Defaults to the default key ID if not provided.
      * @returns Whether we have the key.
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#hasKey}.
      */
     public hasSecretStorageKey(keyId?: string): Promise<boolean> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.hasSecretStorageKey(keyId);
+        return this.secretStorage.hasKey(keyId);
     }
 
     /**
@@ -2910,12 +2923,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param secret - The secret contents.
      * @param keys - The IDs of the keys to use to encrypt the secret or null/undefined
      *     to use the default (will throw if no default key is set).
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#store}.
      */
     public storeSecret(name: string, secret: string, keys?: string[]): Promise<void> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.storeSecret(name, secret, keys);
+        return this.secretStorage.store(name, secret, keys);
     }
 
     /**
@@ -2926,12 +2938,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param name - the name of the secret
      *
      * @returns the contents of the secret
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#get}.
      */
     public getSecret(name: string): Promise<string | undefined> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.getSecret(name);
+        return this.secretStorage.get(name);
     }
 
     /**
@@ -2943,12 +2954,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
     public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.isSecretStored(name);
+        return this.secretStorage.isStored(name);
     }
 
     /**
@@ -2974,12 +2984,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
      * @returns The default key ID or null if no default key ID is set
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#getDefaultKeyId}.
      */
     public getDefaultSecretStorageKeyId(): Promise<string | null> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.getDefaultSecretStorageKeyId();
+        return this.secretStorage.getDefaultKeyId();
     }
 
     /**
@@ -2988,12 +2997,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
      * @param keyId - The new default key ID
+     *
+     * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#setDefaultKeyId}.
      */
     public setDefaultSecretStorageKeyId(keyId: string): Promise<void> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.crypto.setDefaultSecretStorageKeyId(keyId);
+        return this.secretStorage.setDefaultKeyId(keyId);
     }
 
     /**
@@ -3006,6 +3014,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param privateKey - The private key
      * @param expectedPublicKey - The public key
      * @returns true if the key matches, otherwise false
+     *
+     * @deprecated The use of asymmetric keys for SSSS is deprecated.
+     *     Use {@link SecretStorage.ServerSideSecretStorage#checkKey} for symmetric keys.
      */
     public checkSecretStoragePrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
         if (!this.crypto) {
@@ -3302,7 +3313,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             await this.crypto.backupManager.prepareKeyBackupVersion(password);
 
         if (opts.secureSecretStorage) {
-            await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
+            await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
             logger.info("Key backup private key stored in secret storage");
         }
 
@@ -3322,7 +3333,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trusted key
      */
     public isKeyBackupKeyStored(): Promise<Record<string, SecretStorageKeyDescription> | null> {
-        return Promise.resolve(this.isSecretStored("m.megolm_backup.v1"));
+        return Promise.resolve(this.secretStorage.isStored("m.megolm_backup.v1"));
     }
 
     /**
@@ -3587,14 +3598,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        const storedKey = await this.getSecret("m.megolm_backup.v1");
+        const storedKey = await this.secretStorage.get("m.megolm_backup.v1");
 
         // ensure that the key is in the right format.  If not, fix the key and
         // store the fixed version
         const fixedKey = fixBackupKey(storedKey);
         if (fixedKey) {
-            const keys = await this.crypto.getSecretStorageKey();
-            await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
+            const keys = await this.secretStorage.getKey();
+            await this.secretStorage.store("m.megolm_backup.v1", fixedKey, [keys![0]]);
         }
 
         const privKey = decodeBase64(fixedKey || storedKey!);
