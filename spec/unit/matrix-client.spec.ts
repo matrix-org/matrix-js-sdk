@@ -50,6 +50,7 @@ import {
     MatrixScheduler,
     Method,
     Room,
+    EventTimelineSet,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
@@ -2741,6 +2742,122 @@ describe("MatrixClient", function () {
             mockSecretStorage.isStored.mockResolvedValue(null);
             expect(await client.isKeyBackupKeyStored()).toBe(null);
             expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
+        });
+    });
+
+    describe("paginateEventTimeline()", () => {
+        describe("notifications timeline", () => {
+            const unsafeNotification = {
+                actions: ["notify"],
+                room_id: "__proto__",
+                event: testUtils.mkMessage({
+                    user: userId,
+                    room: "!roomId:server.org",
+                    msg: "I am nefarious",
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const goodNotification = {
+                actions: ["notify"],
+                room_id: "!roomId:server.org",
+                event: testUtils.mkMessage({
+                    user: userId,
+                    room: "!roomId:server.org",
+                    msg: "I am nice",
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const highlightNotification = {
+                actions: ["notify", { set_tweak: "highlight" }],
+                room_id: "!roomId:server.org",
+                event: testUtils.mkMessage({
+                    user: userId,
+                    room: "!roomId:server.org",
+                    msg: "I am highlighted",
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const setNotifsResponse = (notifications: any[] = []): void => {
+                const response: HttpLookup = {
+                    method: "GET",
+                    path: "/notifications",
+                    data: { notifications: JSON.parse(JSON.stringify(notifications)) },
+                };
+                httpLookups = [response];
+            };
+
+            beforeEach(() => {
+                makeClient();
+
+                // this is how notif timeline is set up in react-sdk
+                const notifTimelineSet = new EventTimelineSet(undefined, {
+                    timelineSupport: true,
+                    pendingEvents: false,
+                });
+                notifTimelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
+                client.setNotifTimelineSet(notifTimelineSet);
+
+                setNotifsResponse();
+            });
+
+            it("should throw when trying to paginate forwards", async () => {
+                const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
+                await expect(
+                    async () => await client.paginateEventTimeline(timeline, { backwards: false }),
+                ).rejects.toThrow("paginateNotifTimeline can only paginate backwards");
+            });
+
+            it("defaults limit to 30 events", async () => {
+                jest.spyOn(client.http, "authedRequest");
+                const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Get, "/notifications", {
+                    limit: "30",
+                    only: "highlight",
+                });
+            });
+
+            it("filters out unsafe notifications", async () => {
+                setNotifsResponse([unsafeNotification, goodNotification, highlightNotification]);
+
+                const timelineSet = client.getNotifTimelineSet()!;
+                const timeline = timelineSet.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                // badNotification not added to timeline
+                const timelineEvents = timeline.getEvents();
+                expect(timelineEvents.length).toEqual(2);
+            });
+
+            it("sets push actions on events and add to timeline", async () => {
+                setNotifsResponse([goodNotification, highlightNotification]);
+
+                const timelineSet = client.getNotifTimelineSet()!;
+                const timeline = timelineSet.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                const [highlightEvent, goodEvent] = timeline.getEvents();
+                expect(highlightEvent.getPushActions()).toEqual({
+                    notify: true,
+                    tweaks: {
+                        highlight: true,
+                    },
+                });
+                expect(goodEvent.getPushActions()).toEqual({
+                    notify: true,
+                    tweaks: {},
+                });
+            });
         });
     });
 });
