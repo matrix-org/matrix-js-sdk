@@ -93,6 +93,16 @@ export interface CryptoApi {
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
     getTrustCrossSignedDevices(): boolean;
+
+    /**
+     * Get the verification status of a given device.
+     *
+     * @param userId - The ID of the user whose device is to be checked.
+     * @param deviceId - The ID of the device to check
+     *
+     * @returns Verification status of the device, or `null` if the device is not known
+     */
+    getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
 }
 
 export class DeviceVerificationStatus {

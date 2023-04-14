@@ -18,7 +18,7 @@ import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
-import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
 
@@ -50,16 +50,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param userId - user to be checked
      */
     checkUserTrust(userId: string): UserTrustLevel;
-
-    /**
-     * Get the verification level for a given device
-     *
-     * TODO: define this better
-     *
-     * @param userId - user to be checked
-     * @param deviceId - device to be checked
-     */
-    checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
 
     /**
      * Encrypt an event according to the configuration of the room.
