@@ -16,6 +16,7 @@ limitations under the License.
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
+import { DeviceMap } from "./crypto/deviceinfo";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -72,4 +73,15 @@ export interface CryptoApi {
      *    session export objects
      */
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    getUserDeviceInfo(userIds: string[], downloadUncached?: boolean): Promise<DeviceMap>;
 }

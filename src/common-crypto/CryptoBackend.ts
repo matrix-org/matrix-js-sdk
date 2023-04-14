@@ -21,7 +21,6 @@ import { CryptoApi } from "../crypto-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
-import { DeviceMap } from "../crypto/deviceinfo";
 
 /**
  * Common interface for the crypto implementations
@@ -88,17 +87,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param event - event to be checked
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
-
-    /**
-     * Get the device information for the given list of users.
-     *
-     * @param userIds - The users to fetch.
-     * @param downloadUncached - If true, download the device list for users whose device list we are not
-     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
-     *
-     * @returns A map `{@link DeviceMap}`.
-     */
-    getUserDeviceInfo(userIds: string[], downloadUncached?: boolean): Promise<DeviceMap>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api */
