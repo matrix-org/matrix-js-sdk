@@ -30,6 +30,7 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     MatrixEventHandlerMap,
+    PushDetails,
 } from "./models/event";
 import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
@@ -5385,9 +5386,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getPushActionsForEvent(event: MatrixEvent, forceRecalculate = false): IActionsObject | null {
         if (!event.getPushActions() || forceRecalculate) {
-            event.setPushActions(this.pushProcessor.actionsForEvent(event));
+            const { actions, rule } = this.pushProcessor.actionsAndRuleForEvent(event);
+            event.setPushDetails(actions, rule);
         }
         return event.getPushActions();
+    }
+
+    /**
+     * Obtain a dict of actions which should be performed for this event according
+     * to the push rules for this user.  Caches the dict on the event.
+     * @param event - The event to get push actions for.
+     * @param forceRecalculate - forces to recalculate actions for an event
+     * Useful when an event just got decrypted
+     * @returns A dict of actions to perform.
+     */
+    public getPushDetailsForEvent(event: MatrixEvent, forceRecalculate = false): PushDetails | null {
+        if (!event.getPushDetails() || forceRecalculate) {
+            const { actions, rule } = this.pushProcessor.actionsAndRuleForEvent(event);
+            event.setPushDetails(actions, rule);
+        }
+        return event.getPushDetails();
     }
 
     /**
@@ -6064,7 +6082,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     for (let i = 0; i < res.notifications.length; i++) {
                         const notification = res.notifications[i];
                         const event = this.getEventMapper()(notification.event);
-                        event.setPushActions(PushProcessor.actionListToActionsObject(notification.actions));
+
+                        // @TODO(kerrya) reprocessing every notification is ugly
+                        // remove if we get server MSC3994 support
+                        this.getPushDetailsForEvent(event, true);
+
                         event.event.room_id = notification.room_id; // XXX: gutwrenching
                         matrixEvents[i] = event;
                     }
