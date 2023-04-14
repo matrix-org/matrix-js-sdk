@@ -31,6 +31,7 @@ import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
+import { DeviceVerificationStatus } from "../crypto-api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -628,16 +629,11 @@ export class UserTrustLevel {
 }
 
 /**
- * Represents the ways in which we trust a device
+ * Represents the ways in which we trust a device.
+ *
+ * @deprecated Use {@link DeviceVerificationStatus}.
  */
-export class DeviceTrustLevel {
-    public constructor(
-        public readonly crossSigningVerified: boolean,
-        public readonly tofu: boolean,
-        private readonly localVerified: boolean,
-        private readonly trustCrossSignedDevices: boolean,
-    ) {}
-
+export class DeviceTrustLevel extends DeviceVerificationStatus {
     public static fromUserTrustLevel(
         userTrustLevel: UserTrustLevel,
         localVerified: boolean,
@@ -649,13 +645,6 @@ export class DeviceTrustLevel {
             localVerified,
             trustCrossSignedDevices,
         );
-    }
-
-    /**
-     * @returns true if this device is verified via any means
-     */
-    public isVerified(): boolean {
-        return Boolean(this.isLocallyVerified() || (this.trustCrossSignedDevices && this.isCrossSigningVerified()));
     }
 
     /**

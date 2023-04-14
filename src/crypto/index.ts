@@ -88,6 +88,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
+import { DeviceVerificationStatus } from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
