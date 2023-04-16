@@ -1262,12 +1262,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Set the push actions for this event.
+     * Clears rule from push details if present
+     * @deprecated use `setPushDetails`
      *
      * @param pushActions - push actions
      */
     public setPushActions(pushActions: IActionsObject | null): void {
         this.pushDetails = {
-            actions: pushActions ?? undefined,
+            actions: pushActions || undefined,
         };
     }
 
