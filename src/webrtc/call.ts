@@ -2315,7 +2315,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      *       [96685:23:0518/162603.933430:ERROR:sdp_offer_answer.cc(4302)] Failed to set local video description recv parameters for m-section with mid='2'. (INVALID_PARAMETER)
      */
     private getRidOfRTXCodecs(): void {
-        // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
+        // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF before v113
         if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
 
         const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
@@ -2332,7 +2332,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const screenshareVideoTransceiver = this.transceivers.get(
             getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "video"),
         );
-        if (screenshareVideoTransceiver) screenshareVideoTransceiver.setCodecPreferences(codecs);
+        // setCodecPreferences isn't supported on FF (as of v113)
+        screenshareVideoTransceiver?.setCodecPreferences?.(codecs);
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
