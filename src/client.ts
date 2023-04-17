@@ -37,7 +37,7 @@ import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep, noUnsafeEventProps } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -8787,8 +8787,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         for (const [userId, deviceId] of devices) {
             const query = queries[userId] || {};
-            queries[userId] = query;
-            query[deviceId] = keyAlgorithm;
+            safeSet(queries, userId, query);
+            safeSet(query, deviceId, keyAlgorithm);
         }
         const content: IClaimKeysRequest = { one_time_keys: queries };
         if (timeout) {
