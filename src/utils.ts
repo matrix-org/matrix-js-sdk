@@ -720,7 +720,7 @@ function processMapToObjectValue(value: any): any {
  * Recursively converts Maps to plain objects.
  * Also supports sub-lists of Maps.
  */
-export function recursiveMapToObject<K extends string | number | symbol, V>(map: Map<K, V>): Partial<Record<K, V>> {
+export function recursiveMapToObject(map: Map<any, any>): Record<any, any> {
     const targetMap = new Map();
 
     for (const [key, value] of map) {
