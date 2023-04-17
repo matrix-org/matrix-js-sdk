@@ -6833,37 +6833,39 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // if (res.uris) {
                 //     logger.log("Got TURN URIs: " + res.uris + " refresh in " + res.ttl + " secs");
                     // map the response to a format that can be fed to RTCPeerConnection
-                    const servers: ITurnServer = [
+                    
+                    this.turnServers = [
                         {
-                            urls: "stun:turn.pocketnet.app",
+                            urls: ["stun:turn.pocketnet.app"],
                             username: "stunuser",
                             credential: "q1w2e3r4t5ASD!@#",
                         },
                         {
-                            urls: "turn:turn.pocketnet.app",
+                            urls: ["turn:turn.pocketnet.app"],
                             username: "stunuser",
                             credential: "q1w2e3r4t5ASD!@#",
                         },
                         {
-                            urls: "stun:relay.metered.ca:80",
+                            urls: ["stun:relay.metered.ca:80"],
+                            username : "",
+                            credential : ""
                         },
                         {
-                            urls: "turn:relay.metered.ca:80",
+                            urls: ["turn:relay.metered.ca:80"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },
                         {
-                            urls: "turn:relay.metered.ca:443",
+                            urls: ["turn:relay.metered.ca:443"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },
                         {
-                            urls: "turn:relay.metered.ca:443?transport=tcp",
+                            urls: ["turn:relay.metered.ca:443?transport=tcp"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },
-                    ]
-                    this.turnServers = [servers];
+                    ];
                     // The TTL is in seconds but we work in ms
                     this.turnServersExpiry = Date.now() + 1000000 * 1000;
                     credentialsGood = true;

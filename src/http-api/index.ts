@@ -60,7 +60,9 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         } as Upload;
         const defer = utils.defer<UploadResponse>();
 
-        if (global.XMLHttpRequest) {
+        const usexml = false;
+
+        if (global.XMLHttpRequest && usexml) {
             const xhr = new global.XMLHttpRequest();
 
             const timeoutFn = function (): void {
