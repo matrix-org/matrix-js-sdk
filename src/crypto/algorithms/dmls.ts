@@ -18,7 +18,12 @@ limitations under the License.
  * Defines m.dmls encryption/decryption
  */
 
-import { DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm } from "./base";
+import {
+    DecryptionAlgorithm,
+    DecryptionError,
+    EncryptionAlgorithm,
+    registerAlgorithm,
+} from "./base";
 import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
 import { Crypto, IEncryptedContent, IEventDecryptionResult } from "..";
@@ -52,7 +57,62 @@ class MlsEncryption extends EncryptionAlgorithm {
         if (!group) {
             throw "No group available";
         }
-        // TODO: check if membership needs syncing, if group needs resolving
+
+        // check if membership needs syncing, if group needs resolving
+        const members = await room.getEncryptionTargetMembers();
+        const roomMembers = members.map(function (u) {
+            return u.userId;
+        });
+        const devices = await this.crypto.downloadKeys(roomMembers, false);
+        // FIXME: remove blocked devices
+
+        const memberMap: Map<string, Set<string>> = new Map();
+
+        for (const [userId, userDevices] of Object.entries(devices)) {
+            memberMap.set(userId, new Set(Object.keys(userDevices)));
+        }
+
+        mlsProvider.syncMembers(this.roomId, memberMap);
+
+        if (group.has_changes() || group.needs_resolve()) {
+            console.log("has changes/needs resolve", group.has_changes(), group.needs_resolve());
+            const [commit, _mls_epoch, creator, resolves, [welcome, adds]] = await group.resolve(mlsProvider.backend!);
+
+            const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
+            const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
+
+            const contentMap: Record<string, Record<string, any>> = {};
+
+            const payload = {
+                algorithm: WELCOME_PACKAGE.name,
+                ciphertext: welcomeB64,
+                creator: creatorB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
+            }
+
+            for (const user of adds) {
+                try {
+                    const [userId, deviceId] = splitId(user);
+                    if (!(userId in contentMap)) {
+                        contentMap[userId] = {};
+                    }
+                    contentMap[userId][deviceId] = payload;
+                } catch (e) {
+                    console.error("Unable to add user", user, e);
+                }
+            }
+
+            await this.baseApis.sendToDevice("m.room.encrypted", contentMap);
+
+            await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
+                algorithm: MLS_ALGORITHM.name,
+                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
+                epoch_creator: creatorB64,
+            });
+        }
+
         const payload = textEncoder.encode(JSON.stringify({
             room_id: this.roomId,
             type: eventType,
@@ -141,9 +201,20 @@ class WelcomeDecryption extends DecryptionAlgorithm {
     }
 }
 
+function joinId(userId: string, deviceId: string): Uint8Array {
+    return textEncoder.encode(userId + "|" + deviceId);
+}
+
+function splitId(id: Uint8Array | number[]): [string, string] {
+    const userStr = textDecoder.decode(id instanceof Uint8Array ? id : Uint8Array.from(id));
+    // FIXME: this will do the wrong thing if the device ID has a "|"
+    return userStr.split("|", 2) as [string, string];
+}
+
 export class MlsProvider {
     private readonly groups: Map<string, matrixDmls.DmlsGroup>;
-    private readonly storage: Map<string, number[]> ;
+    private readonly storage: Map<string, number[]>;
+    private readonly members: Map<string, Map<string, Set<string>>>;
     public backend?: matrixDmls.DmlsCryptoProvider;
     public credential?: matrixDmls.Credential;
 
@@ -153,6 +224,7 @@ export class MlsProvider {
         // FIXME: this should go in the cryptostorage
         // FIXME: DmlsCryptoProvider should also use cryptostorage
         this.storage = new Map();
+        this.members = new Map();
     }
 
     async init(): Promise<void> {
@@ -165,7 +237,7 @@ export class MlsProvider {
         let baseApis = this.crypto.baseApis;
         this.credential = new matrixDmls.Credential(
             this.backend!,
-            textEncoder.encode(baseApis.getUserId() + "|" + baseApis.getDeviceId()),
+            joinId(baseApis.getUserId()!, baseApis.getDeviceId()!),
         );
     }
 
@@ -187,11 +259,7 @@ export class MlsProvider {
         let baseApis = this.crypto.baseApis;
 
         if (users.length) {
-            const devicesToClaim: [string, string][] = users.map((user) => {
-                const userStr = textDecoder.decode(Uint8Array.from(user));
-                // FIXME: this will do the wrong thing if the device ID has a "|"
-                return userStr.split("|", 2) as [string, string];
-            })
+            const devicesToClaim: [string, string][] = users.map(splitId)
 
             const otks = await baseApis.claimOneTimeKeys(devicesToClaim, INIT_KEY_ALGORITHM.name);
 
@@ -227,14 +295,21 @@ export class MlsProvider {
         delete deviceMap[userId][baseApis.getDeviceId()!];
 
         let addedMembers = false;
+        const members: Map<string, Set<string>> = new Map();
 
         for (const [user, devices] of Object.entries(deviceMap)) {
+            const memberDevices: Set<string> = new Set();
+            members.set(user, memberDevices);
             for (const deviceId of Object.keys(devices)) {
                 addedMembers = true;
-                const mlsUser = user + "|" + deviceId;
-                group.add_member(textEncoder.encode(mlsUser), this.backend!);
+                const mlsUser = joinId(user, deviceId);
+                group.add_member(mlsUser, this.backend!);
+                memberDevices.add(deviceId);
             }
         }
+
+        members.get(userId)!.add(baseApis.getDeviceId()!);
+        this.members.set(room.roomId, members);
 
         if (addedMembers) {
             const [_commit, _mls_epoch, creator, resolves, [welcome, adds]] = await group.resolve(this.backend!);
@@ -255,9 +330,7 @@ export class MlsProvider {
 
             for (const user of adds) {
                 try {
-                    const userStr = textDecoder.decode(Uint8Array.from(user));
-                    // FIXME: this will do the wrong thing if the device ID has a "|"
-                    const [userId, deviceId] = userStr.split("|", 2);
+                    const [userId, deviceId] = splitId(user);
                     if (!(userId in contentMap)) {
                         contentMap[userId] = {};
                     }
@@ -289,11 +362,101 @@ export class MlsProvider {
             oldGroup.add_epoch_from_new_group(this.backend!, group, resolves);
         } else {
             this.groups.set(groupId, group);
+
+            const members: Map<string, Set<string>> = new Map();
+            for (const member of group.members(this.backend!)) {
+                const [userId, deviceId] = splitId(member);
+                if (!members.has(userId)) {
+                    members.set(userId, new Set());
+                }
+                members.get(userId)!.add(deviceId);
+            }
+
+            this.members.set(groupId, members);
         }
     }
 
     getGroup(roomId: string): matrixDmls.DmlsGroup | undefined {
         return this.groups.get(roomId);
+    }
+
+    syncMembers(roomId: string, members: Map<string, Set<string>>): void {
+        /* Membership tracking: ideally, the way it would work is:
+         *
+         * - When we get a membership event in an encrypted group (join, leave,
+         *   invite, etc.), then we mark the appropriate group adds/removes.
+         *   (In the case of a join/invite, we need to get the user's devices,
+         *   then add them all.)
+         *
+         * - We also store group membership by user -> groups.  When we are
+         *   notified that a user's devices have changed, we flag the user's
+         *   groups a dirty.  We will, at a later time, update the user's
+         *   devices, and synchronize the device's membership.
+         *
+         * - We continue to receive and process incoming commits.
+         *
+         * - At a later time, we determine whether we need to send a commit, and
+         *   do so if needed.
+         */
+        const recordedMembers = this.members.get(roomId)!;
+
+        console.log("Syncing members", members, recordedMembers);
+
+        // find out what devices have been added/removed
+        const adds: [string, string][] = [];
+        const removes: [string, string][] = [];
+
+        for (const [userId, devices] of members.entries()) {
+            const recordedDevices = recordedMembers.get(userId);
+            if (recordedDevices) {
+                for (const deviceId of devices.values()) {
+                    if (!recordedDevices.has(deviceId)) {
+                        adds.push([userId, deviceId]);
+                    }
+                }
+                for (const deviceId of recordedDevices.values()) {
+                    if (!devices.has(deviceId)) {
+                        removes.push([userId, deviceId])
+                    }
+                }
+            } else {
+                for (const deviceId of devices.values()) {
+                    adds.push([userId, deviceId]);
+                }
+            }
+        }
+
+        for (const [userId, devices] of recordedMembers.entries()) {
+            if (!members.has(userId)) {
+                for (const deviceId of devices.values()) {
+                    removes.push([userId, deviceId]);
+                }
+            }
+        }
+
+        console.log(adds, removes);
+
+        // sync up the group and recorded members
+        const group = this.groups.get(roomId)!;
+
+        for (const [userId, deviceId] of adds) {
+            group.add_member(joinId(userId, deviceId), this.backend!);
+            if (!recordedMembers.has(userId)) {
+                recordedMembers.set(userId, new Set());
+            }
+            recordedMembers.get(userId)!.add(deviceId);
+        }
+
+        for (const [userId, deviceId] of removes) {
+            group.remove_member(joinId(userId, deviceId), this.backend!);
+            if (recordedMembers.has(userId)) { // should always be true, but be safe
+                const recordedDevices = recordedMembers.get(userId)!;
+                recordedDevices.delete(deviceId);
+                if (recordedDevices.size == 0) {
+                    recordedMembers.delete(userId);
+                }
+            }
+        }
     }
 }
 
