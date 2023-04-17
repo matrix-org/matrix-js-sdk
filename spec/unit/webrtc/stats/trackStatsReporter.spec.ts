@@ -224,10 +224,14 @@ describe("TrackStatsReporter", () => {
                 audioTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
             });
         });
@@ -238,10 +242,14 @@ describe("TrackStatsReporter", () => {
                 audioTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
             });
         });

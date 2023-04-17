@@ -25,6 +25,8 @@ export class SummaryStatsReporter {
         let receivedMedia = 0;
         let receivedVideoMedia = 0;
         let receivedAudioMedia = 0;
+        let maxJitter = 0;
+        let maxPacketLoss = 0;
 
         summary.forEach((stats) => {
             let hasReceivedAudio = false;
@@ -49,12 +51,32 @@ export class SummaryStatsReporter {
             if (stats.receivedMedia > 0 && hasReceivedVideo && hasReceivedAudio) {
                 receivedMedia++;
             }
+
+            // Jitter summary
+            if (maxJitter < stats.videoTrackSummary.maxJitter) {
+                maxJitter = stats.videoTrackSummary.maxJitter;
+            }
+
+            if (maxJitter < stats.audioTrackSummary.maxJitter) {
+                maxJitter = stats.audioTrackSummary.maxJitter;
+            }
+
+            // packet loos summery
+            if (maxPacketLoss < stats.videoTrackSummary.maxPacketLoss) {
+                maxPacketLoss = stats.videoTrackSummary.maxPacketLoss;
+            }
+
+            if (maxPacketLoss < stats.audioTrackSummary.maxPacketLoss) {
+                maxPacketLoss = stats.audioTrackSummary.maxPacketLoss;
+            }
         });
 
         const report = {
             percentageReceivedMedia: Math.round((receivedMedia / entirety) * 100) / 100,
             percentageReceivedVideoMedia: Math.round((receivedVideoMedia / entirety) * 100) / 100,
             percentageReceivedAudioMedia: Math.round((receivedAudioMedia / entirety) * 100) / 100,
+            maxJitter,
+            maxPacketLoss,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }

@@ -21,4 +21,6 @@ export interface SummaryStats {
 export interface TrackSummary {
     count: number;
     muted: number;
+    maxJitter: number;
+    maxPacketLoss: number;
 }
