@@ -688,17 +688,24 @@ export class PushProcessor {
         if (!rulesets) {
             return null;
         }
-        if (ev.getSender() === this.client.credentials.userId) {
+
+        if (ev.getSender() === this.client.getSafeUserId()) {
             return null;
         }
 
         return this.matchingRuleFromKindSet(ev, rulesets.global);
     }
 
-    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets?: IPushRules): IActionsObject {
+    private pushActionsForEventAndRulesets(
+        ev: MatrixEvent,
+        rulesets?: IPushRules,
+    ): {
+        actions?: IActionsObject;
+        rule?: IAnnotatedPushRule;
+    } {
         const rule = this.matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
-            return {} as IActionsObject;
+            return {};
         }
 
         const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
@@ -710,7 +717,7 @@ export class PushProcessor {
             actionObj.tweaks.highlight = rule.kind == PushRuleKind.ContentSpecific;
         }
 
-        return actionObj;
+        return { actions: actionObj, rule };
     }
 
     public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
@@ -732,6 +739,14 @@ export class PushProcessor {
      * Get the user's push actions for the given event
      */
     public actionsForEvent(ev: MatrixEvent): IActionsObject {
+        const { actions } = this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
+        return actions || ({} as IActionsObject);
+    }
+
+    public actionsAndRuleForEvent(ev: MatrixEvent): {
+        actions?: IActionsObject;
+        rule?: IAnnotatedPushRule;
+    } {
         return this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
     }
 
