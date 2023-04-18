@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -228,6 +228,25 @@ describe("RustCrypto", () => {
 
             const res = rustCrypto.getEventEncryptionInfo(event);
             expect(res.encrypted).toBeTruthy();
+        });
+    });
+
+    describe("get|setTrustCrossSignedDevices", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await initRustCrypto({} as MatrixClient["http"], TEST_USER, TEST_DEVICE_ID);
+        });
+
+        it("should be true by default", () => {
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+
+        it("should be easily turn-off-and-on-able", () => {
+            rustCrypto.setTrustCrossSignedDevices(false);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(false);
+            rustCrypto.setTrustCrossSignedDevices(true);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
         });
     });
 });

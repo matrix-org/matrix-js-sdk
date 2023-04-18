@@ -605,18 +605,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns True if trusting cross-signed devices
      */
+    public getTrustCrossSignedDevices(): boolean {
+        return this.trustCrossSignedDevices;
+    }
+
+    /**
+     * @deprecated Use {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
     public getCryptoTrustCrossSignedDevices(): boolean {
         return this.trustCrossSignedDevices;
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
-
-     * This may be set before initCrypto() is called to ensure no races occur.
      *
      * @param val - True to trust cross-signed devices
      */
-    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+    public setTrustCrossSignedDevices(val: boolean): void {
         this.trustCrossSignedDevices = val;
 
         for (const userId of this.deviceList.getKnownUserIds()) {
@@ -632,6 +637,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 }
             }
         }
+    }
+
+    /**
+     * @deprecated Use {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+        this.setTrustCrossSignedDevices(val);
     }
 
     /**

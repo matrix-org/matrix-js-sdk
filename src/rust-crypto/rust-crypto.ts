@@ -36,6 +36,7 @@ import { MapWithDefault } from "../utils";
  */
 export class RustCrypto implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;
+    private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -163,6 +164,22 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
+    public getTrustCrossSignedDevices(): boolean {
+        return this._trustCrossSignedDevices;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setTrustCrossSignedDevices(val: boolean): void {
+        this._trustCrossSignedDevices = val;
+        // TODO: legacy crypto goes through the list of known devices and emits DeviceVerificationChanged
+        //  events. Maybe we need to do the same?
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
