@@ -369,9 +369,9 @@ export class TimelineWindow {
 
         // iterate through each timeline between this.start and this.end
         // (inclusive).
-        let timeline = this.start.timeline;
+        let timeline: EventTimeline | null = this.start.timeline;
         // eslint-disable-next-line no-constant-condition
-        while (true) {
+        while (timeline) {
             const events = timeline.getEvents();
 
             // For the first timeline in the chain, we want to start at
@@ -399,7 +399,7 @@ export class TimelineWindow {
             if (timeline === this.end?.timeline) {
                 break;
             } else {
-                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS)!;
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS);
             }
         }
 
