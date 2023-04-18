@@ -76,36 +76,41 @@ class MlsEncryption extends EncryptionAlgorithm {
 
         if (group.has_changes() || group.needs_resolve()) {
             console.log("has changes/needs resolve", group.has_changes(), group.needs_resolve());
-            const [commit, _mls_epoch, creator, resolves, [welcome, adds]] = await group.resolve(mlsProvider.backend!);
+            const [commit, _mls_epoch, creator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
-            const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
             const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
 
-            const contentMap: Record<string, Record<string, any>> = {};
+            if (welcomeInfo) {
+                const [welcome, adds] = welcomeInfo;
 
-            const payload = {
-                algorithm: WELCOME_PACKAGE.name,
-                ciphertext: welcomeB64,
-                sender: senderB64,
-                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
-                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
-                }),
-            }
+                const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
 
-            for (const user of adds) {
-                try {
-                    const [userId, deviceId] = splitId(user);
-                    if (!(userId in contentMap)) {
-                        contentMap[userId] = {};
-                    }
-                    contentMap[userId][deviceId] = payload;
-                } catch (e) {
-                    console.error("Unable to add user", user, e);
+                const contentMap: Record<string, Record<string, any>> = {};
+
+                const payload = {
+                    algorithm: WELCOME_PACKAGE.name,
+                    ciphertext: welcomeB64,
+                    sender: senderB64,
+                    resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                        return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                    }),
                 }
-            }
 
-            await this.baseApis.sendToDevice("m.room.encrypted", contentMap);
+                for (const user of adds) {
+                    try {
+                        const [userId, deviceId] = splitId(user);
+                        if (!(userId in contentMap)) {
+                            contentMap[userId] = {};
+                        }
+                        contentMap[userId][deviceId] = payload;
+                    } catch (e) {
+                        console.error("Unable to add user", user, e);
+                    }
+                }
+
+                await this.baseApis.sendToDevice("m.room.encrypted", contentMap);
+            }
 
             await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
                 algorithm: MLS_ALGORITHM.name,
@@ -335,35 +340,39 @@ export class MlsProvider {
         this.members.set(room.roomId, members);
 
         if (addedMembers) {
-            const [_commit, _mls_epoch, creator, resolves, [welcome, adds]] = await group.resolve(this.backend!);
+            const [_commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(this.backend!);
 
-            const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
-            const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
+            if (welcomeInfo) {
+                const [welcome, adds] = welcomeInfo;
 
-            const contentMap: Record<string, Record<string, any>> = {};
+                const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
+                const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
 
-            const payload = {
-                algorithm: WELCOME_PACKAGE.name,
-                ciphertext: welcomeB64,
-                creator: creatorB64,
-                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
-                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
-                }),
-            }
+                const contentMap: Record<string, Record<string, any>> = {};
 
-            for (const user of adds) {
-                try {
-                    const [userId, deviceId] = splitId(user);
-                    if (!(userId in contentMap)) {
-                        contentMap[userId] = {};
-                    }
-                    contentMap[userId][deviceId] = payload;
-                } catch (e) {
-                    console.error("Unable to add user", user, e);
+                const payload = {
+                    algorithm: WELCOME_PACKAGE.name,
+                    ciphertext: welcomeB64,
+                    creator: creatorB64,
+                    resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                        return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                    }),
                 }
-            }
 
-            await baseApis.sendToDevice("m.room.encrypted", contentMap);
+                for (const user of adds) {
+                    try {
+                        const [userId, deviceId] = splitId(user);
+                        if (!(userId in contentMap)) {
+                            contentMap[userId] = {};
+                        }
+                        contentMap[userId][deviceId] = payload;
+                    } catch (e) {
+                        console.error("Unable to add user", user, e);
+                    }
+                }
+
+                await baseApis.sendToDevice("m.room.encrypted", contentMap);
+            }
         }
 
         return group;
