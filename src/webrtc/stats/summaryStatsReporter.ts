@@ -81,7 +81,7 @@ export class SummaryStatsReporter {
         return maxJitter;
     }
 
-    private buildMaxPacketLoss(maxPacketLoss, stats: SummaryStats): number {
+    private buildMaxPacketLoss(maxPacketLoss: number, stats: SummaryStats): number {
         if (maxPacketLoss < stats.videoTrackSummary.maxPacketLoss) {
             maxPacketLoss = stats.videoTrackSummary.maxPacketLoss;
         }
