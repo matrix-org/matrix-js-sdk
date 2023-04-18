@@ -18,7 +18,7 @@ jobs:
         strategy:
             matrix:
                 specs: [browserify, integ, unit]
-                node: [16, 18, latest]
+                node: [16, 18, 19]
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
