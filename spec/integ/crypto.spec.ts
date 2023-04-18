@@ -44,7 +44,7 @@ import {
     RoomMember,
     RoomStateEvent,
 } from "../../src/matrix";
-import { DeviceInfo, DeviceVerification } from "../../src/crypto/deviceinfo";
+import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
 import { escapeRegExp } from "../../src/utils";
@@ -2122,9 +2122,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Wait for alice to query `user` keys
             await queryPromise;
 
-            // Old crypto: for bob: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
+            // Old crypto: for `user`: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
             jest.runAllTimers();
-            // Old crypto: for bob: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
+            // Old crypto: for `user`: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
             // It will add bob devices to the DeviceList
             await flushPromises();
 
@@ -2134,17 +2134,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(devicesInfo.size).toBe(1);
             // We are expecting only the EBMMPAFOPU device
             expect(devicesInfo.get(user)!.size).toBe(1);
-
-            const { algorithms, keys, signatures, unsigned } = queryResponseBody.device_keys[user]["EBMMPAFOPU"];
-            const expectedDevice = {
-                algorithms,
-                keys,
-                signatures,
-                unsigned,
-                known: false,
-                verified: DeviceVerification.Unverified,
-            };
-            expect(devicesInfo.get(user)!.get("EBMMPAFOPU")).toEqual(expectedDevice);
+            expect(devicesInfo.get(user)!.get("EBMMPAFOPU")).toEqual(
+                downloadDeviceToJsDevice(queryResponseBody.device_keys[user]["EBMMPAFOPU"]),
+            );
         });
     });
 });
