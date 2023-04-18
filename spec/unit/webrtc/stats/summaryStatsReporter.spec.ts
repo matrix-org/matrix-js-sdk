@@ -44,22 +44,22 @@ describe("SummaryStatsReporter", () => {
                     receivedMedia: 13,
                     receivedAudioMedia: 0,
                     receivedVideoMedia: 13,
-                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 20, maxPacketLoss: 5 },
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                     videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                 },
                 {
                     receivedMedia: 0,
                     receivedAudioMedia: 0,
                     receivedVideoMedia: 0,
-                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
-                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                 },
                 {
                     receivedMedia: 15,
                     receivedAudioMedia: 6,
                     receivedVideoMedia: 9,
-                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
-                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 40 },
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                 },
             ];
             reporter.build(summary);
@@ -67,8 +67,8 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedMedia: 0.5,
                 percentageReceivedAudioMedia: 0.5,
                 percentageReceivedVideoMedia: 0.75,
-                maxJitter: 20,
-                maxPacketLoss: 40,
+                maxJitter: 0,
+                maxPacketLoss: 0,
             });
         });
 
@@ -129,6 +129,47 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+            });
+        });
+
+        it("should find max jitter and max packet loss", async () => {
+            const summary = [
+                {
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                },
+                {
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 20, maxPacketLoss: 5 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                },
+                {
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
+                },
+                {
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 2, maxPacketLoss: 5 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 40 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 20,
+                maxPacketLoss: 40,
             });
         });
     });
