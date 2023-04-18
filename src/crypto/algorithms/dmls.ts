@@ -80,13 +80,14 @@ class MlsEncryption extends EncryptionAlgorithm {
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
             const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
+            const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
 
             const contentMap: Record<string, Record<string, any>> = {};
 
             const payload = {
                 algorithm: WELCOME_PACKAGE.name,
                 ciphertext: welcomeB64,
-                creator: creatorB64,
+                sender: senderB64,
                 resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
                     return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
                 }),
@@ -110,6 +111,10 @@ class MlsEncryption extends EncryptionAlgorithm {
                 algorithm: MLS_ALGORITHM.name,
                 ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
                 epoch_creator: creatorB64,
+                sender: senderB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
             });
         }
 
@@ -148,6 +153,7 @@ class MlsDecryption extends DecryptionAlgorithm {
             epochCreator,
             mlsProvider.backend!,
         );
+        const epochNumber = unverifiedMessage.epoch;
         const processedMessage = group.process_unverified_message(
             unverifiedMessage,
             epochCreator,
@@ -165,10 +171,27 @@ class MlsDecryption extends DecryptionAlgorithm {
                 clearEvent
             }
         } else if (processedMessage.is_staged_commit()) {
-            // FIXME:
-            throw new DecryptionError("MLS_MISSING_FIELDS", "Handling commits not implemented yet");
+            if (typeof(content.sender) !== "string" || !Array.isArray(content.resolves)) {
+                throw new DecryptionError("MLS_MISSING_FIELDS", "Missing or invalid fields in cleartext");
+            }
+            const sender = olmlib.decodeBase64(content.sender);
+            const resolves = content.resolves.map(([epochNum, creatorB64]: [number, string]) => {
+                return [epochNum, olmlib.decodeBase64(creatorB64)];
+            });
+            const commit = processedMessage.as_staged_commit();
+            group.merge_staged_commit(
+                commit, epochNumber, epochCreator,
+                sender, resolves,
+                mlsProvider.backend!,
+            );
+            return {
+                clearEvent: {
+                    type: "io.element.mls.internal",
+                    content: {"body": "This is an MLS commit message, so there's nothing useful to see here."},
+                }
+            }
         } else {
-            throw new DecryptionError("MLS_MISSING_FIELDS", "Unknown MLS message type");
+            throw new DecryptionError("MLS_UNKNOWN_TYPE", "Unknown MLS message type");
         }
     }
 }
@@ -185,11 +208,11 @@ class WelcomeDecryption extends DecryptionAlgorithm {
         console.log("Got welcome", content);
         // FIXME: check that it's a to-device event
         if (typeof(content.ciphertext) !== "string" ||
-            typeof(content.creator) !== "string" ||
+            typeof(content.sender) !== "string" ||
             !Array.isArray(content.resolves)) {
             throw new DecryptionError("MLS_WELCOME_MISSING_FIELDS", "Missing or invalid fields in input");
         }
-        this.crypto.mlsProvider.processWelcome(content.ciphertext, content.creator, content.resolves);
+        this.crypto.mlsProvider.processWelcome(content.ciphertext, content.sender, content.resolves);
         // welcome packages don't have any visible representation and don't get
         // processed further
         return {
