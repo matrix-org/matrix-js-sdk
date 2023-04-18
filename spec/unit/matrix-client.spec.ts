@@ -51,6 +51,11 @@ import {
     Method,
     Room,
     EventTimelineSet,
+    PushRuleActionName,
+    TweakName,
+    RuleId,
+    IPushRule,
+    ConditionKind,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
@@ -2751,7 +2756,7 @@ describe("MatrixClient", function () {
                 actions: ["notify"],
                 room_id: "__proto__",
                 event: testUtils.mkMessage({
-                    user: userId,
+                    user: "@villain:server.org",
                     room: "!roomId:server.org",
                     msg: "I am nefarious",
                 }),
@@ -2762,11 +2767,12 @@ describe("MatrixClient", function () {
 
             const goodNotification = {
                 actions: ["notify"],
-                room_id: "!roomId:server.org",
-                event: testUtils.mkMessage({
-                    user: userId,
-                    room: "!roomId:server.org",
-                    msg: "I am nice",
+                room_id: "!favouriteRoom:server.org",
+                event: new MatrixEvent({
+                    sender: "@bob:server.org",
+                    room_id: "!roomId:server.org",
+                    type: "m.call.invite",
+                    content: {},
                 }),
                 profile_tag: null,
                 read: true,
@@ -2774,12 +2780,12 @@ describe("MatrixClient", function () {
             };
 
             const highlightNotification = {
-                actions: ["notify", { set_tweak: "highlight" }],
+                actions: ["notify", { set_tweak: "highlight", value: true }],
                 room_id: "!roomId:server.org",
                 event: testUtils.mkMessage({
-                    user: userId,
+                    user: "@bob:server.org",
                     room: "!roomId:server.org",
-                    msg: "I am highlighted",
+                    msg: "I am highlighted banana",
                 }),
                 profile_tag: null,
                 read: true,
@@ -2795,6 +2801,41 @@ describe("MatrixClient", function () {
                 httpLookups = [response];
             };
 
+            const callRule: IPushRule = {
+                actions: [PushRuleActionName.Notify],
+                conditions: [
+                    {
+                        kind: ConditionKind.EventMatch,
+                        key: "type",
+                        pattern: "m.call.invite",
+                    },
+                ],
+                default: true,
+                enabled: true,
+                rule_id: ".m.rule.call",
+            };
+            const masterRule: IPushRule = {
+                actions: [PushRuleActionName.DontNotify],
+                conditions: [],
+                default: true,
+                enabled: false,
+                rule_id: RuleId.Master,
+            };
+            const bananaRule = {
+                actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight, value: true }],
+                pattern: "banana",
+                rule_id: "banana",
+                default: false,
+                enabled: true,
+            } as IPushRule;
+            const pushRules = {
+                global: {
+                    underride: [callRule],
+                    override: [masterRule],
+                    content: [bananaRule],
+                },
+            };
+
             beforeEach(() => {
                 makeClient();
 
@@ -2807,6 +2848,8 @@ describe("MatrixClient", function () {
                 client.setNotifTimelineSet(notifTimelineSet);
 
                 setNotifsResponse();
+
+                client.setPushRules(pushRules);
             });
 
             it("should throw when trying to paginate forwards", async () => {
@@ -2839,7 +2882,7 @@ describe("MatrixClient", function () {
                 expect(timelineEvents.length).toEqual(2);
             });
 
-            it("sets push actions on events and add to timeline", async () => {
+            it("sets push details on events and add to timeline", async () => {
                 setNotifsResponse([goodNotification, highlightNotification]);
 
                 const timelineSet = client.getNotifTimelineSet()!;
@@ -2853,9 +2896,15 @@ describe("MatrixClient", function () {
                         highlight: true,
                     },
                 });
+                expect(highlightEvent.getPushDetails().rule).toEqual({
+                    ...bananaRule,
+                    kind: "content",
+                });
                 expect(goodEvent.getPushActions()).toEqual({
                     notify: true,
-                    tweaks: {},
+                    tweaks: {
+                        highlight: false,
+                    },
                 });
             });
         });

@@ -1,6 +1,7 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
 import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName, RuleId } from "../../src";
+import { mockClientMethodsUser } from "../test-utils/client";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -45,9 +46,7 @@ describe("NotificationService", function () {
                 },
             };
         },
-        credentials: {
-            userId: testUserId,
-        },
+        ...mockClientMethodsUser(testUserId),
         supportsIntentionalMentions: () => true,
         pushRules: {
             device: {},
