@@ -185,13 +185,11 @@ export class RustCrypto implements CryptoBackend {
         const untrackedUsers: Set<string> = new Set();
 
         for (const userId of userIds) {
-            const rustUserId = new RustSdkCryptoJs.UserId(userId);
-
             // if this is a tracked user, we can just fetch the device list from the rust-sdk
             // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
             // devices: the rust-sdk will return the last-known device list, which will be good enough.)
-            if (trackedUsers.has(rustUserId)) {
-                iDeviceMapByUserId.set(userId, await this.getUserDevices(rustUserId));
+            if (this.isInRustUserIds(userId, trackedUsers)) {
+                iDeviceMapByUserId.set(userId, await this.getUserDevices(userId));
             } else {
                 untrackedUsers.add(userId);
             }
@@ -209,16 +207,31 @@ export class RustCrypto implements CryptoBackend {
         return iDeviceMapByUserId;
     }
 
+    // TODO comment
+    private isInRustUserIds(userId: string, rustUserIds: Set<RustSdkCryptoJs.UserId>): boolean {
+        for (const rustUserId of rustUserIds) {
+            if (rustUserId.toString() === userId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Get the user devices from the olm machine
-     * @param rustUserId - Rust SDK UserId
+     * @param userId - Rust SDK UserId
      */
-    private async getUserDevices(rustUserId: RustSdkCryptoJs.UserId): Promise<Map<string, IDevice>> {
+    private async getUserDevices(userId: string): Promise<Map<string, IDevice>> {
+        const rustUserId = new RustSdkCryptoJs.UserId(userId);
         const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
         return new Map(
             devices
                 .devices()
-                .map((device: RustSdkCryptoJs.Device) => [device.deviceId.toString(), rustDeviceToJsDevice(device)]),
+                .map((device: RustSdkCryptoJs.Device) => [
+                    device.deviceId.toString(),
+                    rustDeviceToJsDevice(device, rustUserId),
+                ]),
         );
     }
 

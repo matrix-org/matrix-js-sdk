@@ -16,25 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
-import { IDBFactory } from "fake-indexeddb";
-
 import { TestClient } from "../TestClient";
 import * as testUtils from "../test-utils/test-utils";
 import { logger } from "../../src/logger";
-import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
-import { createClient, MatrixClient } from "../../src";
-import "fake-indexeddb/auto";
-import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-convertor";
 
 const ROOM_ID = "!room:id";
-
-afterEach(() => {
-    // reset fake-indexeddb after each test, to make sure we don't leak connections
-    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
-    indexedDB = new IDBFactory();
-});
 
 /**
  * get a /sync response which contains a single e2e room (ROOM_ID), with the
@@ -415,129 +401,5 @@ describe("DeviceList management:", function () {
                 anotherTestClient.stop();
             }
         });
-    });
-});
-
-describe.each(Object.entries(CRYPTO_BACKENDS))("getUserDeviceInfo (%s)", (backend: string, initCrypto: InitCrypto) => {
-    if (!global.Olm) {
-        // currently we use libolm to implement the crypto in the tests, so need it to be present.
-        logger.warn("not running megolm tests: Olm not present");
-        return;
-    }
-
-    /** the MatrixClient under test */
-    let aliceClient: MatrixClient;
-
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
-
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: "@alice:localhost",
-            accessToken: "akjgkrgjs",
-            deviceId: "xzcvb",
-        });
-
-        await initCrypto(aliceClient);
-    });
-
-    afterEach(async () => {
-        await aliceClient.stopClient();
-        fetchMock.mockReset();
-    });
-
-    // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
-    const queryResponseBody = {
-        device_keys: {
-            "@testing_florian1:matrix.org": {
-                EBMMPAFOPU: {
-                    algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
-                    device_id: "EBMMPAFOPU",
-                    keys: {
-                        "curve25519:EBMMPAFOPU": "HyhQD4mXwNViqns0noABW9NxHbCAOkriQ4QKGGndk3w",
-                        "ed25519:EBMMPAFOPU": "xSQaxrFOTXH+7Zjo+iwb445hlNPFjnx1O3KaV3Am55k",
-                    },
-                    signatures: {
-                        "@testing_florian1:matrix.org": {
-                            "ed25519:EBMMPAFOPU":
-                                "XFJVq9HmO5lfJN7l6muaUt887aUHg0/poR3p9XHGXBrLUqzfG7Qllq7jjtUjtcTc5CMD7/mpsXfuC2eV+X1uAw",
-                        },
-                    },
-                    user_id: "@testing_florian1:matrix.org",
-                    unsigned: {
-                        device_display_name: "display name",
-                    },
-                },
-            },
-        },
-        master_keys: {
-            "@testing_florian1:matrix.org": {
-                user_id: "@testing_florian1:matrix.org",
-                usage: ["master"],
-                keys: {
-                    "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
-                        "O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0",
-                },
-                signatures: {
-                    "@testing_florian1:matrix.org": {
-                        "ed25519:UKAQMJSJZC":
-                            "q4GuzzuhZfTpwrlqnJ9+AEUtEfEQ0um1PO3puwp/+vidzFicw0xEPjedpJoASYQIJ8XJAAWX8Q235EKeCzEXCA",
-                    },
-                },
-            },
-        },
-    };
-
-    function awaitKeyQueryRequest(): Promise<Record<string, []>> {
-        return new Promise((resolve) => {
-            const listener = (url: string, options: RequestInit) => {
-                const content = JSON.parse(options.body as string);
-                // Resolve with request payload
-                resolve(content.device_keys);
-
-                // Return response of `/keys/query`
-                return queryResponseBody;
-            };
-
-            for (const path of ["/_matrix/client/r0/keys/query", "/_matrix/client/v3/keys/query"]) {
-                fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
-            }
-        });
-    }
-
-    it("Download uncached keys for known user", async () => {
-        const queryPromise = awaitKeyQueryRequest();
-
-        const user = "@testing_florian1:matrix.org";
-        const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
-
-        // Wait for `/keys/query` to be called
-        const deviceKeysPayload = await queryPromise;
-
-        expect(deviceKeysPayload).toStrictEqual({ [user]: [] });
-        expect(devicesInfo.get(user)?.size).toBe(1);
-
-        // Convert the expected device to IDevice and check
-        expect(devicesInfo.get(user)?.get("EBMMPAFOPU")).toStrictEqual(
-            downloadDeviceToJsDevice(queryResponseBody.device_keys[user]?.EBMMPAFOPU),
-        );
-    });
-
-    it("Download uncached keys for unknown user", async () => {
-        const queryPromise = awaitKeyQueryRequest();
-
-        const user = "@bob:xyz";
-        const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
-
-        // Wait for `/keys/query` to be called
-        const deviceKeysPayload = await queryPromise;
-
-        expect(deviceKeysPayload).toStrictEqual({ [user]: [] });
-        // The old crypto has an empty map for `@bob:xyz`
-        // The new crypto does not have the `@bob:xyz` entry in `devicesInfo`
-        expect(devicesInfo.get(user)?.size).toBeFalsy();
     });
 });

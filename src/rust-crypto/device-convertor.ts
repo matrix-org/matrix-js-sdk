@@ -18,17 +18,21 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import { DeviceVerification, IDevice } from "../crypto/deviceinfo";
 import { DeviceKeys } from "../client";
+import { ISignatures } from "../@types/signed";
 
 /**
  * Convert a {@link RustSdkCryptoJs.Device} to a {@link IDevice}
  * @param device - Rust Sdk device
+ * @param userId - owner of the device
  */
-export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device): IDevice {
+export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: RustSdkCryptoJs.UserId): IDevice {
+    // Copy rust device keys to IDevice.keys
     const keys: Record<string, string> = Object.create(null);
     for (const [keyId, key] of device.keys.entries()) {
         keys[keyId.toString()] = key.toBase64();
     }
 
+    // Compute verified from device state
     let verified: DeviceVerification = DeviceVerification.Unverified;
     if (device.isBlacklisted()) {
         verified = DeviceVerification.Blocked;
@@ -36,11 +40,20 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device): IDevice {
         verified = DeviceVerification.Verified;
     }
 
+    // Convert rust signatures to ISignatures
+    const signatures: ISignatures = {};
+    const signatureMap = device.signatures.get(userId);
+    if (signatureMap) {
+        signatures[userId.toString()] = Object.fromEntries(signatureMap);
+    }
+
     return {
-        algorithms: [], // TODO
+        algorithms: [], // TODO need to be expose in the Rust JS bindings
         keys: keys,
-        known: false, // TODO
-        signatures: undefined, // TODO
+        // Old field used before the cross signing feature
+        // Set it to false now
+        known: false,
+        signatures,
         verified,
     };
 }

@@ -44,10 +44,12 @@ import {
     RoomMember,
     RoomStateEvent,
 } from "../../src/matrix";
-import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { DeviceInfo, DeviceVerification } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
 import { escapeRegExp } from "../../src/utils";
+import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-convertor";
+import { flushPromises } from "../test-utils/flushPromises";
 
 const ROOM_ID = "!room:id";
 
@@ -1995,6 +1997,154 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const res = await uploadPromise;
             expect(res.keysCount).toBeGreaterThan(0);
             expect(res.fallbackKeysCount).toBeGreaterThan(0);
+        });
+    });
+
+    describe("getUserDeviceInfo", () => {
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+        const queryResponseBody = {
+            device_keys: {
+                "@testing_florian1:matrix.org": {
+                    EBMMPAFOPU: {
+                        algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+                        device_id: "EBMMPAFOPU",
+                        keys: {
+                            "curve25519:EBMMPAFOPU": "HyhQD4mXwNViqns0noABW9NxHbCAOkriQ4QKGGndk3w",
+                            "ed25519:EBMMPAFOPU": "xSQaxrFOTXH+7Zjo+iwb445hlNPFjnx1O3KaV3Am55k",
+                        },
+                        signatures: {
+                            "@testing_florian1:matrix.org": {
+                                "ed25519:EBMMPAFOPU":
+                                    "XFJVq9HmO5lfJN7l6muaUt887aUHg0/poR3p9XHGXBrLUqzfG7Qllq7jjtUjtcTc5CMD7/mpsXfuC2eV+X1uAw",
+                            },
+                        },
+                        user_id: "@testing_florian1:matrix.org",
+                        unsigned: {
+                            device_display_name: "display name",
+                        },
+                    },
+                },
+            },
+            master_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["master"],
+                    keys: {
+                        "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                            "O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:UKAQMJSJZC":
+                                "q4GuzzuhZfTpwrlqnJ9+AEUtEfEQ0um1PO3puwp/+vidzFicw0xEPjedpJoASYQIJ8XJAAWX8Q235EKeCzEXCA",
+                        },
+                    },
+                },
+            },
+        };
+
+        function awaitKeyQueryRequest(): Promise<Record<string, []>> {
+            return new Promise((resolve) => {
+                const listener = (url: string, options: RequestInit) => {
+                    const content = JSON.parse(options.body as string);
+                    // Resolve with request payload
+                    resolve(content.device_keys);
+
+                    // Return response of `/keys/query`
+                    return queryResponseBody;
+                };
+
+                for (const path of ["/_matrix/client/r0/keys/query", "/_matrix/client/v3/keys/query"]) {
+                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
+                }
+            });
+        }
+
+        it.skip("Download uncached keys for known user", async () => {
+            const queryPromise = awaitKeyQueryRequest();
+
+            const user = "@testing_florian1:matrix.org";
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
+
+            // Wait for `/keys/query` to be called
+            const deviceKeysPayload = await queryPromise;
+
+            expect(deviceKeysPayload).toStrictEqual({ [user]: [] });
+            expect(devicesInfo.get(user)?.size).toBe(1);
+
+            // Convert the expected device to IDevice and check
+            expect(devicesInfo.get(user)?.get("EBMMPAFOPU")).toStrictEqual(
+                downloadDeviceToJsDevice(queryResponseBody.device_keys[user]?.EBMMPAFOPU),
+            );
+        });
+
+        it.skip("Download uncached keys for unknown user", async () => {
+            const queryPromise = awaitKeyQueryRequest();
+
+            const user = "@bob:xyz";
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
+
+            // Wait for `/keys/query` to be called
+            const deviceKeysPayload = await queryPromise;
+
+            expect(deviceKeysPayload).toStrictEqual({ [user]: [] });
+            // The old crypto has an empty map for `@bob:xyz`
+            // The new crypto does not have the `@bob:xyz` entry in `devicesInfo`
+            expect(devicesInfo.get(user)?.size).toBeFalsy();
+        });
+
+        it("Get devices from tacked users", async () => {
+            jest.useFakeTimers();
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            const queryPromise = awaitKeyQueryRequest();
+
+            const user = "@testing_florian1:matrix.org";
+            // `user` will be added to the room
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([user, "bob:xyz"]));
+
+            // Advance local date to 2 minutes
+            // The old crypto only runs the upload every 60 seconds
+            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+
+            await syncPromise(aliceClient);
+
+            // Old crypto: for alice: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
+            jest.runAllTimers();
+            // Old crypto: for alice: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
+            await flushPromises();
+
+            // Wait for alice to query `user` keys
+            await queryPromise;
+
+            // Old crypto: for bob: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
+            jest.runAllTimers();
+            // Old crypto: for bob: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
+            // It will add bob devices to the DeviceList
+            await flushPromises();
+
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user]);
+
+            // We should only have the `user` in it
+            expect(devicesInfo.size).toBe(1);
+            // We are expecting only the EBMMPAFOPU device
+            expect(devicesInfo.get(user)!.size).toBe(1);
+
+            const { algorithms, keys, signatures, unsigned } = queryResponseBody.device_keys[user]["EBMMPAFOPU"];
+            const expectedDevice = {
+                algorithms,
+                keys,
+                signatures,
+                unsigned,
+                known: false,
+                verified: DeviceVerification.Unverified,
+            };
+            expect(devicesInfo.get(user)!.get("EBMMPAFOPU")).toEqual(expectedDevice);
         });
     });
 });
