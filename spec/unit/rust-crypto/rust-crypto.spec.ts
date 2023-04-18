@@ -249,4 +249,34 @@ describe("RustCrypto", () => {
             expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
         });
     });
+
+    describe("getDeviceVerificationStatus", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getDevice: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(olmMachine, {} as MatrixClient["http"], TEST_USER, TEST_DEVICE_ID);
+        });
+
+        it("should call getDevice", async () => {
+            olmMachine.getDevice.mockResolvedValue({
+                isCrossSigningTrusted: jest.fn().mockReturnValue(false),
+                isLocallyTrusted: jest.fn().mockReturnValue(false),
+            } as unknown as RustSdkCryptoJs.Device);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(olmMachine.getDevice.mock.calls[0][0].toString()).toEqual("@user:domain");
+            expect(olmMachine.getDevice.mock.calls[0][1].toString()).toEqual("device");
+            expect(res?.crossSigningVerified).toBe(false);
+            expect(res?.localVerified).toBe(false);
+        });
+
+        it("should return null for unknown device", async () => {
+            olmMachine.getDevice.mockResolvedValue(undefined);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(res).toBe(null);
+        });
+    });
 });

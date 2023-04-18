@@ -93,4 +93,54 @@ export interface CryptoApi {
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
     getTrustCrossSignedDevices(): boolean;
+
+    /**
+     * Get the verification status of a given device.
+     *
+     * @param userId - The ID of the user whose device is to be checked.
+     * @param deviceId - The ID of the device to check
+     *
+     * @returns Verification status of the device, or `null` if the device is not known
+     */
+    getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
+}
+
+export class DeviceVerificationStatus {
+    public constructor(
+        /**
+         * True if this device has been verified via cross signing.
+         *
+         * This does *not* take into account `trustCrossSignedDevices`.
+         */
+        public readonly crossSigningVerified: boolean,
+
+        /**
+         * TODO: tofu magic wtf does this do?
+         */
+        public readonly tofu: boolean,
+
+        /**
+         * True if the device has been marked as locally verified.
+         */
+        public readonly localVerified: boolean,
+
+        /**
+         * True if the client has been configured to trust cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+         */
+        private readonly trustCrossSignedDevices: boolean,
+    ) {}
+
+    /**
+     * Check if we should consider this device "verified".
+     *
+     * A device is "verified" if either:
+     *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
+     *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
+     *    cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+     *
+     * @returns true if this device is verified via any means.
+     */
+    public isVerified(): boolean {
+        return this.localVerified || (this.trustCrossSignedDevices && this.crossSigningVerified);
+    }
 }
