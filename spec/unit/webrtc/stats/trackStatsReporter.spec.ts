@@ -303,14 +303,14 @@ describe("TrackStatsReporter", () => {
             trackStatsList[1].setJitter(12);
             trackStatsList[4].setJitter(66);
             trackStatsList[6].setJitter(1);
-            trackStatsList[1].setLoss({ packetsTotal: 55, packetsLost: 0, isDownloadStream: true });
-            trackStatsList[4].setLoss({ packetsTotal: 0, packetsLost: 0, isDownloadStream: true });
-            trackStatsList[6].setLoss({ packetsTotal: 1, packetsLost: 0, isDownloadStream: true });
+            trackStatsList[1].setLoss({ packetsLost: 55, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[4].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[6].setLoss({ packetsLost: 1, packetsTotal: 0, isDownloadStream: true });
             // audio remote
             trackStatsList[2].setJitter(1);
             trackStatsList[5].setJitter(15);
-            trackStatsList[2].setLoss({ packetsTotal: 5, packetsLost: 0, isDownloadStream: true });
-            trackStatsList[5].setLoss({ packetsTotal: 0, packetsLost: 0, isDownloadStream: true });
+            trackStatsList[2].setLoss({ packetsLost: 5, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[5].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
 
             const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({

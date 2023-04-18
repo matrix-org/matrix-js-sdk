@@ -153,8 +153,8 @@ export class TrackStatsReporter {
                 if (trackSummary.maxJitter < stats.getJitter()) {
                     trackSummary.maxJitter = stats.getJitter();
                 }
-                if (trackSummary.maxPacketLoss < stats.getLoss().packetsTotal) {
-                    trackSummary.maxPacketLoss = stats.getLoss().packetsTotal;
+                if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
+                    trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
                 }
             });
         return { audioTrackSummary, videoTrackSummary };
