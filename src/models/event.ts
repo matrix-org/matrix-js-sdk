@@ -37,6 +37,7 @@ import { EventStatus } from "./event-status";
 import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
 import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
+import { IAnnotatedPushRule } from "../@types/PushRules";
 
 export { EventStatus } from "./event-status";
 
@@ -119,6 +120,11 @@ export interface IEventRelation {
 export interface IMentions {
     user_ids?: string[];
     room?: boolean;
+}
+
+export interface PushDetails {
+    rule?: IAnnotatedPushRule;
+    actions?: IActionsObject;
 }
 
 /**
@@ -220,7 +226,8 @@ export type MatrixEventHandlerMap = {
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
-    private pushActions: IActionsObject | null = null;
+    // applied push rule and action for this event
+    private pushDetails: PushDetails = {};
     private _replacingEvent: MatrixEvent | null = null;
     private _localRedactionEvent: MatrixEvent | null = null;
     private _isCancelled = false;
@@ -888,7 +895,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             // highlighting when the user's name is mentioned rely on this happening. We also want
             // to set the push actions before emitting so that any notification listeners don't
             // pick up the wrong contents.
-            this.setPushActions(null);
+            this.setPushDetails();
 
             if (options.emit !== false) {
                 this.emit(MatrixEventEvent.Decrypted, this, err);
@@ -1241,16 +1248,42 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns push actions
      */
     public getPushActions(): IActionsObject | null {
-        return this.pushActions;
+        return this.pushDetails.actions || null;
+    }
+
+    /**
+     * Get the push details, if known, for this event
+     *
+     * @returns push actions
+     */
+    public getPushDetails(): PushDetails {
+        return this.pushDetails;
     }
 
     /**
      * Set the push actions for this event.
+     * Clears rule from push details if present
+     * @deprecated use `setPushDetails`
      *
      * @param pushActions - push actions
      */
     public setPushActions(pushActions: IActionsObject | null): void {
-        this.pushActions = pushActions;
+        this.pushDetails = {
+            actions: pushActions || undefined,
+        };
+    }
+
+    /**
+     * Set the push details for this event.
+     *
+     * @param pushActions - push actions
+     * @param rule - the executed push rule
+     */
+    public setPushDetails(pushActions?: IActionsObject, rule?: IAnnotatedPushRule): void {
+        this.pushDetails = {
+            actions: pushActions,
+            rule,
+        };
     }
 
     /**
