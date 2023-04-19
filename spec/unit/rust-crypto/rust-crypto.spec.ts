@@ -265,12 +265,14 @@ describe("RustCrypto", () => {
             olmMachine.getDevice.mockResolvedValue({
                 isCrossSigningTrusted: jest.fn().mockReturnValue(false),
                 isLocallyTrusted: jest.fn().mockReturnValue(false),
+                isCrossSignedByOwner: jest.fn().mockReturnValue(false),
             } as unknown as RustSdkCryptoJs.Device);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
             expect(olmMachine.getDevice.mock.calls[0][0].toString()).toEqual("@user:domain");
             expect(olmMachine.getDevice.mock.calls[0][1].toString()).toEqual("device");
             expect(res?.crossSigningVerified).toBe(false);
             expect(res?.localVerified).toBe(false);
+            expect(res?.signedByOwner).toBe(false);
         });
 
         it("should return null for unknown device", async () => {
