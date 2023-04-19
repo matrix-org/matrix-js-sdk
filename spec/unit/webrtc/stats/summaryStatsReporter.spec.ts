@@ -172,5 +172,65 @@ describe("SummaryStatsReporter", () => {
                 maxPacketLoss: 40,
             });
         });
+
+        it("as received video Media, if no audio track received should count as received Media", async () => {
+            const summary = [
+                {
+                    receivedMedia: 10,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 10,
+                    audioTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 0,
+                maxPacketLoss: 0,
+            });
+        });
+
+        it("as received audio Media, if no video track received should count as received Media", async () => {
+            const summary = [
+                {
+                    receivedMedia: 1,
+                    receivedAudioMedia: 22,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 0,
+                maxPacketLoss: 0,
+            });
+        });
+
+        it("as received no media at all, as received Media", async () => {
+            const summary = [
+                {
+                    receivedMedia: 0,
+                    receivedAudioMedia: 0,
+                    receivedVideoMedia: 0,
+                    audioTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                    videoTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 0,
+                maxPacketLoss: 0,
+            });
+        });
     });
 });
