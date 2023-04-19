@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { Device } from "../models/device";
-import { DeviceInfo, DeviceVerification } from "./deviceinfo";
+import { DeviceInfo } from "./deviceinfo";
 
 /**
  * Convert a DeviceInfo {@link DeviceInfo} to a Device {@link Device}
@@ -23,8 +23,8 @@ import { DeviceInfo, DeviceVerification } from "./deviceinfo";
  * @param userId - id of the device user
  */
 export function deviceInfoToDevice(deviceInfo: DeviceInfo, userId: string): Device {
-    const keys = new Map(Object.entries(deviceInfo.keys));
-    const unsigned = new Map(Object.entries(deviceInfo.unsigned || {}));
+    const keys = new Map<string, string>(Object.entries(deviceInfo.keys));
+    const unsigned = new Map<string, string>(Object.entries(deviceInfo.unsigned || {}));
 
     const signatures = new Map<string, Map<string, string>>();
     if (deviceInfo.signatures) {
@@ -38,7 +38,7 @@ export function deviceInfoToDevice(deviceInfo: DeviceInfo, userId: string): Devi
         userId: userId,
         keys,
         algorithms: deviceInfo.algorithms,
-        verified: DeviceVerification.Unverified,
+        verified: deviceInfo.verified,
         signatures,
         unsigned,
     });
