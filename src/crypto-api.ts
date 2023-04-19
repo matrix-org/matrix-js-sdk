@@ -16,7 +16,7 @@ limitations under the License.
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
-import { DeviceMap } from "./crypto/deviceinfo";
+import { DeviceMap } from "./models/device";
 
 /**
  * Public interface to the cryptography parts of the js-sdk

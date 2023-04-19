@@ -16,20 +16,20 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import { DeviceVerification, IDevice } from "../crypto/deviceinfo";
+import { DeviceVerification } from "../crypto/deviceinfo";
+import { Device } from "../models/device";
 import { DeviceKeys } from "../client";
-import { ISignatures } from "../@types/signed";
 
 /**
- * Convert a {@link RustSdkCryptoJs.Device} to a {@link IDevice}
+ * Convert a {@link RustSdkCryptoJs.Device} to a {@link Device}
  * @param device - Rust Sdk device
  * @param userId - owner of the device
  */
-export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: RustSdkCryptoJs.UserId): IDevice {
-    // Copy rust device keys to IDevice.keys
-    const keys: Record<string, string> = Object.create(null);
+export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: RustSdkCryptoJs.UserId): Device {
+    // Copy rust device keys to Device.keys
+    const keys = new Map<string, string>();
     for (const [keyId, key] of device.keys.entries()) {
-        keys[keyId.toString()] = key.toBase64();
+        keys.set(keyId.toString(), key.toBase64);
     }
 
     // Compute verified from device state
@@ -40,29 +40,28 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
         verified = DeviceVerification.Verified;
     }
 
-    // Convert rust signatures to ISignatures
-    const signatures: ISignatures = {};
-    const signatureMap = device.signatures.get(userId);
+    // Convert rust signatures to Device.signatures
+    const signatures = new Map<string, Map<string, string>>();
+    const signatureMap: Map<string, string> | undefined = device.signatures.get(userId);
     if (signatureMap) {
-        signatures[userId.toString()] = Object.fromEntries(signatureMap);
+        signatures.set(userId.toString(), signatureMap);
     }
 
-    return {
+    return new Device({
+        deviceId: device.deviceId.toString(),
+        userId: userId.toString(),
+        keys,
         algorithms: [], // TODO need to be expose in the Rust JS bindings
-        keys: keys,
-        // Old field used before the cross signing feature
-        // Set it to false now
-        known: false,
-        signatures,
         verified,
-    };
+        signatures,
+    });
 }
 
 /**
- * Convert {@link DeviceKeys}  from `/keys/query` request to a `Map<string, IDevice>`
+ * Convert {@link DeviceKeys}  from `/keys/query` request to a `Map<string, Device>`
  * @param deviceKeys - Device keys object to convert
  */
-export function deviceKeysToIDeviceMap(deviceKeys: DeviceKeys): Map<string, IDevice> {
+export function deviceKeysToDeviceMap(deviceKeys: DeviceKeys): Map<string, Device> {
     return new Map(
         Object.entries(deviceKeys).map(([deviceId, device]) => [deviceId, downloadDeviceToJsDevice(device)]),
     );
@@ -72,16 +71,27 @@ export function deviceKeysToIDeviceMap(deviceKeys: DeviceKeys): Map<string, IDev
 type QueryDevice = DeviceKeys[keyof DeviceKeys];
 
 /**
- * Convert `/keys/query` {@link QueryDevice} device to {@link IDevice}
+ * Convert `/keys/query` {@link QueryDevice} device to {@link Device}
  * @param device - Device from `/keys/query` request
  */
-export function downloadDeviceToJsDevice(device: QueryDevice): IDevice {
-    return {
+export function downloadDeviceToJsDevice(device: QueryDevice): Device {
+    const keys = new Map(Object.entries(device.keys));
+    const unsigned = new Map(Object.entries(device.unsigned || {}));
+
+    const signatures = new Map<string, Map<string, string>>();
+    if (device.signatures) {
+        for (const userId in device.signatures) {
+            signatures.set(userId, new Map(Object.entries(device.signatures[userId])));
+        }
+    }
+
+    return new Device({
+        deviceId: device.device_id,
+        userId: device.user_id,
+        keys,
         algorithms: device.algorithms,
-        keys: device.keys,
-        known: false,
-        signatures: device.signatures,
         verified: DeviceVerification.Unverified,
-        unsigned: device.unsigned,
-    };
+        signatures,
+        unsigned,
+    });
 }

@@ -31,9 +31,9 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import { DeviceVerificationStatus } from "../crypto-api";
-import { DeviceMap, IDevice } from "../crypto/deviceinfo";
-import { deviceKeysToIDeviceMap, rustDeviceToJsDevice } from "./device-convertor";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-convertor";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
+import { Device, DeviceMap } from "../models/device";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -175,7 +175,7 @@ export class RustCrypto implements CryptoBackend {
      * @returns A map `{@link DeviceMap}`.
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
-        const iDeviceMapByUserId = new Map<string, Map<string, IDevice>>();
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
         const trackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
 
         // Keep untracked user to download their keys after
@@ -186,7 +186,7 @@ export class RustCrypto implements CryptoBackend {
             // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
             // devices: the rust-sdk will return the last-known device list, which will be good enough.)
             if (this.isInRustUserIds(userId, trackedUsers)) {
-                iDeviceMapByUserId.set(userId, await this.getUserDevices(userId));
+                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
             } else {
                 untrackedUsers.add(userId);
             }
@@ -197,11 +197,11 @@ export class RustCrypto implements CryptoBackend {
         if (downloadUncached && untrackedUsers.size >= 1) {
             const queryResult = await this.downloadDeviceList(untrackedUsers);
             Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
-                iDeviceMapByUserId.set(userId, deviceKeysToIDeviceMap(deviceKeys)),
+                deviceMapByUserId.set(userId, deviceKeysToDeviceMap(deviceKeys)),
             );
         }
 
-        return iDeviceMapByUserId;
+        return deviceMapByUserId;
     }
 
     // TODO comment
@@ -219,7 +219,7 @@ export class RustCrypto implements CryptoBackend {
      * Get the user devices from the olm machine
      * @param userId - Rust SDK UserId
      */
-    private async getUserDevices(userId: string): Promise<Map<string, IDevice>> {
+    private async getUserDevices(userId: string): Promise<Map<string, Device>> {
         const rustUserId = new RustSdkCryptoJs.UserId(userId);
         const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
         return new Map(

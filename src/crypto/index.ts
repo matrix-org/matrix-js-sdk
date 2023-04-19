@@ -29,7 +29,7 @@ import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
-import { DeviceInfo, DeviceMap, IDevice } from "./deviceinfo";
+import { DeviceInfo, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
@@ -89,6 +89,8 @@ import {
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
 import { DeviceVerificationStatus } from "../crypto-api";
+import { Device, DeviceMap } from "../models/device";
+import { deviceInfoToDevice } from "./device-convertor";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -2073,7 +2075,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns A map `{@link DeviceMap}`.
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
-        const iDeviceMapByUserId = new Map<string, Map<string, IDevice>>();
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
         // Keep the users without device to download theirs keys
         const usersWithoutDeviceInfo: string[] = [];
 
@@ -2082,11 +2084,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // If there are device infos for a userId, we transform it into a map
             // Else, the keys will be downloaded after
             if (deviceInfos) {
-                const iDeviceMap = new Map(
+                const deviceMap = new Map(
                     // Convert DeviceInfo to IDevice
-                    deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfo.toStorage()]),
+                    deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfoToDevice(deviceInfo, userId)]),
                 );
-                iDeviceMapByUserId.set(userId, iDeviceMap);
+                deviceMapByUserId.set(userId, deviceMap);
             } else {
                 usersWithoutDeviceInfo.push(userId);
             }
@@ -2097,16 +2099,18 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const newDeviceInfoMap = await this.downloadKeys(usersWithoutDeviceInfo);
 
             newDeviceInfoMap.forEach((deviceInfoMap, userId) => {
-                const iDeviceMap = new Map<string, IDevice>();
+                const deviceMap = new Map<string, Device>();
                 // Convert DeviceInfo to IDevice
-                deviceInfoMap.forEach((deviceInfo, deviceId) => iDeviceMap.set(deviceId, deviceInfo.toStorage()));
+                deviceInfoMap.forEach((deviceInfo, deviceId) =>
+                    deviceMap.set(deviceId, deviceInfoToDevice(deviceInfo, userId)),
+                );
 
                 // Put the new device infos into the returned map
-                iDeviceMapByUserId.set(userId, iDeviceMap);
+                deviceMapByUserId.set(userId, deviceMap);
             });
         }
 
-        return iDeviceMapByUserId;
+        return deviceMapByUserId;
     }
 
     /**

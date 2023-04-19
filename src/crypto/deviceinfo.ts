@@ -24,10 +24,6 @@ export interface IDevice {
     unsigned?: Record<string, any>;
     signatures?: ISignatures;
 }
-
-// user-Id → device-Id → IDevice
-export type DeviceMap = Map<string, Map<string, IDevice>>;
-
 export enum DeviceVerification {
     Blocked = -1,
     Unverified = 0,

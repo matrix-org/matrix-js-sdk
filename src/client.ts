@@ -80,7 +80,7 @@ import {
     VerificationMethod,
     IRoomKeyRequestBody,
 } from "./crypto";
-import { DeviceInfo, DeviceMap } from "./crypto/deviceinfo";
+import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
 import { keyFromAuthData } from "./crypto/key_passphrase";
 import { User, UserEvent, UserEventHandlerMap } from "./models/user";
@@ -213,6 +213,7 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
+import { DeviceMap } from "./models/device";
 
 export type Store = IStore;
 
