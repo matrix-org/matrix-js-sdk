@@ -2029,6 +2029,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     },
                 },
             },
+            failures: {},
             master_keys: {
                 "@testing_florian1:matrix.org": {
                     user_id: "@testing_florian1:matrix.org",
@@ -2041,6 +2042,38 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         "@testing_florian1:matrix.org": {
                             "ed25519:UKAQMJSJZC":
                                 "q4GuzzuhZfTpwrlqnJ9+AEUtEfEQ0um1PO3puwp/+vidzFicw0xEPjedpJoASYQIJ8XJAAWX8Q235EKeCzEXCA",
+                        },
+                    },
+                },
+            },
+            self_signing_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["self_signing"],
+                    keys: {
+                        "ed25519:YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo":
+                            "YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                                "yckmxgQ3JA5bb205/RunJipnpZ37ycGNf4OFzDwAad++chd71aGHqAMQ1f6D2GVfl8XdHmiRaohZf4mGnDL0AA",
+                        },
+                    },
+                },
+            },
+            user_signing_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["user_signing"],
+                    keys: {
+                        "ed25519:Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs":
+                            "Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                                "WxNNXb13yCrBwXUQzdDWDvWSQ/qWCfwpvssOudlAgbtMzRESMbCTDkeA8sS1awaAtUmu7FrPtDb5LYfK/EE2CQ",
                         },
                     },
                 },
@@ -2064,11 +2097,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
-        it.skip("Download uncached keys for known user", async () => {
+        it("Download uncached keys for known user", async () => {
             const queryPromise = awaitKeyQueryRequest();
 
             const user = "@testing_florian1:matrix.org";
-            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
+            const devicesInfo = await aliceClient.getUserDeviceInfo([user], true);
 
             // Wait for `/keys/query` to be called
             const deviceKeysPayload = await queryPromise;
@@ -2082,11 +2115,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
         });
 
-        it.skip("Download uncached keys for unknown user", async () => {
+        it("Download uncached keys for unknown user", async () => {
             const queryPromise = awaitKeyQueryRequest();
 
             const user = "@bob:xyz";
-            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
+            const devicesInfo = await aliceClient.getUserDeviceInfo([user], true);
 
             // Wait for `/keys/query` to be called
             const deviceKeysPayload = await queryPromise;
@@ -2106,7 +2139,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const user = "@testing_florian1:matrix.org";
             // `user` will be added to the room
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse([user, "bob:xyz"]));
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([user, "@bob:xyz"]));
 
             // Advance local date to 2 minutes
             // The old crypto only runs the upload every 60 seconds
@@ -2128,7 +2161,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // It will add bob devices to the DeviceList
             await flushPromises();
 
-            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user]);
+            const devicesInfo = await aliceClient.getUserDeviceInfo([user]);
 
             // We should only have the `user` in it
             expect(devicesInfo.size).toBe(1);
