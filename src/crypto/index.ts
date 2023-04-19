@@ -90,7 +90,7 @@ import {
 import { ISecretRequest } from "./SecretSharing";
 import { DeviceVerificationStatus } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
-import { deviceInfoToDevice } from "./device-convertor";
+import { deviceInfoToDevice } from "./device-converter";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

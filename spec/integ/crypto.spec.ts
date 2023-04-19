@@ -48,7 +48,7 @@ import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
 import { escapeRegExp } from "../../src/utils";
-import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-convertor";
+import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-converter";
 import { flushPromises } from "../test-utils/flushPromises";
 
 const ROOM_ID = "!room:id";

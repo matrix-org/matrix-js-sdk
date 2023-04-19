@@ -31,7 +31,7 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import { DeviceVerificationStatus } from "../crypto-api";
-import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-convertor";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 

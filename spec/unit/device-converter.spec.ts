@@ -16,10 +16,10 @@ limitations under the License.
 
 import { DeviceInfo, DeviceVerification } from "../../src/crypto/deviceinfo";
 import { DeviceKeys } from "../../src";
-import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-convertor";
-import { deviceInfoToDevice } from "../../src/crypto/device-convertor";
+import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-converter";
+import { deviceInfoToDevice } from "../../src/crypto/device-converter";
 
-describe("device-convertor", () => {
+describe("device-converter", () => {
     const userId = "@alice:example.com";
     const deviceId = "xcvf";
 
