@@ -107,7 +107,7 @@
         "eslint-import-resolver-typescript": "^3.5.1",
         "eslint-plugin-import": "^2.26.0",
         "eslint-plugin-jest": "^27.1.6",
-        "eslint-plugin-jsdoc": "^40.0.0",
+        "eslint-plugin-jsdoc": "^41.0.0",
         "eslint-plugin-matrix-org": "^1.0.0",
         "eslint-plugin-tsdoc": "^0.2.17",
         "eslint-plugin-unicorn": "^46.0.0",
@@ -127,6 +127,7 @@
         "typedoc": "^0.23.20",
         "typedoc-plugin-mdn-links": "^3.0.3",
         "typedoc-plugin-missing-exports": "^1.0.0",
+        "typedoc-plugin-versions": "^0.2.3",
         "typescript": "^5.0.0"
     },
     "@casualbot/jest-sonar-reporter": {

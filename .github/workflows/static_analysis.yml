@@ -67,6 +67,13 @@ jobs:
             - name: Generate Docs
               run: "yarn run gendoc --treatWarningsAsErrors"
 
+            # Upload artifact duplicates symlink contents so we do this to save 75% space
+            - name: Flatten symlink and write _redirects
+              run: |
+                  find _docs -mindepth 1 -maxdepth 1 ! -type f ! -name stable -printf '/%f/* /stable/:splat\n' > _docs/_redirects
+                  find _docs -mindepth 1 -maxdepth 1 -type l -delete
+                  find _docs -mindepth 1 -maxdepth 1 -type d -execdir mv {} stable \; -quit
+
             - name: Upload Artifact
               uses: actions/upload-artifact@v3
               with:
