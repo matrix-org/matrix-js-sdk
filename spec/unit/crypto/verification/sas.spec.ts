@@ -374,6 +374,12 @@ describe("SAS verification", function () {
             expect(bobDeviceTrust.isLocallyVerified()).toBeTruthy();
             expect(bobDeviceTrust.isCrossSigningVerified()).toBeFalsy();
 
+            const bobDeviceVerificationStatus = (await alice.client
+                .getCrypto()!
+                .getDeviceVerificationStatus("@bob:example.com", "Dynabook"))!;
+            expect(bobDeviceVerificationStatus.localVerified).toBe(true);
+            expect(bobDeviceVerificationStatus.crossSigningVerified).toBe(false);
+
             const aliceTrust = bob.client.checkUserTrust("@alice:example.com");
             expect(aliceTrust.isCrossSigningVerified()).toBeTruthy();
             expect(aliceTrust.isTofu()).toBeTruthy();
@@ -381,6 +387,17 @@ describe("SAS verification", function () {
             const aliceDeviceTrust = bob.client.checkDeviceTrust("@alice:example.com", "Osborne2");
             expect(aliceDeviceTrust.isLocallyVerified()).toBeTruthy();
             expect(aliceDeviceTrust.isCrossSigningVerified()).toBeFalsy();
+
+            const aliceDeviceVerificationStatus = (await bob.client
+                .getCrypto()!
+                .getDeviceVerificationStatus("@alice:example.com", "Osborne2"))!;
+            expect(aliceDeviceVerificationStatus.localVerified).toBe(true);
+            expect(aliceDeviceVerificationStatus.crossSigningVerified).toBe(false);
+
+            const unknownDeviceVerificationStatus = await bob.client
+                .getCrypto()!
+                .getDeviceVerificationStatus("@alice:example.com", "xyz");
+            expect(unknownDeviceVerificationStatus).toBe(null);
         });
     });
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { Mocked, mocked } from "jest-mock";
 
 import { logger } from "../../src/logger";
 import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
@@ -50,6 +50,12 @@ import {
     MatrixScheduler,
     Method,
     Room,
+    EventTimelineSet,
+    PushRuleActionName,
+    TweakName,
+    RuleId,
+    IPushRule,
+    ConditionKind,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
@@ -63,6 +69,7 @@ import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
+import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 
 jest.useFakeTimers();
 
@@ -2701,6 +2708,204 @@ describe("MatrixClient", function () {
                 const history = client.getRoomUpgradeHistory(room3.roomId, verifyLinks, useMsc3946);
                 // So we get no history back
                 expect(history.map((room) => room.roomId)).toEqual([room3.roomId]);
+            });
+        });
+    });
+
+    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
+    describe("SecretStorage wrappers", () => {
+        let mockSecretStorage: Mocked<ServerSideSecretStorageImpl>;
+
+        beforeEach(() => {
+            mockSecretStorage = {
+                getDefaultKeyId: jest.fn(),
+                hasKey: jest.fn(),
+                isStored: jest.fn(),
+            } as unknown as Mocked<ServerSideSecretStorageImpl>;
+            client["_secretStorage"] = mockSecretStorage;
+        });
+
+        it("hasSecretStorageKey", async () => {
+            mockSecretStorage.hasKey.mockResolvedValue(false);
+            expect(await client.hasSecretStorageKey("mykey")).toBe(false);
+            expect(mockSecretStorage.hasKey).toHaveBeenCalledWith("mykey");
+        });
+
+        it("isSecretStored", async () => {
+            const mockResult = { key: {} as SecretStorageKeyDescriptionAesV1 };
+            mockSecretStorage.isStored.mockResolvedValue(mockResult);
+            expect(await client.isSecretStored("mysecret")).toBe(mockResult);
+            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("mysecret");
+        });
+
+        it("getDefaultSecretStorageKeyId", async () => {
+            mockSecretStorage.getDefaultKeyId.mockResolvedValue("bzz");
+            expect(await client.getDefaultSecretStorageKeyId()).toEqual("bzz");
+        });
+
+        it("isKeyBackupKeyStored", async () => {
+            mockSecretStorage.isStored.mockResolvedValue(null);
+            expect(await client.isKeyBackupKeyStored()).toBe(null);
+            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
+        });
+    });
+
+    describe("paginateEventTimeline()", () => {
+        describe("notifications timeline", () => {
+            const unsafeNotification = {
+                actions: ["notify"],
+                room_id: "__proto__",
+                event: testUtils.mkMessage({
+                    user: "@villain:server.org",
+                    room: "!roomId:server.org",
+                    msg: "I am nefarious",
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const goodNotification = {
+                actions: ["notify"],
+                room_id: "!favouriteRoom:server.org",
+                event: new MatrixEvent({
+                    sender: "@bob:server.org",
+                    room_id: "!roomId:server.org",
+                    type: "m.call.invite",
+                    content: {},
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const highlightNotification = {
+                actions: ["notify", { set_tweak: "highlight", value: true }],
+                room_id: "!roomId:server.org",
+                event: testUtils.mkMessage({
+                    user: "@bob:server.org",
+                    room: "!roomId:server.org",
+                    msg: "I am highlighted banana",
+                }),
+                profile_tag: null,
+                read: true,
+                ts: 12345,
+            };
+
+            const setNotifsResponse = (notifications: any[] = []): void => {
+                const response: HttpLookup = {
+                    method: "GET",
+                    path: "/notifications",
+                    data: { notifications: JSON.parse(JSON.stringify(notifications)) },
+                };
+                httpLookups = [response];
+            };
+
+            const callRule: IPushRule = {
+                actions: [PushRuleActionName.Notify],
+                conditions: [
+                    {
+                        kind: ConditionKind.EventMatch,
+                        key: "type",
+                        pattern: "m.call.invite",
+                    },
+                ],
+                default: true,
+                enabled: true,
+                rule_id: ".m.rule.call",
+            };
+            const masterRule: IPushRule = {
+                actions: [PushRuleActionName.DontNotify],
+                conditions: [],
+                default: true,
+                enabled: false,
+                rule_id: RuleId.Master,
+            };
+            const bananaRule = {
+                actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight, value: true }],
+                pattern: "banana",
+                rule_id: "banana",
+                default: false,
+                enabled: true,
+            } as IPushRule;
+            const pushRules = {
+                global: {
+                    underride: [callRule],
+                    override: [masterRule],
+                    content: [bananaRule],
+                },
+            };
+
+            beforeEach(() => {
+                makeClient();
+
+                // this is how notif timeline is set up in react-sdk
+                const notifTimelineSet = new EventTimelineSet(undefined, {
+                    timelineSupport: true,
+                    pendingEvents: false,
+                });
+                notifTimelineSet.getLiveTimeline().setPaginationToken("", EventTimeline.BACKWARDS);
+                client.setNotifTimelineSet(notifTimelineSet);
+
+                setNotifsResponse();
+
+                client.setPushRules(pushRules);
+            });
+
+            it("should throw when trying to paginate forwards", async () => {
+                const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
+                await expect(
+                    async () => await client.paginateEventTimeline(timeline, { backwards: false }),
+                ).rejects.toThrow("paginateNotifTimeline can only paginate backwards");
+            });
+
+            it("defaults limit to 30 events", async () => {
+                jest.spyOn(client.http, "authedRequest");
+                const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Get, "/notifications", {
+                    limit: "30",
+                    only: "highlight",
+                });
+            });
+
+            it("filters out unsafe notifications", async () => {
+                setNotifsResponse([unsafeNotification, goodNotification, highlightNotification]);
+
+                const timelineSet = client.getNotifTimelineSet()!;
+                const timeline = timelineSet.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                // badNotification not added to timeline
+                const timelineEvents = timeline.getEvents();
+                expect(timelineEvents.length).toEqual(2);
+            });
+
+            it("sets push details on events and add to timeline", async () => {
+                setNotifsResponse([goodNotification, highlightNotification]);
+
+                const timelineSet = client.getNotifTimelineSet()!;
+                const timeline = timelineSet.getLiveTimeline();
+                await client.paginateEventTimeline(timeline, { backwards: true });
+
+                const [highlightEvent, goodEvent] = timeline.getEvents();
+                expect(highlightEvent.getPushActions()).toEqual({
+                    notify: true,
+                    tweaks: {
+                        highlight: true,
+                    },
+                });
+                expect(highlightEvent.getPushDetails().rule).toEqual({
+                    ...bananaRule,
+                    kind: "content",
+                });
+                expect(goodEvent.getPushActions()).toEqual({
+                    notify: true,
+                    tweaks: {
+                        highlight: false,
+                    },
+                });
             });
         });
     });

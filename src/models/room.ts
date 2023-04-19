@@ -324,7 +324,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly polls: Map<string, Poll> = new Map<string, Poll>();
-    public readonly threadsTimelineSets: EventTimelineSet[] = [];
+
+    /**
+     * Empty array if the timeline sets have not been initialised. After initialisation:
+     * 0: All threads
+     * 1: Threads the current user has participated in
+     */
+    public readonly threadsTimelineSets: [] | [EventTimelineSet, EventTimelineSet] = [];
+
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private timelineNeedsRefresh = false;
@@ -361,22 +368,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * The room summary.
      */
     public summary: RoomSummary | null = null;
-    // legacy fields
     /**
      * The live event timeline for this room, with the oldest event at index 0.
-     * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
      */
     public timeline!: MatrixEvent[];
     /**
-     * oldState The state of the room at the time of the oldest
-     * event in the live timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+     * oldState The state of the room at the time of the oldest event in the live timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.BACKWARDS) instead
      */
     public oldState!: RoomState;
     /**
-     * currentState The state of the room at the time of the
-     * newest event in the timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+     * currentState The state of the room at the time of the newest event in the timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
     public readonly relations = new RelationsContainer(this.client, this);
@@ -490,7 +500,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     this.createThreadTimelineSet(ThreadFilterType.My),
                 ]);
                 const timelineSets = await this.threadTimelineSetsPromise;
-                this.threadsTimelineSets.push(...timelineSets);
+                this.threadsTimelineSets[0] = timelineSets[0];
+                this.threadsTimelineSets[1] = timelineSets[1];
                 return timelineSets;
             } catch (e) {
                 this.threadTimelineSetsPromise = null;
@@ -1961,6 +1972,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
+        if (this.threadsTimelineSets.length === 0) return;
+
         const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
 
         const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
