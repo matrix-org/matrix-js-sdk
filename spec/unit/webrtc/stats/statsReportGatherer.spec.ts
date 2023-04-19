@@ -43,8 +43,8 @@ describe("StatsReportGatherer", () => {
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
-                audioTrackSummary: { count: 0, muted: 0 },
-                videoTrackSummary: { count: 0, muted: 0 },
+                audioTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                videoTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
             });
             expect(collector.getActive()).toBeTruthy();
         });
@@ -74,8 +74,8 @@ describe("StatsReportGatherer", () => {
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
-                audioTrackSummary: { count: 0, muted: 0 },
-                videoTrackSummary: { count: 0, muted: 0 },
+                audioTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
+                videoTrackSummary: { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
             });
             expect(getStats).toHaveBeenCalled();
             expect(collector.getActive()).toBeFalsy();

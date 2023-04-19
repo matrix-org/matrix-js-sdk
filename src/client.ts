@@ -30,6 +30,7 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     MatrixEventHandlerMap,
+    PushDetails,
 } from "./models/event";
 import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
@@ -37,7 +38,7 @@ import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep, noUnsafeEventProps } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -2620,12 +2621,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param userId - The ID of the user whose devices is to be checked.
      * @param deviceId - The ID of the device to check
+     *
+     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
-        if (!this.cryptoBackend) {
+        if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.cryptoBackend.checkDeviceTrust(userId, deviceId);
+        return this.crypto.checkDeviceTrust(userId, deviceId);
     }
 
     /**
@@ -2763,24 +2766,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Default: true
      *
      * @returns True if trusting cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.getTrustCrossSignedDevices | `CryptoApi.getTrustCrossSignedDevices`}.
      */
     public getCryptoTrustCrossSignedDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getCryptoTrustCrossSignedDevices();
+        return this.cryptoBackend.getTrustCrossSignedDevices();
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
      *
      * @param val - True to trust cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.setTrustCrossSignedDevices | `CryptoApi.setTrustCrossSignedDevices`}.
      */
     public setCryptoTrustCrossSignedDevices(val: boolean): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.setCryptoTrustCrossSignedDevices(val);
+        this.cryptoBackend.setTrustCrossSignedDevices(val);
     }
 
     /**
@@ -5385,9 +5392,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getPushActionsForEvent(event: MatrixEvent, forceRecalculate = false): IActionsObject | null {
         if (!event.getPushActions() || forceRecalculate) {
-            event.setPushActions(this.pushProcessor.actionsForEvent(event));
+            const { actions, rule } = this.pushProcessor.actionsAndRuleForEvent(event);
+            event.setPushDetails(actions, rule);
         }
         return event.getPushActions();
+    }
+
+    /**
+     * Obtain a dict of actions which should be performed for this event according
+     * to the push rules for this user.  Caches the dict on the event.
+     * @param event - The event to get push actions for.
+     * @param forceRecalculate - forces to recalculate actions for an event
+     * Useful when an event just got decrypted
+     * @returns A dict of actions to perform.
+     */
+    public getPushDetailsForEvent(event: MatrixEvent, forceRecalculate = false): PushDetails | null {
+        if (!event.getPushDetails() || forceRecalculate) {
+            const { actions, rule } = this.pushProcessor.actionsAndRuleForEvent(event);
+            event.setPushDetails(actions, rule);
+        }
+        return event.getPushDetails();
     }
 
     /**
@@ -6064,7 +6088,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     for (let i = 0; i < res.notifications.length; i++) {
                         const notification = res.notifications[i];
                         const event = this.getEventMapper()(notification.event);
-                        event.setPushActions(PushProcessor.actionListToActionsObject(notification.actions));
+
+                        // @TODO(kerrya) reprocessing every notification is ugly
+                        // remove if we get server MSC3994 support
+                        this.getPushDetailsForEvent(event, true);
+
                         event.event.room_id = notification.room_id; // XXX: gutwrenching
                         matrixEvents[i] = event;
                     }
@@ -8787,8 +8815,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         for (const [userId, deviceId] of devices) {
             const query = queries[userId] || {};
-            queries[userId] = query;
-            query[deviceId] = keyAlgorithm;
+            safeSet(queries, userId, query);
+            safeSet(query, deviceId, keyAlgorithm);
         }
         const content: IClaimKeysRequest = { one_time_keys: queries };
         if (timeout) {

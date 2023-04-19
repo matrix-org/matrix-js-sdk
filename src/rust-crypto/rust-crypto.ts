@@ -25,17 +25,19 @@ import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
-import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
+import { DeviceVerificationStatus } from "../crypto-api";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  */
 export class RustCrypto implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;
+    private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -130,11 +132,6 @@ export class RustCrypto implements CryptoBackend {
         return new UserTrustLevel(false, false, false);
     }
 
-    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
-        // TODO
-        return new DeviceTrustLevel(false, false, false, false);
-    }
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -163,6 +160,44 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
+    public getTrustCrossSignedDevices(): boolean {
+        return this._trustCrossSignedDevices;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setTrustCrossSignedDevices(val: boolean): void {
+        this._trustCrossSignedDevices = val;
+        // TODO: legacy crypto goes through the list of known devices and emits DeviceVerificationChanged
+        //  events. Maybe we need to do the same?
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getDeviceVerificationStatus}.
+     */
+    public async getDeviceVerificationStatus(
+        userId: string,
+        deviceId: string,
+    ): Promise<DeviceVerificationStatus | null> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) return null;
+
+        return new DeviceVerificationStatus(
+            device.isCrossSigningTrusted(),
+            false, // tofu
+            device.isLocallyTrusted(),
+            this._trustCrossSignedDevices,
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -140,8 +140,8 @@ export class TrackStatsReporter {
         audioTrackSummary: TrackSummary;
         videoTrackSummary: TrackSummary;
     } {
-        const audioTrackSummary = { count: 0, muted: 0 };
-        const videoTrackSummary = { count: 0, muted: 0 };
+        const audioTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
+        const videoTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
         trackStatsList
             .filter((t) => t.getType() === "remote")
             .forEach((stats) => {
@@ -149,6 +149,12 @@ export class TrackStatsReporter {
                 trackSummary.count++;
                 if (stats.alive && stats.muted) {
                     trackSummary.muted++;
+                }
+                if (trackSummary.maxJitter < stats.getJitter()) {
+                    trackSummary.maxJitter = stats.getJitter();
+                }
+                if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
+                    trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
                 }
             });
         return { audioTrackSummary, videoTrackSummary };

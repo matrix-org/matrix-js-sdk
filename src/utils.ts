@@ -720,7 +720,7 @@ function processMapToObjectValue(value: any): any {
  * Recursively converts Maps to plain objects.
  * Also supports sub-lists of Maps.
  */
-export function recursiveMapToObject(map: Map<any, any>): any {
+export function recursiveMapToObject(map: Map<any, any>): Record<any, any> {
     const targetMap = new Map();
 
     for (const [key, value] of map) {
@@ -734,7 +734,7 @@ export function unsafeProp<K extends keyof any | undefined>(prop: K): boolean {
     return prop === "__proto__" || prop === "prototype" || prop === "constructor";
 }
 
-export function safeSet<K extends keyof any>(obj: Record<any, any>, prop: K, value: any): void {
+export function safeSet<O extends Record<any, any>, K extends keyof O>(obj: O, prop: K, value: O[K]): void {
     if (unsafeProp(prop)) {
         throw new Error("Trying to modify prototype or constructor");
     }

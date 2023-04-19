@@ -224,24 +224,107 @@ describe("TrackStatsReporter", () => {
                 audioTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
             });
         });
 
-        it("and returns  summary if stats list not empty", async () => {
-            const summary = TrackStatsReporter.buildTrackSummary([]);
+        it("and returns  summary if stats list not empty and ignore local summery", async () => {
+            const trackStatsList = buildMockTrackStatsList();
+            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
                 audioTrackSummary: {
-                    count: 0,
+                    count: 2,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
                 },
                 videoTrackSummary: {
-                    count: 0,
+                    count: 3,
                     muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                },
+            });
+        });
+
+        it("and returns summary and count muted if alive", async () => {
+            const trackStatsList = buildMockTrackStatsList();
+            trackStatsList[1].muted = true;
+            trackStatsList[5].muted = true;
+            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 2,
+                    muted: 1,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                },
+                videoTrackSummary: {
+                    count: 3,
+                    muted: 1,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                },
+            });
+        });
+
+        it("and returns summary and ignore muted if not alive", async () => {
+            const trackStatsList = buildMockTrackStatsList();
+            trackStatsList[1].muted = true;
+            trackStatsList[1].alive = false;
+            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 2,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                },
+                videoTrackSummary: {
+                    count: 3,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                },
+            });
+        });
+
+        it("and returns summary and build max jitter and packet loss", async () => {
+            const trackStatsList = buildMockTrackStatsList();
+            // video remote
+            trackStatsList[1].setJitter(12);
+            trackStatsList[4].setJitter(66);
+            trackStatsList[6].setJitter(1);
+            trackStatsList[1].setLoss({ packetsLost: 55, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[4].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[6].setLoss({ packetsLost: 1, packetsTotal: 0, isDownloadStream: true });
+            // audio remote
+            trackStatsList[2].setJitter(1);
+            trackStatsList[5].setJitter(15);
+            trackStatsList[2].setLoss({ packetsLost: 5, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[5].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+
+            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            expect(summary).toEqual({
+                audioTrackSummary: {
+                    count: 2,
+                    muted: 0,
+                    maxJitter: 15,
+                    maxPacketLoss: 5,
+                },
+                videoTrackSummary: {
+                    count: 3,
+                    muted: 0,
+                    maxJitter: 66,
+                    maxPacketLoss: 55,
                 },
             });
         });
@@ -273,3 +356,28 @@ describe("TrackStatsReporter", () => {
         });
     });
 });
+
+function buildMockTrackStatsList(): MediaTrackStats[] {
+    const trackStats1 = new MediaTrackStats("1", "local", "video");
+    trackStats1.muted = false;
+    trackStats1.alive = true;
+    const trackStats2 = new MediaTrackStats("1", "remote", "video");
+    trackStats2.muted = false;
+    trackStats2.alive = true;
+    const trackStats3 = new MediaTrackStats("1", "remote", "audio");
+    trackStats3.muted = false;
+    trackStats3.alive = true;
+    const trackStats4 = new MediaTrackStats("1", "local", "audio");
+    trackStats4.muted = false;
+    trackStats4.alive = true;
+    const trackStats5 = new MediaTrackStats("1", "remote", "video");
+    trackStats5.muted = false;
+    trackStats5.alive = true;
+    const trackStats6 = new MediaTrackStats("1", "remote", "audio");
+    trackStats6.muted = false;
+    trackStats6.alive = true;
+    const trackStats7 = new MediaTrackStats("1", "remote", "video");
+    trackStats7.muted = false;
+    trackStats7.alive = true;
+    return [trackStats1, trackStats2, trackStats3, trackStats4, trackStats5, trackStats6, trackStats7];
+}

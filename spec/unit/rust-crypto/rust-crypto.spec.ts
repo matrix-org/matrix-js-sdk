@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -228,6 +228,55 @@ describe("RustCrypto", () => {
 
             const res = rustCrypto.getEventEncryptionInfo(event);
             expect(res.encrypted).toBeTruthy();
+        });
+    });
+
+    describe("get|setTrustCrossSignedDevices", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await initRustCrypto({} as MatrixClient["http"], TEST_USER, TEST_DEVICE_ID);
+        });
+
+        it("should be true by default", () => {
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+
+        it("should be easily turn-off-and-on-able", () => {
+            rustCrypto.setTrustCrossSignedDevices(false);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(false);
+            rustCrypto.setTrustCrossSignedDevices(true);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+    });
+
+    describe("getDeviceVerificationStatus", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getDevice: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(olmMachine, {} as MatrixClient["http"], TEST_USER, TEST_DEVICE_ID);
+        });
+
+        it("should call getDevice", async () => {
+            olmMachine.getDevice.mockResolvedValue({
+                isCrossSigningTrusted: jest.fn().mockReturnValue(false),
+                isLocallyTrusted: jest.fn().mockReturnValue(false),
+            } as unknown as RustSdkCryptoJs.Device);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(olmMachine.getDevice.mock.calls[0][0].toString()).toEqual("@user:domain");
+            expect(olmMachine.getDevice.mock.calls[0][1].toString()).toEqual("device");
+            expect(res?.crossSigningVerified).toBe(false);
+            expect(res?.localVerified).toBe(false);
+        });
+
+        it("should return null for unknown device", async () => {
+            olmMachine.getDevice.mockResolvedValue(undefined);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(res).toBe(null);
         });
     });
 });

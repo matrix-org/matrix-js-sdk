@@ -14,48 +14,81 @@ import { StatsReportEmitter } from "./statsReportEmitter";
 import { SummaryStats } from "./summaryStats";
 import { SummaryStatsReport } from "./statsReport";
 
+interface ReceivedMedia {
+    audio: number;
+    video: number;
+    media: number;
+}
+
 export class SummaryStatsReporter {
     public constructor(private emitter: StatsReportEmitter) {}
 
     public build(summary: SummaryStats[]): void {
-        const entirety = summary.length;
-        if (entirety === 0) {
+        const entiretyTracksCount = summary.length;
+        if (entiretyTracksCount === 0) {
             return;
         }
-        let receivedMedia = 0;
-        let receivedVideoMedia = 0;
-        let receivedAudioMedia = 0;
+        const receivedCounter: ReceivedMedia = { audio: 0, video: 0, media: 0 };
+        let maxJitter = 0;
+        let maxPacketLoss = 0;
 
         summary.forEach((stats) => {
-            let hasReceivedAudio = false;
-            let hasReceivedVideo = false;
-            if (stats.receivedAudioMedia > 0) {
-                receivedAudioMedia++;
-                hasReceivedAudio = true;
-            }
-            if (stats.receivedVideoMedia > 0) {
-                receivedVideoMedia++;
-                hasReceivedVideo = true;
-            } else {
-                if (
-                    stats.videoTrackSummary.muted > 0 &&
-                    stats.videoTrackSummary.muted === stats.videoTrackSummary.count
-                ) {
-                    receivedVideoMedia++;
-                    hasReceivedVideo = true;
-                }
-            }
-
-            if (stats.receivedMedia > 0 && hasReceivedVideo && hasReceivedAudio) {
-                receivedMedia++;
-            }
+            this.countTrackListReceivedMedia(receivedCounter, stats);
+            maxJitter = this.buildMaxJitter(maxJitter, stats);
+            maxPacketLoss = this.buildMaxPacketLoss(maxPacketLoss, stats);
         });
 
         const report = {
-            percentageReceivedMedia: Math.round((receivedMedia / entirety) * 100) / 100,
-            percentageReceivedVideoMedia: Math.round((receivedVideoMedia / entirety) * 100) / 100,
-            percentageReceivedAudioMedia: Math.round((receivedAudioMedia / entirety) * 100) / 100,
+            percentageReceivedMedia: Math.round((receivedCounter.media / entiretyTracksCount) * 100) / 100,
+            percentageReceivedVideoMedia: Math.round((receivedCounter.video / entiretyTracksCount) * 100) / 100,
+            percentageReceivedAudioMedia: Math.round((receivedCounter.audio / entiretyTracksCount) * 100) / 100,
+            maxJitter,
+            maxPacketLoss,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
+    }
+
+    private countTrackListReceivedMedia(counter: ReceivedMedia, stats: SummaryStats): void {
+        let hasReceivedAudio = false;
+        let hasReceivedVideo = false;
+        if (stats.receivedAudioMedia > 0 || stats.audioTrackSummary.count === 0) {
+            counter.audio++;
+            hasReceivedAudio = true;
+        }
+        if (stats.receivedVideoMedia > 0 || stats.videoTrackSummary.count === 0) {
+            counter.video++;
+            hasReceivedVideo = true;
+        } else {
+            if (stats.videoTrackSummary.muted > 0 && stats.videoTrackSummary.muted === stats.videoTrackSummary.count) {
+                counter.video++;
+                hasReceivedVideo = true;
+            }
+        }
+
+        if (hasReceivedVideo && hasReceivedAudio) {
+            counter.media++;
+        }
+    }
+
+    private buildMaxJitter(maxJitter: number, stats: SummaryStats): number {
+        if (maxJitter < stats.videoTrackSummary.maxJitter) {
+            maxJitter = stats.videoTrackSummary.maxJitter;
+        }
+
+        if (maxJitter < stats.audioTrackSummary.maxJitter) {
+            maxJitter = stats.audioTrackSummary.maxJitter;
+        }
+        return maxJitter;
+    }
+
+    private buildMaxPacketLoss(maxPacketLoss: number, stats: SummaryStats): number {
+        if (maxPacketLoss < stats.videoTrackSummary.maxPacketLoss) {
+            maxPacketLoss = stats.videoTrackSummary.maxPacketLoss;
+        }
+
+        if (maxPacketLoss < stats.audioTrackSummary.maxPacketLoss) {
+            maxPacketLoss = stats.audioTrackSummary.maxPacketLoss;
+        }
+        return maxPacketLoss;
     }
 }

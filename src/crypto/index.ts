@@ -88,6 +88,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
+import { DeviceVerificationStatus } from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -605,18 +606,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns True if trusting cross-signed devices
      */
+    public getTrustCrossSignedDevices(): boolean {
+        return this.trustCrossSignedDevices;
+    }
+
+    /**
+     * @deprecated Use {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
     public getCryptoTrustCrossSignedDevices(): boolean {
         return this.trustCrossSignedDevices;
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
-
-     * This may be set before initCrypto() is called to ensure no races occur.
      *
      * @param val - True to trust cross-signed devices
      */
-    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+    public setTrustCrossSignedDevices(val: boolean): void {
         this.trustCrossSignedDevices = val;
 
         for (const userId of this.deviceList.getKnownUserIds()) {
@@ -632,6 +638,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 }
             }
         }
+    }
+
+    /**
+     * @deprecated Use {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+        this.setTrustCrossSignedDevices(val);
     }
 
     /**
@@ -1440,10 +1453,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check whether a given device is trusted.
      *
-     * @param userId - The ID of the user whose devices is to be checked.
+     * @param userId - The ID of the user whose device is to be checked.
      * @param deviceId - The ID of the device to check
-     *
-     * @returns
+     */
+    public async getDeviceVerificationStatus(
+        userId: string,
+        deviceId: string,
+    ): Promise<DeviceVerificationStatus | null> {
+        const device = this.deviceList.getStoredDevice(userId, deviceId);
+        if (!device) {
+            return null;
+        }
+        return this.checkDeviceInfoTrust(userId, device);
+    }
+
+    /**
+     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         const device = this.deviceList.getStoredDevice(userId, deviceId);
@@ -1456,7 +1481,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userId - The ID of the user whose devices is to be checked.
      * @param device - The device info object to check
      *
-     * @returns
+     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceInfoTrust(userId: string, device?: DeviceInfo): DeviceTrustLevel {
         const trustedLocally = !!device?.isVerified();

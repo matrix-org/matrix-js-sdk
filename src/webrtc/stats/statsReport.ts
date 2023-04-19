@@ -68,4 +68,6 @@ export interface SummaryStatsReport {
     percentageReceivedMedia: number;
     percentageReceivedAudioMedia: number;
     percentageReceivedVideoMedia: number;
+    maxJitter: number;
+    maxPacketLoss: number;
 }

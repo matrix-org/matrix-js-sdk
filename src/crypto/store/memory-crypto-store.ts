@@ -338,7 +338,7 @@ export class MemoryCryptoStore implements CryptoStore {
             deviceSessions = {};
             this.sessions[deviceKey] = deviceSessions;
         }
-        deviceSessions[sessionId] = sessionInfo;
+        safeSet(deviceSessions, sessionId, sessionInfo);
     }
 
     public async storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {

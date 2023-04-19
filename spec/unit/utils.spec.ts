@@ -678,14 +678,14 @@ describe("utils", function () {
 
     describe("safeSet", () => {
         it("should set a value", () => {
-            const obj = {};
+            const obj: Record<string, string> = {};
             safeSet(obj, "testProp", "test value");
             expect(obj).toEqual({ testProp: "test value" });
         });
 
         it.each(["__proto__", "prototype", "constructor"])("should raise an error when setting »%s«", (prop) => {
             expect(() => {
-                safeSet({}, prop, "teset value");
+                safeSet(<Record<string, string>>{}, prop, "teset value");
             }).toThrow("Trying to modify prototype or constructor");
         });
     });
