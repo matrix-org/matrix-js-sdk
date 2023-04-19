@@ -634,6 +634,15 @@ export class UserTrustLevel {
  * @deprecated Use {@link DeviceVerificationStatus}.
  */
 export class DeviceTrustLevel extends DeviceVerificationStatus {
+    public constructor(
+        crossSigningVerified: boolean,
+        tofu: boolean,
+        localVerified: boolean,
+        trustCrossSignedDevices: boolean,
+    ) {
+        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices });
+    }
+
     public static fromUserTrustLevel(
         userTrustLevel: UserTrustLevel,
         localVerified: boolean,
