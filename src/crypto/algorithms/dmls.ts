@@ -28,7 +28,7 @@ import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
 import { Crypto, IEncryptedContent, IEventDecryptionResult } from "..";
 import { UnstableValue } from "../../NamespacedValue";
-import * as matrixDmls from "matrix-dmls-wasm";
+import * as matrixDmls from "@matrix-org/matrix-dmls-wasm";
 import * as olmlib from "../olmlib";
 
 export const MLS_ALGORITHM = new UnstableValue(
