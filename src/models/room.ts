@@ -368,22 +368,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * The room summary.
      */
     public summary: RoomSummary | null = null;
-    // legacy fields
     /**
      * The live event timeline for this room, with the oldest event at index 0.
-     * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
      */
     public timeline!: MatrixEvent[];
     /**
-     * oldState The state of the room at the time of the oldest
-     * event in the live timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+     * oldState The state of the room at the time of the oldest event in the live timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.BACKWARDS) instead
      */
     public oldState!: RoomState;
     /**
-     * currentState The state of the room at the time of the
-     * newest event in the timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+     * currentState The state of the room at the time of the newest event in the timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
     public readonly relations = new RelationsContainer(this.client, this);
