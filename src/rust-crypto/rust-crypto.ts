@@ -204,7 +204,12 @@ export class RustCrypto implements CryptoBackend {
         return deviceMapByUserId;
     }
 
-    // TODO comment
+    /**
+     * Search if the `userId` is in the given RustUserIds set
+     * `RustSdkCryptoJs.UserId` is an object, `userId` a string, so we can't use `mySet.has(userId)`
+     * @param userId - userId to find
+     * @param rustUserIds - collection of `RustSdkCryptoJs.UserId`
+     */
     private isInRustUserIds(userId: string, rustUserIds: Set<RustSdkCryptoJs.UserId>): boolean {
         for (const rustUserId of rustUserIds) {
             if (rustUserId.toString() === userId) {
