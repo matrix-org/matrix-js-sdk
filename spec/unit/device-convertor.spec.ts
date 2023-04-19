@@ -23,7 +23,7 @@ describe("device-convertor", () => {
     const userId = "@alice:example.com";
     const deviceId = "xcvf";
 
-    // All parameters for DeviceInfo initialization
+    // All parameters for DeviceInfo or QueryDevice initialization
     const keys = {
         [`ed25519:${deviceId}`]: "key1",
         [`curve25519:${deviceId}`]: "key2",

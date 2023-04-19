@@ -24,6 +24,7 @@ export interface IDevice {
     unsigned?: Record<string, any>;
     signatures?: ISignatures;
 }
+
 export enum DeviceVerification {
     Blocked = -1,
     Unverified = 0,
