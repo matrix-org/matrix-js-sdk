@@ -118,29 +118,41 @@ export interface CryptoApi {
 }
 
 export class DeviceVerificationStatus {
+    /**
+     * True if this device has been verified via cross signing.
+     *
+     * This does *not* take into account `trustCrossSignedDevices`.
+     */
+    public readonly crossSigningVerified: boolean;
+
+    /**
+     * TODO: tofu magic wtf does this do?
+     */
+    public readonly tofu: boolean;
+
+    /**
+     * True if the device has been marked as locally verified.
+     */
+    public readonly localVerified: boolean;
+
+    /**
+     * True if the client has been configured to trust cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    private readonly trustCrossSignedDevices: boolean;
+
     public constructor(
-        /**
-         * True if this device has been verified via cross signing.
-         *
-         * This does *not* take into account `trustCrossSignedDevices`.
-         */
-        public readonly crossSigningVerified: boolean,
-
-        /**
-         * TODO: tofu magic wtf does this do?
-         */
-        public readonly tofu: boolean,
-
-        /**
-         * True if the device has been marked as locally verified.
-         */
-        public readonly localVerified: boolean,
-
-        /**
-         * True if the client has been configured to trust cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
-         */
-        private readonly trustCrossSignedDevices: boolean,
-    ) {}
+        opts: Partial<DeviceVerificationStatus> & {
+            /**
+             * True if cross-signed devices should be considered verified for {@link DeviceVerificationStatus#isVerified}.
+             */
+            trustCrossSignedDevices?: boolean;
+        },
+    ) {
+        this.crossSigningVerified = opts.crossSigningVerified ?? false;
+        this.tofu = opts.tofu ?? false;
+        this.localVerified = opts.localVerified ?? false;
+        this.trustCrossSignedDevices = opts.trustCrossSignedDevices ?? false;
+    }
 
     /**
      * Check if we should consider this device "verified".
