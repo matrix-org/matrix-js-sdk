@@ -213,7 +213,11 @@ export class GroupCall extends TypedEventEmitter<
     public retryCallInterval = 5000;
     public participantTimeout = 1000 * 15;
     public pttMaxTransmitTime = 1000 * 20;
-    public statsCollectIntervalTime = 10000;
+    /**
+     * Configure default webrtc stats collection interval in ms
+     * Disable collecting webrtc stats by setting interval to 0
+     */
+    public statsCollectIntervalTime = 0;
 
     public activeSpeaker?: CallFeed;
     public localCallFeed?: CallFeed;
