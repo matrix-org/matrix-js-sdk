@@ -27,7 +27,7 @@ export class GroupCallStats {
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
     public start(): void {
-        if (this.timer === undefined) {
+        if (this.timer === undefined && this.interval > 0) {
             this.timer = setInterval(() => {
                 this.processStats();
             }, this.interval);
