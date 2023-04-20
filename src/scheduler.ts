@@ -282,7 +282,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
                     );
                     if (waitTimeMs === -1) {
                         // give up (you quitter!)
-                        debuglog("Queue '%s' giving up on event %s", queueName, obj.event.getId());
+                        logger.info("Queue '%s' giving up on event %s", queueName, obj.event.getId());
                         // remove this from the queue
                         this.clearQueue(queueName, err);
                     } else {
@@ -298,11 +298,11 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (index >= 0) {
             this.activeQueues.splice(index, 1);
         }
-        debuglog("Stopping queue '%s' as it is now empty", queueName);
+        logger.info("Stopping queue '%s' as it is now empty", queueName);
     }
 
     private clearQueue(queueName: string, err: unknown): void {
-        debuglog("clearing queue '%s'", queueName);
+        logger.info("clearing queue '%s'", queueName);
         let obj: IQueueEntry<T> | undefined;
         while ((obj = this.removeNextEvent(queueName))) {
             obj.defer.reject(err);
