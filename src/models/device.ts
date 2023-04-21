@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** State of the verification of the device.
- * Beware that the enum values are numbers instead of plain strings
- */
+/** State of the verification of the device. */
 export enum DeviceVerification {
     Blocked = -1,
     Unverified = 0,
