@@ -2102,7 +2102,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const queryPromise = awaitKeyQueryRequest();
 
             const user = "@testing_florian1:matrix.org";
-            const devicesInfo = await aliceClient.getUserDeviceInfo([user], true);
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
 
             // Wait for `/keys/query` to be called
             const deviceKeysPayload = await queryPromise;
@@ -2120,7 +2120,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const queryPromise = awaitKeyQueryRequest();
 
             const user = "@bob:xyz";
-            const devicesInfo = await aliceClient.getUserDeviceInfo([user], true);
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user], true);
 
             // Wait for `/keys/query` to be called
             const deviceKeysPayload = await queryPromise;
@@ -2162,7 +2162,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // It will add `@testing_florian1:matrix.org` devices to the DeviceList
             await flushPromises();
 
-            const devicesInfo = await aliceClient.getUserDeviceInfo([user]);
+            const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user]);
 
             // We should only have the `user` in it
             expect(devicesInfo.size).toBe(1);

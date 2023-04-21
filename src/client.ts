@@ -213,7 +213,6 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
-import { DeviceMap } from "./models/device";
 
 export type Store = IStore;
 
@@ -2316,23 +2315,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
         return this.crypto.getStoredDevicesForUser(userId) || [];
-    }
-
-    /**
-     * Get the device information for the given list of users.
-     *
-     * @param userIds - The users to fetch.
-     * @param downloadUncached - If true, download the device list for users whose device list we are not
-     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
-     *
-     * @returns A map `{@link DeviceMap}`.
-     */
-    public getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
-        if (!this.cryptoBackend) {
-            throw new Error("End-to-end encryption disabled");
-        }
-
-        return this.cryptoBackend.getUserDeviceInfo(userIds, downloadUncached);
     }
 
     /**
