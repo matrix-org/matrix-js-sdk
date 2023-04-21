@@ -112,7 +112,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func: (session: ISessionInfo) => void,
     ): void {
         const sessions = this._getEndToEndSessions(deviceKey);
-        func(sessions[sessionId] || {});
+        func(sessions[sessionId] ?? {});
     }
 
     public getEndToEndSessions(
@@ -120,7 +120,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void {
-        func(this._getEndToEndSessions(deviceKey) || {});
+        func(this._getEndToEndSessions(deviceKey) ?? {});
     }
 
     public getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void {

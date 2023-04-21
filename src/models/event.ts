@@ -533,9 +533,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             return {} as T;
         }
         if (this.clearEvent) {
-            return (this.clearEvent.content || {}) as T;
+            return (this.clearEvent.content ?? {}) as T;
         }
-        return (this.event.content || {}) as T;
+        return (this.event.content ?? {}) as T;
     }
 
     /**
@@ -549,7 +549,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this._localRedactionEvent) {
             return {} as T;
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getContent()["m.new_content"] || {};
+            return this._replacingEvent.getContent()["m.new_content"] ?? {};
         } else {
             return this.getOriginalContent();
         }
@@ -818,7 +818,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return recipients;
     }
 
-    private async decryptionLoop(crypto: CryptoBackend, options: IDecryptOptions = {}): Promise<void> {
+    private async decryptionLoop(crypto: CryptoBackend | undefined, options: IDecryptOptions = {}): Promise<void> {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
@@ -1553,7 +1553,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param otherEvent - The other event to check against.
      * @returns True if the events are the same, false otherwise.
      */
-    public isEquivalentTo(otherEvent: MatrixEvent): boolean {
+    public isEquivalentTo(otherEvent?: MatrixEvent): boolean {
         if (!otherEvent) return false;
         if (otherEvent === this) return true;
         const myProps = deepSortedObjectEntries(this.event);
