@@ -77,6 +77,10 @@ export interface CryptoApi {
     /**
      * Get the device information for the given list of users.
      *
+     * First of all, the devices are retrieved from the tracked users in the local client
+     * If the users are not tracked and the `downloadUncached` parameter is set at `true`,
+     * A `/keys/query` request is made to the local user homeserver to retrieve these devices
+     *
      * @param userIds - The users to fetch.
      * @param downloadUncached - If true, download the device list for users whose device list we are not
      *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
