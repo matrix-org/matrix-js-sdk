@@ -89,6 +89,8 @@ import {
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
 import { DeviceVerificationStatus } from "../crypto-api";
+import { Device, DeviceMap } from "../models/device";
+import { deviceInfoToDevice } from "./device-converter";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -2061,6 +2063,54 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getStoredDevicesForUser(userId: string): Array<DeviceInfo> | null {
         return this.deviceList.getStoredDevicesForUser(userId);
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
+        // Keep the users without device to download theirs keys
+        const usersWithoutDeviceInfo: string[] = [];
+
+        for (const userId of userIds) {
+            const deviceInfos = await this.getStoredDevicesForUser(userId);
+            // If there are device infos for a userId, we transform it into a map
+            // Else, the keys will be downloaded after
+            if (deviceInfos) {
+                const deviceMap = new Map(
+                    // Convert DeviceInfo to Device
+                    deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfoToDevice(deviceInfo, userId)]),
+                );
+                deviceMapByUserId.set(userId, deviceMap);
+            } else {
+                usersWithoutDeviceInfo.push(userId);
+            }
+        }
+
+        // Download device info for users without device infos
+        if (downloadUncached && usersWithoutDeviceInfo.length > 0) {
+            const newDeviceInfoMap = await this.downloadKeys(usersWithoutDeviceInfo);
+
+            newDeviceInfoMap.forEach((deviceInfoMap, userId) => {
+                const deviceMap = new Map<string, Device>();
+                // Convert DeviceInfo to Device
+                deviceInfoMap.forEach((deviceInfo, deviceId) =>
+                    deviceMap.set(deviceId, deviceInfoToDevice(deviceInfo, userId)),
+                );
+
+                // Put the new device infos into the returned map
+                deviceMapByUserId.set(userId, deviceMap);
+            });
+        }
+
+        return deviceMapByUserId;
     }
 
     /**
