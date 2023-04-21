@@ -18,9 +18,9 @@ import { Device } from "../models/device";
 import { DeviceInfo } from "./deviceinfo";
 
 /**
- * Convert a DeviceInfo {@link DeviceInfo} to a Device {@link Device}
+ * Convert a {@link DeviceInfo} to a {@link Device}.
  * @param deviceInfo - deviceInfo to convert
- * @param userId - id of the device user
+ * @param userId - id of the hat owns the device.
  */
 export function deviceInfoToDevice(deviceInfo: DeviceInfo, userId: string): Device {
     const keys = new Map<string, string>(Object.entries(deviceInfo.keys));
