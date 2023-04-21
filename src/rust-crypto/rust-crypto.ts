@@ -176,7 +176,11 @@ export class RustCrypto implements CryptoBackend {
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
         const deviceMapByUserId = new Map<string, Map<string, Device>>();
-        const trackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+
+        // Convert RustSdkCryptoJs.UserId to a `Set<string>`
+        const trackedUsers = new Set<string>();
+        rustTrackedUsers.forEach((rustUserId) => trackedUsers.add(rustUserId.toString()));
 
         // Keep untracked user to download their keys after
         const untrackedUsers: Set<string> = new Set();
@@ -185,7 +189,7 @@ export class RustCrypto implements CryptoBackend {
             // if this is a tracked user, we can just fetch the device list from the rust-sdk
             // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
             // devices: the rust-sdk will return the last-known device list, which will be good enough.)
-            if (this.isInRustUserIds(userId, trackedUsers)) {
+            if (trackedUsers.has(userId)) {
                 deviceMapByUserId.set(userId, await this.getUserDevices(userId));
             } else {
                 untrackedUsers.add(userId);
@@ -205,23 +209,7 @@ export class RustCrypto implements CryptoBackend {
     }
 
     /**
-     * Search if the `userId` is in the given RustUserIds set
-     * `RustSdkCryptoJs.UserId` is an object, `userId` a string, so we can't use `mySet.has(userId)`
-     * @param userId - userId to find
-     * @param rustUserIds - collection of `RustSdkCryptoJs.UserId`
-     */
-    private isInRustUserIds(userId: string, rustUserIds: Set<RustSdkCryptoJs.UserId>): boolean {
-        for (const rustUserId of rustUserIds) {
-            if (rustUserId.toString() === userId) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get the user devices from the olm machine
+     * Get the device list for the given user from the olm machine
      * @param userId - Rust SDK UserId
      */
     private async getUserDevices(userId: string): Promise<Map<string, Device>> {
