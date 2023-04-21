@@ -2085,7 +2085,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // Else, the keys will be downloaded after
             if (deviceInfos) {
                 const deviceMap = new Map(
-                    // Convert DeviceInfo to IDevice
+                    // Convert DeviceInfo to Device
                     deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfoToDevice(deviceInfo, userId)]),
                 );
                 deviceMapByUserId.set(userId, deviceMap);
@@ -2100,7 +2100,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             newDeviceInfoMap.forEach((deviceInfoMap, userId) => {
                 const deviceMap = new Map<string, Device>();
-                // Convert DeviceInfo to IDevice
+                // Convert DeviceInfo to Device
                 deviceInfoMap.forEach((deviceInfo, deviceId) =>
                     deviceMap.set(deviceId, deviceInfoToDevice(deviceInfo, userId)),
                 );
