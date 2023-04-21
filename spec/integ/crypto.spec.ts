@@ -2006,6 +2006,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+        // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
         const queryResponseBody = {
             device_keys: {
                 "@testing_florian1:matrix.org": {
@@ -2158,7 +2159,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Old crypto: for `user`: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
             jest.runAllTimers();
             // Old crypto: for `user`: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
-            // It will add bob devices to the DeviceList
+            // It will add `@testing_florian1:matrix.org` devices to the DeviceList
             await flushPromises();
 
             const devicesInfo = await aliceClient.getUserDeviceInfo([user]);
