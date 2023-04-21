@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceInfo, DeviceVerification } from "../../src/crypto/deviceinfo";
-import { DeviceKeys } from "../../src";
+import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { DeviceKeys, DeviceVerification } from "../../src";
 import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-converter";
 import { deviceInfoToDevice } from "../../src/crypto/device-converter";
 
@@ -31,8 +31,9 @@ describe("device-converter", () => {
     const algorithms = ["algo1", "algo2"];
     const verified = DeviceVerification.Verified;
     const signatures = { [userId]: { [deviceId]: "sign1" } };
+    const displayName = "display name";
     const unsigned = {
-        device_display_name: "display name",
+        device_display_name: displayName,
     };
 
     describe("deviceInfoToDevice", () => {
@@ -45,14 +46,13 @@ describe("device-converter", () => {
             expect(device.verified).toBe(verified);
             expect(device.getIdentityKey()).toBe(keys[`curve25519:${deviceId}`]);
             expect(device.getFingerprint()).toBe(keys[`ed25519:${deviceId}`]);
-            expect(device.getDisplayName()).toBe(unsigned.device_display_name);
+            expect(device.displayName).toBe(displayName);
         });
 
-        it("should add empty signatures and unsigned map", () => {
+        it("should add empty signatures", () => {
             const deviceInfo = DeviceInfo.fromStorage({ keys, algorithms, verified }, deviceId);
             const device = deviceInfoToDevice(deviceInfo, userId);
 
-            expect(device.unsigned.size).toBe(0);
             expect(device.signatures.size).toBe(0);
         });
     });
@@ -74,10 +74,10 @@ describe("device-converter", () => {
             expect(device.verified).toBe(DeviceVerification.Unverified);
             expect(device.getIdentityKey()).toBe(keys[`curve25519:${deviceId}`]);
             expect(device.getFingerprint()).toBe(keys[`ed25519:${deviceId}`]);
-            expect(device.getDisplayName()).toBe(unsigned.device_display_name);
+            expect(device.displayName).toBe(displayName);
         });
 
-        it("should add empty signatures and unsigned map", () => {
+        it("should add empty signatures", () => {
             const queryDevice: DeviceKeys[keyof DeviceKeys] = {
                 keys,
                 algorithms,
@@ -86,7 +86,6 @@ describe("device-converter", () => {
             };
             const device = downloadDeviceToJsDevice(queryDevice);
 
-            expect(device.unsigned.size).toBe(0);
             expect(device.signatures.size).toBe(0);
         });
     });

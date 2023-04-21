@@ -16,8 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import { DeviceVerification } from "../crypto/deviceinfo";
-import { Device } from "../models/device";
+import { Device, DeviceVerification } from "../models/device";
 import { DeviceKeys } from "../client";
 
 /**
@@ -71,13 +70,6 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
         }
     });
 
-    // Add device display name to unsigned field
-    const unsigned = new Map<string, string>();
-    const { displayName } = device;
-    if (displayName) {
-        unsigned.set("device_display_name", displayName);
-    }
-
     return new Device({
         deviceId: device.deviceId.toString(),
         userId: userId.toString(),
@@ -85,7 +77,7 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
         algorithms: Array.from(algorithms),
         verified,
         signatures,
-        unsigned,
+        displayName: device.displayName,
     });
 }
 
@@ -108,7 +100,7 @@ type QueryDevice = DeviceKeys[keyof DeviceKeys];
  */
 export function downloadDeviceToJsDevice(device: QueryDevice): Device {
     const keys = new Map(Object.entries(device.keys));
-    const unsigned = new Map(Object.entries(device.unsigned || {}));
+    const displayName = device.unsigned?.device_display_name;
 
     const signatures = new Map<string, Map<string, string>>();
     if (device.signatures) {
@@ -124,6 +116,6 @@ export function downloadDeviceToJsDevice(device: QueryDevice): Device {
         algorithms: device.algorithms,
         verified: DeviceVerification.Unverified,
         signatures,
-        unsigned,
+        displayName,
     });
 }

@@ -24,7 +24,7 @@ import { DeviceInfo } from "./deviceinfo";
  */
 export function deviceInfoToDevice(deviceInfo: DeviceInfo, userId: string): Device {
     const keys = new Map<string, string>(Object.entries(deviceInfo.keys));
-    const unsigned = new Map<string, string>(Object.entries(deviceInfo.unsigned || {}));
+    const displayName = deviceInfo.getDisplayName() || undefined;
 
     const signatures = new Map<string, Map<string, string>>();
     if (deviceInfo.signatures) {
@@ -40,6 +40,6 @@ export function deviceInfoToDevice(deviceInfo: DeviceInfo, userId: string): Devi
         algorithms: deviceInfo.algorithms,
         verified: deviceInfo.verified,
         signatures,
-        unsigned,
+        displayName,
     });
 }

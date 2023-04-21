@@ -14,18 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceVerification } from "../crypto/deviceinfo";
+/** State of the verification of the device.
+ * Beware that the enum values are numbers instead of plain strings
+ */
+export enum DeviceVerification {
+    Blocked = -1,
+    Unverified = 0,
+    Verified = 1,
+}
 
-// user-Id → device-Id → IDevice
+/** A map from user ID to device ID to Device */
 export type DeviceMap = Map<string, Map<string, Device>>;
 
 type DeviceParameters = Pick<Device, "deviceId" | "userId" | "algorithms" | "keys"> & Partial<Device>;
 
+/**
+ *  Information on a user's device, as returned by {@link CryptoApi.getUserDeviceInfo}.
+ */
 export class Device {
     /** id of the device */
     public readonly deviceId: string;
 
-    /** id of the device user */
+    /** id of the user that owns the device */
     public readonly userId: string;
 
     /** list of algorithms supported by this device */
@@ -37,11 +47,11 @@ export class Device {
     /** whether the device has been verified/blocked by the user */
     public readonly verified: DeviceVerification;
 
-    /** additional data from the homeserver */
-    public readonly unsigned: Map<string, string>;
-
     /** a map `<userId, map<algorithm:device_id, signature>>` */
     public readonly signatures: Map<string, Map<string, string>>;
+
+    /** display name of the device */
+    public readonly displayName?: string;
 
     public constructor(opts: DeviceParameters) {
         this.deviceId = opts.deviceId;
@@ -49,8 +59,8 @@ export class Device {
         this.algorithms = opts.algorithms;
         this.keys = opts.keys;
         this.verified = opts.verified || DeviceVerification.Unverified;
-        this.unsigned = opts.unsigned || new Map();
         this.signatures = opts.signatures || new Map();
+        this.displayName = opts.displayName;
     }
 
     /**
@@ -69,14 +79,5 @@ export class Device {
      */
     public getIdentityKey(): string | undefined {
         return this.keys.get(`curve25519:${this.deviceId}`);
-    }
-
-    /**
-     * Get the configured display name for this device, if any
-     * In `unsigned.device_display_name`
-     * @returns the device display name
-     */
-    public getDisplayName(): string | undefined {
-        return this.unsigned.get("device_display_name");
     }
 }
