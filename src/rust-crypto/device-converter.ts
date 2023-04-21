@@ -29,7 +29,7 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
     // Copy rust device keys to Device.keys
     const keys = new Map<string, string>();
     for (const [keyId, key] of device.keys.entries()) {
-        keys.set(keyId.toString(), key.toBase64);
+        keys.set(keyId.toString(), key.toBase64());
     }
 
     // Compute verified from device state
@@ -42,18 +42,50 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
 
     // Convert rust signatures to Device.signatures
     const signatures = new Map<string, Map<string, string>>();
-    const signatureMap: Map<string, string> | undefined = device.signatures.get(userId);
-    if (signatureMap) {
-        signatures.set(userId.toString(), signatureMap);
+    const mayBeSignatureMap: Map<string, RustSdkCryptoJs.MaybeSignature> | undefined = device.signatures.get(userId);
+    if (mayBeSignatureMap) {
+        const convertedSignatures = new Map<string, string>();
+        // Convert maybeSignatures map to a Map<string, string>
+        for (const [key, value] of mayBeSignatureMap.entries()) {
+            if (value.isValid() && value.signature) {
+                convertedSignatures.set(key, value.signature.toBase64());
+            }
+        }
+
+        signatures.set(userId.toString(), convertedSignatures);
+    }
+
+    // Convert rust algorithms to algorithms
+    const rustAlgorithms: RustSdkCryptoJs.EncryptionAlgorithm[] = device.algorithms;
+    // Use set to ensure that algorithms are not duplicated
+    const algorithms = new Set<string>();
+    rustAlgorithms.forEach((algorithm) => {
+        switch (algorithm) {
+            case RustSdkCryptoJs.EncryptionAlgorithm.MegolmV1AesSha2:
+                algorithms.add("m.megolm.v1.aes-sha2");
+                break;
+            case RustSdkCryptoJs.EncryptionAlgorithm.OlmV1Curve25519AesSha2:
+            default:
+                algorithms.add("m.olm.v1.curve25519-aes-sha2");
+                break;
+        }
+    });
+
+    // Add device display name to unsigned field
+    const unsigned = new Map<string, string>();
+    const { displayName } = device;
+    if (displayName) {
+        unsigned.set("device_display_name", displayName);
     }
 
     return new Device({
         deviceId: device.deviceId.toString(),
         userId: userId.toString(),
         keys,
-        algorithms: [], // TODO need to be expose in the Rust JS bindings
+        algorithms: Array.from(algorithms),
         verified,
         signatures,
+        unsigned,
     });
 }
 
