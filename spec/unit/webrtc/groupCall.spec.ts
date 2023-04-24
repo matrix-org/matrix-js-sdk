@@ -1650,33 +1650,35 @@ describe("Group Call", function () {
             );
         });
         it("should be undefined if not get stats", async () => {
-            // noinspection TypeScriptUnresolvedVariable
+            // @ts-ignore
             const stats = groupCall.stats;
             expect(stats).toBeUndefined();
         });
 
         it("should be defined after first access", async () => {
             groupCall.getGroupCallStats();
-            // noinspection TypeScriptUnresolvedVariable
+            // @ts-ignore
             const stats = groupCall.stats;
             expect(stats).toBeDefined();
         });
 
         it("with every number should do nothing if no stats exists.", async () => {
             groupCall.setGroupCallStatsInterval(0);
-            // noinspection TypeScriptUnresolvedVariable
+            // @ts-ignore
             let stats = groupCall.stats;
             expect(stats).toBeUndefined();
 
             groupCall.setGroupCallStatsInterval(10000);
-            // noinspection TypeScriptUnresolvedVariable
+            // @ts-ignore
             stats = groupCall.stats;
             expect(stats).toBeUndefined();
         });
 
         it("with number should stop existing stats", async () => {
             const stats = groupCall.getGroupCallStats();
+            // @ts-ignore
             const stop = jest.spyOn(stats, "stop");
+            // @ts-ignore
             const start = jest.spyOn(stats, "start");
             groupCall.setGroupCallStatsInterval(0);
 
@@ -1686,7 +1688,9 @@ describe("Group Call", function () {
 
         it("with number should restart existing stats", async () => {
             const stats = groupCall.getGroupCallStats();
+            // @ts-ignore
             const stop = jest.spyOn(stats, "stop");
+            // @ts-ignore
             const start = jest.spyOn(stats, "start");
             groupCall.setGroupCallStatsInterval(10000);
 
