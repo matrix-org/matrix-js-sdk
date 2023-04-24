@@ -213,11 +213,6 @@ export class GroupCall extends TypedEventEmitter<
     public retryCallInterval = 5000;
     public participantTimeout = 1000 * 15;
     public pttMaxTransmitTime = 1000 * 20;
-    /**
-     * Configure default webrtc stats collection interval in ms
-     * Disable collecting webrtc stats by setting interval to 0
-     */
-    public statsCollectIntervalTime = 0;
 
     public activeSpeaker?: CallFeed;
     public localCallFeed?: CallFeed;
@@ -242,6 +237,11 @@ export class GroupCall extends TypedEventEmitter<
     private initCallFeedPromise?: Promise<void>;
 
     private stats: GroupCallStats | undefined;
+    /**
+     * Configure default webrtc stats collection interval in ms
+     * Disable collecting webrtc stats by setting interval to 0
+     */
+    private statsCollectIntervalTime = 0;
 
     public constructor(
         private client: MatrixClient,
@@ -1605,5 +1605,16 @@ export class GroupCall extends TypedEventEmitter<
             this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
         }
         return this.stats;
+    }
+
+    public setGroupCallStatsInterval(interval: number): void {
+        this.statsCollectIntervalTime = interval;
+        if (this.stats !== undefined) {
+            this.stats.stop();
+            this.stats.setInterval(interval);
+            if (interval > 0) {
+                this.stats.start();
+            }
+        }
     }
 }

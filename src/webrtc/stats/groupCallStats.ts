@@ -69,4 +69,8 @@ export class GroupCallStats {
 
         Promise.all(summary).then((s: Awaited<SummaryStats>[]) => this.summaryStatsReporter.build(s));
     }
+
+    public setInterval(interval: number): void {
+        this.interval = interval;
+    }
 }
