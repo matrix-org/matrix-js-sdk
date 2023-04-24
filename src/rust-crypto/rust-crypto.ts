@@ -269,6 +269,7 @@ export class RustCrypto implements CryptoBackend {
         if (!device) return null;
 
         return new DeviceVerificationStatus({
+            signedByOwner: device.isCrossSignedByOwner(),
             crossSigningVerified: device.isCrossSigningTrusted(),
             localVerified: device.isLocallyTrusted(),
             trustCrossSignedDevices: this._trustCrossSignedDevices,

@@ -639,8 +639,9 @@ export class DeviceTrustLevel extends DeviceVerificationStatus {
         tofu: boolean,
         localVerified: boolean,
         trustCrossSignedDevices: boolean,
+        signedByOwner = false,
     ) {
-        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices });
+        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices, signedByOwner });
     }
 
     public static fromUserTrustLevel(
@@ -653,6 +654,7 @@ export class DeviceTrustLevel extends DeviceVerificationStatus {
             userTrustLevel.isTofu(),
             localVerified,
             trustCrossSignedDevices,
+            true,
         );
     }
 

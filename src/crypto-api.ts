@@ -125,6 +125,14 @@ export interface CryptoApi {
 
 export class DeviceVerificationStatus {
     /**
+     * True if this device has been signed by its owner (and that signature verified).
+     *
+     * This doesn't necessarily mean that we have verified the device, since we may not have verified the
+     * owner's cross-signing key.
+     */
+    public readonly signedByOwner: boolean;
+
+    /**
      * True if this device has been verified via cross signing.
      *
      * This does *not* take into account `trustCrossSignedDevices`.
@@ -154,6 +162,7 @@ export class DeviceVerificationStatus {
             trustCrossSignedDevices?: boolean;
         },
     ) {
+        this.signedByOwner = opts.signedByOwner ?? false;
         this.crossSigningVerified = opts.crossSigningVerified ?? false;
         this.tofu = opts.tofu ?? false;
         this.localVerified = opts.localVerified ?? false;
