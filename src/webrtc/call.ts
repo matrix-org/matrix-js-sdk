@@ -1945,6 +1945,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async onNegotiateReceived(event: MatrixEvent): Promise<void> {
+        window.console.log('####### onNegotiateReceived', event);
         const content = event.getContent<MCallInviteNegotiate>();
         const description = content.description;
         if (!description || !description.sdp || !description.type) {
@@ -1996,12 +1997,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 await this.peerConn!.setLocalDescription(answer);
 
+                window.console.log('####### send NegotiateReceived', event);
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn!.localDescription?.toJSON(),
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
         } catch (err) {
+            window.console.log('####### fail', event);
             logger.warn(`Call ${this.callId} onNegotiateReceived() failed to complete negotiation`, err);
         }
 
