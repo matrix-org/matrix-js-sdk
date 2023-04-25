@@ -1607,9 +1607,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         if (requestScreenshareFeed) {
-            this.peerConn!.addTransceiver("video", {
-                direction: "recvonly",
-            });
+            for (const kind of ["audio", "video"]) {
+                this.peerConn!.addTransceiver(kind, {
+                    direction: "recvonly",
+                });
+            }
         }
 
         this.state = CallState.CreateOffer;
