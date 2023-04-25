@@ -2434,10 +2434,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the VerificationRequest that is in progress, if any
      */
     public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.findVerificationRequestDMInProgress(roomId);
+        return this.cryptoBackend.findVerificationRequestDMInProgress(roomId);
     }
 
     /**
@@ -2594,10 +2594,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the cross signing information for the user.
      */
     public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getStoredCrossSigningForUser(userId);
+        return this.cryptoBackend.getStoredCrossSigningForUser(userId);
     }
 
     /**

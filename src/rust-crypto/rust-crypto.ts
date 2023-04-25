@@ -135,6 +135,32 @@ export class RustCrypto implements CryptoBackend {
         return new UserTrustLevel(false, false, false);
     }
 
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
+        // TODO
+        return;
+    }
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getStoredCrossSigningForUser(userId: string): null {
+        // TODO
+        return null;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
