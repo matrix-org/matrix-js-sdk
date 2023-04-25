@@ -1,5 +1,5 @@
-Changes in [25.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.0.0-rc.1) (2023-04-18)
-============================================================================================================
+Changes in [25.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.0.0) (2023-04-25)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Change `Store.save()` to return a `Promise` ([\#3221](https://github.com/matrix-org/matrix-js-sdk/pull/3221)). Contributed by @texuf.
