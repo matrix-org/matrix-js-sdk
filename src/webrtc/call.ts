@@ -425,6 +425,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private readonly isOnlyDataChannelAllowed: boolean;
     private stats: GroupCallStats | undefined;
 
+    private streamIds = new Map<SDPStreamMetadataPurpose, string>();
+
     /**
      * Construct a new Matrix Call.
      * @param opts - Config options.
@@ -648,7 +650,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 localFeed.sdpMetadataStreamId = localFeed.stream.id;
             }
 
-            metadata[localFeed.sdpMetadataStreamId] = {
+            metadata[this.streamIds.get(localFeed.purpose) ?? localFeed.sdpMetadataStreamId] = {
                 purpose: localFeed.purpose,
                 audio_muted: localFeed.isAudioMuted(),
                 video_muted: localFeed.isVideoMuted(),
@@ -1593,6 +1595,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         });
     }
 
+    private preallocateTransceivers(): void {
+        for (const purpose of [SDPStreamMetadataPurpose.Usermedia]) {
+            const stream = this.getLocalFeeds().find((f) => f.purpose === purpose)?.stream ?? new MediaStream();
+            this.streamIds.set(purpose, stream.id);
+            for (const kind of ["audio", "video"]) {
+                const key = getTransceiverKey(purpose, kind);
+                if (this.transceivers.has(key)) continue;
+
+                this.transceivers.set(
+                    key,
+                    this.peerConn!.addTransceiver(kind, {
+                        direction: "sendrecv",
+                        streams: [stream],
+                    }),
+                );
+            }
+        }
+    }
+
     private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
         if (this.successor) {
             this.successor.queueGotCallFeedsForAnswer(callFeeds);
@@ -1606,6 +1627,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         for (const feed of callFeeds) {
             this.pushLocalFeed(feed);
         }
+
+        this.preallocateTransceivers();
 
         if (requestScreenshareFeed) {
             for (const kind of ["audio", "video"]) {
@@ -1749,6 +1772,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         for (const feed of callFeeds) {
             this.pushLocalFeed(feed);
         }
+
+        this.preallocateTransceivers();
 
         this.state = CallState.CreateAnswer;
 
