@@ -28,7 +28,7 @@ import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
-import { Feature } from "../feature";
+import { Feature, ServerSupport } from "../feature";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -459,7 +459,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
-        if (!this.client.canSupport.get(Feature.RelationsRecursion)) {
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+        if (recursionSupport !== ServerSupport.Unsupported) {
             return Promise.all(
                 events
                     .filter((e) => e.isEncrypted())
