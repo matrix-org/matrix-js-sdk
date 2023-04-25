@@ -147,6 +147,20 @@ export class RustCrypto implements CryptoBackend {
         return;
     }
 
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getStoredCrossSigningForUser(userId: string): null {
+        // TODO
+        return null;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
