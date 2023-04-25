@@ -2093,10 +2093,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        let offer: RTCSessionDescriptionInit;
         try {
             this.getRidOfRTXCodecs();
-            offer = await this.createOffer();
         } catch (err) {
             logger.debug(`Call ${this.callId} gotLocalOffer() failed to create offer: `, err);
             this.terminate(CallParty.Local, CallErrorCode.CreateOffer, true);
@@ -2104,7 +2102,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn!.setLocalDescription(offer);
+            await this.peerConn!.setLocalDescription();
         } catch (err) {
             logger.debug(`Call ${this.callId} gotLocalOffer() error setting local description!`, err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
