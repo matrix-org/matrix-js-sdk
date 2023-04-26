@@ -1,5 +1,5 @@
 /*
-Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
 import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { ReceiptAccumulator } from "./receipt-accumulator";
 
 interface IOpts {
     /**
@@ -41,6 +42,12 @@ export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
     unsigned?: IUnsigned;
+}
+
+export interface AccumulatedReceipt {
+    data: IMinimalEvent;
+    type: ReceiptType;
+    eventId: string;
 }
 
 export interface IEphemeral {
@@ -167,22 +174,7 @@ interface IRoom {
     _accountData: { [eventType: string]: IMinimalEvent };
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
-    _readReceipts: {
-        [userId: string]: {
-            data: IMinimalEvent;
-            type: ReceiptType;
-            eventId: string;
-        };
-    };
-    _threadReadReceipts: {
-        [threadId: string]: {
-            [userId: string]: {
-                data: IMinimalEvent;
-                type: ReceiptType;
-                eventId: string;
-            };
-        };
-    };
+    _receipts: ReceiptAccumulator;
 }
 
 export interface ISyncData {
@@ -387,8 +379,7 @@ export class SyncAccumulator {
                 _unreadNotifications: {},
                 _unreadThreadNotifications: {},
                 _summary: {},
-                _readReceipts: {},
-                _threadReadReceipts: {},
+                _receipts: new ReceiptAccumulator(),
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -453,19 +444,13 @@ export class SyncAccumulator {
                         const receipt = {
                             data: e.content[eventId][key][userId],
                             type: key as ReceiptType,
-                            eventId: eventId,
+                            eventId,
                         };
 
                         if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
-                            currentData._readReceipts[userId] = receipt;
+                            currentData._receipts.setUnthreaded(userId, receipt);
                         } else {
-                            currentData._threadReadReceipts = {
-                                ...currentData._threadReadReceipts,
-                                [data.thread_id]: {
-                                    ...(currentData._threadReadReceipts[data.thread_id] ?? {}),
-                                    [userId]: receipt,
-                                },
-                            };
+                            currentData._receipts.setThreaded(data.thread_id, userId, receipt);
                         }
                     }
                 });
@@ -590,20 +575,18 @@ export class SyncAccumulator {
                 MapWithDefault<ReceiptType, Map<string, object>>
             > = new MapWithDefault(() => new MapWithDefault(() => new Map()));
 
-            for (const [userId, receiptData] of Object.entries(roomData._readReceipts)) {
+            for (const [userId, receiptData] of roomData._receipts.allUnthreaded()) {
                 receiptEventContent
                     .getOrCreate(receiptData.eventId)
                     .getOrCreate(receiptData.type)
                     .set(userId, receiptData.data);
             }
 
-            for (const threadReceipts of Object.values(roomData._threadReadReceipts)) {
-                for (const [userId, receiptData] of Object.entries(threadReceipts)) {
-                    receiptEventContent
-                        .getOrCreate(receiptData.eventId)
-                        .getOrCreate(receiptData.type)
-                        .set(userId, receiptData.data);
-                }
+            for (const [userId, receiptData] of roomData._receipts.allThreaded()) {
+                receiptEventContent
+                    .getOrCreate(receiptData.eventId)
+                    .getOrCreate(receiptData.type)
+                    .set(userId, receiptData.data);
             }
 
             receiptEvent.content = recursiveMapToObject(receiptEventContent);

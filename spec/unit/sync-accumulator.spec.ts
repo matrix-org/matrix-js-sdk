@@ -356,6 +356,77 @@ describe("SyncAccumulator", function () {
         });
     });
 
+    it("can handle large numbers of identical receipts", () => {
+        const testSize = 1000; // Make this big to check performance (e.g. 10 million ~= 10s)
+
+        const newReceipt = (ts: number) => {
+            return {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    "$event1:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts },
+                        },
+                    },
+                },
+            };
+        };
+
+        const receipts = [];
+        for (let i = 0; i < testSize; i++) {
+            receipts.push(newReceipt(testSize - i));
+        }
+
+        sa.accumulate(
+            syncSkeleton({
+                ephemeral: {
+                    events: receipts,
+                },
+            }),
+        );
+
+        const events = sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events;
+        expect(events.length).toEqual(1);
+        expect(events[0]).toEqual(newReceipt(1));
+    });
+
+    it("can handle large numbers of receipts for different users and events", () => {
+        const testSize = 100; // Make this big to check performance (e.g. 1 million ~= 10s)
+
+        const newReceipt = (ts: number) => {
+            return {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    [`$event${ts}:localhost`]: {
+                        [ReceiptType.Read]: {
+                            [`@alice${ts}:localhost`]: { ts },
+                        },
+                    },
+                },
+            };
+        };
+
+        const receipts = [];
+        for (let i = 0; i < testSize; i++) {
+            receipts.push(newReceipt(testSize - i));
+        }
+
+        sa.accumulate(
+            syncSkeleton({
+                ephemeral: {
+                    events: receipts,
+                },
+            }),
+        );
+
+        const events = sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events;
+        expect(events.length).toEqual(1);
+        expect(events[0]["content"]["$event1:localhost"]).toEqual({ "m.read": { "@alice1:localhost": { ts: 1 } } });
+        expect(Object.keys(events[0]["content"]).length).toEqual(testSize);
+    });
+
     it("should accumulate threaded read receipts", () => {
         const receipt1 = {
             type: "m.receipt",
