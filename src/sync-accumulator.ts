@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { logger } from "./logger";
-import { deepCopy, isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
+import { deepCopy, isSupportedReceiptType } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
@@ -41,6 +41,7 @@ interface IOpts {
 export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
+    room_id?: string;
     unsigned?: IUnsigned;
 }
 
@@ -561,39 +562,11 @@ export class SyncAccumulator {
                 roomJson.account_data.events.push(roomData._accountData[evType]);
             });
 
-            // Add receipt data
-            const receiptEvent = {
-                type: EventType.Receipt,
-                room_id: roomId,
-                content: {
-                    // $event_id: { "m.read": { $user_id: $json } }
-                } as IContent,
-            };
-
-            const receiptEventContent: MapWithDefault<
-                string,
-                MapWithDefault<ReceiptType, Map<string, object>>
-            > = new MapWithDefault(() => new MapWithDefault(() => new Map()));
-
-            for (const [userId, receiptData] of roomData._receipts.allUnthreaded()) {
-                receiptEventContent
-                    .getOrCreate(receiptData.eventId)
-                    .getOrCreate(receiptData.type)
-                    .set(userId, receiptData.data);
-            }
-
-            for (const [userId, receiptData] of roomData._receipts.allThreaded()) {
-                receiptEventContent
-                    .getOrCreate(receiptData.eventId)
-                    .getOrCreate(receiptData.type)
-                    .set(userId, receiptData.data);
-            }
-
-            receiptEvent.content = recursiveMapToObject(receiptEventContent);
+            const receiptEvent = roomData._receipts.buildAccumulatedReceiptEvent(roomId);
 
             // add only if we have some receipt data
-            if (receiptEventContent.size > 0) {
-                roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);
+            if (receiptEvent) {
+                roomJson.ephemeral.events.push(receiptEvent);
             }
 
             // Add timeline data
