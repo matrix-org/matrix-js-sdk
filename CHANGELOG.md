@@ -1,3 +1,20 @@
+Changes in [25.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.0.0) (2023-04-25)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Change `Store.save()` to return a `Promise` ([\#3221](https://github.com/matrix-org/matrix-js-sdk/pull/3221)). Contributed by @texuf.
+
+## ✨ Features
+ * Add typedoc-plugin-mdn-links ([\#3292](https://github.com/matrix-org/matrix-js-sdk/pull/3292)).
+ * Annotate events with executed push rule ([\#3284](https://github.com/matrix-org/matrix-js-sdk/pull/3284)). Contributed by @kerryarchibald.
+ * Element-R: pass device list change notifications into rust crypto-sdk ([\#3254](https://github.com/matrix-org/matrix-js-sdk/pull/3254)). Fixes vector-im/element-web#24795. Contributed by @florianduros.
+ * Support for MSC3882 revision 1 ([\#3228](https://github.com/matrix-org/matrix-js-sdk/pull/3228)). Contributed by @hughns.
+
+## 🐛 Bug Fixes
+ * Fix screen sharing on Firefox 113 ([\#3282](https://github.com/matrix-org/matrix-js-sdk/pull/3282)). Contributed by @tulir.
+ * Retry processing potential poll events after decryption ([\#3246](https://github.com/matrix-org/matrix-js-sdk/pull/3246)). Fixes vector-im/element-web#24568.
+ * Element-R: handle events which arrive before their keys ([\#3230](https://github.com/matrix-org/matrix-js-sdk/pull/3230)). Fixes vector-im/element-web#24489.
+
 Changes in [24.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v24.1.0) (2023-04-11)
 ==================================================================================================
 

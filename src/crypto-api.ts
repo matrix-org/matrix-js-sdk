@@ -16,6 +16,7 @@ limitations under the License.
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
+import { DeviceMap } from "./models/device";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -74,6 +75,23 @@ export interface CryptoApi {
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
 
     /**
+     * Get the device information for the given list of users.
+     *
+     * For any users whose device lists are cached (due to sharing an encrypted room with the user), the
+     * cached device data is returned.
+     *
+     * If there are uncached users, and the `downloadUncached` parameter is set to `true`,
+     * a `/keys/query` request is made to the server to retrieve these devices.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    getUserDeviceInfo(userIds: string[], downloadUncached?: boolean): Promise<DeviceMap>;
+
+    /**
      * Set whether to trust other user's signatures of their devices.
      *
      * If false, devices will only be considered 'verified' if we have
@@ -107,6 +125,14 @@ export interface CryptoApi {
 
 export class DeviceVerificationStatus {
     /**
+     * True if this device has been signed by its owner (and that signature verified).
+     *
+     * This doesn't necessarily mean that we have verified the device, since we may not have verified the
+     * owner's cross-signing key.
+     */
+    public readonly signedByOwner: boolean;
+
+    /**
      * True if this device has been verified via cross signing.
      *
      * This does *not* take into account `trustCrossSignedDevices`.
@@ -136,6 +162,7 @@ export class DeviceVerificationStatus {
             trustCrossSignedDevices?: boolean;
         },
     ) {
+        this.signedByOwner = opts.signedByOwner ?? false;
         this.crossSigningVerified = opts.crossSigningVerified ?? false;
         this.tofu = opts.tofu ?? false;
         this.localVerified = opts.localVerified ?? false;

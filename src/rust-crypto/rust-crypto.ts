@@ -24,13 +24,16 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import { DeviceVerificationStatus } from "../crypto-api";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
+import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
+import { Device, DeviceMap } from "../models/device";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -54,7 +57,7 @@ export class RustCrypto implements CryptoBackend {
 
     public constructor(
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         _userId: string,
         _deviceId: string,
     ) {
@@ -132,6 +135,32 @@ export class RustCrypto implements CryptoBackend {
         return new UserTrustLevel(false, false, false);
     }
 
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
+        // TODO
+        return;
+    }
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getStoredCrossSigningForUser(userId: string): null {
+        // TODO
+        return null;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -160,6 +189,79 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+
+        // Convert RustSdkCryptoJs.UserId to a `Set<string>`
+        const trackedUsers = new Set<string>();
+        rustTrackedUsers.forEach((rustUserId) => trackedUsers.add(rustUserId.toString()));
+
+        // Keep untracked user to download their keys after
+        const untrackedUsers: Set<string> = new Set();
+
+        for (const userId of userIds) {
+            // if this is a tracked user, we can just fetch the device list from the rust-sdk
+            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
+            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
+            if (trackedUsers.has(userId)) {
+                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
+            } else {
+                untrackedUsers.add(userId);
+            }
+        }
+
+        // for any users whose device lists we are not tracking, fall back to downloading the device list
+        // over HTTP.
+        if (downloadUncached && untrackedUsers.size >= 1) {
+            const queryResult = await this.downloadDeviceList(untrackedUsers);
+            Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
+                deviceMapByUserId.set(userId, deviceKeysToDeviceMap(deviceKeys)),
+            );
+        }
+
+        return deviceMapByUserId;
+    }
+
+    /**
+     * Get the device list for the given user from the olm machine
+     * @param userId - Rust SDK UserId
+     */
+    private async getUserDevices(userId: string): Promise<Map<string, Device>> {
+        const rustUserId = new RustSdkCryptoJs.UserId(userId);
+        const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        return new Map(
+            devices
+                .devices()
+                .map((device: RustSdkCryptoJs.Device) => [
+                    device.deviceId.toString(),
+                    rustDeviceToJsDevice(device, rustUserId),
+                ]),
+        );
+    }
+
+    /**
+     * Download the given user keys by calling `/keys/query` request
+     * @param untrackedUsers - download keys of these users
+     */
+    private async downloadDeviceList(untrackedUsers: Set<string>): Promise<IDownloadKeyResult> {
+        const queryBody: IQueryKeysRequest = { device_keys: {} };
+        untrackedUsers.forEach((user) => (queryBody.device_keys[user] = []));
+
+        return await this.http.authedRequest(Method.Post, "/_matrix/client/v3/keys/query", undefined, queryBody, {
+            prefix: "",
+        });
     }
 
     /**
@@ -193,6 +295,7 @@ export class RustCrypto implements CryptoBackend {
         if (!device) return null;
 
         return new DeviceVerificationStatus({
+            signedByOwner: device.isCrossSignedByOwner(),
             crossSigningVerified: device.isCrossSigningTrusted(),
             localVerified: device.isLocallyTrusted(),
             trustCrossSignedDevices: this._trustCrossSignedDevices,
