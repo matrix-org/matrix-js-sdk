@@ -1896,7 +1896,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
+            this.isSettingRemoteAnswerPending = true;
             await this.peerConn!.setRemoteDescription(content.answer);
+            this.isSettingRemoteAnswerPending = false;
         } catch (e) {
             logger.debug(`Call ${this.callId} onAnswerReceived() failed to set remote description`, e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -1946,7 +1948,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async onNegotiateReceived(event: MatrixEvent): Promise<void> {
-        // window.console.log('####### onNegotiateReceived', event);
         const content = event.getContent<MCallInviteNegotiate>();
         const description = content.description;
         if (!description || !description.sdp || !description.type) {
@@ -2002,14 +2003,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 await this.peerConn!.setLocalDescription(answer);
 
-                // window.console.log('####### send NegotiateReceived', event);
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn!.localDescription?.toJSON(),
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
         } catch (err) {
-            // window.console.log('####### fail', event);
             logger.warn(`Call ${this.callId} onNegotiateReceived() failed to complete negotiation`, err);
         }
 
@@ -2093,8 +2092,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
+        let offer: RTCSessionDescriptionInit;
         try {
             this.getRidOfRTXCodecs();
+            offer = await this.createOffer();
         } catch (err) {
             logger.debug(`Call ${this.callId} gotLocalOffer() failed to create offer: `, err);
             this.terminate(CallParty.Local, CallErrorCode.CreateOffer, true);
@@ -2102,7 +2103,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn!.setLocalDescription();
+            await this.peerConn!.setLocalDescription(offer);
         } catch (err) {
             logger.debug(`Call ${this.callId} gotLocalOffer() error setting local description!`, err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
