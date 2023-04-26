@@ -388,6 +388,10 @@ describe("Group Call", function () {
                 call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
 
                 await groupCall.create();
+
+                const deviceCallMap = new Map<string, MatrixCall>();
+                deviceCallMap.set(FAKE_DEVICE_ID_1, call.typed());
+                (groupCall as any).calls.set(FAKE_USER_ID_1, deviceCallMap);
             });
 
             it("ignores changes, if we can't get user id of opponent", async () => {

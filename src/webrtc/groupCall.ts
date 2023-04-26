@@ -881,6 +881,11 @@ export class GroupCall extends TypedEventEmitter<
         );
 
         if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+        // We must do this before we start initialising / answering the call as we
+        // need to know it is the active call for this user+deviceId and to not ignore
+        // events from it.
+        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
+        this.calls.set(opponentUserId, deviceMap);
 
         this.initCall(newCall);
 
@@ -895,8 +900,6 @@ export class GroupCall extends TypedEventEmitter<
         }
         newCall.answerWithCallFeeds(feeds);
 
-        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
-        this.calls.set(opponentUserId, deviceMap);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     };
 
@@ -1137,6 +1140,14 @@ export class GroupCall extends TypedEventEmitter<
         const currentUserMediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
         const remoteUsermediaFeed = call.remoteUsermediaFeed;
         const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
+
+        const deviceMap = this.calls.get(opponentMemberId);
+        const currentCallForUserDevice = deviceMap?.get(opponentDeviceId);
+        if (currentCallForUserDevice?.callId !== call.callId) {
+            // the call in question is not the current call for this user/deviceId
+            // so ignore feed events from it otherwise we'll remove our real feeds
+            return;
+        }
 
         if (remoteFeedChanged) {
             if (!currentUserMediaFeed && remoteUsermediaFeed) {
