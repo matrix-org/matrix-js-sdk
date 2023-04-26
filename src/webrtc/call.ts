@@ -1439,8 +1439,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // we may not have a video track - if not, re-request usermedia
         if (!muted && this.localUsermediaStream!.getVideoTracks().length === 0) {
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, true);
-            await this.updateLocalUsermediaStream(stream);
+            try {
+                const stream = await this.client.getMediaHandler().getUserMediaStream(true, true);
+                await this.updateLocalUsermediaStream(stream);
+            } catch (error) {
+                logger.error(`Call ${this.callId} setLocalVideoMuted() failed unmute`, error);
+                this.emit(
+                    CallEvent.Error,
+                    new CallError(CallErrorCode.NoUserMedia, "Failed to get camera access: ", <Error>error),
+                    this,
+                );
+                return this.isLocalVideoMuted();
+            }
         }
 
         this.localUsermediaFeed?.setAudioVideoMuted(null, muted);

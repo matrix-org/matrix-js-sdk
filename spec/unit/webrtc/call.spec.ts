@@ -1335,8 +1335,9 @@ describe("Call", function () {
         it("re-uses transceiver when screen sharing is re-enabled", async () => {
             const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
 
-            // sanity check: we should start with one transciever (user media audio)
-            expect(mockPeerConn.transceivers.length).toEqual(1);
+            // sanity check: we should start with two transceivers (user media
+            // audio and video)
+            expect(mockPeerConn.transceivers.length).toEqual(2);
 
             const screenshareOnProm1 = new Promise<void>(waitNegotiateFunc);
 
@@ -1345,25 +1346,25 @@ describe("Call", function () {
 
             await screenshareOnProm1;
 
-            // we should now have another transciever for the screenshare
-            expect(mockPeerConn.transceivers.length).toEqual(2);
+            // we should now have another transceiver for the screenshare
+            expect(mockPeerConn.transceivers.length).toEqual(3);
 
             const screenshareOffProm = new Promise<void>(waitNegotiateFunc);
             await call.setScreensharingEnabled(false);
             MockRTCPeerConnection.triggerAllNegotiations();
             await screenshareOffProm;
 
-            // both transceivers should still be there
-            expect(mockPeerConn.transceivers.length).toEqual(2);
+            // all three transceivers should still be there
+            expect(mockPeerConn.transceivers.length).toEqual(3);
 
             const screenshareOnProm2 = new Promise<void>(waitNegotiateFunc);
             await call.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
             await screenshareOnProm2;
 
-            // should still be two, ie. another one should not have been created
+            // should still be three, ie. another one should not have been created
             // when re-enabling the screen share.
-            expect(mockPeerConn.transceivers.length).toEqual(2);
+            expect(mockPeerConn.transceivers.length).toEqual(3);
         });
     });
 
