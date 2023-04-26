@@ -16,9 +16,9 @@ limitations under the License.
 
 import { IMinimalEvent } from "./sync-accumulator";
 import { EventType } from "./@types/event";
-import { MapWithDefault, recursiveMapToObject } from "./utils";
+import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
 import { IContent } from "./models/event";
-import { ReceiptType } from "./@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
 
 interface AccumulatedReceipt {
     data: IMinimalEvent;
@@ -50,7 +50,7 @@ export class ReceiptAccumulator {
      * Provide an unthreaded receipt for this user. Overwrites any other
      * unthreaded receipt we have for this user.
      */
-    public setUnthreaded(userId: string, receipt: AccumulatedReceipt): void {
+    private setUnthreaded(userId: string, receipt: AccumulatedReceipt): void {
         this.unthreadedReadReceipts.set(userId, receipt);
     }
 
@@ -58,7 +58,7 @@ export class ReceiptAccumulator {
      * Provide a receipt for this user in this thread. Overwrites any other
      * receipt we have for this user in this thread.
      */
-    public setThreaded(threadId: string, userId: string, receipt: AccumulatedReceipt): void {
+    private setThreaded(threadId: string, userId: string, receipt: AccumulatedReceipt): void {
         this.threadedReadReceipts.getOrCreate(threadId).set(userId, receipt);
     }
 
@@ -81,6 +81,52 @@ export class ReceiptAccumulator {
                 yield e;
             }
         }
+    }
+
+    /**
+     * Given a list of ephemeral events, find the receipts and store the
+     * relevant ones to be returned later from buildAccumulatedReceiptEvent().
+     */
+    public consumeEphemeralEvents(events: IMinimalEvent[] | undefined): void {
+        events?.forEach((e) => {
+            if (e.type !== EventType.Receipt || !e.content) {
+                // This means we'll drop unknown ephemeral events but that
+                // seems okay.
+                return;
+            }
+
+            // Handle m.receipt events. They clobber based on:
+            //   (user_id, receipt_type)
+            // but they are keyed in the event as:
+            //   content:{ $event_id: { $receipt_type: { $user_id: {json} }}}
+            // so store them in the former so we can accumulate receipt deltas
+            // quickly and efficiently (we expect a lot of them). Fold the
+            // receipt type into the key name since we only have 1 at the
+            // moment (m.read) and nested JSON objects are slower and more
+            // of a hassle to work with. We'll inflate this back out when
+            // getJSON() is called.
+            Object.keys(e.content).forEach((eventId) => {
+                Object.entries<ReceiptContent>(e.content[eventId]).forEach(([key, value]) => {
+                    if (!isSupportedReceiptType(key)) return;
+
+                    for (const userId of Object.keys(value)) {
+                        const data = e.content[eventId][key][userId];
+
+                        const receipt = {
+                            data: e.content[eventId][key][userId],
+                            type: key as ReceiptType,
+                            eventId,
+                        };
+
+                        if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
+                            this.setUnthreaded(userId, receipt);
+                        } else {
+                            this.setThreaded(data.thread_id, userId, receipt);
+                        }
+                    }
+                });
+            });
+        });
     }
 
     /**
