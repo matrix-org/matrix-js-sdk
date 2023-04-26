@@ -91,6 +91,7 @@ import { ISecretRequest } from "./SecretSharing";
 import { DeviceVerificationStatus } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
+import { UIAuthCallback } from "../interactive-auth";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -134,7 +135,7 @@ export interface IBootstrapCrossSigningOpts {
      * A function that makes the request requiring auth. Receives the auth data as an object.
      * Can be called multiple times, first with an empty authDict, to obtain the flows.
      */
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
+    authUploadDeviceSigningKeys?: UIAuthCallback<void>;
 }
 
 export interface ICryptoCallbacks extends SecretStorageCallbacks {
