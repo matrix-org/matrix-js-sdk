@@ -396,7 +396,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
-    public lastThread?: Thread;
 
     /**
      * A mapping of eventId to all visibility changes to apply
@@ -783,6 +782,32 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             return Number.MIN_SAFE_INTEGER;
         }
+    }
+
+    /**
+     * Returns the last live event of this room.
+     * "last" means latest timestamp.
+     * "live of this room" means from all live timelines: the room and the threads.
+     *
+     * @returns MatrixEvent if there is a last event; else undefined.
+     */
+    public getLastLiveEvent(): MatrixEvent | undefined {
+        const roomEvents = this.getLiveTimeline().getEvents();
+        const lastRoomEvent = roomEvents[roomEvents.length - 1] as MatrixEvent | undefined;
+
+        return this.getThreads().reduce<MatrixEvent | undefined>(
+            (lastEventSoFar: MatrixEvent | undefined, thread: Thread) => {
+                const lastThreadEvent = thread.events[thread.events.length - 1];
+
+                if (!lastEventSoFar || (lastThreadEvent?.getTs() ?? 0) > (lastEventSoFar?.getTs() ?? 0)) {
+                    // no last-event-so-far or last thread event is newer than the last-event-so-far
+                    return lastThreadEvent;
+                }
+
+                return lastEventSoFar;
+            },
+            lastRoomEvent,
+        );
     }
 
     /**
@@ -2212,14 +2237,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
-        const isNewer =
-            this.lastThread?.rootEvent &&
-            rootEvent?.localTimestamp &&
-            this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
-
-        if (!this.lastThread || isNewer) {
-            this.lastThread = thread;
-        }
 
         if (this.threadsReady) {
             this.updateThreadRootEvents(thread, toStartOfTimeline, false);
