@@ -45,12 +45,6 @@ export interface IMinimalEvent {
     unsigned?: IUnsigned;
 }
 
-export interface AccumulatedReceipt {
-    data: IMinimalEvent;
-    type: ReceiptType;
-    eventId: string;
-}
-
 export interface IEphemeral {
     events: IMinimalEvent[];
 }

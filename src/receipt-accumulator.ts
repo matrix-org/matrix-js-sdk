@@ -14,11 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AccumulatedReceipt, IMinimalEvent } from "./sync-accumulator";
+import { IMinimalEvent } from "./sync-accumulator";
 import { EventType } from "./@types/event";
 import { MapWithDefault, recursiveMapToObject } from "./utils";
 import { IContent } from "./models/event";
 import { ReceiptType } from "./@types/read_receipts";
+
+interface AccumulatedReceipt {
+    data: IMinimalEvent;
+    type: ReceiptType;
+    eventId: string;
+}
 
 /**
  * Summarises the read receipts within a room. Used by the sync accumulator.
