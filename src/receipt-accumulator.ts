@@ -33,7 +33,7 @@ import { ReceiptType } from "./@types/read_receipts";
  */
 export class ReceiptAccumulator {
     /** user_id -\> most-recently-received unthreaded receipt */
-    private readReceipts: Map<string, AccumulatedReceipt> = new Map();
+    private unthreadedReadReceipts: Map<string, AccumulatedReceipt> = new Map();
 
     /** thread_id -\> user_id -\> most-recently-received receipt for this thread */
     private threadedReadReceipts: MapWithDefault<string, Map<string, AccumulatedReceipt>> = new MapWithDefault(
@@ -45,7 +45,7 @@ export class ReceiptAccumulator {
      * unthreaded receipt we have for this user.
      */
     public setUnthreaded(userId: string, receipt: AccumulatedReceipt): void {
-        this.readReceipts.set(userId, receipt);
+        this.unthreadedReadReceipts.set(userId, receipt);
     }
 
     /**
@@ -61,7 +61,7 @@ export class ReceiptAccumulator {
      *          most recently-received unthreaded receipts for each user.
      */
     private allUnthreaded(): IterableIterator<[string, AccumulatedReceipt]> {
-        return this.readReceipts.entries();
+        return this.unthreadedReadReceipts.entries();
     }
 
     /**
