@@ -1900,6 +1900,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn!.setRemoteDescription(content.answer);
             this.isSettingRemoteAnswerPending = false;
         } catch (e) {
+            this.isSettingRemoteAnswerPending = false;
             logger.debug(`Call ${this.callId} onAnswerReceived() failed to set remote description`, e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
@@ -2009,6 +2010,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 });
             }
         } catch (err) {
+            this.isSettingRemoteAnswerPending = false;
             logger.warn(`Call ${this.callId} onNegotiateReceived() failed to complete negotiation`, err);
         }
 
