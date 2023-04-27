@@ -44,7 +44,14 @@ export interface IStageStatus {
     error?: string;
 }
 
+/**
+ * Data returned in the body of a 401 response from a UIA endpoint.
+ *
+ * @see https://spec.matrix.org/v1.6/client-server-api/#user-interactive-api-in-the-rest-api
+ */
 export interface IAuthData {
+    // XXX: many of the fields here (`type`, `available_flows`, `required_stages`, etc) look like they
+    // shouldn't be here. They aren't in the spec and it's unclear what they are supposed to do. Be wary of using them.
     session?: string;
     type?: string;
     completed?: string[];
@@ -77,6 +84,11 @@ export enum AuthType {
     UnstableRegistrationToken = "org.matrix.msc3231.login.registration_token",
 }
 
+/**
+ * The parameters which are submitted as the `auth` dict in a UIA request
+ *
+ * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
+ */
 export interface IAuthDict {
     // [key: string]: any;
     type?: string;
@@ -441,7 +453,7 @@ export class InteractiveAuth {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    private async doRequest(auth: IAuthData | null, background = false): Promise<void> {
+    private async doRequest(auth: IAuthDict | null, background = false): Promise<void> {
         try {
             const result = await this.requestCallback(auth, background);
             this.attemptAuthDeferred!.resolve(result);

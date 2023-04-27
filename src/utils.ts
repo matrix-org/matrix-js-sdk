@@ -668,7 +668,7 @@ export function recursivelyAssign<T1 extends T2, T2 extends Record<string, any>>
             continue;
         }
         if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
-            target[sourceKey as keyof T1] = sourceValue;
+            safeSet(target, sourceKey, sourceValue);
             continue;
         }
     }
