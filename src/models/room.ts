@@ -398,7 +398,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private threads = new Map<string, Thread>();
 
     /**
-     * @deprecated use {@link Room.getLastThread} instead
+     * @deprecated This value is unreliable. It may not contain the last thread.
+     *             Use {@link Room.getLastThread} instead.
      */
     public lastThread?: Thread;
 
