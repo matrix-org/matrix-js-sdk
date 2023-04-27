@@ -151,7 +151,7 @@ interface IOpts {
      * The busyChanged callback should be used instead of the background flag.
      * Should return a promise which resolves to the successful response or rejects with a MatrixError.
      */
-    doRequest(auth: IAuthData | null, background: boolean): Promise<IAuthData>;
+    doRequest(auth: IAuthDict | null, background: boolean): Promise<IAuthData>;
     /**
      * Called when the status of the UI auth changes,
      * ie. when the state of an auth stage changes of when the auth flow moves to a new stage.
