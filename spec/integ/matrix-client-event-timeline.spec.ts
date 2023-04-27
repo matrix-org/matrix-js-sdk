@@ -35,7 +35,7 @@ import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/util
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
-import { Feature, ServerSupport } from "../../lib/feature";
+import { Feature, ServerSupport } from "../../src/feature";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -1257,9 +1257,9 @@ describe("MatrixClient event timelines", function () {
                     "/" +
                     encodeURIComponent(THREAD_RELATION_TYPE.name) +
                     buildRelationPaginationQuery({
-                        recurse: true,
                         dir: Direction.Backward,
                         limit: 3,
+                        recurse: true,
                     }),
             )
             .respond(200, {
