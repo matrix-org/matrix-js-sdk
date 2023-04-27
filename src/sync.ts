@@ -1525,7 +1525,7 @@ export class SyncApi {
         }
 
         // Handle one_time_keys_count and unused fallback keys
-        this.syncOpts.cryptoCallbacks?.processKeyCounts(
+        await this.syncOpts.cryptoCallbacks?.processKeyCounts(
             data.device_one_time_keys_count,
             data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
         );
