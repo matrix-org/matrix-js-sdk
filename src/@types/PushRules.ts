@@ -206,8 +206,4 @@ export interface IPusherRequest extends Omit<IPusher, "device_id" | "org.matrix.
     append?: boolean;
 }
 
-export interface IPusherRemoveRequest extends Pick<IPusher, "app_id" | "pushkey"> {
-    kind: null;
-}
-
 /* eslint-enable camelcase */
