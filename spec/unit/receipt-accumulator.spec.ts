@@ -129,6 +129,50 @@ describe("ReceiptAccumulator", function () {
             ]),
         );
     });
+
+    it("Keeps main thread receipts even when an unthreaded receipt came later", () => {
+        const acc = new ReceiptAccumulator();
+
+        // Given receipts for the special thread "main" and also unthreaded
+        // receipts (which have no thread id).
+        const receipt1 = newReceipt("$event1", ReceiptType.Read, "@alice:localhost", 1, "main");
+        const receipt2 = newReceipt("$event2", ReceiptType.Read, "@alice:localhost", 2);
+
+        // When we collect them
+        acc.consumeEphemeralEvents([receipt1, receipt2]);
+        const newEvent = acc.buildAccumulatedReceiptEvent(roomId);
+
+        // We preserve both: thread:main and unthreaded receipts are different
+        // things, with different meanings.
+        expect(newEvent).toEqual(
+            newMultiReceipt([
+                ["$event1", ReceiptType.Read, "@alice:localhost", 1, "main"],
+                ["$event2", ReceiptType.Read, "@alice:localhost", 2, undefined],
+            ]),
+        );
+    });
+
+    it("Keeps unthreaded receipts even when a main thread receipt came later", () => {
+        const acc = new ReceiptAccumulator();
+
+        // Given receipts for the special thread "main" and also unthreaded
+        // receipts (which have no thread id).
+        const receipt1 = newReceipt("$event1", ReceiptType.Read, "@alice:localhost", 1);
+        const receipt2 = newReceipt("$event2", ReceiptType.Read, "@alice:localhost", 2, "main");
+
+        // When we collect them
+        acc.consumeEphemeralEvents([receipt1, receipt2]);
+        const newEvent = acc.buildAccumulatedReceiptEvent(roomId);
+
+        // We preserve both: thread:main and unthreaded receipts are different
+        // things, with different meanings.
+        expect(newEvent).toEqual(
+            newMultiReceipt([
+                ["$event1", ReceiptType.Read, "@alice:localhost", 1, undefined],
+                ["$event2", ReceiptType.Read, "@alice:localhost", 2, "main"],
+            ]),
+        );
+    });
 });
 
 const newReceipt = (

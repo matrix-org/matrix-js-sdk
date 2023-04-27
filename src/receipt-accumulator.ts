@@ -18,7 +18,7 @@ import { IMinimalEvent } from "./sync-accumulator";
 import { EventType } from "./@types/event";
 import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
 import { IContent } from "./models/event";
-import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
+import { ReceiptContent, ReceiptType } from "./@types/read_receipts";
 
 interface AccumulatedReceipt {
     data: IMinimalEvent;
@@ -118,7 +118,7 @@ export class ReceiptAccumulator {
                             eventId,
                         };
 
-                        if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
+                        if (!data.thread_id) {
                             this.setUnthreaded(userId, receipt);
                         } else {
                             this.setThreaded(data.thread_id, userId, receipt);
