@@ -398,6 +398,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private threads = new Map<string, Thread>();
 
     /**
+     * @deprecated use {@link Room.getLastThread} instead
+     */
+    public lastThread?: Thread;
+
+    /**
      * A mapping of eventId to all visibility changes to apply
      * to the event, by chronological order, as per
      * https://github.com/matrix-org/matrix-doc/pull/3531
@@ -794,20 +799,33 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public getLastLiveEvent(): MatrixEvent | undefined {
         const roomEvents = this.getLiveTimeline().getEvents();
         const lastRoomEvent = roomEvents[roomEvents.length - 1] as MatrixEvent | undefined;
+        const lastThread = this.getLastThread();
 
-        return this.getThreads().reduce<MatrixEvent | undefined>(
-            (lastEventSoFar: MatrixEvent | undefined, thread: Thread) => {
-                const lastThreadEvent = thread.events[thread.events.length - 1];
+        if (!lastThread) return lastRoomEvent;
 
-                if (!lastEventSoFar || (lastThreadEvent?.getTs() ?? 0) > (lastEventSoFar?.getTs() ?? 0)) {
-                    // no last-event-so-far or last thread event is newer than the last-event-so-far
-                    return lastThreadEvent;
-                }
+        const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
 
-                return lastEventSoFar;
-            },
-            lastRoomEvent,
-        );
+        return (lastRoomEvent?.getTs() ?? 0) > (lastThreadEvent.getTs() ?? 0) ? lastRoomEvent : lastThreadEvent;
+    }
+
+    /**
+     * @returns the thread with the most recent event in its live time line. undefined if there is no thread.
+     */
+    public getLastThread(): Thread | undefined {
+        return this.getThreads().reduce<Thread | undefined>((lastThread: Thread | undefined, thread: Thread) => {
+            if (!lastThread) return thread;
+
+            const threadEvent = thread.events[thread.events.length - 1];
+            const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
+
+            if ((threadEvent?.getTs() ?? 0) >= (lastThreadEvent?.getTs() ?? 0)) {
+                // Last message of current thread is newer → new last thread.
+                // Equal also means newer, because it was added to the thread map later.
+                return thread;
+            }
+
+            return lastThread;
+        }, undefined);
     }
 
     /**
@@ -2237,6 +2255,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
+        const isNewer =
+            this.lastThread?.rootEvent &&
+            rootEvent?.localTimestamp &&
+            this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
+
+        if (!this.lastThread || isNewer) {
+            this.lastThread = thread;
+        }
 
         if (this.threadsReady) {
             this.updateThreadRootEvents(thread, toStartOfTimeline, false);

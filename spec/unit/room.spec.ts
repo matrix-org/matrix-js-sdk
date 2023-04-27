@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -188,7 +188,41 @@ describe("Room", function () {
                 participantUserIds: ["@bob:example.org"],
             });
             result.threadEvent = mkThreadResponse(rootEvent, { ts: tsThread });
-            thread.liveTimeline.addEvent(result.threadEvent, true);
+            thread.liveTimeline.addEvent(result.threadEvent, { toStartOfTimeline: true });
+        }
+
+        return result;
+    };
+
+    const addRoomThreads = (
+        room: Room,
+        thread1EventTs: Optional<number>,
+        thread2EventTs: Optional<number>,
+    ): { thread1?: Thread; thread2?: Thread } => {
+        const result: { thread1?: Thread; thread2?: Thread } = {};
+
+        if (thread1EventTs !== null) {
+            const { rootEvent: thread1RootEvent, thread: thread1 } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+            const thread1Event = mkThreadResponse(thread1RootEvent, { ts: thread1EventTs });
+            thread1.liveTimeline.addEvent(thread1Event, { toStartOfTimeline: true });
+            result.thread1 = thread1;
+        }
+
+        if (thread2EventTs !== null) {
+            const { rootEvent: thread2RootEvent, thread: thread2 } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+            const thread2Event = mkThreadResponse(thread2RootEvent, { ts: thread2EventTs });
+            thread2.liveTimeline.addEvent(thread2Event, { toStartOfTimeline: true });
+            result.thread2 = thread2;
         }
 
         return result;
@@ -3554,6 +3588,37 @@ describe("Room", function () {
                     expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
                 });
             });
+        });
+    });
+
+    describe("getLastThread", () => {
+        it("when there is no thread, it should return undefined", () => {
+            expect(room.getLastThread()).toBeUndefined();
+        });
+
+        it("when there is only one thread, it should return this one", () => {
+            const { thread1 } = addRoomThreads(room, 23, null);
+            expect(room.getLastThread()).toBe(thread1);
+        });
+
+        it("when there are tho threads, it should return the one with the recent event I", () => {
+            const { thread2 } = addRoomThreads(room, 23, 42);
+            expect(room.getLastThread()).toBe(thread2);
+        });
+
+        it("when there are tho threads, it should return the one with the recent event II", () => {
+            const { thread1 } = addRoomThreads(room, 42, 23);
+            expect(room.getLastThread()).toBe(thread1);
+        });
+
+        it("when there is a thread with the last event ts undefined, it should return the thread with the defined event ts", () => {
+            const { thread2 } = addRoomThreads(room, undefined, 23);
+            expect(room.getLastThread()).toBe(thread2);
+        });
+
+        it("when the last event ts of all threads is undefined, it should return the last added thread", () => {
+            const { thread2 } = addRoomThreads(room, undefined, undefined);
+            expect(room.getLastThread()).toBe(thread2);
         });
     });
 });
