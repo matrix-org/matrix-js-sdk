@@ -1183,21 +1183,19 @@ describe("MatrixClient event timelines", function () {
             event: true,
         });
         THREAD_REPLY2.localTimestamp += 1000;
-        const THREAD_ROOT_REACTION = utils.mkEvent(
-            {
-                event: true,
-                type: EventType.Reaction,
-                user: userId,
-                room: roomId,
-                content: {
-                    "m.relates_to": {
-                        rel_type: RelationType.Annotation,
-                        event_id: THREAD_ROOT.event_id!,
-                        key: Math.random().toString(),
-                    },
+        const THREAD_ROOT_REACTION = utils.mkEvent({
+            event: true,
+            type: EventType.Reaction,
+            user: userId,
+            room: roomId,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: THREAD_ROOT.event_id!,
+                    key: Math.random().toString(),
                 },
             },
-        );
+        });
         THREAD_ROOT_REACTION.localTimestamp += 2000;
 
         // Test data for a second reply to the first thread
@@ -1253,10 +1251,14 @@ describe("MatrixClient event timelines", function () {
             .when(
                 "GET",
                 "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                buildRelationPaginationQuery(client.canSupport, { recurse: true , dir: Direction.Backward, limit: 3 }),
+                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
+                    "/" +
+                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                    buildRelationPaginationQuery(client.canSupport, {
+                        recurse: true,
+                        dir: Direction.Backward,
+                        limit: 3,
+                    }),
             )
             .respond(200, {
                 chunk: [THREAD_REPLY3.event, THREAD_ROOT_REACTION, THREAD_REPLY2.event, THREAD_REPLY],
@@ -1957,7 +1959,10 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery(client.canSupport, { dir: Direction.Backward, from: "start_token" }),
+                        buildRelationPaginationQuery(client.canSupport, {
+                            dir: Direction.Backward,
+                            from: "start_token",
+                        }),
                 )
                 .respond(200, function () {
                     return {
