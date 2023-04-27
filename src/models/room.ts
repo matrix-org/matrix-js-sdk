@@ -396,6 +396,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
+
+    /**
+     * @deprecated This value is unreliable. It may not contain the last thread.
+     *             Use {@link Room.getLastThread} instead.
+     */
     public lastThread?: Thread;
 
     /**
@@ -783,6 +788,54 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             return Number.MIN_SAFE_INTEGER;
         }
+    }
+
+    /**
+     * Returns the last live event of this room.
+     * "last" means latest timestamp.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
+     * "live of this room" means from all live timelines: the room and the threads.
+     *
+     * @returns MatrixEvent if there is a last event; else undefined.
+     */
+    public getLastLiveEvent(): MatrixEvent | undefined {
+        const roomEvents = this.getLiveTimeline().getEvents();
+        const lastRoomEvent = roomEvents[roomEvents.length - 1] as MatrixEvent | undefined;
+        const lastThread = this.getLastThread();
+
+        if (!lastThread) return lastRoomEvent;
+
+        const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
+
+        return (lastRoomEvent?.getTs() ?? 0) > (lastThreadEvent.getTs() ?? 0) ? lastRoomEvent : lastThreadEvent;
+    }
+
+    /**
+     * Returns the last thread of this room.
+     * "last" means latest timestamp of the last thread event.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
+     *
+     * @returns the thread with the most recent event in its live time line. undefined if there is no thread.
+     */
+    public getLastThread(): Thread | undefined {
+        return this.getThreads().reduce<Thread | undefined>((lastThread: Thread | undefined, thread: Thread) => {
+            if (!lastThread) return thread;
+
+            const threadEvent = thread.events[thread.events.length - 1];
+            const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
+
+            if ((threadEvent?.getTs() ?? 0) >= (lastThreadEvent?.getTs() ?? 0)) {
+                // Last message of current thread is newer → new last thread.
+                // Equal also means newer, because it was added to the thread map later.
+                return thread;
+            }
+
+            return lastThread;
+        }, undefined);
     }
 
     /**

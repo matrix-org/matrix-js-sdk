@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -54,6 +54,7 @@ import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
+import { IMessageOpts } from "../test-utils/test-utils";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -63,9 +64,10 @@ describe("Room", function () {
     const userD = "@dorothy:bar";
     let room: Room;
 
-    const mkMessage = () =>
+    const mkMessage = (opts?: Partial<IMessageOpts>) =>
         utils.mkMessage(
             {
+                ...opts,
                 event: true,
                 user: userA,
                 room: roomId,
@@ -113,9 +115,10 @@ describe("Room", function () {
             room.client,
         );
 
-    const mkThreadResponse = (root: MatrixEvent) =>
+    const mkThreadResponse = (root: MatrixEvent, opts?: Partial<IMessageOpts>) =>
         utils.mkEvent(
             {
+                ...opts,
                 event: true,
                 type: EventType.RoomMessage,
                 user: userA,
@@ -164,6 +167,66 @@ describe("Room", function () {
             },
             room.client,
         );
+
+    const addRoomMainAndThreadMessages = (
+        room: Room,
+        tsMain?: number,
+        tsThread?: number,
+    ): { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } => {
+        const result: { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } = {};
+
+        if (tsMain) {
+            result.mainEvent = mkMessage({ ts: tsMain });
+            room.addLiveEvents([result.mainEvent]);
+        }
+
+        if (tsThread) {
+            const { rootEvent, thread } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+            result.threadEvent = mkThreadResponse(rootEvent, { ts: tsThread });
+            thread.liveTimeline.addEvent(result.threadEvent, { toStartOfTimeline: true });
+        }
+
+        return result;
+    };
+
+    const addRoomThreads = (
+        room: Room,
+        thread1EventTs: Optional<number>,
+        thread2EventTs: Optional<number>,
+    ): { thread1?: Thread; thread2?: Thread } => {
+        const result: { thread1?: Thread; thread2?: Thread } = {};
+
+        if (thread1EventTs !== null) {
+            const { rootEvent: thread1RootEvent, thread: thread1 } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+            const thread1Event = mkThreadResponse(thread1RootEvent, { ts: thread1EventTs });
+            thread1.liveTimeline.addEvent(thread1Event, { toStartOfTimeline: true });
+            result.thread1 = thread1;
+        }
+
+        if (thread2EventTs !== null) {
+            const { rootEvent: thread2RootEvent, thread: thread2 } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+            const thread2Event = mkThreadResponse(thread2RootEvent, { ts: thread2EventTs });
+            thread2.liveTimeline.addEvent(thread2Event, { toStartOfTimeline: true });
+            result.thread2 = thread2;
+        }
+
+        return result;
+    };
 
     beforeEach(function () {
         room = new Room(roomId, new TestClient(userA, "device").client, userA);
@@ -3473,6 +3536,69 @@ describe("Room", function () {
             // Don't provide an argument for msc3946ProcessDynamicPredecessor -
             // we should ignore the predecessor event.
             expect(room.findPredecessor()).toBeNull();
+        });
+    });
+
+    describe("getLastLiveEvent", () => {
+        let lastEventInMainTimeline: MatrixEvent;
+        let lastEventInThread: MatrixEvent;
+
+        it("when there are no events, it should return undefined", () => {
+            expect(room.getLastLiveEvent()).toBeUndefined();
+        });
+
+        it("when there is only an event in the main timeline and there are no threads, it should return the last event from the main timeline", () => {
+            lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23).mainEvent!;
+            room.addLiveEvents([lastEventInMainTimeline]);
+            expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
+        });
+
+        it("when there is no event in the room live timeline but in a thread, it should return the last event from the thread", () => {
+            lastEventInThread = addRoomMainAndThreadMessages(room, undefined, 42).threadEvent!;
+            expect(room.getLastLiveEvent()).toBe(lastEventInThread);
+        });
+
+        describe("when there are events in both, the main timeline and threads", () => {
+            it("and the last event is in a thread, it should return the last event from the thread", () => {
+                lastEventInThread = addRoomMainAndThreadMessages(room, 23, 42).threadEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInThread);
+            });
+
+            it("and the last event is in the main timeline, it should return the last event from the main timeline", () => {
+                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 42, 23).mainEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
+            });
+        });
+    });
+
+    describe("getLastThread", () => {
+        it("when there is no thread, it should return undefined", () => {
+            expect(room.getLastThread()).toBeUndefined();
+        });
+
+        it("when there is only one thread, it should return this one", () => {
+            const { thread1 } = addRoomThreads(room, 23, null);
+            expect(room.getLastThread()).toBe(thread1);
+        });
+
+        it("when there are tho threads, it should return the one with the recent event I", () => {
+            const { thread2 } = addRoomThreads(room, 23, 42);
+            expect(room.getLastThread()).toBe(thread2);
+        });
+
+        it("when there are tho threads, it should return the one with the recent event II", () => {
+            const { thread1 } = addRoomThreads(room, 42, 23);
+            expect(room.getLastThread()).toBe(thread1);
+        });
+
+        it("when there is a thread with the last event ts undefined, it should return the thread with the defined event ts", () => {
+            const { thread2 } = addRoomThreads(room, undefined, 23);
+            expect(room.getLastThread()).toBe(thread2);
+        });
+
+        it("when the last event ts of all threads is undefined, it should return the last added thread", () => {
+            const { thread2 } = addRoomThreads(room, undefined, undefined);
+            expect(room.getLastThread()).toBe(thread2);
         });
     });
 });
