@@ -19,11 +19,10 @@ limitations under the License.
  */
 
 import { logger } from "./logger";
-import { deepCopy, isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
+import { deepCopy } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
-import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { ReceiptAccumulator } from "./receipt-accumulator";
 
@@ -41,13 +40,8 @@ interface IOpts {
 export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
+    room_id?: string;
     unsigned?: IUnsigned;
-}
-
-export interface AccumulatedReceipt {
-    data: IMinimalEvent;
-    type: ReceiptType;
-    eventId: string;
 }
 
 export interface IEphemeral {
@@ -410,52 +404,17 @@ export class SyncAccumulator {
             acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] || acc[INVITED_COUNT_KEY];
         }
 
-        data.ephemeral?.events?.forEach((e) => {
-            // We purposefully do not persist m.typing events.
-            // Technically you could refresh a browser before the timer on a
-            // typing event is up, so it'll look like you aren't typing when
-            // you really still are. However, the alternative is worse. If
-            // we do persist typing events, it will look like people are
-            // typing forever until someone really does start typing (which
-            // will prompt Synapse to send down an actual m.typing event to
-            // clobber the one we persisted).
-            if (e.type !== EventType.Receipt || !e.content) {
-                // This means we'll drop unknown ephemeral events but that
-                // seems okay.
-                return;
-            }
-            // Handle m.receipt events. They clobber based on:
-            //   (user_id, receipt_type)
-            // but they are keyed in the event as:
-            //   content:{ $event_id: { $receipt_type: { $user_id: {json} }}}
-            // so store them in the former so we can accumulate receipt deltas
-            // quickly and efficiently (we expect a lot of them). Fold the
-            // receipt type into the key name since we only have 1 at the
-            // moment (m.read) and nested JSON objects are slower and more
-            // of a hassle to work with. We'll inflate this back out when
-            // getJSON() is called.
-            Object.keys(e.content).forEach((eventId) => {
-                Object.entries<ReceiptContent>(e.content[eventId]).forEach(([key, value]) => {
-                    if (!isSupportedReceiptType(key)) return;
+        // We purposefully do not persist m.typing events.
+        // Technically you could refresh a browser before the timer on a
+        // typing event is up, so it'll look like you aren't typing when
+        // you really still are. However, the alternative is worse. If
+        // we do persist typing events, it will look like people are
+        // typing forever until someone really does start typing (which
+        // will prompt Synapse to send down an actual m.typing event to
+        // clobber the one we persisted).
 
-                    for (const userId of Object.keys(value)) {
-                        const data = e.content[eventId][key][userId];
-
-                        const receipt = {
-                            data: e.content[eventId][key][userId],
-                            type: key as ReceiptType,
-                            eventId,
-                        };
-
-                        if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
-                            currentData._receipts.setUnthreaded(userId, receipt);
-                        } else {
-                            currentData._receipts.setThreaded(data.thread_id, userId, receipt);
-                        }
-                    }
-                });
-            });
-        });
+        // Persist the receipts
+        currentData._receipts.consumeEphemeralEvents(data.ephemeral?.events);
 
         // if we got a limited sync, we need to remove all timeline entries or else
         // we will have gaps in the timeline.
@@ -561,39 +520,11 @@ export class SyncAccumulator {
                 roomJson.account_data.events.push(roomData._accountData[evType]);
             });
 
-            // Add receipt data
-            const receiptEvent = {
-                type: EventType.Receipt,
-                room_id: roomId,
-                content: {
-                    // $event_id: { "m.read": { $user_id: $json } }
-                } as IContent,
-            };
-
-            const receiptEventContent: MapWithDefault<
-                string,
-                MapWithDefault<ReceiptType, Map<string, object>>
-            > = new MapWithDefault(() => new MapWithDefault(() => new Map()));
-
-            for (const [userId, receiptData] of roomData._receipts.allUnthreaded()) {
-                receiptEventContent
-                    .getOrCreate(receiptData.eventId)
-                    .getOrCreate(receiptData.type)
-                    .set(userId, receiptData.data);
-            }
-
-            for (const [userId, receiptData] of roomData._receipts.allThreaded()) {
-                receiptEventContent
-                    .getOrCreate(receiptData.eventId)
-                    .getOrCreate(receiptData.type)
-                    .set(userId, receiptData.data);
-            }
-
-            receiptEvent.content = recursiveMapToObject(receiptEventContent);
+            const receiptEvent = roomData._receipts.buildAccumulatedReceiptEvent(roomId);
 
             // add only if we have some receipt data
-            if (receiptEventContent.size > 0) {
-                roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);
+            if (receiptEvent) {
+                roomJson.ephemeral.events.push(receiptEvent);
             }
 
             // Add timeline data
