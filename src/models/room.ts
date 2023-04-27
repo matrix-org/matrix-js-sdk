@@ -792,6 +792,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Returns the last live event of this room.
      * "last" means latest timestamp.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
      * "live of this room" means from all live timelines: the room and the threads.
      *
      * @returns MatrixEvent if there is a last event; else undefined.
@@ -809,6 +812,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Returns the last thread of this room.
+     * "last" means latest timestamp of the last thread event.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
+     *
      * @returns the thread with the most recent event in its live time line. undefined if there is no thread.
      */
     public getLastThread(): Thread | undefined {
