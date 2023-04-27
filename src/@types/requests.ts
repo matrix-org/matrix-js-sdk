@@ -186,6 +186,7 @@ export interface IRelationsRequestOpts {
     to?: string;
     limit?: number;
     dir?: Direction;
+    recurse?: boolean; // MSC3981 Relations Recursion https://github.com/matrix-org/matrix-spec-proposals/pull/3981
 }
 
 export interface IRelationsResponse {

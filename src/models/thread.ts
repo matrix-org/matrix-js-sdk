@@ -28,6 +28,7 @@ import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
+import { Feature, ServerSupport } from "../feature";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -458,25 +459,28 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
-        return Promise.all(
-            events
-                .filter((e) => e.isEncrypted())
-                .map((event: MatrixEvent) => {
-                    if (event.isRelation()) return; // skip - relations don't get edits
-                    return this.client
-                        .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
-                            limit: 1,
-                        })
-                        .then((relations) => {
-                            if (relations.events.length) {
-                                event.makeReplaced(relations.events[0]);
-                            }
-                        })
-                        .catch((e) => {
-                            logger.error("Failed to load edits for encrypted thread event", e);
-                        });
-                }),
-        );
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+        if (recursionSupport !== ServerSupport.Unsupported) {
+            return Promise.all(
+                events
+                    .filter((e) => e.isEncrypted())
+                    .map((event: MatrixEvent) => {
+                        if (event.isRelation()) return; // skip - relations don't get edits
+                        return this.client
+                            .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
+                                limit: 1,
+                            })
+                            .then((relations) => {
+                                if (relations.events.length) {
+                                    event.makeReplaced(relations.events[0]);
+                                }
+                            })
+                            .catch((e) => {
+                                logger.error("Failed to load edits for encrypted thread event", e);
+                            });
+                    }),
+            );
+        }
     }
 
     public setEventMetadata(event: Optional<MatrixEvent>): void {
