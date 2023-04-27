@@ -715,7 +715,7 @@ interface IJoinedMembersResponse {
 }
 
 export interface IRegisterRequestParams {
-    auth?: IAuthData;
+    auth?: IAuthDict;
     username?: string;
     password?: string;
     refresh_token?: boolean;
@@ -2434,10 +2434,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the VerificationRequest that is in progress, if any
      */
     public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.findVerificationRequestDMInProgress(roomId);
+        return this.cryptoBackend.findVerificationRequestDMInProgress(roomId);
     }
 
     /**
@@ -2594,10 +2594,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the cross signing information for the user.
      */
     public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getStoredCrossSigningForUser(userId);
+        return this.cryptoBackend.getStoredCrossSigningForUser(userId);
     }
 
     /**
@@ -7861,7 +7861,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public async requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: IAuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
@@ -8237,7 +8237,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getRoomIdForAlias(alias: string): Promise<{ room_id: string; servers: string[] }> {
         // eslint-disable-line camelcase
-        // TODO: deprecate this or resolveRoomAlias
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8247,10 +8246,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: Object with room_id and servers.
      * @returns Rejects: with an error response.
+     * @deprecated use `getRoomIdForAlias` instead
      */
     // eslint-disable-next-line camelcase
     public resolveRoomAlias(roomAlias: string): Promise<{ room_id: string; servers: string[] }> {
-        // TODO: deprecate this or getRoomIdForAlias
         const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
         return this.http.request(Method.Get, path);
     }
@@ -8844,7 +8843,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: IAuthDict, keys?: CrossSigningKeys): Promise<{}> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });

@@ -397,6 +397,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // Perfect negotiation state: https://www.w3.org/TR/webrtc/#perfect-negotiation-example
     private makingOffer = false;
     private ignoreOffer = false;
+    private isSettingRemoteAnswerPending = false;
 
     private responsePromiseChain?: Promise<void>;
 
@@ -1895,8 +1896,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
+            this.isSettingRemoteAnswerPending = true;
             await this.peerConn!.setRemoteDescription(content.answer);
+            this.isSettingRemoteAnswerPending = false;
         } catch (e) {
+            this.isSettingRemoteAnswerPending = false;
             logger.debug(`Call ${this.callId} onAnswerReceived() failed to set remote description`, e);
             this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
             return;
@@ -1957,9 +1961,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const polite = this.direction === CallDirection.Inbound;
 
         // Here we follow the perfect negotiation logic from
-        // https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
-        const offerCollision =
-            description.type === "offer" && (this.makingOffer || this.peerConn!.signalingState !== "stable");
+        // https://w3c.github.io/webrtc-pc/#perfect-negotiation-example
+        const readyForOffer =
+            !this.makingOffer && (this.peerConn!.signalingState === "stable" || this.isSettingRemoteAnswerPending);
+
+        const offerCollision = description.type === "offer" && !readyForOffer;
 
         this.ignoreOffer = !polite && offerCollision;
         if (this.ignoreOffer) {
@@ -1981,7 +1987,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn!.setRemoteDescription(description);
+            this.isSettingRemoteAnswerPending = description.type == "answer";
+            await this.peerConn!.setRemoteDescription(description); // SRD rolls back as needed
+            this.isSettingRemoteAnswerPending = false;
 
             if (description.type === "offer") {
                 let answer: RTCSessionDescriptionInit;
@@ -2002,6 +2010,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 });
             }
         } catch (err) {
+            this.isSettingRemoteAnswerPending = false;
             logger.warn(`Call ${this.callId} onNegotiateReceived() failed to complete negotiation`, err);
         }
 

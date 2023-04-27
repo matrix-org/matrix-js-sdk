@@ -236,7 +236,12 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
-    private readonly stats: GroupCallStats;
+    private stats: GroupCallStats | undefined;
+    /**
+     * Configure default webrtc stats collection interval in ms
+     * Disable collecting webrtc stats by setting interval to 0
+     */
+    private statsCollectIntervalTime = 0;
 
     public constructor(
         private client: MatrixClient,
@@ -261,12 +266,6 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
-
-        const userID = this.client.getUserId() || "unknown";
-        this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
-        this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
@@ -553,7 +552,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
-        this.stats.stop();
+        this.stats?.stop();
     }
 
     public leave(): void {
@@ -881,6 +880,11 @@ export class GroupCall extends TypedEventEmitter<
         );
 
         if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+        // We must do this before we start initialising / answering the call as we
+        // need to know it is the active call for this user+deviceId and to not ignore
+        // events from it.
+        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
+        this.calls.set(opponentUserId, deviceMap);
 
         this.initCall(newCall);
 
@@ -895,8 +899,6 @@ export class GroupCall extends TypedEventEmitter<
         }
         newCall.answerWithCallFeeds(feeds);
 
-        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
-        this.calls.set(opponentUserId, deviceMap);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     };
 
@@ -1084,7 +1086,7 @@ export class GroupCall extends TypedEventEmitter<
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
 
-        call.initStats(this.stats);
+        call.initStats(this.getGroupCallStats());
 
         onCallFeedsChanged();
     }
@@ -1137,6 +1139,14 @@ export class GroupCall extends TypedEventEmitter<
         const currentUserMediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
         const remoteUsermediaFeed = call.remoteUsermediaFeed;
         const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
+
+        const deviceMap = this.calls.get(opponentMemberId);
+        const currentCallForUserDevice = deviceMap?.get(opponentDeviceId);
+        if (currentCallForUserDevice?.callId !== call.callId) {
+            // the call in question is not the current call for this user/deviceId
+            // so ignore feed events from it otherwise we'll remove our real feeds
+            return;
+        }
 
         if (remoteFeedChanged) {
             if (!currentUserMediaFeed && remoteUsermediaFeed) {
@@ -1598,6 +1608,24 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     public getGroupCallStats(): GroupCallStats {
+        if (this.stats === undefined) {
+            const userID = this.client.getUserId() || "unknown";
+            this.stats = new GroupCallStats(this.groupCallId, userID, this.statsCollectIntervalTime);
+            this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+            this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
+            this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
+        }
         return this.stats;
+    }
+
+    public setGroupCallStatsInterval(interval: number): void {
+        this.statsCollectIntervalTime = interval;
+        if (this.stats !== undefined) {
+            this.stats.stop();
+            this.stats.setInterval(interval);
+            if (interval > 0) {
+                this.stats.start();
+            }
+        }
     }
 }
