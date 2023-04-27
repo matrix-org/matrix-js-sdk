@@ -239,6 +239,8 @@ export class MockRTCPeerConnection {
     public triggerIncomingDataChannel(): void {
         this.onDataChannelListener?.({ channel: {} } as RTCDataChannelEvent);
     }
+
+    public restartIce(): void {}
 }
 
 export class MockRTCRtpSender {

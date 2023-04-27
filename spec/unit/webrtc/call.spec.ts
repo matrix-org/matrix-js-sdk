@@ -1652,12 +1652,18 @@ describe("Call", function () {
         beforeEach(async () => {
             jest.useFakeTimers();
             jest.spyOn(call, "hangup");
-
             await fakeIncomingCall(client, call, "1");
 
             mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
             mockPeerConn.iceConnectionState = "disconnected";
             mockPeerConn.iceConnectionStateChangeListener!();
+            jest.spyOn(mockPeerConn, "restartIce");
+        });
+
+        it("should restart ICE gathering after being disconnected for 2 seconds", () => {
+            jest.advanceTimersByTime(3 * 1000);
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
         });
 
         it("should hang up after being disconnected for 30 seconds", () => {
