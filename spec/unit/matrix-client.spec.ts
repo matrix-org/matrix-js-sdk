@@ -2909,4 +2909,43 @@ describe("MatrixClient", function () {
             });
         });
     });
+
+    describe("pushers", () => {
+        const pusher = {
+            app_id: "test",
+            app_display_name: "Test App",
+            data: {},
+            device_display_name: "test device",
+            kind: "http",
+            lang: "en-NZ",
+            pushkey: "1234",
+        };
+
+        beforeEach(() => {
+            makeClient();
+            const response: HttpLookup = {
+                method: Method.Post,
+                path: "/pushers/set",
+                data: {},
+            };
+            httpLookups = [response];
+            jest.spyOn(client.http, "authedRequest").mockClear();
+        });
+
+        it("should make correct request to set pusher", async () => {
+            const result = await client.setPusher(pusher);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Post, "/pushers/set", undefined, pusher);
+            expect(result).toEqual({});
+        });
+
+        it("should make correct request to remove pusher", async () => {
+            const result = await client.removePusher(pusher.pushkey, pusher.app_id);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Post, "/pushers/set", undefined, {
+                pushkey: pusher.pushkey,
+                app_id: pusher.app_id,
+                kind: null,
+            });
+            expect(result).toEqual({});
+        });
+    });
 });
