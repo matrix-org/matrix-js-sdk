@@ -68,13 +68,23 @@ describe("GroupCallStats", () => {
             jest.useRealTimers();
         });
 
-        it("starting processing as well without stats collectors", async () => {
+        it("starting processing stats as well without stats collectors", async () => {
             // @ts-ignore
             stats.processStats = jest.fn();
             stats.start();
             jest.advanceTimersByTime(TIME_INTERVAL);
             // @ts-ignore
             expect(stats.processStats).toHaveBeenCalled();
+        });
+
+        it("not starting processing stats if interval 0", async () => {
+            const statsDisabled = new GroupCallStats(GROUP_CALL_ID, LOCAL_USER_ID, 0);
+            // @ts-ignore
+            statsDisabled.processStats = jest.fn();
+            statsDisabled.start();
+            jest.advanceTimersByTime(TIME_INTERVAL);
+            // @ts-ignore
+            expect(statsDisabled.processStats).not.toHaveBeenCalled();
         });
 
         it("starting processing and calling the collectors", async () => {

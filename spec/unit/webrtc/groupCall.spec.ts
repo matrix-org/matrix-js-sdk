@@ -1629,4 +1629,77 @@ describe("Group Call", function () {
             expect(room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, FAKE_USER_ID_2)).toBe(null);
         });
     });
+
+    describe("collection stats", () => {
+        let groupCall: GroupCall;
+
+        beforeAll(() => {
+            jest.useFakeTimers();
+            jest.setSystemTime(0);
+        });
+
+        afterAll(() => jest.useRealTimers());
+
+        beforeEach(async () => {
+            const typedMockClient = new MockCallMatrixClient(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1);
+            const mockClient = typedMockClient.typed();
+            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
+            groupCall = new GroupCall(
+                mockClient,
+                room,
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+                FAKE_CONF_ID,
+            );
+        });
+        it("should be undefined if not get stats", async () => {
+            // @ts-ignore
+            const stats = groupCall.stats;
+            expect(stats).toBeUndefined();
+        });
+
+        it("should be defined after first access", async () => {
+            groupCall.getGroupCallStats();
+            // @ts-ignore
+            const stats = groupCall.stats;
+            expect(stats).toBeDefined();
+        });
+
+        it("with every number should do nothing if no stats exists.", async () => {
+            groupCall.setGroupCallStatsInterval(0);
+            // @ts-ignore
+            let stats = groupCall.stats;
+            expect(stats).toBeUndefined();
+
+            groupCall.setGroupCallStatsInterval(10000);
+            // @ts-ignore
+            stats = groupCall.stats;
+            expect(stats).toBeUndefined();
+        });
+
+        it("with number should stop existing stats", async () => {
+            const stats = groupCall.getGroupCallStats();
+            // @ts-ignore
+            const stop = jest.spyOn(stats, "stop");
+            // @ts-ignore
+            const start = jest.spyOn(stats, "start");
+            groupCall.setGroupCallStatsInterval(0);
+
+            expect(stop).toHaveBeenCalled();
+            expect(start).not.toHaveBeenCalled();
+        });
+
+        it("with number should restart existing stats", async () => {
+            const stats = groupCall.getGroupCallStats();
+            // @ts-ignore
+            const stop = jest.spyOn(stats, "stop");
+            // @ts-ignore
+            const start = jest.spyOn(stats, "start");
+            groupCall.setGroupCallStatsInterval(10000);
+
+            expect(stop).toHaveBeenCalled();
+            expect(start).toHaveBeenCalled();
+        });
+    });
 });
