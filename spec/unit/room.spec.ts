@@ -3547,46 +3547,26 @@ describe("Room", function () {
             expect(room.getLastLiveEvent()).toBeUndefined();
         });
 
-        describe("when there is only an event in the main timeline and there are no threads", () => {
-            beforeEach(() => {
-                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23).mainEvent!;
-                room.addLiveEvents([lastEventInMainTimeline]);
-            });
-
-            it("should return the last event from the main timeline", () => {
-                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
-            });
+        it("when there is only an event in the main timeline and there are no threads, it should return the last event from the main timeline", () => {
+            lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23).mainEvent!;
+            room.addLiveEvents([lastEventInMainTimeline]);
+            expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
         });
 
-        describe("when there is no event in the room live timeline, but in a thread", () => {
-            beforeEach(() => {
-                lastEventInThread = addRoomMainAndThreadMessages(room, undefined, 42).threadEvent!;
-            });
-
-            it("should return the last event from the thread", () => {
-                expect(room.getLastLiveEvent()).toBe(lastEventInThread);
-            });
+        it("when there is no event in the room live timeline but in a thread, it should return the last event from the thread", () => {
+            lastEventInThread = addRoomMainAndThreadMessages(room, undefined, 42).threadEvent!;
+            expect(room.getLastLiveEvent()).toBe(lastEventInThread);
         });
 
         describe("when there are events in both, the main timeline and threads", () => {
-            describe("and the last event is in a thread", () => {
-                beforeEach(() => {
-                    lastEventInThread = addRoomMainAndThreadMessages(room, 23, 42).threadEvent!;
-                });
-
-                it("should return the last event from the thread", () => {
-                    expect(room.getLastLiveEvent()).toBe(lastEventInThread);
-                });
+            it("and the last event is in a thread, it should return the last event from the thread", () => {
+                lastEventInThread = addRoomMainAndThreadMessages(room, 23, 42).threadEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
 
-            describe("and the last event is in the main timeline", () => {
-                beforeEach(() => {
-                    lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 42, 23).mainEvent!;
-                });
-
-                it("should return the last event from the main timeline", () => {
-                    expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
-                });
+            it("and the last event is in the main timeline, it should return the last event from the main timeline", () => {
+                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 42, 23).mainEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
         });
     });
