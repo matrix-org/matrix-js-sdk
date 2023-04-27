@@ -21,11 +21,13 @@ import {
     EventStatus,
     EventTimeline,
     EventTimelineSet,
+    EventType,
     Filter,
     IEvent,
     MatrixClient,
     MatrixEvent,
     PendingEventOrdering,
+    RelationType,
     Room,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
@@ -33,6 +35,7 @@ import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/util
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
+import { Feature, ServerSupport } from "../../src/feature";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -1164,6 +1167,117 @@ describe("MatrixClient event timelines", function () {
         ]);
     });
 
+    it("should ensure thread events don't get reordered with recursive relations", async () => {
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY2 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 2",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY2.localTimestamp += 1000;
+        const THREAD_ROOT_REACTION = utils.mkEvent({
+            event: true,
+            type: EventType.Reaction,
+            user: userId,
+            room: roomId,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: THREAD_ROOT.event_id!,
+                    key: Math.random().toString(),
+                },
+            },
+        });
+        THREAD_ROOT_REACTION.localTimestamp += 2000;
+
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY3 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 3",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY3.localTimestamp += 3000;
+
+        // Test data for the first thread, with the second reply
+        const THREAD_ROOT_UPDATED = {
+            ...THREAD_ROOT,
+            unsigned: {
+                ...THREAD_ROOT.unsigned,
+                "m.relations": {
+                    ...THREAD_ROOT.unsigned!["m.relations"],
+                    "io.element.thread": {
+                        ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
+                        count: 3,
+                        latest_event: THREAD_REPLY3.event,
+                    },
+                },
+            },
+        };
+
+        // @ts-ignore
+        client.clientOpts.threadSupport = true;
+        client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Stable);
+        Thread.setServerSideSupport(FeatureSupport.Stable);
+        Thread.setServerSideListSupport(FeatureSupport.Stable);
+        Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+        client.fetchRoomEvent = () => Promise.resolve(THREAD_ROOT_UPDATED);
+
+        await client.stopClient(); // we don't need the client to be syncing at this time
+        const room = client.getRoom(roomId)!;
+
+        const prom = emitPromise(room, ThreadEvent.Update);
+        // Assume we're seeing the reply while loading backlog
+        room.addLiveEvents([THREAD_REPLY2]);
+        httpBackend
+            .when(
+                "GET",
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
+                    "/" +
+                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                    buildRelationPaginationQuery({
+                        dir: Direction.Backward,
+                        limit: 3,
+                        recurse: true,
+                    }),
+            )
+            .respond(200, {
+                chunk: [THREAD_REPLY3.event, THREAD_ROOT_REACTION, THREAD_REPLY2.event, THREAD_REPLY],
+            });
+        await flushHttp(prom);
+        // but while loading the metadata, a new reply has arrived
+        room.addLiveEvents([THREAD_REPLY3]);
+        const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
+        // then the events should still be all in the right order
+        expect(thread.events.map((it) => it.getId())).toEqual([
+            THREAD_ROOT.event_id,
+            THREAD_REPLY.event_id,
+            THREAD_REPLY2.getId(),
+            THREAD_REPLY3.getId(),
+        ]);
+    });
+
     describe("paginateEventTimeline for thread list timeline", function () {
         const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
 
@@ -1847,7 +1961,10 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, from: "start_token" }),
+                        buildRelationPaginationQuery({
+                            dir: Direction.Backward,
+                            from: "start_token",
+                        }),
                 )
                 .respond(200, function () {
                     return {

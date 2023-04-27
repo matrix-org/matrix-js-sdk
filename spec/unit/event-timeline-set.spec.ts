@@ -82,6 +82,7 @@ describe("EventTimelineSet", () => {
     beforeEach(() => {
         client = utils.mock(MatrixClient, "MatrixClient");
         client.reEmitter = utils.mock(ReEmitter, "ReEmitter");
+        client.canSupport = new Map();
         room = new Room(roomId, client, userA);
         eventTimelineSet = new EventTimelineSet(room);
         eventTimeline = new EventTimeline(eventTimelineSet);
