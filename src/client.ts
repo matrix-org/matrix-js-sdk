@@ -38,7 +38,7 @@ import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -7956,7 +7956,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<IRelationsResponse> {
-        const params = utils.prefixUnstableParameters(this.canSupport, opts as QueryDict);
+        let params = opts as QueryDict;
+        if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
+            params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+        }
+        if (this.canSupport.get(Feature.RelationsRecursion) === ServerSupport.Unstable) {
+            params = replaceParam("recurse", "org.matrix.msc3981.recurse", params);
+        }
         const queryString = utils.encodeParams(params);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";

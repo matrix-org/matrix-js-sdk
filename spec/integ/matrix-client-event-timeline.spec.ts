@@ -31,11 +31,11 @@ import {
     Room,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
-import { encodeParams, encodeUri, prefixUnstableParameters, QueryDict } from "../../src/utils";
+import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
-import { Feature, ServerSupport } from "../../src/feature";
 import { emitPromise } from "../test-utils/test-utils";
+import { Feature, ServerSupport } from "../../lib/feature";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -52,11 +52,13 @@ const withoutRoomId = (e: Partial<IEvent>): Partial<IEvent> => {
 /**
  * Our httpBackend only allows matching calls if we have the exact same query, in the exact same order
  * This method allows building queries with the exact same parameter order as the fetchRelations method in client
- * @param supports features supported by our client
  * @param params query parameters
  */
-const buildRelationPaginationQuery = (supports: Map<Feature, ServerSupport>, params: QueryDict): string => {
-    return "?" + encodeParams(prefixUnstableParameters(supports, params)).toString();
+const buildRelationPaginationQuery = (params: QueryDict): string => {
+    if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
+        params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+    }
+    return "?" + encodeParams(params).toString();
 };
 
 const USER_MEMBERSHIP_EVENT = utils.mkMembership({
@@ -620,7 +622,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery(client.canSupport, { dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
                 )
                 .respond(200, function () {
                     return {
@@ -1234,7 +1236,7 @@ describe("MatrixClient event timelines", function () {
 
         // @ts-ignore
         client.clientOpts.threadSupport = true;
-        client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Unstable);
+        client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Stable);
         Thread.setServerSideSupport(FeatureSupport.Stable);
         Thread.setServerSideListSupport(FeatureSupport.Stable);
         Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1254,7 +1256,7 @@ describe("MatrixClient event timelines", function () {
                     encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
                     "/" +
                     encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                    buildRelationPaginationQuery(client.canSupport, {
+                    buildRelationPaginationQuery({
                         recurse: true,
                         dir: Direction.Backward,
                         limit: 3,
@@ -1901,7 +1903,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery(client.canSupport, { dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
                 )
                 .respond(200, function () {
                     return {
@@ -1959,7 +1961,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery(client.canSupport, {
+                        buildRelationPaginationQuery({
                             dir: Direction.Backward,
                             from: "start_token",
                         }),
@@ -1976,7 +1978,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery(client.canSupport, { dir: Direction.Forward, from: "end_token" }),
+                        buildRelationPaginationQuery({ dir: Direction.Forward, from: "end_token" }),
                 )
                 .respond(200, function () {
                     return {

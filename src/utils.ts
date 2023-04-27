@@ -25,8 +25,6 @@ import { Optional } from "matrix-events-sdk";
 import { IEvent, MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
-import { Feature, ServerSupport } from "./feature";
-import { FeatureSupport, Thread } from "./models/thread";
 
 const interns = new Map<string, string>();
 
@@ -87,16 +85,6 @@ export function replaceParam(stable: string, unstable: string, dict: QueryDict):
     };
     delete result[stable];
     return result;
-}
-
-export function prefixUnstableParameters(supports: Map<Feature, ServerSupport>, params: QueryDict): QueryDict {
-    if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
-        params = replaceParam("dir", "org.matrix.msc3715.dir", params);
-    }
-    if (supports.get(Feature.RelationsRecursion) === ServerSupport.Unstable) {
-        params = replaceParam("recurse", "org.matrix.msc3981.recurse", params);
-    }
-    return params;
 }
 
 /**
