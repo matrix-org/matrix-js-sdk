@@ -8621,6 +8621,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Removes an existing pusher
+     * @param pushKey - pushkey of pusher to remove
+     * @param appId - app_id of pusher to remove
+     * @returns Promise which resolves: Empty json object on success
+     * @returns Rejects: with an error response.
+     */
+    public removePusher(pushKey: string, appId: string): Promise<{}> {
+        const path = "/pushers/set";
+        const body = {
+            pushkey: pushKey,
+            app_id: appId,
+            kind: null, // marks pusher for removal
+        };
+        return this.http.authedRequest(Method.Post, path, undefined, body);
+    }
+
+    /**
      * Persists local notification settings
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
