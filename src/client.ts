@@ -635,7 +635,7 @@ interface IJoinRequestBody {
 
 interface ITagMetadata {
     [key: string]: any;
-    order: number;
+    order?: number;
 }
 
 interface IMessagesResponse {
@@ -4185,7 +4185,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata): Promise<{}> {
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
