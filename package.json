@@ -120,7 +120,7 @@
         "jest-mock": "^29.0.0",
         "matrix-mock-request": "^2.5.0",
         "prettier": "2.8.8",
-        "rimraf": "^4.0.0",
+        "rimraf": "^5.0.0",
         "terser": "^5.5.1",
         "ts-node": "^10.9.1",
         "tsify": "^5.0.2",
