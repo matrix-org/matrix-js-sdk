@@ -319,7 +319,7 @@ export class RustCrypto implements CryptoBackend {
     private async receiveSyncChanges({
         events,
         oneTimeKeysCounts = new Map<string, number>(),
-        unusedFallbackKeys = new Set<string>(),
+        unusedFallbackKeys,
         devices = new RustSdkCryptoJs.DeviceLists(),
     }: {
         events?: IToDeviceEvent[];
