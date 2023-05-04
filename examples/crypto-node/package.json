@@ -1,0 +1,15 @@
+{
+    "name": "example-app",
+    "type": "module",
+    "version": "0.0.0",
+    "description": "",
+    "main": "src/index.js",
+    "scripts": {
+        "preinstall": "npm install ../.."
+    },
+    "author": "",
+    "license": "Apache 2.0",
+    "dependencies": {
+        "matrix-js-sdk": "file:../.."
+    }
+}

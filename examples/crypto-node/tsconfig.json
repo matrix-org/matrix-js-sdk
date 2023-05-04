@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "es2016",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "noUnusedLocals": true,
+        "noImplicitAny": false,
+        "noImplicitThis": true,
+        "strictNullChecks": true,
+        "noEmit": true,
+        "declaration": true,
+        "strict": true
+    },
+
+    "ts-node": {
+        "esm": true
+    },
+
+    "include": ["./src/**/*.ts"]
+}
