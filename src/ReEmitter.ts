@@ -25,7 +25,7 @@ export class ReEmitter {
     public constructor(private readonly target: EventEmitter) {}
 
     // Map from emitter to event name to re-emitter
-    private reEmitters = new Map<EventEmitter, Map<string, (...args: any[]) => void>>();
+    private reEmitters = new WeakMap<EventEmitter, Map<string, (...args: any[]) => void>>();
 
     public reEmit(source: EventEmitter, eventNames: string[]): void {
         let reEmittersByEvent = this.reEmitters.get(source);
@@ -35,6 +35,8 @@ export class ReEmitter {
         }
 
         for (const eventName of eventNames) {
+            if (reEmittersByEvent.has(eventName)) continue;
+
             // We include the source as the last argument for event handlers which may need it,
             // such as read receipt listeners on the client class which won't have the context
             // of the room.
