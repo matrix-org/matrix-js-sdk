@@ -1,20 +1,21 @@
 {
-    "compilerOptions": {
-        "target": "es2016",
-        "esModuleInterop": true,
-        "moduleResolution": "node",
-        "noUnusedLocals": true,
-        "noImplicitAny": false,
-        "noImplicitThis": true,
-        "strictNullChecks": true,
-        "noEmit": true,
-        "declaration": true,
-        "strict": true
-    },
+	"compilerOptions": {
+		"target": "es2017",
+		"module": "es2022",
+		"esModuleInterop": true,
+		"moduleResolution": "node",
+		"noUnusedLocals": true,
+		"noImplicitAny": false,
+		"noImplicitThis": true,
+		"strictNullChecks": true,
+		"noEmit": true,
+		"declaration": true,
+		"strict": true
+	},
 
-    "ts-node": {
-        "esm": true
-    },
+	"ts-node": {
+		"esm": true
+	},
 
-    "include": ["./src/**/*.ts"]
+	"include": ["./src/**/*.ts"]
 }
