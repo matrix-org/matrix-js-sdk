@@ -10,9 +10,8 @@
     "author": "",
     "license": "Apache 2.0",
     "dependencies": {
-        "cli-color": "^1.0.0",
-        "matrix-js-sdk": "file:../..",
-        "olm": "https://packages.matrix.org/npm/olm/olm-3.2.1.tgz"
+        "@matrix-org/olm": "^3.2.15",
+        "matrix-js-sdk": "file:../.."
     },
     "devDependencies": {
         "@types/cli-color": "^2.0.2"
