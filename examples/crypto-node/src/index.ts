@@ -1,5 +1,6 @@
-import olm from "olm";
+import olm from "@matrix-org/olm";
 import fs from "fs/promises";
+import readline from "readline";
 import credentials from "./credentials.js";
 
 const oldFetch = fetch;
@@ -20,10 +21,17 @@ import * as sdk from "../../../lib/index.js";
 import { logger } from "../../../lib/logger.js";
 import type { MatrixClient, Room } from "../../../lib/index.js";
 
-logger.setLevel(5);
+logger.setLevel(4);
 
 let roomList: Room[] = [];
 let viewingRoom: Room | null = null;
+
+const rl = readline.createInterface({
+	input: process.stdin,
+	output: process.stdout
+});
+
+rl.setPrompt("$ ");
 
 const startWithAccessToken = async (accessToken: string, deviceId: string) => {
 	const client = sdk.createClient({
@@ -35,7 +43,13 @@ const startWithAccessToken = async (accessToken: string, deviceId: string) => {
 
 	await client.initCrypto();
 
-	await client.startClient({ initialSyncLimit: 0 });
+	await client.startClient({ initialSyncLimit: 20 });
+
+	const state: string = await new Promise(resolve => client.once(sdk.ClientEvent.Sync, resolve));
+
+	if (state !== "PREPARED") {
+		throw new Error("Sync failed.");
+	}
 
 	return client;
 };
@@ -79,13 +93,8 @@ const setRoomList = (client: MatrixClient) => {
 	});
 };
 
-const fixWidth = (str: string, len: number) => {
-	if (str.length === len) {
-		return str;
-	}
-
-	return str.length > len ? `${str.substring(0, len - 1)}\u2026` : str.padEnd(len);
-};
+const fixWidth = (str: string, len: number) =>
+	str.length > len ? `${str.substring(0, len - 1)}\u2026` : str.padEnd(len);
 
 const printRoomList = () => {
 	console.log("\nRoom List:");
@@ -102,6 +111,23 @@ const printRoomList = () => {
 	}
 };
 
+const printMessages = () => {
+	if (!viewingRoom) {
+		printRoomList();
+		return;
+	}
+
+	const events = viewingRoom.getLiveTimeline().getEvents();
+
+	for (const event of events) {
+		if (event.getType() !== sdk.EventType.RoomMessage) {
+			continue;
+		}
+
+		console.log(event.getContent().body);
+	}
+};
+
 const client = await start();
 
 client.on(sdk.ClientEvent.Room, () => {
@@ -110,4 +136,39 @@ client.on(sdk.ClientEvent.Room, () => {
 	if (!viewingRoom) {
 		printRoomList();
 	}
+
+	rl.prompt();
 });
+
+rl.on("line", (line: string) => {
+	if (line.trim().length === 0) {
+		rl.prompt();
+		return;
+	}
+
+	if (viewingRoom == null) {
+		if (line.indexOf("/join ") === 0) {
+			const index = line.split(" ")[1];
+
+			if (roomList[index] == null) {
+				console.log("invalid room");
+				rl.prompt();
+				return;
+			}
+
+			viewingRoom = roomList[index];
+
+			printMessages();
+
+			rl.prompt();
+			return;
+		}
+	}
+
+	console.log("invalid command");
+	rl.prompt();
+});
+
+setRoomList(client);
+printRoomList();
+rl.prompt();
