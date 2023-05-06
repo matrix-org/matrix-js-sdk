@@ -276,6 +276,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     private retryDecryption = false;
 
+    /* flag to check that the event is plainTextExport or not
+     */
+    public exportPlainText = false;
+
+
     /* The txnId with which this event was sent if it was during this session,
      * allows for a unique ID which does not change when the event comes back down sync.
      */
