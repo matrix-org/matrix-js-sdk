@@ -68,6 +68,20 @@ rl.on("line", async (line: string) => {
 		return;
 	}
 
+	if (viewingRoom != null && line.indexOf("/invite ") === 0) {
+		const userId = line.split(" ")[1].trim();
+
+		try {
+			await client.invite(viewingRoom.roomId, userId);
+
+			prompt();
+		} catch (error) {
+			prompt(`/invite Error: ${error}`);
+		}
+
+		return;
+	}
+
 	if (viewingRoom != null && line.indexOf("/members") === 0) {
 		printMemberList(viewingRoom);
 		prompt();

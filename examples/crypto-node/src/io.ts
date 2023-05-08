@@ -107,7 +107,7 @@ export const printRoomInfo = (room: Room): void => {
 		}
 
 		for (const [stateKey, event] of events) {
-			const postfix = stateKey == null ? "" : `(${stateKey})`;
+			const postfix = stateKey.length < 1 ? "" : `(${stateKey})`;
 			const typeAndKey = `${key}${postfix}`;
 			const typeStr = fixWidth(typeAndKey, eTypeHeader.length);
 			const sendStr = fixWidth(event.getSender() ?? "", sendHeader.length);
