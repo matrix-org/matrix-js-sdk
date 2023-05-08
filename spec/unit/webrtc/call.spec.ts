@@ -1671,6 +1671,19 @@ describe("Call", function () {
             expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
         });
 
+        it("should restart ICE gathering one again after being failed for 4 seconds", () => {
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
+        });
+
+        it("should call hangup if Android after ICE being failed for 4 seconds", () => {
+            mockPeerConn.restartIce = null;
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
         it("should not hangup if we've managed to re-connect", () => {
             mockPeerConn.iceConnectionState = "connected";
             mockPeerConn.iceConnectionStateChangeListener!();
