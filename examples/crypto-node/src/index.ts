@@ -1,5 +1,5 @@
 import credentials from "./credentials.js";
-import { rl, printRoomList, printMessages, printMemberList } from "./io.js";
+import { rl, prompt, printRoomList, printMessages, printMemberList } from "./io.js";
 import { start, verifyRoom, getRoomList } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
@@ -16,7 +16,7 @@ client.on(sdk.ClientEvent.Room, () => {
 		printRoomList(roomList);
 	}
 
-	rl.prompt();
+	prompt();
 });
 
 client.on(sdk.RoomEvent.Timeline, async(event, room) => {
@@ -32,65 +32,63 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 
 	await client.decryptEventIfNeeded(event);
 
-	process.stdout.clearLine(-1);
-	process.stdout.cursorTo(0);
-	console.log(event.getContent().body);
-	rl.prompt();
+	prompt(event.getContent().body);
 });
 
 rl.on("line", async (line: string) => {
 	if (line.trim().length === 0) {
-		rl.prompt();
+		prompt();
 		return;
 	}
 
-	if (viewingRoom == null) {
-		if (line.indexOf("/join ") === 0) {
-			const index = line.split(" ")[1];
+	if (viewingRoom == null && line.indexOf("/join ") === 0) {
+		const index = line.split(" ")[1];
 
-			if (roomList[index] == null) {
-				console.log("invalid room");
-				rl.prompt();
-				return;
-			}
-
-			if (roomList[index].getMember(client.getUserId()).membership === sdk.JoinRule.Invite) {
-				await client.joinRoom(roomList[index].roomId);
-			}
-
-			await verifyRoom(client, roomList[index]);
-
-			viewingRoom = roomList[index];
-			await client.roomInitialSync(roomList[index].roomId, 20);
-
-			if (viewingRoom) {
-				printMessages(viewingRoom);
-			} else {
-				printRoomList(roomList);
-			}
-
-			rl.prompt();
+		if (roomList[index] == null) {
+			prompt("invalid room");
 			return;
 		}
-	} else {
-		if (line.indexOf("/members") === 0) {
-			printMemberList(viewingRoom);
-		} else {
-			const message = {
-				msgtype: sdk.MsgType.Text,
-				body: line
-			};
 
-			await client.sendMessage(viewingRoom.roomId, message);
+		if (roomList[index].getMember(client.getUserId()).membership === sdk.JoinRule.Invite) {
+			await client.joinRoom(roomList[index].roomId);
 		}
-		rl.prompt();
+
+		await verifyRoom(client, roomList[index]);
+
+		viewingRoom = roomList[index];
+		await client.roomInitialSync(roomList[index].roomId, 20);
+
+		if (viewingRoom) {
+			printMessages(viewingRoom);
+		} else {
+			printRoomList(roomList);
+		}
+
+		prompt();
 		return;
 	}
 
-	console.log("invalid command");
-	rl.prompt();
+	if (viewingRoom != null && line.indexOf("/members") === 0) {
+		printMemberList(viewingRoom);
+		prompt();
+		return;
+	}
+
+	if (viewingRoom != null) {
+		const message = {
+			msgtype: sdk.MsgType.Text,
+			body: line
+		};
+
+		await client.sendMessage(viewingRoom.roomId, message);
+
+		prompt();
+		return;
+	}
+
+	prompt("invalid command");
 });
 
 roomList = getRoomList(client);
 printRoomList(roomList);
-rl.prompt();
+prompt();

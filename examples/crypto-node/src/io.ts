@@ -84,3 +84,20 @@ export const printMemberList = (room: Room): void => {
 		console.log(`${membership} :: ${member.name} (${member.userId})`);
 	}
 }
+
+/**
+ * Prompt the user with an optional string preserving input text.
+ */
+export const prompt = (text?: string): void => {
+	const cursor = rl.getCursorPos();
+
+	clearLine();
+
+	if (text != null) {
+		console.log(text);
+	}
+
+	process.stdout.cursorTo(cursor.cols);
+
+	rl.prompt(true);
+};
