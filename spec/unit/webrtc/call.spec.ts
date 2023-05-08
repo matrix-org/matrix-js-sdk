@@ -1678,6 +1678,7 @@ describe("Call", function () {
         });
 
         it("should call hangup if Android after ICE being failed for 4 seconds", () => {
+            // @ts-ignore
             mockPeerConn.restartIce = null;
             mockPeerConn.iceConnectionState = "failed";
             mockPeerConn.iceConnectionStateChangeListener!();
