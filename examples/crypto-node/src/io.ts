@@ -1,5 +1,5 @@
 import readline from "readline";
-import { EventType, Room } from "../../../lib/index.js"
+import { Direction, EventType, Room } from "../../../lib/index.js"
 
 /**
  * Setup the line reader.
@@ -83,7 +83,40 @@ export const printMemberList = (room: Room): void => {
 
 		console.log(`${membership} :: ${member.name} (${member.userId})`);
 	}
-}
+};
+
+/**
+ * Print additional information about a room.
+ */
+export const printRoomInfo = (room: Room): void => {
+	const state = room.getLiveTimeline().getState(Direction.Forward);
+	const eTypeHeader = fixWidth("Event Type(state_key)", 26);
+	const sendHeader = fixWidth("Sender", 26);
+	const contentHeader = fixWidth("Content", 26);
+
+	console.log(`${eTypeHeader}|${sendHeader}|${contentHeader}`);
+
+	if (state == null) {
+		return;
+	}
+
+	for (const [key, events] of state.events) {
+
+		if (key === EventType.RoomMember) {
+			continue;
+		}
+
+		for (const [stateKey, event] of events) {
+			const postfix = stateKey == null ? "" : `(${stateKey})`;
+			const typeAndKey = `${key}${postfix}`;
+			const typeStr = fixWidth(typeAndKey, eTypeHeader.length);
+			const sendStr = fixWidth(event.getSender() ?? "", sendHeader.length);
+			const contentStr = fixWidth(JSON.stringify(event.getContent()), 26);
+
+			console.log(`${typeStr}|${sendStr}|${contentStr}`);
+		}
+	}
+};
 
 /**
  * Prompt the user with an optional string preserving input text.

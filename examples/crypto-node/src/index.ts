@@ -1,5 +1,5 @@
 import credentials from "./credentials.js";
-import { rl, prompt, printRoomList, printMessages, printMemberList } from "./io.js";
+import { rl, prompt, printRoomList, printMessages, printMemberList, printRoomInfo } from "./io.js";
 import { start, verifyRoom, getRoomList } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
@@ -70,6 +70,19 @@ rl.on("line", async (line: string) => {
 
 	if (viewingRoom != null && line.indexOf("/members") === 0) {
 		printMemberList(viewingRoom);
+		prompt();
+		return;
+	}
+
+	if (viewingRoom != null && line.indexOf("/roominfo") === 0) {
+		printRoomInfo(viewingRoom);
+		prompt();
+		return;
+	}
+
+	if (viewingRoom != null && line.indexOf("/exit") === 0) {
+		viewingRoom = null;
+		printRoomList(roomList);
 		prompt();
 		return;
 	}
