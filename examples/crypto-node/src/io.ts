@@ -63,3 +63,24 @@ export const printMessages = (room: Room): void => {
 		console.log(event.getContent().body);
 	}
 };
+
+/**
+ * Print a list of members in the room.
+ */
+export const printMemberList = (room: Room): void => {
+	const members = room.getMembers();
+
+	members.sort((a, b) => a.name === b.name ? 0 : a.name > b.name ? -1 : 1);
+
+	console.log(`Membership list for room "${room.name}"`);
+
+	for (const member of members) {
+		if (member.membership == null) {
+			continue;
+		}
+
+		const membership = fixWidth(member.membership, 10);
+
+		console.log(`${membership} :: ${member.name} (${member.userId})`);
+	}
+}

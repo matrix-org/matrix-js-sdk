@@ -1,5 +1,5 @@
 import credentials from "./credentials.js";
-import { rl, printRoomList, printMessages } from "./io.js";
+import { rl, printRoomList, printMessages, printMemberList } from "./io.js";
 import { start, verifyRoom, getRoomList } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
@@ -16,6 +16,25 @@ client.on(sdk.ClientEvent.Room, () => {
 		printRoomList(roomList);
 	}
 
+	rl.prompt();
+});
+
+client.on(sdk.RoomEvent.Timeline, async(event, room) => {
+	const type = event.getType() as EventType;
+
+	if (![sdk.EventType.RoomMessage, sdk.EventType.RoomMessageEncrypted].includes(type)) {
+		return;
+	}
+
+	if (room != null && room.roomId !== viewingRoom?.roomId) {
+		return;
+	}
+
+	await client.decryptEventIfNeeded(event);
+
+	process.stdout.clearLine(-1);
+	process.stdout.cursorTo(0);
+	console.log(event.getContent().body);
 	rl.prompt();
 });
 
@@ -54,12 +73,16 @@ rl.on("line", async (line: string) => {
 			return;
 		}
 	} else {
-		const message = {
-			msgtype: sdk.MsgType.Text,
-			body: line
-		};
+		if (line.indexOf("/members") === 0) {
+			printMemberList(viewingRoom);
+		} else {
+			const message = {
+				msgtype: sdk.MsgType.Text,
+				body: line
+			};
 
-		await client.sendMessage(viewingRoom.roomId, message);
+			await client.sendMessage(viewingRoom.roomId, message);
+		}
 		rl.prompt();
 		return;
 	}
@@ -67,26 +90,6 @@ rl.on("line", async (line: string) => {
 	console.log("invalid command");
 	rl.prompt();
 });
-
-client.on(sdk.RoomEvent.Timeline, async(event, room) => {
-	const type = event.getType() as EventType;
-
-	if (![sdk.EventType.RoomMessage, sdk.EventType.RoomMessageEncrypted].includes(type)) {
-		return;
-	}
-
-	if (room != null && room.roomId !== viewingRoom?.roomId) {
-		return;
-	}
-
-	await client.decryptEventIfNeeded(event);
-
-	process.stdout.clearLine(-1);
-	process.stdout.cursorTo(0);
-	console.log(event.getContent().body);
-	rl.prompt();
-});
-
 
 roomList = getRoomList(client);
 printRoomList(roomList);
