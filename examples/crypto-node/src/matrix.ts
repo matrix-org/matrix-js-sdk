@@ -132,3 +132,35 @@ export const verifyRoom = async (client: MatrixClient, room: Room): Promise<void
 
 	await Promise.all(verificationPromises);
 };
+
+/**
+ * Get a sorted list of rooms.
+ */
+export const getRoomList = (client: MatrixClient): Room[] => {
+	const rooms = client.getRooms();
+
+	rooms.sort((a, b) => {
+		const aEvents = a.getLiveTimeline().getEvents();
+		const bEvents = b.getLiveTimeline().getEvents();
+
+		const aMsg = aEvents[aEvents.length - 1];
+
+		if (aMsg == null) {
+			return -1;
+		}
+
+		const bMsg = bEvents[bEvents.length - 1];
+
+		if (bMsg == null) {
+			return 1;
+		}
+
+		if (aMsg.getTs() === bMsg.getTs()) {
+			return 0;
+		}
+
+		return aMsg.getTs() > bMsg.getTs() ? 1 : -1;
+	});
+
+	return rooms;
+};
