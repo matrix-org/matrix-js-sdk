@@ -33,6 +33,16 @@ const rl = readline.createInterface({
 
 rl.setPrompt("$ ");
 
+const clearDevices = async (client: MatrixClient) => {
+	const devices = await client.getDevices();
+
+	const devicesIds = devices.devices
+		.map(device => device.device_id)
+		.filter(id => id !== client.getDeviceId());
+
+	await Promise.all(devicesIds.map(id => client.deleteDevice(id)));
+};
+
 const startWithAccessToken = async (accessToken: string, deviceId: string) => {
 	const client = sdk.createClient({
 		userId: credentials.userId,
@@ -50,6 +60,8 @@ const startWithAccessToken = async (accessToken: string, deviceId: string) => {
 	if (state !== "PREPARED") {
 		throw new Error("Sync failed.");
 	}
+
+	await clearDevices(client);
 
 	return client;
 };
