@@ -8,6 +8,7 @@
  */
 import olm from "@matrix-org/olm";
 
+// @ts-ignore TS2322 Ignore slight olm signature mismatch.
 global.Olm = olm;
 
 /**
