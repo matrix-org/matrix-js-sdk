@@ -221,12 +221,21 @@ rl.on("line", async (line: string) => {
 	rl.prompt();
 });
 
-client.on(sdk.RoomEvent.Timeline, (event) => {
-	if (event.getType() !== "m.room.message") {
+client.on(sdk.RoomEvent.Timeline, async(event, room) => {
+	if (!["m.room.message", "m.room.encrypted"].includes(event.getType())) {
 		return;
 	}
 
-	console.log("GOT MESSAGE", event.getContent());
+	if (room != null && room.roomId !== viewingRoom?.roomId) {
+		return;
+	}
+
+	await client.decryptEventIfNeeded(event);
+
+	process.stdout.clearLine(-1);
+	process.stdout.cursorTo(0);
+	console.log(event.getContent().body);
+	rl.prompt();
 });
 
 
