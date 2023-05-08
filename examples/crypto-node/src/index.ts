@@ -67,6 +67,30 @@ const start = async () => {
 	return await startWithAccessToken(res.access_token, res.device_id);
 };
 
+const verify = async (userId: string, deviceId: string) => {
+	await client.setDeviceKnown(userId, deviceId);
+	await client.setDeviceVerified(userId, deviceId);
+};
+
+const verifyAll = async (room: Room) => {
+	const members = await room.getEncryptionTargetMembers();
+	const verificationPromises: Promise<void>[] = [];
+
+	for (const member of members) {
+		const devices = client.getStoredDevicesForUser(member.userId);
+
+		for (const device of devices) {
+
+			if (device.isUnverified()) {
+				verificationPromises.push( verify(member.userId, device.deviceId) );
+			}
+		}
+	}
+
+	await Promise.all(verificationPromises);
+};
+
+
 const setRoomList = (client: MatrixClient) => {
 	roomList = client.getRooms();
 	roomList.sort((a, b) => {
@@ -140,7 +164,7 @@ client.on(sdk.ClientEvent.Room, () => {
 	rl.prompt();
 });
 
-rl.on("line", (line: string) => {
+rl.on("line", async (line: string) => {
 	if (line.trim().length === 0) {
 		rl.prompt();
 		return;
@@ -156,18 +180,43 @@ rl.on("line", (line: string) => {
 				return;
 			}
 
+			if (roomList[index].getMember(client.getUserId()).membership === sdk.JoinRule.Invite) {
+				await client.joinRoom(roomList[index].roomId);
+			}
+
+			await verifyAll(roomList[index]);
+
 			viewingRoom = roomList[index];
+			await client.roomInitialSync(roomList[index].roomId, 20);
 
 			printMessages();
 
 			rl.prompt();
 			return;
 		}
+	} else {
+		const message = {
+			msgtype: sdk.MsgType.Text,
+			body: line
+		};
+
+		await client.sendMessage(viewingRoom.roomId, message);
+		rl.prompt();
+		return;
 	}
 
 	console.log("invalid command");
 	rl.prompt();
 });
+
+client.on(sdk.RoomEvent.Timeline, (event) => {
+	if (event.getType() !== "m.room.message") {
+		return;
+	}
+
+	console.log("GOT MESSAGE", event.getContent());
+});
+
 
 setRoomList(client);
 printRoomList();
