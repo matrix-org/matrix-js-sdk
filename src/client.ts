@@ -635,7 +635,7 @@ interface IJoinRequestBody {
 
 interface ITagMetadata {
     [key: string]: any;
-    order: number;
+    order?: number;
 }
 
 interface IMessagesResponse {
@@ -4185,7 +4185,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata): Promise<{}> {
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -8625,6 +8625,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setPusher(pusher: IPusherRequest): Promise<{}> {
         const path = "/pushers/set";
         return this.http.authedRequest(Method.Post, path, undefined, pusher);
+    }
+
+    /**
+     * Removes an existing pusher
+     * @param pushKey - pushkey of pusher to remove
+     * @param appId - app_id of pusher to remove
+     * @returns Promise which resolves: Empty json object on success
+     * @returns Rejects: with an error response.
+     */
+    public removePusher(pushKey: string, appId: string): Promise<{}> {
+        const path = "/pushers/set";
+        const body = {
+            pushkey: pushKey,
+            app_id: appId,
+            kind: null, // marks pusher for removal
+        };
+        return this.http.authedRequest(Method.Post, path, undefined, body);
     }
 
     /**

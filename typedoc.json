@@ -1,0 +1,3 @@
+{
+    "plugin": ["typedoc-plugin-mdn-links", "typedoc-plugin-missing-exports", "typedoc-plugin-versions"]
+}
