@@ -12,8 +12,5 @@
     "dependencies": {
         "@matrix-org/olm": "^3.2.15",
         "matrix-js-sdk": "file:../.."
-    },
-    "devDependencies": {
-        "@types/cli-color": "^2.0.2"
     }
 }
