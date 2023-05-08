@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { CodecMap, ConnectionStatsReport, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
+import { AudioConcealment, CodecMap, ConnectionStatsReport, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 import { MediaTrackStats, Resolution } from "./media/mediaTrackStats";
 
 export class StatsReportBuilder {
@@ -38,11 +38,15 @@ export class StatsReportBuilder {
         const framerates: FramerateMap = { local: new Map<TrackID, number>(), remote: new Map<TrackID, number>() };
         const codecs: CodecMap = { local: new Map<TrackID, string>(), remote: new Map<TrackID, string>() };
         const jitter = new Map<TrackID, number>();
+        const audioConcealment = new Map<TrackID, AudioConcealment>();
 
         let audioBitrateDownload = 0;
         let audioBitrateUpload = 0;
         let videoBitrateDownload = 0;
         let videoBitrateUpload = 0;
+
+        let concealedAudio = 0;
+        let totalAudioDuration = 0;
 
         for (const [trackId, trackStats] of stats) {
             // process packet loss stats
@@ -56,6 +60,11 @@ export class StatsReportBuilder {
             bitrateDownload += trackStats.getBitrate().download;
             bitrateUpload += trackStats.getBitrate().upload;
 
+            // process audio quality stats
+            const audioConcealmentForTrack = trackStats.getAudioConcealment();
+            concealedAudio += audioConcealmentForTrack.concealedAudio;
+            totalAudioDuration += audioConcealmentForTrack.totalAudioDuration;
+            
             // collect resolutions and framerates
             if (trackStats.kind === "audio") {
                 audioBitrateDownload += trackStats.getBitrate().download;
@@ -70,6 +79,7 @@ export class StatsReportBuilder {
             codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
             if (trackStats.getType() === "remote") {
                 jitter.set(trackId, trackStats.getJitter());
+                audioConcealment.set(trackId, trackStats.getAudioConcealment());
             }
 
             trackStats.resetBitrate();
@@ -98,6 +108,7 @@ export class StatsReportBuilder {
             download: StatsReportBuilder.calculatePacketLoss(lostPackets.download, totalPackets.download),
             upload: StatsReportBuilder.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
         };
+        report.audioConcealment = { ratio: concealedAudio / totalAudioDuration, concealedAudio, totalAudioDuration };
         report.framerate = framerates;
         report.resolution = resolutions;
         report.codec = codecs;

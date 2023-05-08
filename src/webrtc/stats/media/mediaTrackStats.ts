@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { AudioConcealment } from "../statsReport";
 import { TrackId } from "./mediaTrackHandler";
 
 export interface PacketLoss {
@@ -32,7 +33,14 @@ export interface Bitrate {
      */
     upload: number;
 }
+export interface ConcealedAudio {
+    /**
+     * durtation in ms
+     */
+    duration: number;
 
+    ratio: number;
+}
 export interface Resolution {
     width: number;
     height: number;
@@ -44,6 +52,7 @@ export class MediaTrackStats {
     private loss: PacketLoss = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
     private bitrate: Bitrate = { download: 0, upload: 0 };
     private resolution: Resolution = { width: -1, height: -1 };
+    private audioConcealment: AudioConcealment = { ratio: 0, concealedAudio: 0, totalAudioDuration: 0 };
     private framerate = 0;
     private jitter = 0;
     private codec = "";
@@ -61,8 +70,8 @@ export class MediaTrackStats {
         return this.type;
     }
 
-    public setLoss(loos: PacketLoss): void {
-        this.loss = loos;
+    public setLoss(loss: PacketLoss): void {
+        this.loss = loss;
     }
 
     public getLoss(): PacketLoss {
@@ -151,5 +160,24 @@ export class MediaTrackStats {
      */
     public getJitter(): number {
         return this.jitter;
+    }
+
+    /**
+     * Audio concealment ration (conceled duration / total duration)
+     */
+    public setConcealedAudioDuration(duration: number): void {
+        this.audioConcealment.concealedAudio = duration;
+    }
+
+    public setConcealedAudioRatio(ratio: number): void {
+        this.audioConcealment.ratio = ratio;
+    }
+
+    public setTrackDuration(duration: number): void {
+        this.audioConcealment.totalAudioDuration = duration;
+    }
+
+    public getAudioConcealment(): AudioConcealment {
+        return this.audioConcealment;
     }
 }

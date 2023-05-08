@@ -173,4 +173,14 @@ export class TrackStatsReporter {
             trackStats.setJitter(-1);
         }
     }
+
+    public static buildAudioConcealment(trackStats: MediaTrackStats, statsReport: any): void {
+        if(statsReport !== "inbound-rtp"){
+            return;
+        }        
+        const msPerSample = Math.round(1000 * statsReport?.totalSamplesDuration / statsReport?.totalSamplesReceived);
+        trackStats.setTrackDuration(1000 * statsReport?.totalSamplesDuration);
+        trackStats.setConcealedAudioDuration(msPerSample * statsReport?.concealedSamples);
+        trackStats.setConcealedAudioRatio(statsReport?.concealedSamples / statsReport?.totalSamplesReceived);
+    }
 }
