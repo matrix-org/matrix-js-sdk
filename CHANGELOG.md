@@ -1,5 +1,5 @@
-Changes in [25.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.1.0-rc.1) (2023-05-02)
-============================================================================================================
+Changes in [25.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.1.0) (2023-05-09)
+==================================================================================================
 
 ## 🦖 Deprecations
  * Deprecate MatrixClient::resolveRoomAlias ([\#3316](https://github.com/matrix-org/matrix-js-sdk/pull/3316)).
