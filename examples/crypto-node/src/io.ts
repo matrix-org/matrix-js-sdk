@@ -1,5 +1,5 @@
 import readline from "readline";
-import { Direction, EventType, Room } from "../../../lib/index.js"
+import { Direction, EventType, Room, MatrixEvent } from "../../../lib/index.js"
 
 export type Command = (...args: string[]) => Promise<string | void> | string | void
 
@@ -118,7 +118,7 @@ export const printMessages = (room: Room): void => {
 			continue;
 		}
 
-		console.log(event.getContent().body);
+		printMessage(event);
 	}
 };
 
@@ -175,3 +175,32 @@ export const printRoomInfo = (room: Room): void => {
 		}
 	}
 };
+
+/**
+ * Print a message with nice formatting.
+ */
+export const printMessage = (event: MatrixEvent) => {
+	const name = fixWidth(event.sender ? event.sender.name : event.getSender() ?? "", 30);
+	const time = tsToDateString(event.getTs());
+
+	let content: string;
+
+	if (event.getType() === EventType.RoomMessage) {
+		content = event.getContent().body;
+	} else if (event.isState()) {
+		const stateKey = event.getStateKey();
+		const postfix = stateKey == null || stateKey.length < 1 ? "" : ` (${stateKey})`;
+		const stateName = `${event.getType()}${postfix}`;
+
+		content = `[State: ${stateName} updated to: ${JSON.stringify(event.getContent())}]`;
+	} else {
+		// random message event
+		content = `[Message: ${event.getType()} Content: ${JSON.stringify(event.getContent())}]`;
+	}
+
+	console.log(`[${time}] ${name}`);
+
+	for (const line of content.split("\n")) {
+		console.log(`  ${line}`);
+	}
+}

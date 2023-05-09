@@ -3,6 +3,7 @@ import {
 	prompt,
 	fixWidth,
 	printRoomList,
+	printMessage,
 	printMessages,
 	printMemberList,
 	printRoomInfo,
@@ -40,7 +41,8 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 
 	await client.decryptEventIfNeeded(event);
 
-	prompt(event.getContent().body);
+	printMessage(event);
+	prompt();
 });
 
 addCommand("/help", () => {
