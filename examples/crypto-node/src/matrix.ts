@@ -89,17 +89,12 @@ export const clearDevices = async (client: MatrixClient) => {
 /**
  * Start the client with a password login.
  */
-export const start = async (passwordLogin: PasswordLogin, options?: { forgetDevices?: boolean }): Promise<MatrixClient> => {
+export const start = async (passwordLogin: PasswordLogin): Promise<MatrixClient> => {
 	// Get the token login details.
 	const tokenLogin = await getTokenLogin(passwordLogin);
 
 	// Start the client with the token.
 	const client = await startWithToken(tokenLogin);
-
-	// Clear other devices - this can help resolve olm session issues.
-	if (options?.forgetDevices) {
-		await clearDevices(client);
-	}
 
 	return client;
 }
