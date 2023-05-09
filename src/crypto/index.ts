@@ -38,7 +38,7 @@ import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
 import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { VerificationBase } from "./verification/Base";
+import type { VerificationBase } from "./verification/Base";
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode";
 import { SAS as SASVerification } from "./verification/SAS";
 import { keyFromPassphrase } from "./key_passphrase";

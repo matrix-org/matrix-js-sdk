@@ -22,10 +22,10 @@ limitations under the License.
 import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto";
+import type { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
+import type { Crypto } from "../crypto";
 import { logger } from "../logger";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
-import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
 import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";

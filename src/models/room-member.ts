@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { MatrixEvent } from "./event";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { User } from "./user";
-import { MatrixEvent } from "./event";
 import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
