@@ -1,5 +1,5 @@
 import credentials from "./credentials.js";
-import { rl, prompt, printRoomList, printMessages, printMemberList, printRoomInfo } from "./io.js";
+import { prompt, printRoomList, printMessages, printMemberList, printRoomInfo, addCommand } from "./io.js";
 import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
@@ -35,91 +35,86 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 	prompt(event.getContent().body);
 });
 
-rl.on("line", async (line: string) => {
-	if (line.trim().length === 0) {
-		prompt();
-		return;
-	}
+addCommand("/cleardevices", async () => {
+	await clearDevices(client);
+});
 
-	if (line.indexOf("/cleardevices") === 0) {
-		await clearDevices(client);
-		prompt();
-		return;
-	}
-
-	if (viewingRoom == null && line.indexOf("/join ") === 0) {
-		const index = line.split(" ")[1];
-
-		if (roomList[index] == null) {
-			prompt("invalid room");
-			return;
-		}
-
-		if (roomList[index].getMember(client.getUserId()).membership === sdk.JoinRule.Invite) {
-			await client.joinRoom(roomList[index].roomId);
-		}
-
-		await verifyRoom(client, roomList[index]);
-
-		viewingRoom = roomList[index];
-		await client.roomInitialSync(roomList[index].roomId, 20);
-
-		if (viewingRoom) {
-			printMessages(viewingRoom);
-		} else {
-			printRoomList(roomList);
-		}
-
-		prompt();
-		return;
-	}
-
-	if (viewingRoom != null && line.indexOf("/invite ") === 0) {
-		const userId = line.split(" ")[1].trim();
-
-		try {
-			await client.invite(viewingRoom.roomId, userId);
-
-			prompt();
-		} catch (error) {
-			prompt(`/invite Error: ${error}`);
-		}
-
-		return;
-	}
-
-	if (viewingRoom != null && line.indexOf("/members") === 0) {
-		printMemberList(viewingRoom);
-		prompt();
-		return;
-	}
-
-	if (viewingRoom != null && line.indexOf("/roominfo") === 0) {
-		printRoomInfo(viewingRoom);
-		prompt();
-		return;
-	}
-
-	if (viewingRoom != null && line.indexOf("/exit") === 0) {
-		viewingRoom = null;
-		printRoomList(roomList);
-		prompt();
-		return;
-	}
-
+addCommand("/join", async (index) => {
 	if (viewingRoom != null) {
-		const message = {
-			msgtype: sdk.MsgType.Text,
-			body: line
-		};
-
-		await client.sendMessage(viewingRoom.roomId, message);
-
-		prompt();
-		return;
+		return "You must first exit your current room.";
 	}
 
-	prompt("invalid command");
+	viewingRoom = roomList[index];
+
+	if (viewingRoom == null) {
+		return "Invalid Room.";
+	}
+
+	if (viewingRoom.getMember(client.getUserId() ?? "")?.membership === sdk.JoinRule.Invite) {
+		await client.joinRoom(viewingRoom.roomId);
+	}
+
+	await verifyRoom(client, viewingRoom);
+	await client.roomInitialSync(viewingRoom.roomId, 20);
+
+	printMessages(viewingRoom);
+});
+
+addCommand("/exit", () => {
+	viewingRoom = null;
+	printRoomList(roomList);
+});
+
+addCommand("/invite", async (userId) => {
+	if (viewingRoom == null) {
+		return "You must first join a room.";
+	}
+
+	try {
+		await client.invite(viewingRoom.roomId, userId);
+	} catch (error) {
+		return `/invite Error: ${error}`;
+	}
+});
+
+addCommand("/members", async () => {
+	if (viewingRoom == null) {
+		return "You must first join a room.";
+	}
+
+	printMemberList(viewingRoom);
+});
+
+addCommand("/roominfo", async () => {
+	if (viewingRoom == null) {
+		return "You must first join a room.";
+	}
+
+	printMemberList(viewingRoom);
+});
+
+addCommand("/roominfo", async () => {
+	if (viewingRoom == null) {
+		return "You must first join a room.";
+	}
+
+	printRoomInfo(viewingRoom);
+});
+
+addCommand("/send", async (...tokens) => {
+	if (viewingRoom == null) {
+		return "You must first join a room.";
+	}
+
+	console.log(tokens);
+	console.log(tokens.join(" "));
+
+	const message = {
+		msgtype: sdk.MsgType.Text,
+		body: tokens.join(" ")
+	};
+
+	await client.sendMessage(viewingRoom.roomId, message);
 });
 
 roomList = getRoomList(client);

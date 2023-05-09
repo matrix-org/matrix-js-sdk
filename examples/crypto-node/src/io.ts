@@ -1,10 +1,12 @@
 import readline from "readline";
 import { Direction, EventType, Room } from "../../../lib/index.js"
 
+export type Command = (...args: string[]) => Promise<string | void> | string | void
+
 /**
  * Setup the line reader.
  */
-export const rl = readline.createInterface({
+const rl = readline.createInterface({
 	input: process.stdin,
 	output: process.stdout
 });
@@ -17,6 +19,51 @@ rl.setPrompt("$ ");
 export const clearLine = (): void => {
 	process.stdout.clearLine(-1);
 	process.stdout.cursorTo(0);
+};
+
+const commands = new Map<string, Command>();
+
+rl.on("line", async line => {
+	for (const [command, method] of commands.entries()) {
+		if (line.indexOf(command) === 0) {
+			const args = line.split(" ");
+
+			args.shift();
+
+			const result = await method(...args);
+
+			// Result can be void so we need to use this nullish coalescing operator
+			// to convert it to undefined.
+			prompt(result ?? undefined);
+			return;
+		}
+	}
+
+	prompt("Invalid command.");
+});
+
+/**
+ * Prompt the user with an optional string preserving input text.
+ */
+export const prompt = (text?: string): void => {
+	const cursor = rl.getCursorPos();
+
+	clearLine();
+
+	if (text != null) {
+		console.log(text);
+	}
+
+	process.stdout.cursorTo(cursor.cols);
+
+	rl.prompt(true);
+};
+
+/**
+ * Add a command to execute when the user sends input.
+ */
+export const addCommand = (command: string, method: Command): void => {
+	commands.set(command, method);
 };
 
 /**
@@ -116,21 +163,4 @@ export const printRoomInfo = (room: Room): void => {
 			console.log(`${typeStr}|${sendStr}|${contentStr}`);
 		}
 	}
-};
-
-/**
- * Prompt the user with an optional string preserving input text.
- */
-export const prompt = (text?: string): void => {
-	const cursor = rl.getCursorPos();
-
-	clearLine();
-
-	if (text != null) {
-		console.log(text);
-	}
-
-	process.stdout.cursorTo(cursor.cols);
-
-	rl.prompt(true);
 };
