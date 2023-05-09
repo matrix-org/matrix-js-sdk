@@ -35,6 +35,10 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 	prompt(event.getContent().body);
 });
 
+addCommand("/quit", () => {
+	process.exit();
+});
+
 addCommand("/cleardevices", async () => {
 	await clearDevices(client);
 });
