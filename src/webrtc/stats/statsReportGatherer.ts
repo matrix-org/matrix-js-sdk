@@ -53,7 +53,7 @@ export class StatsReportGatherer {
             receivedMedia: 0,
             receivedAudioMedia: 0,
             receivedVideoMedia: 0,
-            audioTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0 },
+            audioTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0, percentageConcealedAudio: 0 },
             videoTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0 },
         } as SummaryStats;
         if (this.isActive) {

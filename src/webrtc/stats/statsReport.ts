@@ -35,7 +35,8 @@ export interface ConnectionStatsReport {
     bandwidth: ConnectionStatsBandwidth;
     bitrate: ConnectionStatsBitrate;
     packetLoss: PacketLoss;
-    audioConcealment: AudioConcealment;
+    audioConcealment: Map<TrackID, AudioConcealment>;
+    totalAudioConcealment: AudioConcealment;
     resolution: ResolutionMap;
     framerate: FramerateMap;
     codec: CodecMap;
@@ -77,4 +78,5 @@ export interface SummaryStatsReport {
     percentageReceivedVideoMedia: number;
     maxJitter: number;
     maxPacketLoss: number;
+    percentageConcealedAudio: number;
 }

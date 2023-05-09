@@ -1,6 +1,6 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
 import { StatsValueFormatter } from "./statsValueFormatter";
-import { TrackSummary } from "./summaryStats";
+import { AudioTrackSummary, TrackSummary } from "./summaryStats";
 
 export class TrackStatsReporter {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
@@ -137,26 +137,37 @@ export class TrackStatsReporter {
     }
 
     public static buildTrackSummary(trackStatsList: MediaTrackStats[]): {
-        audioTrackSummary: TrackSummary;
+        audioTrackSummary: AudioTrackSummary;
         videoTrackSummary: TrackSummary;
     } {
-        const audioTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        const videoTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        trackStatsList
-            .filter((t) => t.getType() === "remote")
-            .forEach((stats) => {
-                const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
-                trackSummary.count++;
-                if (stats.alive && stats.muted) {
-                    trackSummary.muted++;
-                }
-                if (trackSummary.maxJitter < stats.getJitter()) {
-                    trackSummary.maxJitter = stats.getJitter();
-                }
-                if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
-                    trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
-                }
-            });
+        const videoTrackSummary: TrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
+        const audioTrackSummary: AudioTrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            percentageConcealedAudio: 0,
+        };
+
+        const remoteTrackList = trackStatsList.filter((t) => t.getType() === "remote");
+        remoteTrackList.forEach((stats) => {
+            const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+            trackSummary.count++;
+            if (stats.alive && stats.muted) {
+                trackSummary.muted++;
+            }
+            if (trackSummary.maxJitter < stats.getJitter()) {
+                trackSummary.maxJitter = stats.getJitter();
+            }
+            if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
+                trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
+            }
+        });
+
+        const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
+        audioTrackList.forEach((stats) => {
+            audioTrackSummary.percentageConcealedAudio += stats.getAudioConcealment()?.ratio / audioTrackList.length;
+        });
         return { audioTrackSummary, videoTrackSummary };
     }
 
@@ -175,10 +186,10 @@ export class TrackStatsReporter {
     }
 
     public static buildAudioConcealment(trackStats: MediaTrackStats, statsReport: any): void {
-        if(statsReport !== "inbound-rtp"){
+        if (statsReport.type !== "inbound-rtp") {
             return;
-        }        
-        const msPerSample = Math.round(1000 * statsReport?.totalSamplesDuration / statsReport?.totalSamplesReceived);
+        }
+        const msPerSample = (1000 * statsReport?.totalSamplesDuration) / statsReport?.totalSamplesReceived;
         trackStats.setTrackDuration(1000 * statsReport?.totalSamplesDuration);
         trackStats.setConcealedAudioDuration(msPerSample * statsReport?.concealedSamples);
         trackStats.setConcealedAudioRatio(statsReport?.concealedSamples / statsReport?.totalSamplesReceived);

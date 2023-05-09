@@ -45,7 +45,7 @@ export class StatsReportBuilder {
         let videoBitrateDownload = 0;
         let videoBitrateUpload = 0;
 
-        let concealedAudio = 0;
+        let totalConcealedAudio = 0;
         let totalAudioDuration = 0;
 
         for (const [trackId, trackStats] of stats) {
@@ -60,26 +60,29 @@ export class StatsReportBuilder {
             bitrateDownload += trackStats.getBitrate().download;
             bitrateUpload += trackStats.getBitrate().upload;
 
-            // process audio quality stats
-            const audioConcealmentForTrack = trackStats.getAudioConcealment();
-            concealedAudio += audioConcealmentForTrack.concealedAudio;
-            totalAudioDuration += audioConcealmentForTrack.totalAudioDuration;
-            
             // collect resolutions and framerates
             if (trackStats.kind === "audio") {
+                // process audio quality stats
+                const audioConcealmentForTrack = trackStats.getAudioConcealment();
+                totalConcealedAudio += audioConcealmentForTrack.concealedAudio;
+                totalAudioDuration += audioConcealmentForTrack.totalAudioDuration;
+                
                 audioBitrateDownload += trackStats.getBitrate().download;
                 audioBitrateUpload += trackStats.getBitrate().upload;
             } else {
                 videoBitrateDownload += trackStats.getBitrate().download;
                 videoBitrateUpload += trackStats.getBitrate().upload;
             }
-
+            
             resolutions[trackStats.getType()].set(trackId, trackStats.getResolution());
             framerates[trackStats.getType()].set(trackId, trackStats.getFramerate());
             codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
             if (trackStats.getType() === "remote") {
                 jitter.set(trackId, trackStats.getJitter());
-                audioConcealment.set(trackId, trackStats.getAudioConcealment());
+                // TODO: decide if we even want per track audio concealment
+                if (trackStats.kind === "audio") {
+                    audioConcealment.set(trackId, trackStats.getAudioConcealment());
+                }
             }
 
             trackStats.resetBitrate();
@@ -108,7 +111,13 @@ export class StatsReportBuilder {
             download: StatsReportBuilder.calculatePacketLoss(lostPackets.download, totalPackets.download),
             upload: StatsReportBuilder.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
         };
-        report.audioConcealment = { ratio: concealedAudio / totalAudioDuration, concealedAudio, totalAudioDuration };
+        report.audioConcealment = audioConcealment;
+        report.totalAudioConcealment = {
+            ratio: totalConcealedAudio / totalAudioDuration,
+            concealedAudio: totalConcealedAudio,
+            totalAudioDuration,
+        };
+
         report.framerate = framerates;
         report.resolution = resolutions;
         report.codec = codecs;
