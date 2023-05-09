@@ -17,7 +17,7 @@ const rl = readline.createInterface({
 	input: process.stdin,
 	output: process.stdout,
 	completer: (line: string) => {
-		const hits = [...commands.keys()].filter(function (c) {
+		const hits = [...commands.keys()].filter(c => {
 				return c.indexOf(line) == 0;
 		});
 
