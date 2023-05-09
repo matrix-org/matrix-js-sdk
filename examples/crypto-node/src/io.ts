@@ -1,5 +1,7 @@
 import readline from "readline";
 import { Direction, EventType, Room, MatrixEvent } from "../../../lib/index.js"
+import fs from "fs/promises";
+import type { PasswordLogin } from "./matrix.js";
 
 export type Command = (...args: string[]) => Promise<string | void> | string | void
 
@@ -203,4 +205,26 @@ export const printMessage = (event: MatrixEvent) => {
 	for (const line of content.split("\n")) {
 		console.log(`  ${line}`);
 	}
+}
+
+/**
+ * Read login credentials from a JSON file.
+ */
+export const readCredentials = async (path: string): Promise<PasswordLogin> => {
+	const text = await fs.readFile(path, { encoding: "utf8" });
+	const json = JSON.parse(text);
+
+	if (json.userId == null) {
+		throw new Error("userId field is required");
+	}
+
+	if (json.password == null) {
+		throw new Error("password field is required");
+	}
+
+	if (json.baseUrl == null) {
+		json.baseUrl = "https://matrix.org";
+	}
+
+	return json;
 }

@@ -3,15 +3,14 @@
  * methods in './io.ts' together to create a simple CLI.
  */
 
-/**
- * Import the user's credentials.
- */
-import credentials from "./credentials.js";
+import Path from "path";
+import { fileURLToPath } from 'url';
 
 /**
  * Import out IO helper methods.
  */
 import {
+	readCredentials,
 	prompt,
 	fixWidth,
 	printRoomList,
@@ -38,6 +37,12 @@ import type { Room } from "../../../lib/index.js";
  */
 let roomList: Room[] = [];
 let viewingRoom: Room | null = null;
+
+/**
+* Import the user's credentials.
+*/
+const dirname = Path.dirname(fileURLToPath(import.meta.url));
+const credentials = await readCredentials(Path.join(dirname, "../credentials.json"));
 
 /**
  * Create our matrix client.
