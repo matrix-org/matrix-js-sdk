@@ -1,4 +1,16 @@
+/**
+ * This file glues the matrix helper methods in './matrix.ts' with the IO helper
+ * methods in './io.ts' together to create a simple CLI.
+ */
+
+/**
+ * Import the user's credentials.
+ */
 import credentials from "./credentials.js";
+
+/**
+ * Import out IO helper methods.
+ */
 import {
 	prompt,
 	fixWidth,
@@ -9,16 +21,33 @@ import {
 	printRoomInfo,
 	addCommand
 } from "./io.js";
-import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
-import sdk from "./matrix-importer.js";
-import type { Room, EventType } from "../../../lib/index.js";
 
+/**
+ * Import our matrix helper methods.
+ */
+import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
+
+/**
+ * Import the types and enums from matrix-js-sdk.
+ */
+import { ClientEvent, RoomEvent, EventType, JoinRule, MsgType } from "../../../lib/index.js"
+import type { Room } from "../../../lib/index.js";
+
+/**
+ * Global state for keeping track of rooms.
+ */
 let roomList: Room[] = [];
 let viewingRoom: Room | null = null;
 
+/**
+ * Create our matrix client.
+ */
 const client = await start(credentials);
 
-client.on(sdk.ClientEvent.Room, () => {
+/**
+ * When a room is added or removed update the room list.
+ */
+client.on(ClientEvent.Room, () => {
 	roomList = getRoomList(client);
 
 	if (!viewingRoom) {
@@ -28,10 +57,13 @@ client.on(sdk.ClientEvent.Room, () => {
 	prompt();
 });
 
-client.on(sdk.RoomEvent.Timeline, async(event, room) => {
+/**
+ * When we receive a message, check if we are in that room and if so display it.
+ */
+client.on(RoomEvent.Timeline, async(event, room) => {
 	const type = event.getType() as EventType;
 
-	if (![sdk.EventType.RoomMessage, sdk.EventType.RoomMessageEncrypted].includes(type)) {
+	if (![EventType.RoomMessage, EventType.RoomMessageEncrypted].includes(type)) {
 		return;
 	}
 
@@ -45,6 +77,13 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 	prompt();
 });
 
+/**
+ * Below is all of the possible commands and definitions.
+ */
+
+/**
+ * Basic help command, displays the possible commands.
+ */
 addCommand("/help", () => {
 	const displayCommand = (command: string, description: string) => {
 		console.log(`  ${fixWidth(command, 20)} : ${description}`);
@@ -66,14 +105,23 @@ addCommand("/help", () => {
 	displayCommand("/roominfo", "Display room info e.g. name, topic.");
 });
 
+/**
+ * Quit command for quitting the program.
+ */
 addCommand("/quit", () => {
 	process.exit();
 });
 
+/**
+ * Clear devices command for removing all other devices from the users account.
+ */
 addCommand("/cleardevices", async () => {
 	await clearDevices(client);
 });
 
+/**
+ * Join room command for joining a room from the room index.
+ */
 addCommand("/join", async (index) => {
 	if (viewingRoom != null) {
 		return "You must first exit your current room.";
@@ -85,7 +133,7 @@ addCommand("/join", async (index) => {
 		return "Invalid Room.";
 	}
 
-	if (viewingRoom.getMember(client.getUserId() ?? "")?.membership === sdk.JoinRule.Invite) {
+	if (viewingRoom.getMember(client.getUserId() ?? "")?.membership === JoinRule.Invite) {
 		await client.joinRoom(viewingRoom.roomId);
 	}
 
@@ -95,11 +143,17 @@ addCommand("/join", async (index) => {
 	printMessages(viewingRoom);
 });
 
+/**
+ * Exit command for exiting a joined room.
+ */
 addCommand("/exit", () => {
 	viewingRoom = null;
 	printRoomList(roomList);
 });
 
+/**
+ * Invite command for inviting a user to the current room.
+ */
 addCommand("/invite", async (userId) => {
 	if (viewingRoom == null) {
 		return "You must first join a room.";
@@ -112,6 +166,9 @@ addCommand("/invite", async (userId) => {
 	}
 });
 
+/**
+ * Members command, displays the list of members in the current room.
+ */
 addCommand("/members", async () => {
 	if (viewingRoom == null) {
 		return "You must first join a room.";
@@ -120,14 +177,9 @@ addCommand("/members", async () => {
 	printMemberList(viewingRoom);
 });
 
-addCommand("/roominfo", async () => {
-	if (viewingRoom == null) {
-		return "You must first join a room.";
-	}
-
-	printMemberList(viewingRoom);
-});
-
+/**
+ * Members command, displays the information about the current room.
+ */
 addCommand("/roominfo", async () => {
 	if (viewingRoom == null) {
 		return "You must first join a room.";
@@ -136,6 +188,9 @@ addCommand("/roominfo", async () => {
 	printRoomInfo(viewingRoom);
 });
 
+/**
+ * Send command for allowing the user to send messages in the current room.
+ */
 addCommand("/send", async (...tokens) => {
 	if (viewingRoom == null) {
 		return "You must first join a room.";
@@ -145,13 +200,24 @@ addCommand("/send", async (...tokens) => {
 	console.log(tokens.join(" "));
 
 	const message = {
-		msgtype: sdk.MsgType.Text,
+		msgtype: MsgType.Text,
 		body: tokens.join(" ")
 	};
 
 	await client.sendMessage(viewingRoom.roomId, message);
 });
 
+/**
+ * Initialize the room list.
+ */
 roomList = getRoomList(client);
+
+/**
+ * Print the list of rooms.
+ */
 printRoomList(roomList);
+
+/**
+ * Request the first input from the user.
+ */
 prompt();

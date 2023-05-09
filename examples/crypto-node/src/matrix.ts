@@ -4,7 +4,7 @@
  */
 
 import sdk from "./matrix-importer.js";
-import type { MatrixClient, Room } from "../../../lib/index.js";
+import type { ICreateClientOpts, MatrixClient, Room } from "../../../lib/index.js";
 
 /**
  * This interface provides the details needed to perform a password login.
@@ -28,7 +28,7 @@ export interface TokenLogin {
 /**
  * Create a matrix client using a token login.
  */
-export const startWithToken = async (tokenLogin: TokenLogin | sdk.ICreateClientOpts): Promise<MatrixClient> => {
+export const startWithToken = async (tokenLogin: TokenLogin | ICreateClientOpts): Promise<MatrixClient> => {
 	const client = sdk.createClient(tokenLogin);
 
 	// We must initialize the crypto before starting the client.
