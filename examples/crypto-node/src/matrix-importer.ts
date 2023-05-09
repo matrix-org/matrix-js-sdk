@@ -45,6 +45,6 @@ logger.setLevel(5);
 /**
  * Now we can import and export the matrix sdk.
  */
-import * as sdk from "../../../lib/index.js";
+import * as sdk from "matrix-js-sdk";
 
 export default sdk;

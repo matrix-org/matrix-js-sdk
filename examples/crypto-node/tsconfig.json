@@ -10,12 +10,14 @@
 		"strictNullChecks": true,
 		"noEmit": true,
 		"declaration": true,
-		"strict": true
+		"strict": true,
+		"outDir": "./dist"
 	},
 
 	"ts-node": {
 		"esm": true
 	},
 
-	"include": ["./src/**/*.ts"]
+	"include": ["./src/**/*.ts"],
+	"exclude": ["node_modules"]
 }

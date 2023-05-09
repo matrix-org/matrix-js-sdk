@@ -4,7 +4,7 @@
  */
 
 import sdk from "./matrix-importer.js";
-import type { ICreateClientOpts, MatrixClient, Room } from "../../../lib/index.js";
+import type { ICreateClientOpts, MatrixClient, Room } from "matrix-js-sdk";
 
 /**
  * This interface provides the details needed to perform a password login.

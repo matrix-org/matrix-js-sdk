@@ -29,8 +29,8 @@ import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
 /**
  * Import the types and enums from matrix-js-sdk.
  */
-import { ClientEvent, RoomEvent, EventType, JoinRule, MsgType } from "../../../lib/index.js"
-import type { Room } from "../../../lib/index.js";
+import { ClientEvent, RoomEvent, EventType, JoinRule, MsgType } from "matrix-js-sdk"
+import type { Room } from "matrix-js-sdk";
 
 /**
  * Global state for keeping track of rooms.

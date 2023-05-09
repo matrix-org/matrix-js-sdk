@@ -1,5 +1,5 @@
 import readline from "readline";
-import { Direction, EventType, Room, MatrixEvent } from "../../../lib/index.js"
+import { Direction, EventType, Room, MatrixEvent } from "matrix-js-sdk"
 import fs from "fs/promises";
 import type { PasswordLogin } from "./matrix.js";
 
