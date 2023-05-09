@@ -1,5 +1,6 @@
-This is a functional terminal app which allows you to see the room list for a user, join rooms, send messages and view room membership lists.
+## About
 
+This is a functional terminal app which allows you to see the room list for a user, join rooms, send messages and view room membership lists with E2EE enabled.
 
 ## Install
 
