@@ -1,5 +1,13 @@
 import credentials from "./credentials.js";
-import { prompt, printRoomList, printMessages, printMemberList, printRoomInfo, addCommand } from "./io.js";
+import {
+	prompt,
+	fixWidth,
+	printRoomList,
+	printMessages,
+	printMemberList,
+	printRoomInfo,
+	addCommand
+} from "./io.js";
 import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
@@ -33,6 +41,27 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 	await client.decryptEventIfNeeded(event);
 
 	prompt(event.getContent().body);
+});
+
+addCommand("/help", () => {
+	const displayCommand = (command: string, description: string) => {
+		console.log(`  ${fixWidth(command, 20)} : ${description}`);
+	};
+
+	console.log("Global commands:");
+	displayCommand("/help", "Show this help.");
+	displayCommand("/quit", "Quit the program.");
+	displayCommand("/cleardevices", "Clear all other devices from this account.");
+
+	console.log("Room list index commands:");
+	displayCommand("/join <index>", "Join a room, e.g. '/join 5'");
+
+	console.log("Room commands:");
+	displayCommand("/exit", "Return to the room list index.");
+	displayCommand("/send <message>", "Send a message to the room, e.g. '/send Hello World.'");
+	displayCommand("/members", "Show the room member list.");
+	displayCommand("/invite @foo:bar", "Invite @foo:bar to the room.");
+	displayCommand("/roominfo", "Display room info e.g. name, topic.");
 });
 
 addCommand("/quit", () => {
