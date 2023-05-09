@@ -8,10 +8,9 @@
 		"noImplicitAny": false,
 		"noImplicitThis": true,
 		"strictNullChecks": true,
-		"noEmit": true,
 		"declaration": true,
 		"strict": true,
-		"outDir": "./dist"
+		"outDir": "./lib"
 	},
 
 	"ts-node": {
