@@ -1698,16 +1698,16 @@ describe("SlidingSync", () => {
 });
 
 function timeout(delayMs: number, reason: string): { promise: Promise<never>; cancel: () => void } {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: number;
     return {
         promise: new Promise((resolve, reject) => {
-            timeoutId = setTimeout(() => {
+            timeoutId = window.setTimeout(() => {
                 reject(new Error(`timeout: ${delayMs}ms - ${reason}`));
             }, delayMs);
         }),
         cancel: () => {
             if (timeoutId) {
-                clearTimeout(timeoutId);
+                window.clearTimeout(timeoutId);
             }
         },
     };
