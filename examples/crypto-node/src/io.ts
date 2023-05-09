@@ -4,11 +4,24 @@ import { Direction, EventType, Room } from "../../../lib/index.js"
 export type Command = (...args: string[]) => Promise<string | void> | string | void
 
 /**
+ * A map for holding all the added commands and methods.
+ */
+const commands = new Map<string, Command>();
+
+/**
  * Setup the line reader.
  */
 const rl = readline.createInterface({
 	input: process.stdin,
-	output: process.stdout
+	output: process.stdout,
+	completer: (line: string) => {
+		const hits = [...commands.keys()].filter(function (c) {
+				return c.indexOf(line) == 0;
+		});
+
+		// show all completions if none found
+		return [hits.length ? hits : [...commands.keys()], line];
+	}
 });
 
 rl.setPrompt("$ ");
@@ -20,8 +33,6 @@ export const clearLine = (): void => {
 	process.stdout.clearLine(-1);
 	process.stdout.cursorTo(0);
 };
-
-const commands = new Map<string, Command>();
 
 rl.on("line", async line => {
 	for (const [command, method] of commands.entries()) {
