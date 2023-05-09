@@ -4,7 +4,7 @@ This is a functional terminal app which allows you to see the room list for a us
 
 ## Install
 
-To try it out, you will need to create a credentials file: `crednetials.json` in the root of this example folder and configure it for your `homeserver`, `access_token` and `user_id` like so:
+To try it out, you will need to create a credentials file: `credentials.json` in the root of this example folder and configure it for your `homeserver`, `access_token` and `user_id` like so:
 
 ```json
 {
