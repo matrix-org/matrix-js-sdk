@@ -1,13 +1,13 @@
 import credentials from "./credentials.js";
 import { rl, prompt, printRoomList, printMessages, printMemberList, printRoomInfo } from "./io.js";
-import { start, verifyRoom, getRoomList } from "./matrix.js";
+import { start, verifyRoom, getRoomList, clearDevices } from "./matrix.js";
 import sdk from "./matrix-importer.js";
 import type { Room, EventType } from "../../../lib/index.js";
 
 let roomList: Room[] = [];
 let viewingRoom: Room | null = null;
 
-const client = await start(credentials, { forgetDevices: true });
+const client = await start(credentials);
 
 client.on(sdk.ClientEvent.Room, () => {
 	roomList = getRoomList(client);
@@ -37,6 +37,12 @@ client.on(sdk.RoomEvent.Timeline, async(event, room) => {
 
 rl.on("line", async (line: string) => {
 	if (line.trim().length === 0) {
+		prompt();
+		return;
+	}
+
+	if (line.indexOf("/cleardevices") === 0) {
+		await clearDevices(client);
 		prompt();
 		return;
 	}
