@@ -29,6 +29,8 @@ export interface TokenLogin {
  * Create a matrix client using a token login.
  */
 export const startWithToken = async (tokenLogin: TokenLogin | ICreateClientOpts): Promise<MatrixClient> => {
+	// If tokenLogin does not include store or cryptoStore parameters the client
+	// will use the default in-memory ones.
 	const client = sdk.createClient(tokenLogin);
 
 	// We must initialize the crypto before starting the client.
@@ -94,6 +96,8 @@ export const start = async (passwordLogin: PasswordLogin): Promise<MatrixClient>
 	const tokenLogin = await getTokenLogin(passwordLogin);
 
 	// Start the client with the token.
+	// Here we are not adding a store or a cryptoStore to the tokenLogin so the
+	// client will default to the in-memory one.
 	const client = await startWithToken(tokenLogin);
 
 	return client;

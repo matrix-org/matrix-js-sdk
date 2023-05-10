@@ -35,7 +35,7 @@ Once it starts up you can list commands by typing:
 /help
 ```
 
-If you have trouble with encryption errors cause by old devices with broken olm sessions you can delete them all by running:
+If you have trouble with encryption errors caused by devices with broken olm sessions you can delete them all by running:
 
 ```
 /cleardevices
@@ -46,6 +46,8 @@ This will delete all the devices on the account (except for the current one) so 
 ## Limitations
 
 This example does not provide any way of verifying your sessions, so on some clients, users in the room will get a warning that someone is using an unverified session.
+
+This example does not store your access token meaning you log in everytime and generate a new one, if you have access to persistant storage you should save your device ID and access token so that you can reuse the old session.
 
 This example does not provide any persistent storage so encryption keys for the device it creates are not persisted. This means every time the client starts it generates a new unverified device which is inaccessable when the program exits.
 
