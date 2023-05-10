@@ -45,9 +45,7 @@ export class SummaryStatsReporter {
         });
         const decimalPlaces = 5;
         const report = {
-            percentageReceivedMedia: Number(
-                (summaryCounter.receivedMedia / summaryTotalCount).toFixed(decimalPlaces),
-            ),
+            percentageReceivedMedia: Number((summaryCounter.receivedMedia / summaryTotalCount).toFixed(decimalPlaces)),
             percentageReceivedVideoMedia: Number(
                 (summaryCounter.receivedVideo / summaryTotalCount).toFixed(decimalPlaces),
             ),
