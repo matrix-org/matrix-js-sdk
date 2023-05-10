@@ -35,10 +35,63 @@ Once it starts up you can list commands by typing:
 /help
 ```
 
-If you have trouble with encryption errors cause by old devices you can delete them all by running:
+If you have trouble with encryption errors cause by old devices with broken olm sessions you can delete them all by running:
 
 ```
 /cleardevices
 ```
 
 This will delete all the devices on the account (except for the current one) so be careful if you have devices you do not wish to lose.
+
+## Limitations
+
+This example does not provide any way of verifying your sessions, so on some clients, users in the room will get a warning that someone is using an unverified session.
+
+This example does not provide any persistent storage so encryption keys for the device it creates are not persisted. This means every time the client starts it generates a new unverified device which is inaccessable when the program exits.
+
+If you want to persist data you will need to overwrite the default memory stores with stores that save data with a IndexedDB implementation:
+
+```javascript
+import sqlite3 from "sqlite3";
+import indexeddbjs from "indexeddb-js";
+
+const engine = new sqlite3.Database("./sqlite");
+const { indexedDB } = indexeddbjs.makeScope("sqlite3", engine);
+
+sdk.createClient({
+	baseUrl: "https://matrix.org",
+	userId: "@my_user:matrix.org",
+	accessToken: "my_access_token",
+	deviceId: "my_device_id",
+	store: new sdk.IndexedDBStore({ indexedDB }),
+	cryptoStore: new sdk.IndexedDBCryptoStore(indexedDB, "crypto")
+});
+```
+
+Alternatively you could create your own store implementation using whatever backend storage you want.
+
+## Structure
+
+The structure of this example has been split into separate files that deal with specific logic.
+
+If you want to know how to import the Matrix SDK, have a look at `matrix-importer.ts`. If you want to know how to use the Matrix SDK, take a look at `matrix.ts`. If you want to know how to read the state, the `io.ts` file has a few related methods for things like printing rooms or messages. Finally the `index.ts` file glues a lot of these methods together to turn it into a small Matrix messaging client.
+
+### matrix-importer.ts
+
+This file is responsible for setting up the globals needed to enable E2EE on Matrix and importing the Matrix SDK correctly. This file then exports the Matrix SDK for ease of use.
+
+### matrix.ts
+
+This file provides a few methods to assist with certain actions through the Matrix SDK, such as logging in, verifying devices, clearing devices and getting rooms.
+
+* `getTokenLogin` - This method logs in via password to obtain an access token and device ID.
+* `startWithToken` - This method uses an access token to log into the user's account, starts the client and initializes crypto.
+* `clearDevices` - This method deletes the devices (other than the current one) from the user's account.
+
+### io.ts
+
+This file is responsible for handling the input and output to the console and reading credentials from a file.
+
+### index.ts
+
+This file handles the application setup and requests input from the user. This file essentially glues the methods from `matrix.ts` and `io.ts` together to turn it into a console messaging application.
