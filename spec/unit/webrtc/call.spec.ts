@@ -1671,13 +1671,13 @@ describe("Call", function () {
             expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
         });
 
-        it("should restart ICE gathering one again after being failed for 4 seconds", () => {
+        it("should restart ICE gathering once again after ICE being failed", () => {
             mockPeerConn.iceConnectionState = "failed";
             mockPeerConn.iceConnectionStateChangeListener!();
             expect(mockPeerConn.restartIce).toHaveBeenCalled();
         });
 
-        it("should call hangup if Android after ICE being failed for 4 seconds", () => {
+        it("should call hangup after ICE being failed and if there not exists a restartIce method", () => {
             // @ts-ignore
             mockPeerConn.restartIce = null;
             mockPeerConn.iceConnectionState = "failed";

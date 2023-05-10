@@ -2249,16 +2249,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             if (!this.callLengthInterval && !this.callStartTime) {
                 this.callStartTime = Date.now();
 
-                // noinspection TypeScriptValidateTypes
                 this.callLengthInterval = setInterval(() => {
                     this.emit(CallEvent.LengthChanged, Math.round((Date.now() - this.callStartTime!) / 1000), this);
                 }, CALL_LENGTH_INTERVAL);
             }
         } else if (this.peerConn?.iceConnectionState == "failed") {
+            this.candidatesEnded = false;
             // Firefox for Android does not yet have support for restartIce()
             // (the types say it's always defined though, so we have to cast
             // to prevent typescript from warning).
-            this.candidatesEnded = false;
             if (this.peerConn?.restartIce as (() => void) | null) {
                 this.candidatesEnded = false;
                 logger.debug(
@@ -2273,7 +2272,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         } else if (this.peerConn?.iceConnectionState == "disconnected") {
             this.candidatesEnded = false;
-            // noinspection TypeScriptValidateTypes
             this.iceReconnectionTimeOut = setTimeout((): void => {
                 logger.info(
                     `Call ${this.callId} onIceConnectionStateChanged() ICE restarting because of ICE disconnected, (state=${this.peerConn?.iceConnectionState}, conn=${this.peerConn?.connectionState})`,
@@ -2285,7 +2283,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.iceReconnectionTimeOut = undefined;
             }, ICE_RECONNECTING_TIMEOUT);
 
-            // noinspection TypeScriptValidateTypes
             this.iceDisconnectedTimeout = setTimeout((): void => {
                 logger.info(
                     `Call ${this.callId} onIceConnectionStateChanged() hanging up call (ICE disconnected for too long)`,
