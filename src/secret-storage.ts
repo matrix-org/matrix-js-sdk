@@ -197,7 +197,7 @@ export interface SecretStorageCallbacks {
 }
 
 interface SecretInfo {
-    encrypted: {
+    encrypted?: {
         [keyId: string]: IEncryptedPayload;
     };
 }

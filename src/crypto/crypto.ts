@@ -16,9 +16,11 @@ limitations under the License.
 
 import { logger } from "../logger";
 
-export let crypto = global.window?.crypto;
-export let subtleCrypto = global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
-export let TextEncoder = global.window?.TextEncoder;
+export let crypto = global.window?.crypto as Crypto | undefined;
+export let subtleCrypto = (global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle) as
+    | SubtleCrypto
+    | undefined;
+export let TextEncoder = global.window?.TextEncoder as typeof window.TextEncoder | undefined;
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {

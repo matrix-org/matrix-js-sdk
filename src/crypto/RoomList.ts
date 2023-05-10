@@ -43,8 +43,8 @@ export class RoomList {
         });
     }
 
-    public getRoomEncryption(roomId: string): IRoomEncryption {
-        return this.roomEncryption[roomId] || null;
+    public getRoomEncryption(roomId: string): IRoomEncryption | undefined {
+        return this.roomEncryption[roomId] ?? null;
     }
 
     public isRoomEncrypted(roomId: string): boolean {

@@ -118,6 +118,17 @@ module.exports = {
                 // These need a bit more work before we can enable
                 // "jsdoc/check-param-names": "error",
                 // "jsdoc/check-indentation": "error",
+                "no-extra-boolean-cast": "error",
+                "@typescript-eslint/strict-boolean-expressions": [
+                    "error",
+                    {
+                        allowNullableString: true,
+                        allowNullableNumber: true,
+                        allowNullableBoolean: true,
+                        allowNullableEnum: true,
+                        allowAny: true,
+                    },
+                ],
             },
         },
         {
