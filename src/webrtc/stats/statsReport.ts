@@ -78,4 +78,5 @@ export interface SummaryStatsReport {
     maxJitter: number;
     maxPacketLoss: number;
     percentageConcealedAudio: number;
+    peerConnections: number;
 }
