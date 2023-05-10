@@ -146,7 +146,7 @@ export class TrackStatsReporter {
             muted: 0,
             maxJitter: 0,
             maxPacketLoss: 0,
-            percentageConcealedAudio: 0,
+            concealedAudioRatio: 0,
         };
 
         const remoteTrackList = trackStatsList.filter((t) => t.getType() === "remote");
@@ -166,7 +166,7 @@ export class TrackStatsReporter {
 
         const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
         audioTrackList.forEach((stats) => {
-            audioTrackSummary.percentageConcealedAudio += stats.getAudioConcealment()?.ratio / audioTrackList.length;
+            audioTrackSummary.concealedAudioRatio += stats.getAudioConcealment()?.ratio / audioTrackList.length;
         });
         return { audioTrackSummary, videoTrackSummary };
     }

@@ -98,6 +98,6 @@ export class SummaryStatsReporter {
         summaryCounter: SummaryCounter,
         stats: SummaryStats,
     ): void {
-        summaryCounter.concealedAudio += stats.audioTrackSummary.percentageConcealedAudio;
+        summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudioRatio;
     }
 }

@@ -25,5 +25,5 @@ export interface TrackSummary {
     maxPacketLoss: number;
 }
 export interface AudioTrackSummary extends TrackSummary {
-    percentageConcealedAudio: number;
+    concealedAudioRatio: number;
 }
