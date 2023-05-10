@@ -66,14 +66,14 @@ export class StatsReportBuilder {
                 const audioConcealmentForTrack = trackStats.getAudioConcealment();
                 totalConcealedAudio += audioConcealmentForTrack.concealedAudio;
                 totalAudioDuration += audioConcealmentForTrack.totalAudioDuration;
-                
+
                 audioBitrateDownload += trackStats.getBitrate().download;
                 audioBitrateUpload += trackStats.getBitrate().upload;
             } else {
                 videoBitrateDownload += trackStats.getBitrate().download;
                 videoBitrateUpload += trackStats.getBitrate().upload;
             }
-            
+
             resolutions[trackStats.getType()].set(trackId, trackStats.getResolution());
             framerates[trackStats.getType()].set(trackId, trackStats.getFramerate());
             codecs[trackStats.getType()].set(trackId, trackStats.getCodec());

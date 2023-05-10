@@ -112,7 +112,7 @@ describe("StatsReportBuilder", () => {
         remoteAudioTrack.setLoss({ packetsTotal: 20, packetsLost: 0, isDownloadStream: true });
         remoteAudioTrack.setBitrate({ download: 4000, upload: 0 });
         remoteAudioTrack.setJitter(0.1);
-        remoteAudioTrack.setAudioConcealment(3000,3000 * 20);
+        remoteAudioTrack.setAudioConcealment(3000, 3000 * 20);
 
         localVideoTrack.setCodec("v8");
         localVideoTrack.setLoss({ packetsTotal: 30, packetsLost: 6, isDownloadStream: false });

@@ -29,7 +29,12 @@ export class SummaryStatsReporter {
         if (summaryTotalCount === 0) {
             return;
         }
-        const summaryCounter: SummaryCounter = { receivedAudio: 0, receivedVideo: 0, receivedMedia: 0, concealedAudio:0 };
+        const summaryCounter: SummaryCounter = {
+            receivedAudio: 0,
+            receivedVideo: 0,
+            receivedMedia: 0,
+            concealedAudio: 0,
+        };
         let maxJitter = 0;
         let maxPacketLoss = 0;
         summary.forEach((stats) => {
@@ -38,14 +43,22 @@ export class SummaryStatsReporter {
             maxJitter = this.buildMaxJitter(maxJitter, stats);
             maxPacketLoss = this.buildMaxPacketLoss(maxPacketLoss, stats);
         });
-        const digitsForPercentages = 5;
+        const decimalPlaces = 5;
         const report = {
-            percentageReceivedMedia: Number((summaryCounter.receivedMedia / summaryTotalCount).toFixed(digitsForPercentages)),
-            percentageReceivedVideoMedia: Number((summaryCounter.receivedVideo / summaryTotalCount).toFixed(digitsForPercentages)),
-            percentageReceivedAudioMedia: Number((summaryCounter.receivedAudio / summaryTotalCount).toFixed(digitsForPercentages)),
+            percentageReceivedMedia: Number(
+                (summaryCounter.receivedMedia / summaryTotalCount).toFixed(decimalPlaces),
+            ),
+            percentageReceivedVideoMedia: Number(
+                (summaryCounter.receivedVideo / summaryTotalCount).toFixed(decimalPlaces),
+            ),
+            percentageReceivedAudioMedia: Number(
+                (summaryCounter.receivedAudio / summaryTotalCount).toFixed(decimalPlaces),
+            ),
             maxJitter,
             maxPacketLoss,
-            percentageConcealedAudio: Number((summaryCounter.concealedAudio / summaryTotalCount).toFixed(digitsForPercentages)),
+            percentageConcealedAudio: Number(
+                (summaryCounter.concealedAudio / summaryTotalCount).toFixed(decimalPlaces),
+            ),
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
@@ -94,10 +107,7 @@ export class SummaryStatsReporter {
         return maxPacketLoss;
     }
 
-    private countPercentageConcealedAudio(
-        summaryCounter: SummaryCounter,
-        stats: SummaryStats,
-    ): void {
+    private countPercentageConcealedAudio(summaryCounter: SummaryCounter, stats: SummaryStats): void {
         summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudioRatio;
     }
 }
