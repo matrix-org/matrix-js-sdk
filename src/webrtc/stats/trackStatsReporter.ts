@@ -190,8 +190,8 @@ export class TrackStatsReporter {
             return;
         }
         const msPerSample = (1000 * statsReport?.totalSamplesDuration) / statsReport?.totalSamplesReceived;
-        trackStats.setTrackDuration(1000 * statsReport?.totalSamplesDuration);
-        trackStats.setConcealedAudioDuration(msPerSample * statsReport?.concealedSamples);
-        trackStats.setConcealedAudioRatio(statsReport?.concealedSamples / statsReport?.totalSamplesReceived);
+        const concealedAudioDuration = msPerSample * statsReport?.concealedSamples;
+        const totalAudioDuration = 1000 * statsReport?.totalSamplesDuration;
+        trackStats.setAudioConcealment(concealedAudioDuration, totalAudioDuration);
     }
 }

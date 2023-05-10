@@ -226,6 +226,7 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudioRatio: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
@@ -245,6 +246,7 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudioRatio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
@@ -266,6 +268,7 @@ describe("TrackStatsReporter", () => {
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudioRatio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
@@ -287,6 +290,7 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudioRatio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
@@ -297,7 +301,7 @@ describe("TrackStatsReporter", () => {
             });
         });
 
-        it("and returns summary and build max jitter and packet loss", async () => {
+        it("and returns summary and build max jitter, packet loss and audio conealment", async () => {
             const trackStatsList = buildMockTrackStatsList();
             // video remote
             trackStatsList[1].setJitter(12);
@@ -311,6 +315,8 @@ describe("TrackStatsReporter", () => {
             trackStatsList[5].setJitter(15);
             trackStatsList[2].setLoss({ packetsLost: 5, packetsTotal: 0, isDownloadStream: true });
             trackStatsList[5].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[2].setAudioConcealment(220, 2000);
+            trackStatsList[5].setAudioConcealment(180, 2000);
 
             const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
@@ -319,6 +325,7 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 15,
                     maxPacketLoss: 5,
+                    concealedAudioRatio: 0.1,
                 },
                 videoTrackSummary: {
                     count: 3,

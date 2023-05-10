@@ -44,14 +44,14 @@ describe("SummaryStatsReporter", () => {
                     receivedMedia: 13,
                     receivedAudioMedia: 0,
                     receivedVideoMedia: 13,
-                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0, concealedAudioRatio: 0 },
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0, concealedAudioRatio: 5 },
                     videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                 },
                 {
                     receivedMedia: 0,
                     receivedAudioMedia: 0,
                     receivedVideoMedia: 0,
-                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0, concealedAudioRatio: 0 },
+                    audioTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0, concealedAudioRatio: 10 },
                     videoTrackSummary: { count: 1, muted: 0, maxJitter: 0, maxPacketLoss: 0 },
                 },
                 {
@@ -69,6 +69,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 0.75,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 3.75,
             });
         });
 
@@ -89,6 +90,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -109,6 +111,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 0,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -129,6 +132,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -170,6 +174,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 20,
                 maxPacketLoss: 40,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -190,6 +195,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -210,6 +216,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
 
@@ -230,6 +237,7 @@ describe("SummaryStatsReporter", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 0,
                 maxPacketLoss: 0,
+                percentageConcealedAudio: 0,
             });
         });
     });

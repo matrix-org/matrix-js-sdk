@@ -165,16 +165,12 @@ export class MediaTrackStats {
     /**
      * Audio concealment ration (conceled duration / total duration)
      */
-    public setConcealedAudioDuration(duration: number): void {
-        this.audioConcealment.concealedAudio = duration;
-    }
-
-    public setConcealedAudioRatio(ratio: number): void {
-        this.audioConcealment.ratio = ratio;
-    }
-
-    public setTrackDuration(duration: number): void {
-        this.audioConcealment.totalAudioDuration = duration;
+    public setAudioConcealment(concealedAudioDuration: number, totalAudioDuration: number): void {
+        this.audioConcealment.concealedAudio = concealedAudioDuration;
+        this.audioConcealment.totalAudioDuration = totalAudioDuration;
+        if (totalAudioDuration > 0) {
+            this.audioConcealment.ratio = concealedAudioDuration / totalAudioDuration;
+        }
     }
 
     public getAudioConcealment(): AudioConcealment {
