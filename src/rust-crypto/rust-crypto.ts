@@ -331,7 +331,7 @@ export class RustCrypto implements CryptoBackend {
             events ? JSON.stringify(events) : "[]",
             devices,
             oneTimeKeysCounts,
-            unusedFallbackKeys,
+            unusedFallbackKeys ?? new Set<string>(),
         );
 
         // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
