@@ -309,6 +309,13 @@ export class RustCrypto implements CryptoBackend {
         return false;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#isSecretStorageReady}
+     */
+    public async isSecretStorageReady(): Promise<boolean> {
+        return false;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
