@@ -125,7 +125,7 @@ export interface CryptoApi {
 }
 
 /**
- * Options object for {@link CryptoApi.bootstrapCrossSigning}.
+ * Options object for `CryptoApi.bootstrapCrossSigning`.
  */
 export interface BootstrapCrossSigningOpts {
     /** Optional. Reset the cross-signing keys even if keys already exist. */
