@@ -302,6 +302,13 @@ export class RustCrypto implements CryptoBackend {
         });
     }
 
+    /**
+     * Implementation of {@link CryptoApi#isCrossSigningReady}
+     */
+    public async isCrossSigningReady(): Promise<boolean> {
+        return false;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
