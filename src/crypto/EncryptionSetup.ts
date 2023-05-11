@@ -19,7 +19,7 @@ import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { Method, ClientPrefix } from "../http-api";
-import { Crypto, ICryptoCallbacks, IBootstrapCrossSigningOpts } from "./index";
+import { Crypto, ICryptoCallbacks } from "./index";
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -31,9 +31,10 @@ import {
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
+import { BootstrapCrossSigningOpts } from "../crypto-api";
 
 interface ICrossSigningKeys {
-    authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
+    authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
     keys: Record<"master" | "self_signing" | "user_signing", ICrossSigningKey>;
 }
 

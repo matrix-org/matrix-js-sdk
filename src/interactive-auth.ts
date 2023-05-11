@@ -20,6 +20,7 @@ import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
 import { MatrixError } from "./http-api";
+import { UIAResponse } from "./@types/uia";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -117,6 +118,16 @@ export class NoAuthFlowFoundError extends Error {
         super(m);
     }
 }
+
+/**
+ * The type of an application callback to perform the user-interactive bit of UIA.
+ *
+ * It is called with a single parameter, `makeRequest`, which is a function which takes the UIA parameters and
+ * makes the HTTP request.
+ *
+ * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
+ */
+export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict) => Promise<UIAResponse<T>>) => Promise<T>;
 
 interface IOpts {
     /**
