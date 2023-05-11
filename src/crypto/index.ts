@@ -88,8 +88,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
-import { DeviceVerificationStatus } from "../crypto-api";
-import type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 
@@ -763,7 +762,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async bootstrapCrossSigning({
         authUploadDeviceSigningKeys,
         setupNewCrossSigning,
-    }: IBootstrapCrossSigningOpts = {}): Promise<void> {
+    }: BootstrapCrossSigningOpts = {}): Promise<void> {
         logger.log("Bootstrapping cross-signing");
 
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
