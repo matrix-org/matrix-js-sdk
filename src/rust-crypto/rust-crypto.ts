@@ -74,7 +74,7 @@ export class RustCrypto implements CryptoBackend {
         _deviceId: string,
 
         /** Interface to server-side secret storage */
-        private readonly secretStorage: ServerSideSecretStorage,
+        _secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
