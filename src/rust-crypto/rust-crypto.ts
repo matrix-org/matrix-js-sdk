@@ -30,7 +30,7 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { DeviceVerificationStatus } from "../crypto-api";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
@@ -322,6 +322,13 @@ export class RustCrypto implements CryptoBackend {
      */
     public async isCrossSigningReady(): Promise<boolean> {
         return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#boostrapCrossSigning}
+     */
+    public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
+        logger.log("Cross-signing ready");
     }
 
     /**
