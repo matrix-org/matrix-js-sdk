@@ -25,8 +25,10 @@ jobs:
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: 📖 Generate JSDoc
-              run: "yarn gendoc"
+            - name: 📖 Generate docs
+              run: |
+                  yarn tpv --yes --out _docs --stale
+                  yarn gendoc
 
             - name: 🚀 Deploy
               uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3
