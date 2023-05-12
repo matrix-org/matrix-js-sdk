@@ -35,7 +35,13 @@ import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
-import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
+import {
+    CrossSigningKey,
+    ICreateSecretStorageOpts,
+    IEncryptedEventInfo,
+    IImportRoomKeysOpts,
+    IRecoveryKey,
+} from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
@@ -45,7 +51,7 @@ import { keyFromPassphrase } from "./key_passphrase";
 import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey";
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
+import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
@@ -54,7 +60,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
@@ -70,7 +76,6 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IContent } from "../models/event";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
@@ -80,11 +85,11 @@ import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageCallbacks,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
-    SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorageCallbacks,
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
@@ -1415,6 +1420,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns the key ID
      */
+    public getCrossSigningKeyId(type: CrossSigningKey | string = CrossSigningKey.Master): Promise<string | null> {
+        return Promise.resolve(this.getCrossSigningId(type));
+    }
+
+    // old name, for backwards compatibility
     public getCrossSigningId(type: string): string | null {
         return this.crossSigningInfo.getId(type);
     }

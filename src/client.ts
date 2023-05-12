@@ -2567,14 +2567,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the user's cross-signing key ID.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * Get the ID of one of the user's cross-signing keys
      *
      * @param type - The type of key to get the ID of.  One of
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
+     * @deprecated prefer {@link CryptoApi#getCrossSigningKeyId}
      */
     public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {

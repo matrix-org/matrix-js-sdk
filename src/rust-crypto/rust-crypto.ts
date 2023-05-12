@@ -35,6 +35,7 @@ import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter"
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { ServerSideSecretStorage } from "../secret-storage";
+import { CrossSigningKey } from "../crypto/api";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -322,6 +323,14 @@ export class RustCrypto implements CryptoBackend {
      */
     public async isCrossSigningReady(): Promise<boolean> {
         return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningKeyId}
+     */
+    public async getCrossSigningKeyId(type: CrossSigningKey | string = CrossSigningKey.Master): Promise<string | null> {
+        // TODO
+        return null;
     }
 
     /**
