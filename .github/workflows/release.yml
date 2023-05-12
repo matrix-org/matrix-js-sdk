@@ -27,7 +27,7 @@ jobs:
 
             - name: 📖 Generate docs
               run: |
-                  yarn tpv --yes --out _docs --stale
+                  yarn tpv --yes --out _docs --stale --major 10
                   yarn gendoc
 
             - name: 🚀 Deploy
