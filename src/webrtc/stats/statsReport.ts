@@ -45,7 +45,6 @@ export interface ConnectionStatsReport {
 }
 
 export interface AudioConcealment {
-    ratio: number;
     concealedAudio: number;
     totalAudioDuration: number;
 }

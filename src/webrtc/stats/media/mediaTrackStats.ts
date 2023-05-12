@@ -52,7 +52,7 @@ export class MediaTrackStats {
     private loss: PacketLoss = { packetsTotal: 0, packetsLost: 0, isDownloadStream: false };
     private bitrate: Bitrate = { download: 0, upload: 0 };
     private resolution: Resolution = { width: -1, height: -1 };
-    private audioConcealment: AudioConcealment = { ratio: 0, concealedAudio: 0, totalAudioDuration: 0 };
+    private audioConcealment: AudioConcealment = { concealedAudio: 0, totalAudioDuration: 0 };
     private framerate = 0;
     private jitter = 0;
     private codec = "";
@@ -168,9 +168,6 @@ export class MediaTrackStats {
     public setAudioConcealment(concealedAudioDuration: number, totalAudioDuration: number): void {
         this.audioConcealment.concealedAudio = concealedAudioDuration;
         this.audioConcealment.totalAudioDuration = totalAudioDuration;
-        if (totalAudioDuration > 0) {
-            this.audioConcealment.ratio = concealedAudioDuration / totalAudioDuration;
-        }
     }
 
     public getAudioConcealment(): AudioConcealment {

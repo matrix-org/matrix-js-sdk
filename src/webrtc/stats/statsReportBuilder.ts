@@ -113,7 +113,6 @@ export class StatsReportBuilder {
         };
         report.audioConcealment = audioConcealment;
         report.totalAudioConcealment = {
-            ratio: totalConcealedAudio / totalAudioDuration,
             concealedAudio: totalConcealedAudio,
             totalAudioDuration,
         };
