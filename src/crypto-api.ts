@@ -152,7 +152,7 @@ export interface CryptoApi {
      *
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
      */
-    getCrossSigningKeyId(type: CrossSigningKey | string): Promise<string | null>;
+    getCrossSigningKeyId(type?: CrossSigningKey | string): Promise<string | null>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.
