@@ -226,13 +226,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
-                    concealedAudioRatio: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -246,13 +249,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
-                    concealedAudioRatio: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -268,13 +274,16 @@ describe("TrackStatsReporter", () => {
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
-                    concealedAudioRatio: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -290,13 +299,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
-                    concealedAudioRatio: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -325,13 +337,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 15,
                     maxPacketLoss: 5,
-                    concealedAudioRatio: 0.1,
+                    concealedAudio: 400,
+                    totalAudio: 4000,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 66,
                     maxPacketLoss: 55,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
