@@ -17,6 +17,7 @@ limitations under the License.
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
+import { UIAuthCallback } from "./interactive-auth";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -121,6 +122,49 @@ export interface CryptoApi {
      * @returns Verification status of the device, or `null` if the device is not known
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
+
+    /**
+     * Checks whether cross signing:
+     * - is enabled on this account and trusted by this device
+     * - has private keys either cached locally or stored in secret storage
+     *
+     * If this function returns false, bootstrapCrossSigning() can be used
+     * to fix things such that it returns true. That is to say, after
+     * bootstrapCrossSigning() completes successfully, this function should
+     * return true.
+     *
+     * @returns True if cross-signing is ready to be used on this device
+     */
+    isCrossSigningReady(): Promise<boolean>;
+
+    /**
+     * Checks whether secret storage:
+     * - is enabled on this account
+     * - is storing cross-signing private keys
+     * - is storing session backup key (if enabled)
+     *
+     * If this function returns false, bootstrapSecretStorage() can be used
+     * to fix things such that it returns true. That is to say, after
+     * bootstrapSecretStorage() completes successfully, this function should
+     * return true.
+     *
+     * @returns True if secret storage is ready to be used on this device
+     */
+    isSecretStorageReady(): Promise<boolean>;
+}
+
+/**
+ * Options object for `CryptoApi.bootstrapCrossSigning`.
+ */
+export interface BootstrapCrossSigningOpts {
+    /** Optional. Reset the cross-signing keys even if keys already exist. */
+    setupNewCrossSigning?: boolean;
+
+    /**
+     * An application callback to collect the authentication data for uploading the keys. If not given, the keys
+     * will not be uploaded to the server (which seems like a bad thing?).
+     */
+    authUploadDeviceSigningKeys?: UIAuthCallback<void>;
 }
 
 export class DeviceVerificationStatus {

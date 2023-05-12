@@ -1,3 +1,21 @@
+Changes in [25.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.1.0) (2023-05-09)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Deprecate MatrixClient::resolveRoomAlias ([\#3316](https://github.com/matrix-org/matrix-js-sdk/pull/3316)).
+
+## ✨ Features
+ * add client method to remove pusher ([\#3324](https://github.com/matrix-org/matrix-js-sdk/pull/3324)). Contributed by @kerryarchibald.
+ * Implement MSC 3981 ([\#3248](https://github.com/matrix-org/matrix-js-sdk/pull/3248)). Fixes vector-im/element-web#25021. Contributed by @justjanne.
+ * Added `Room.getLastLiveEvent` and `Room.getLastThread`. Deprecated `Room.lastThread` in favour of `Room.getLastThread`. ([\#3321](https://github.com/matrix-org/matrix-js-sdk/pull/3321)).
+ * Element-R: wire up device lists ([\#3272](https://github.com/matrix-org/matrix-js-sdk/pull/3272)). Contributed by @florianduros.
+ * Node 20 support ([\#3302](https://github.com/matrix-org/matrix-js-sdk/pull/3302)).
+
+## 🐛 Bug Fixes
+ * Fix racing between one-time-keys processing and sync ([\#3327](https://github.com/matrix-org/matrix-js-sdk/pull/3327)). Fixes vector-im/element-web#25214. Contributed by @florianduros.
+ * Fix lack of media when a user reconnects ([\#3318](https://github.com/matrix-org/matrix-js-sdk/pull/3318)).
+ * Fix TimelineWindow getEvents exploding if no neigbouring timeline ([\#3285](https://github.com/matrix-org/matrix-js-sdk/pull/3285)). Fixes vector-im/element-web#25104.
+
 Changes in [25.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.0.0) (2023-04-25)
 ==================================================================================================
 

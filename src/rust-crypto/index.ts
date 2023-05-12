@@ -20,11 +20,22 @@ import { RustCrypto } from "./rust-crypto";
 import { logger } from "../logger";
 import { RUST_SDK_STORE_PREFIX } from "./constants";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
+import { ServerSideSecretStorage } from "../secret-storage";
 
+/**
+ * Create a new `RustCrypto` implementation
+ *
+ * @param http - Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
+ *     We expect it to set the access token, etc.
+ * @param userId - The local user's User ID.
+ * @param deviceId - The local user's Device ID.
+ * @param secretStorage - Interface to server-side secret storage.
+ */
 export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
     deviceId: string,
+    secretStorage: ServerSideSecretStorage,
 ): Promise<RustCrypto> {
     // initialise the rust matrix-sdk-crypto-js, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
@@ -38,7 +49,7 @@ export async function initRustCrypto(
 
     // TODO: use the pickle key for the passphrase
     const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, RUST_SDK_STORE_PREFIX, "test pass");
-    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId);
+    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );
