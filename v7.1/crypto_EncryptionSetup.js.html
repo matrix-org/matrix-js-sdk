@@ -1,0 +1,446 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>JSDoc: crypto/EncryptionSetup.js</title>
+
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="./build/entry.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link href="https://fonts.googleapis.com/css?family=Muli:100,400,700|Oswald:300|Inconsolata,700" rel="stylesheet">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+    <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+    
+</head>
+
+<body>
+    <div id="stickyNavbarOverlay"></div>
+    <div class="top-navbar">
+        <div class="container">
+            <nav class="navbar" role="navigation" aria-label="main navigation">
+                <div class="navbar-brand">
+                    
+                    
+                        <h1 class="navbar-item">Documentation</h1>
+                    
+                    <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
+                    </a>
+                </div>
+                
+            </nav>
+        </div>
+    </div>
+    <div class="container">
+        <div class="columns">
+            <div class="column is-3" id="sidebarNav">
+                <div class="sidebar">
+                    <nav>
+                        <h2><a href="index.html">Home</a></h2><div class="category"><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_CrossSigning.html">crypto/CrossSigning</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_SecretStorage.html">crypto/SecretStorage</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a></li><li><a href="module-crypto_verification_IllegalMethod.html">crypto/verification/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="AccountDataClientAdapter.html">AccountDataClientAdapter</a></li><li><a href="Backend.html">Backend</a></li><li><a href="CrossSigningCallbacks.html">CrossSigningCallbacks</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="EncryptionSetupBuilder.html">EncryptionSetupBuilder</a></li><li><a href="EncryptionSetupOperation.html">EncryptionSetupOperation</a></li><li><a href="IndexedDBStoreWorker.html">IndexedDBStoreWorker</a></li><li><a href="InRoomChannel.html">InRoomChannel</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis.MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client.MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_CrossSigning.CrossSigningInfo.html">CrossSigningInfo</a></li><li><a href="module-crypto_CrossSigning.DeviceTrustLevel.html">DeviceTrustLevel</a></li><li><a href="module-crypto_CrossSigning.UserTrustLevel.html">UserTrustLevel</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList
+
+Manages the list of other users' devicesmodule:.DeviceList</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList
+
+Manages the list of encrypted roomsmodule:.RoomList</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.IndexedDBCryptoStore.html">IndexedDBCryptoStore</a></li><li><a href="module-crypto_store_localStorage-crypto-store.LocalStorageCryptoStore.html">LocalStorageCryptoStore</a></li><li><a href="module-crypto_store_memory-crypto-store.MemoryCryptoStore.html">MemoryCryptoStore</a></li><li><a href="module-crypto_verification_Base.VerificationBase.html">VerificationBase</a></li><li><a href="module-crypto_verification_IllegalMethod-crypto_verification_IllegalMethod_IllegalMethod.html">crypto/verification/IllegalMethod/IllegalMethod</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ReciprocateQRCode.html">crypto/verification/QRCode/ReciprocateQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter.Filter.html">Filter</a></li><li><a href="module-filter-component.FilterComponent.html">FilterComponent</a></li><li><a href="module-http-api.ConnectionError.html">ConnectionError</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context.EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline.EventTimeline.html">EventTimeline</a></li><li><a href="module-models_event-timeline-set.EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.RoomState.html">RoomState</a></li><li><a href="module-models_room-summary.RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result.SearchResult.html">SearchResult</a></li><li><a href="module-models_user.User.html">User</a></li><li><a href="module-pushprocessor.PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler.MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb.IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a></li><li><a href="module-store_session_webstorage.WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub.StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator.SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window.TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call.MatrixCall.html">MatrixCall</a></li><li><a href="Relations.html">Relations</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SSSSCryptoCallbacks.html">SSSSCryptoCallbacks</a></li><li><a href="SyncApi.html">SyncApi</a></li><li><a href="ToDeviceChannel.html">ToDeviceChannel</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:%2522change%2522wheneverthestateoftherequestobjecthaschanged.">"change" whenever the state of the request object has changed.</a></li><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crossSigning.keysChanged%2522">MatrixClient"crossSigning.keysChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.devicesUpdated%2522">MatrixClient"crypto.devicesUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.secrets.requestCancelled%2522">MatrixClient"crypto.secrets.requestCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.willUpdateDevices%2522">MatrixClient"crypto.willUpdateDevices"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-client.html#~event:MatrixClient%2522userTrustStatusChanged%2522">MatrixClient"userTrustStatusChanged"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_initialiseFromExportedDevice">_initialiseFromExportedDevice</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#decryptBrowser">decryptBrowser</a></li><li><a href="global.html#decryptNode">decryptNode</a></li><li><a href="global.html#encryptBrowser">encryptBrowser</a></li><li><a href="global.html#encryptNode">encryptNode</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul></div>
+                    </nav>
+                </div>
+            </div>
+            <div class="column is-9-desktop">
+                <div class="content" id="main-content-wrapper">
+                    <header class="page-title">
+                        <p>Source</p>
+                        <h1>crypto/EncryptionSetup.js</h1>
+                    </header>
+
+                    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import {MatrixEvent} from "../models/event";
+import {EventEmitter} from "events";
+import {createCryptoStoreCacheCallbacks} from "./CrossSigning";
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import {
+    PREFIX_UNSTABLE,
+} from "../http-api";
+
+/**
+ * Builds an EncryptionSetupOperation by calling any of the add.. methods.
+ * Once done, `buildOperation()` can be called which allows to apply to operation.
+ *
+ * This is used as a helper by Crypto to keep track of all the network requests
+ * and other side-effects of bootstrapping, so it can be applied in one go (and retried in the future)
+ * Also keeps track of all the private keys created during bootstrapping, so we don't need to prompt for them
+ * more than once.
+ */
+export class EncryptionSetupBuilder {
+    /**
+     * @param  {Object.&lt;String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
+     * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
+     */
+    constructor(accountData, delegateCryptoCallbacks) {
+        this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
+        this.crossSigningCallbacks = new CrossSigningCallbacks();
+        this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
+
+        this._crossSigningKeys = null;
+        this._keySignatures = null;
+        this._keyBackupInfo = null;
+    }
+
+    /**
+     * Adds new cross-signing public keys
+     * @param {Object} auth auth dictionary needed to upload the new keys
+     * @param {Object} keys the new keys
+     */
+    addCrossSigningKeys(auth, keys) {
+        this._crossSigningKeys = {auth, keys};
+    }
+
+    /**
+     * Adds the key backup info to be updated on the server
+     *
+     * Used either to create a new key backup, or add signatures
+     * from the new MSK.
+     *
+     * @param {Object} keyBackupInfo as received from/sent to the server
+     */
+    addSessionBackup(keyBackupInfo) {
+        this._keyBackupInfo = keyBackupInfo;
+    }
+
+    /**
+     * Adds the session backup private key to be updated in the local cache
+     *
+     * Used after fixing the format of the key
+     *
+     * @param {Uint8Array} privateKey
+     */
+    addSessionBackupPrivateKeyToCache(privateKey) {
+        this._sessionBackupPrivateKey = privateKey;
+    }
+
+    /**
+     * Add signatures from a given user and device/x-sign key
+     * Used to sign the new cross-signing key with the device key
+     *
+     * @param {String} userId
+     * @param {String} deviceId
+     * @param {String} signature
+     */
+    addKeySignature(userId, deviceId, signature) {
+        if (!this._keySignatures) {
+            this._keySignatures = {};
+        }
+        const userSignatures = this._keySignatures[userId] || {};
+        this._keySignatures[userId] = userSignatures;
+        userSignatures[deviceId] = signature;
+    }
+
+
+    /**
+     * @param {String} type
+     * @param {Object} content
+     * @return {Promise}
+     */
+    setAccountData(type, content) {
+        return this.accountDataClientAdapter.setAccountData(type, content);
+    }
+
+    /**
+     * builds the operation containing all the parts that have been added to the builder
+     * @return {EncryptionSetupOperation}
+     */
+    buildOperation() {
+        const accountData = this.accountDataClientAdapter._values;
+        return new EncryptionSetupOperation(
+            accountData,
+            this._crossSigningKeys,
+            this._keyBackupInfo,
+            this._keySignatures,
+        );
+    }
+
+    /**
+     * Stores the created keys locally.
+     *
+     * This does not yet store the operation in a way that it can be restored,
+     * but that is the idea in the future.
+     *
+     * @param  {Crypto} crypto
+     * @return {Promise}
+     */
+    async persist(crypto) {
+        // store self_signing and user_signing private key in cache
+        if (this._crossSigningKeys) {
+            const cacheCallbacks = createCryptoStoreCacheCallbacks(
+                crypto._cryptoStore, crypto._olmDevice);
+            for (const type of ["self_signing", "user_signing"]) {
+                // logger.log(`Cache ${type} cross-signing private key locally`);
+                const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
+                await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
+            }
+            // store own cross-sign pubkeys as trusted
+            await crypto._cryptoStore.doTxn(
+                'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    crypto._cryptoStore.storeCrossSigningKeys(
+                        txn, this._crossSigningKeys.keys);
+                },
+            );
+        }
+        // store session backup key in cache
+        if (this._sessionBackupPrivateKey) {
+            await crypto.storeSessionBackupPrivateKey(this._sessionBackupPrivateKey);
+        }
+    }
+}
+
+/**
+ * Can be created from EncryptionSetupBuilder, or
+ * (in a follow-up PR, not implemented yet) restored from storage, to retry.
+ *
+ * It does not have knowledge of any private keys, unlike the builder.
+ */
+export class EncryptionSetupOperation {
+    /**
+     * @param  {Map&lt;String, Object>} accountData
+     * @param  {Object} crossSigningKeys
+     * @param  {Object} keyBackupInfo
+     * @param  {Object} keySignatures
+     */
+    constructor(accountData, crossSigningKeys, keyBackupInfo, keySignatures) {
+        this._accountData = accountData;
+        this._crossSigningKeys = crossSigningKeys;
+        this._keyBackupInfo = keyBackupInfo;
+        this._keySignatures = keySignatures;
+    }
+
+    /**
+     * Runs the (remaining part of, in the future) operation by sending requests to the server.
+     * @param  {Crypto} crypto
+     */
+    async apply(crypto) {
+        const baseApis = crypto._baseApis;
+        // set account data
+        if (this._accountData) {
+            for (const [type, content] of this._accountData) {
+                await baseApis.setAccountData(type, content);
+            }
+        }
+        // upload cross-signing keys
+        if (this._crossSigningKeys) {
+            const keys = {};
+            for (const [name, key] of Object.entries(this._crossSigningKeys.keys)) {
+                keys[name + "_key"] = key;
+            }
+            await baseApis.uploadDeviceSigningKeys(
+                this._crossSigningKeys.auth,
+                keys,
+            );
+            // pass the new keys to the main instance of our own CrossSigningInfo.
+            crypto._crossSigningInfo.setKeys(this._crossSigningKeys.keys);
+        }
+        // upload first cross-signing signatures with the new key
+        // (e.g. signing our own device)
+        if (this._keySignatures) {
+            await baseApis.uploadKeySignatures(this._keySignatures);
+        }
+        // need to create/update key backup info
+        if (this._keyBackupInfo) {
+            if (this._keyBackupInfo.version) {
+                // session backup signature
+                // The backup is trusted because the user provided the private key.
+                // Sign the backup with the cross signing key so the key backup can
+                // be trusted via cross-signing.
+                await baseApis._http.authedRequest(
+                    undefined, "PUT", "/room_keys/version/" + this._keyBackupInfo.version,
+                    undefined, {
+                        algorithm: this._keyBackupInfo.algorithm,
+                        auth_data: this._keyBackupInfo.auth_data,
+                    },
+                    {prefix: PREFIX_UNSTABLE},
+                );
+            } else {
+                // add new key backup
+                await baseApis._http.authedRequest(
+                    undefined, "POST", "/room_keys/version",
+                    undefined, this._keyBackupInfo,
+                    {prefix: PREFIX_UNSTABLE},
+                );
+            }
+        }
+    }
+}
+
+
+/**
+ * Catches account data set by SecretStorage during bootstrapping by
+ * implementing the methods related to account data in MatrixClient
+ */
+class AccountDataClientAdapter extends EventEmitter {
+    /**
+     * @param  {Object.&lt;String, MatrixEvent>} accountData existing account data
+     */
+    constructor(accountData) {
+        super();
+        this._existingValues = accountData;
+        this._values = new Map();
+    }
+
+    /**
+     * @param  {String} type
+     * @return {Promise&lt;Object>} the content of the account data
+     */
+    getAccountDataFromServer(type) {
+        return Promise.resolve(this.getAccountData(type));
+    }
+
+    /**
+     * @param  {String} type
+     * @return {Object} the content of the account data
+     */
+    getAccountData(type) {
+        const modifiedValue = this._values.get(type);
+        if (modifiedValue) {
+            return modifiedValue;
+        }
+        const existingValue = this._existingValues[type];
+        if (existingValue) {
+            return existingValue.getContent();
+        }
+        return null;
+    }
+
+    /**
+     * @param {String} type
+     * @param {Object} content
+     * @return {Promise}
+     */
+    setAccountData(type, content) {
+        const lastEvent = this._values.get(type);
+        this._values.set(type, content);
+        // ensure accountData is emitted on the next tick,
+        // as SecretStorage listens for it while calling this method
+        // and it seems to rely on this.
+        return Promise.resolve().then(() => {
+            const event = new MatrixEvent({type, content});
+            this.emit("accountData", event, lastEvent);
+        });
+    }
+}
+
+/**
+ * Catches the private cross-signing keys set during bootstrapping
+ * by both cache callbacks (see createCryptoStoreCacheCallbacks) as non-cache callbacks.
+ * See CrossSigningInfo constructor
+ */
+class CrossSigningCallbacks {
+    constructor() {
+        this.privateKeys = new Map();
+    }
+
+    // cache callbacks
+    getCrossSigningKeyCache(type, expectedPublicKey) {
+        return this.getCrossSigningKey(type, expectedPublicKey);
+    }
+
+    storeCrossSigningKeyCache(type, key) {
+        this.privateKeys.set(type, key);
+        return Promise.resolve();
+    }
+
+    // non-cache callbacks
+    getCrossSigningKey(type, _expectedPubkey) {
+        return Promise.resolve(this.privateKeys.get(type));
+    }
+
+    saveCrossSigningKeys(privateKeys) {
+        for (const [type, privateKey] of Object.entries(privateKeys)) {
+            this.privateKeys.set(type, privateKey);
+        }
+    }
+}
+
+/**
+ * Catches the 4S private key set during bootstrapping by implementing
+ * the SecretStorage crypto callbacks
+ */
+class SSSSCryptoCallbacks {
+    constructor(delegateCryptoCallbacks) {
+        this._privateKeys = new Map();
+        this._delegateCryptoCallbacks = delegateCryptoCallbacks;
+    }
+
+    async getSecretStorageKey({ keys }, name) {
+        for (const keyId of Object.keys(keys)) {
+            const privateKey = this._privateKeys.get(keyId);
+            if (privateKey) {
+                return [keyId, privateKey];
+            }
+        }
+        // if we don't have the key cached yet, ask
+        // for it to the general crypto callbacks and cache it
+        if (this._delegateCryptoCallbacks) {
+            const result = await this._delegateCryptoCallbacks.
+                getSecretStorageKey({keys}, name);
+            if (result) {
+                const [keyId, privateKey] = result;
+                this._privateKeys.set(keyId, privateKey);
+            }
+            return result;
+        }
+    }
+
+    addPrivateKey(keyId, privKey) {
+        this._privateKeys.set(keyId, privKey);
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<footer class="footer">
+    <div class="content has-text-centered">
+        <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Fri Jul 03 2020 13:17:48 GMT+0100 (British Summer Time)</p>
+        <p class="sidebar-created-by">
+            <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+            <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+        </p>
+    </div>
+</footer>
+
+
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
