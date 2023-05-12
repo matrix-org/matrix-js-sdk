@@ -94,6 +94,26 @@ describe("RustCrypto", () => {
         });
     });
 
+    it("isCrossSigningReady", async () => {
+        const rustCrypto = new RustCrypto(
+            {} as RustSdkCryptoJs.OlmMachine,
+            {} as MatrixHttpApi<any>,
+            TEST_USER,
+            TEST_DEVICE_ID,
+        );
+        await expect(rustCrypto.isCrossSigningReady()).resolves.toBe(false);
+    });
+
+    it("isSecretStorageReady", async () => {
+        const rustCrypto = new RustCrypto(
+            {} as RustSdkCryptoJs.OlmMachine,
+            {} as MatrixHttpApi<any>,
+            TEST_USER,
+            TEST_DEVICE_ID,
+        );
+        await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
+    });
+
     describe("outgoing requests", () => {
         /** the RustCrypto implementation under test */
         let rustCrypto: RustCrypto;
