@@ -66,7 +66,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     });
 
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
-        oldBackendOnly("publishes keys if none were yet published", async () => {
+        it("publishes keys if none were yet published", async () => {
             // have account_data requests return an empty object
             fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
 
@@ -75,7 +75,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             // ... and one to upload the cross-signing keys (with UIA)
             fetchMock.post(
-                { url: "path:/_matrix/client/unstable/keys/device_signing/upload", name: "upload-keys" },
+                // legacy crypto uses /unstable/; /v3/ is correct
+                {
+                    url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                    name: "upload-keys",
+                },
                 {},
             );
 
