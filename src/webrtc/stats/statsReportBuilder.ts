@@ -79,7 +79,6 @@ export class StatsReportBuilder {
             codecs[trackStats.getType()].set(trackId, trackStats.getCodec());
             if (trackStats.getType() === "remote") {
                 jitter.set(trackId, trackStats.getJitter());
-                // TODO: decide if we even want per track audio concealment
                 if (trackStats.kind === "audio") {
                     audioConcealment.set(trackId, trackStats.getAudioConcealment());
                 }
