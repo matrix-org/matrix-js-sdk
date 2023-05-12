@@ -74,7 +74,6 @@ import {
     CryptoEventHandlerMap,
     fixBackupKey,
     ICryptoCallbacks,
-    IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
     isCryptoAvailable,
     VerificationMethod,
@@ -205,7 +204,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { CryptoApi } from "./crypto-api";
+import { BootstrapCrossSigningOpts, CryptoApi } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -2228,7 +2227,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId, this.secretStorage);
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto
@@ -2752,7 +2751,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
      */
-    public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts): Promise<void> {
+    public bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }

@@ -17,6 +17,7 @@ limitations under the License.
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
+import { UIAuthCallback } from "./interactive-auth";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -150,6 +151,20 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+}
+
+/**
+ * Options object for `CryptoApi.bootstrapCrossSigning`.
+ */
+export interface BootstrapCrossSigningOpts {
+    /** Optional. Reset the cross-signing keys even if keys already exist. */
+    setupNewCrossSigning?: boolean;
+
+    /**
+     * An application callback to collect the authentication data for uploading the keys. If not given, the keys
+     * will not be uploaded to the server (which seems like a bad thing?).
+     */
+    authUploadDeviceSigningKeys?: UIAuthCallback<void>;
 }
 
 export class DeviceVerificationStatus {

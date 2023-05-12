@@ -88,9 +88,12 @@ import {
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
-import { DeviceVerificationStatus } from "../crypto-api";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
+
+/* re-exports for backwards compatibility */
+export type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -125,16 +128,6 @@ const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
-}
-
-export interface IBootstrapCrossSigningOpts {
-    /** Optional. Reset even if keys already exist. */
-    setupNewCrossSigning?: boolean;
-    /**
-     * A function that makes the request requiring auth. Receives the auth data as an object.
-     * Can be called multiple times, first with an empty authDict, to obtain the flows.
-     */
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
 export interface ICryptoCallbacks extends SecretStorageCallbacks {
@@ -769,7 +762,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async bootstrapCrossSigning({
         authUploadDeviceSigningKeys,
         setupNewCrossSigning,
-    }: IBootstrapCrossSigningOpts = {}): Promise<void> {
+    }: BootstrapCrossSigningOpts = {}): Promise<void> {
         logger.log("Bootstrapping cross-signing");
 
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
