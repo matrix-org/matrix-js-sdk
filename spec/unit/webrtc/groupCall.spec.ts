@@ -517,8 +517,7 @@ describe("Group Call", function () {
                 await groupCall.setMicrophoneMuted(false);
                 expect(groupCall.isMicrophoneMuted()).toEqual(false);
 
-                jest.advanceTimersByTime(groupCall.pttMaxTransmitTime + 100);
-
+                await jest.advanceTimersByTimeAsync(groupCall.pttMaxTransmitTime + 100);
                 expect(groupCall.isMicrophoneMuted()).toEqual(true);
             });
 
@@ -585,7 +584,15 @@ describe("Group Call", function () {
                 });
                 mockCall.sendMetadataUpdate = jest.fn().mockReturnValue(metadataUpdatePromise);
 
+                const getUserMediaStreamFlush = Promise.resolve("stream");
+                // @ts-ignore
+                mockCall.cleint = {
+                    getMediaHandler: {
+                        getUserMediaStream: jest.fn().mockReturnValue(getUserMediaStreamFlush),
+                    },
+                };
                 const mutePromise = groupCall.setMicrophoneMuted(true);
+                await getUserMediaStreamFlush;
                 // we should be muted at this point, before the metadata update has been sent
                 expect(groupCall.isMicrophoneMuted()).toEqual(true);
                 expect(mockCall.localUsermediaFeed.setAudioVideoMuted).toHaveBeenCalled();
@@ -892,12 +899,23 @@ describe("Group Call", function () {
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
             });
 
-            it("returns false when no permission for audio stream", async () => {
+            it("returns false when no permission for audio stream and localCallFeed do not have an audio track", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
+                // @ts-ignore
+                jest.spyOn(groupCall.localCallFeed, "hasAudioTrack", "get").mockReturnValue(false);
                 jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockRejectedValueOnce(
                     new Error("No Permission"),
                 );
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
+            });
+
+            it("returns true when no permission for audio stream but localCallFeed has a audio track already", async () => {
+                const groupCall = await createAndEnterGroupCall(mockClient, room);
+                // @ts-ignore
+                jest.spyOn(groupCall.localCallFeed, "hasAudioTrack", "get").mockReturnValue(true);
+                jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream");
+                expect(mockClient.getMediaHandler().getUserMediaStream).not.toHaveBeenCalled();
+                expect(await groupCall.setMicrophoneMuted(false)).toBe(true);
             });
 
             it("returns false when unmuting video with no video device", async () => {
