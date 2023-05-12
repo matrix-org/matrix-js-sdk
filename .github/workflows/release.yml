@@ -25,10 +25,16 @@ jobs:
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
+            - name: 🔨 Install symlinks
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y symlinks
+
             - name: 📖 Generate docs
               run: |
                   yarn tpv --yes --out _docs --stale --major 10
                   yarn gendoc
+                  symlinks -rc _docs
 
             - name: 🚀 Deploy
               run: |
