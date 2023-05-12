@@ -34,6 +34,7 @@ import { DeviceVerificationStatus } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
+import { ServerSideSecretStorage } from "../secret-storage";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -56,10 +57,24 @@ export class RustCrypto implements CryptoBackend {
     private outgoingRequestProcessor: OutgoingRequestProcessor;
 
     public constructor(
+        /** The `OlmMachine` from the underlying rust crypto sdk. */
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
+
+        /**
+         * Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
+         *
+         * We expect it to set the access token, etc.
+         */
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+
+        /** The local user's User ID. */
         _userId: string,
+
+        /** The local user's Device ID. */
         _deviceId: string,
+
+        /** Interface to server-side secret storage */
+        _secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
