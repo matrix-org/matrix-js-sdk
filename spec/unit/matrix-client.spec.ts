@@ -2758,6 +2758,10 @@ describe("MatrixClient", function () {
                 expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
             });
 
+            it("bootstrapCrossSigning", () => {
+                expect(() => client.bootstrapCrossSigning({})).toThrow("End-to-end encryption disabled");
+            });
+
             it("isSecretStorageReady", () => {
                 expect(() => client.isSecretStorageReady()).toThrow("End-to-end encryption disabled");
             });
@@ -2769,6 +2773,7 @@ describe("MatrixClient", function () {
             beforeEach(() => {
                 mockCryptoBackend = {
                     isCrossSigningReady: jest.fn(),
+                    bootstrapCrossSigning: jest.fn(),
                     isSecretStorageReady: jest.fn(),
                     stop: jest.fn().mockResolvedValue(undefined),
                 } as unknown as Mocked<CryptoBackend>;
@@ -2780,6 +2785,14 @@ describe("MatrixClient", function () {
                 mockCryptoBackend.isCrossSigningReady.mockResolvedValue(testResult as unknown as boolean);
                 expect(await client.isCrossSigningReady()).toBe(testResult);
                 expect(mockCryptoBackend.isCrossSigningReady).toHaveBeenCalledTimes(1);
+            });
+
+            it("bootstrapCrossSigning", async () => {
+                const testOpts = {};
+                mockCryptoBackend.bootstrapCrossSigning.mockResolvedValue(undefined);
+                await client.bootstrapCrossSigning(testOpts);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledTimes(1);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledWith(testOpts);
             });
 
             it("isSecretStorageReady", async () => {

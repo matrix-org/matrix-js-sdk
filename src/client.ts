@@ -2747,15 +2747,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This function:
      * - creates new cross-signing keys if they are not found locally cached nor in
-     *   secret storage (if it has been setup)
+     *   secret storage (if it has been set up)
      *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * @deprecated Prefer {@link CryptoApi.bootstrapCrossSigning | `CryptoApi.bootstrapCrossSigning`}.
      */
     public bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.bootstrapCrossSigning(opts);
+        return this.cryptoBackend.bootstrapCrossSigning(opts);
     }
 
     /**
