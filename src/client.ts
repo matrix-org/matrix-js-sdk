@@ -2731,12 +2731,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * bootstrapCrossSigning() completes successfully, this function should
      * return true.
      * @returns True if cross-signing is ready to be used on this device
+     * @deprecated Prefer {@link CryptoApi.isCrossSigningReady | `CryptoApi.isCrossSigningReady`}:
      */
     public isCrossSigningReady(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isCrossSigningReady();
+        return this.cryptoBackend.isCrossSigningReady();
     }
 
     /**
@@ -2843,15 +2844,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * bootstrapSecretStorage() completes successfully, this function should
      * return true.
      *
-     * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
-     *
      * @returns True if secret storage is ready to be used on this device
+     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}:
      */
     public isSecretStorageReady(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isSecretStorageReady();
+        return this.cryptoBackend.isSecretStorageReady();
     }
 
     /**

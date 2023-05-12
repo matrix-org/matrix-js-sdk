@@ -22,7 +22,7 @@ import { Mocked } from "jest-mock";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
@@ -36,21 +36,15 @@ afterEach(() => {
     indexedDB = new IDBFactory();
 });
 
-describe("RustCrypto", () => {
-    const TEST_USER = "@alice:example.com";
-    const TEST_DEVICE_ID = "TEST_DEVICE";
+const TEST_USER = "@alice:example.com";
+const TEST_DEVICE_ID = "TEST_DEVICE";
 
+describe("RustCrypto", () => {
     describe(".exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(
-                mockHttpApi,
-                TEST_USER,
-                TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-            )) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should return a list", async () => {
@@ -63,13 +57,7 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(
-                mockHttpApi,
-                TEST_USER,
-                TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-            )) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should pass through unencrypted to-device messages", async () => {
@@ -103,6 +91,16 @@ describe("RustCrypto", () => {
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
         });
+    });
+
+    it("isCrossSigningReady", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.isCrossSigningReady()).resolves.toBe(false);
+    });
+
+    it("isSecretStorageReady", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
     });
 
     describe("outgoing requests", () => {
@@ -223,13 +221,7 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(
-                mockHttpApi,
-                TEST_USER,
-                TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-            )) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should handle unencrypted events", () => {
@@ -257,12 +249,7 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            rustCrypto = await initRustCrypto(
-                {} as MatrixClient["http"],
-                TEST_USER,
-                TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-            );
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should be true by default", () => {
@@ -315,3 +302,16 @@ describe("RustCrypto", () => {
         });
     });
 });
+
+/** build a basic RustCrypto instance for testing
+ *
+ * just provides default arguments for initRustCrypto()
+ */
+async function makeTestRustCrypto(
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }> = {} as MatrixClient["http"],
+    userId: string = TEST_USER,
+    deviceId: string = TEST_DEVICE_ID,
+    secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+): Promise<RustCrypto> {
+    return await initRustCrypto(http, userId, deviceId, secretStorage);
+}
