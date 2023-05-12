@@ -23,4 +23,6 @@ export interface TrackSummary {
     muted: number;
     maxJitter: number;
     maxPacketLoss: number;
+    concealedAudio: number;
+    totalAudio: number;
 }

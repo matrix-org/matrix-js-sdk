@@ -155,6 +155,22 @@ export interface CryptoApi {
     getCrossSigningKeyId(type: CrossSigningKey | string): Promise<string | null>;
 
     /**
+     * Bootstrap cross-signing by creating keys if needed.
+     *
+     * If everything is already set up, then no changes are made, so this is safe to run to ensure
+     * cross-signing is ready for use.
+     *
+     * This function:
+     * - creates new cross-signing keys if they are not found locally cached nor in
+     *   secret storage (if it has been set up)
+     * - publishes the public keys to the server if they are not already published
+     * - stores the private keys in secret storage if secret storage is set up.
+     *
+     * @param opts - options object
+     */
+    bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void>;
+
+    /**
      * Checks whether secret storage:
      * - is enabled on this account
      * - is storing cross-signing private keys
