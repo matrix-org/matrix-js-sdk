@@ -27,7 +27,7 @@
 <ul class="tsd-hierarchy">
 <li><a href="_internal_.CryptoBackend.html" class="tsd-signature-type tsd-kind-interface">CryptoBackend</a></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L26">src/crypto-api.ts:26</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L27">src/crypto-api.ts:27</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-index-accordion" open><summary class="tsd-accordion-summary tsd-index-summary">
@@ -44,6 +44,8 @@
 <a href="CryptoApi.html#getDeviceVerificationStatus" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Device<wbr/>Verification<wbr/>Status</span></a>
 <a href="CryptoApi.html#getTrustCrossSignedDevices" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span></a>
 <a href="CryptoApi.html#getUserDeviceInfo" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>User<wbr/>Device<wbr/>Info</span></a>
+<a href="CryptoApi.html#isCrossSigningReady" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>is<wbr/>Cross<wbr/>Signing<wbr/>Ready</span></a>
+<a href="CryptoApi.html#isSecretStorageReady" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>is<wbr/>Secret<wbr/>Storage<wbr/>Ready</span></a>
 <a href="CryptoApi.html#prepareToEncrypt" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>prepare<wbr/>To<wbr/>Encrypt</span></a>
 <a href="CryptoApi.html#setTrustCrossSignedDevices" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>set<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span></a>
 <a href="CryptoApi.html#userHasCrossSigningKeys" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>user<wbr/>Has<wbr/>Cross<wbr/>Signing<wbr/>Keys</span></a>
@@ -59,7 +61,7 @@ do not specify a value.</p>
 <p>If true, all unverified devices will be blacklisted by default</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L34">src/crypto-api.ts:34</a></li></ul></aside></section></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L35">src/crypto-api.ts:35</a></li></ul></aside></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Methods</h2>
 <section class="tsd-panel tsd-member"><a id="exportRoomKeys" class="tsd-anchor"></a>
@@ -74,7 +76,7 @@ do not specify a value.</p>
    session export objects</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L75">src/crypto-api.ts:75</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L76">src/crypto-api.ts:76</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="forceDiscardSession" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>force<wbr/>Discard<wbr/>Session</span><a href="#forceDiscardSession" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -95,7 +97,7 @@ problem with encryption.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L65">src/crypto-api.ts:65</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L66">src/crypto-api.ts:66</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getDeviceVerificationStatus" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>get<wbr/>Device<wbr/>Verification<wbr/>Status</span><a href="#getDeviceVerificationStatus" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -117,7 +119,7 @@ problem with encryption.</p>
 <h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">null</span><span class="tsd-signature-symbol"> | </span><a href="../classes/DeviceVerificationStatus.html" class="tsd-signature-type tsd-kind-class">DeviceVerificationStatus</a><span class="tsd-signature-symbol">&gt;</span></h4><p>Verification status of the device, or <code>null</code> if the device is not known</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L123">src/crypto-api.ts:123</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L124">src/crypto-api.ts:124</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getTrustCrossSignedDevices" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>get<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span><a href="#getTrustCrossSignedDevices" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -130,7 +132,7 @@ problem with encryption.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><p><code>true</code> if we trust cross-signed devices, otherwise <code>false</code>.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L113">src/crypto-api.ts:113</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L114">src/crypto-api.ts:114</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getUserDeviceInfo" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>get<wbr/>User<wbr/>Device<wbr/>Info</span><a href="#getUserDeviceInfo" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -157,7 +159,46 @@ a <code>/keys/query</code> request is made to the server to retrieve these devic
 <h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><a href="../types/DeviceMap.html" class="tsd-signature-type tsd-kind-type-alias">DeviceMap</a><span class="tsd-signature-symbol">&gt;</span></h4><p>A map <code>{@link DeviceMap}</code>.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L92">src/crypto-api.ts:92</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L93">src/crypto-api.ts:93</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member"><a id="isCrossSigningReady" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>is<wbr/>Cross<wbr/>Signing<wbr/>Ready</span><a href="#isCrossSigningReady" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="tsd-signature tsd-anchor-link" id="isCrossSigningReady.isCrossSigningReady-1"><span class="tsd-kind-call-signature">is<wbr/>Cross<wbr/>Signing<wbr/>Ready</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#isCrossSigningReady.isCrossSigningReady-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Checks whether cross signing:</p>
+<ul>
+<li>is enabled on this account and trusted by this device</li>
+<li>has private keys either cached locally or stored in secret storage</li>
+</ul>
+<p>If this function returns false, bootstrapCrossSigning() can be used
+to fix things such that it returns true. That is to say, after
+bootstrapCrossSigning() completes successfully, this function should
+return true.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>True if cross-signing is ready to be used on this device</p>
+<aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L138">src/crypto-api.ts:138</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member"><a id="isSecretStorageReady" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>is<wbr/>Secret<wbr/>Storage<wbr/>Ready</span><a href="#isSecretStorageReady" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="tsd-signature tsd-anchor-link" id="isSecretStorageReady.isSecretStorageReady-1"><span class="tsd-kind-call-signature">is<wbr/>Secret<wbr/>Storage<wbr/>Ready</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#isSecretStorageReady.isSecretStorageReady-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Checks whether secret storage:</p>
+<ul>
+<li>is enabled on this account</li>
+<li>is storing cross-signing private keys</li>
+<li>is storing session backup key (if enabled)</li>
+</ul>
+<p>If this function returns false, bootstrapSecretStorage() can be used
+to fix things such that it returns true. That is to say, after
+bootstrapSecretStorage() completes successfully, this function should
+return true.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>True if secret storage is ready to be used on this device</p>
+<aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L153">src/crypto-api.ts:153</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="prepareToEncrypt" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>prepare<wbr/>To<wbr/>Encrypt</span><a href="#prepareToEncrypt" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -175,7 +216,7 @@ send, in order to speed up sending of the message.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L52">src/crypto-api.ts:52</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L53">src/crypto-api.ts:53</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="setTrustCrossSignedDevices" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>set<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span><a href="#setTrustCrossSignedDevices" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -195,7 +236,7 @@ verified that device individually (effectively disabling cross-signing).</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L104">src/crypto-api.ts:104</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L105">src/crypto-api.ts:105</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="userHasCrossSigningKeys" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>user<wbr/>Has<wbr/>Cross<wbr/>Signing<wbr/>Keys</span><a href="#userHasCrossSigningKeys" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -208,7 +249,7 @@ the cross-signing pseudo-device.</p>
 <h4 class="tsd-returns-title">Returns <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" class="tsd-signature-type external" target="_blank">Promise</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>true if the user has previously published cross-signing keys</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/d4500da/src/crypto-api.ts#L44">src/crypto-api.ts:44</a></li></ul></aside></li></ul></section></section></div>
+<li>Defined in <a href="https://github.com/matrix-org/matrix-js-sdk/blob/dbd5cb3e7/src/crypto-api.ts#L45">src/crypto-api.ts:45</a></li></ul></aside></li></ul></section></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -233,6 +274,8 @@ the cross-signing pseudo-device.</p>
 <li><a href="#getDeviceVerificationStatus" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Device<wbr/>Verification<wbr/>Status</span></a></li>
 <li><a href="#getTrustCrossSignedDevices" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span></a></li>
 <li><a href="#getUserDeviceInfo" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>User<wbr/>Device<wbr/>Info</span></a></li>
+<li><a href="#isCrossSigningReady" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>is<wbr/>Cross<wbr/>Signing<wbr/>Ready</span></a></li>
+<li><a href="#isSecretStorageReady" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>is<wbr/>Secret<wbr/>Storage<wbr/>Ready</span></a></li>
 <li><a href="#prepareToEncrypt" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>prepare<wbr/>To<wbr/>Encrypt</span></a></li>
 <li><a href="#setTrustCrossSignedDevices" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>set<wbr/>Trust<wbr/>Cross<wbr/>Signed<wbr/>Devices</span></a></li>
 <li><a href="#userHasCrossSigningKeys" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>user<wbr/>Has<wbr/>Cross<wbr/>Signing<wbr/>Keys</span></a></li></ul></div></details></div>
@@ -381,6 +424,7 @@ the cross-signing pseudo-device.</p>
 <li><a href="_internal_.BackupAlgorithm.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Backup<wbr/>Algorithm</span></a></li>
 <li><a href="_internal_.BaseOperation.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Base<wbr/>Operation</span></a></li>
 <li><a href="_internal_.Bitrate.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Bitrate</span></a></li>
+<li><a href="_internal_.BootstrapCrossSigningOpts.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Bootstrap<wbr/>Cross<wbr/>Signing<wbr/>Opts</span></a></li>
 <li><a href="_internal_.ByteSentStatsReport.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Byte<wbr/>Sent<wbr/>Stats<wbr/>Report</span></a></li>
 <li><a href="_internal_.CachedReceipt.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Cached<wbr/>Receipt</span></a></li>
 <li><a href="_internal_.CallCapabilities.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Call<wbr/>Capabilities</span></a></li>
@@ -402,7 +446,6 @@ the cross-signing pseudo-device.</p>
 <li><a href="_internal_.GroupCallStatsReport.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Group<wbr/>Call<wbr/>Stats<wbr/>Report</span></a></li>
 <li><a href="_internal_.IAccountData.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>IAccount<wbr/>Data</span></a></li>
 <li><a href="_internal_.IActionsObject.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>IActions<wbr/>Object</span></a></li>
-<li><a href="_internal_.IBootstrapCrossSigningOpts.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>IBootstrap<wbr/>Cross<wbr/>Signing<wbr/>Opts</span></a></li>
 <li><a href="_internal_.ICacheCallbacks.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>ICache<wbr/>Callbacks</span></a></li>
 <li><a href="_internal_.ICallFeedOpts.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>ICall<wbr/>Feed<wbr/>Opts</span></a></li>
 <li><a href="_internal_.ICallHandlers.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>ICall<wbr/>Handlers</span></a></li>
@@ -983,6 +1026,7 @@ the cross-signing pseudo-device.</p>
 <li><a href="../types/TweakHighlight.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>Tweak<wbr/>Highlight</span></a></li>
 <li><a href="../types/TweakSound.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>Tweak<wbr/>Sound</span></a></li>
 <li><a href="../types/Tweaks.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>Tweaks</span></a></li>
+<li><a href="../types/UIAuthCallback.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>UIAuth<wbr/>Callback</span></a></li>
 <li><a href="../types/UserEventHandlerMap.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>User<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
 <li><a href="../variables/CRYPTO_ENABLED.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>CRYPTO_<wbr/>ENABLED</span></a></li>
 <li><a href="../variables/DMMemberCountCondition.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>DMMember<wbr/>Count<wbr/>Condition</span></a></li>
