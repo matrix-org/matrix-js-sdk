@@ -19,6 +19,7 @@ interface SummaryCounter {
     receivedVideo: number;
     receivedMedia: number;
     concealedAudio: number;
+    totalAudio: number;
 }
 
 export class SummaryStatsReporter {
@@ -34,12 +35,13 @@ export class SummaryStatsReporter {
             receivedVideo: 0,
             receivedMedia: 0,
             concealedAudio: 0,
+            totalAudio: 0,
         };
         let maxJitter = 0;
         let maxPacketLoss = 0;
         summary.forEach((stats) => {
             this.countTrackListReceivedMedia(summaryCounter, stats);
-            this.countPercentageConcealedAudio(summaryCounter, stats);
+            this.countConcealedAudio(summaryCounter, stats);
             maxJitter = this.buildMaxJitter(maxJitter, stats);
             maxPacketLoss = this.buildMaxPacketLoss(maxPacketLoss, stats);
         });
@@ -55,7 +57,9 @@ export class SummaryStatsReporter {
             maxJitter,
             maxPacketLoss,
             percentageConcealedAudio: Number(
-                (summaryCounter.concealedAudio / summaryTotalCount).toFixed(decimalPlaces),
+                summaryCounter.totalAudio > 0
+                    ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
+                    : 0,
             ),
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
@@ -105,7 +109,8 @@ export class SummaryStatsReporter {
         return maxPacketLoss;
     }
 
-    private countPercentageConcealedAudio(summaryCounter: SummaryCounter, stats: SummaryStats): void {
-        summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudioRatio;
+    private countConcealedAudio(summaryCounter: SummaryCounter, stats: SummaryStats): void {
+        summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudio;
+        summaryCounter.totalAudio += stats.audioTrackSummary.totalAudio;
     }
 }

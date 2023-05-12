@@ -1,6 +1,6 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
 import { StatsValueFormatter } from "./statsValueFormatter";
-import { AudioTrackSummary, TrackSummary } from "./summaryStats";
+import { TrackSummary } from "./summaryStats";
 
 export class TrackStatsReporter {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
@@ -137,19 +137,29 @@ export class TrackStatsReporter {
     }
 
     public static buildTrackSummary(trackStatsList: MediaTrackStats[]): {
-        audioTrackSummary: AudioTrackSummary;
+        audioTrackSummary: TrackSummary;
         videoTrackSummary: TrackSummary;
     } {
-        const videoTrackSummary: TrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        const audioTrackSummary: AudioTrackSummary = {
+        const videoTrackSummary: TrackSummary = {
             count: 0,
             muted: 0,
             maxJitter: 0,
             maxPacketLoss: 0,
-            concealedAudioRatio: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
+        const audioTrackSummary: TrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
         };
 
         const remoteTrackList = trackStatsList.filter((t) => t.getType() === "remote");
+        const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
+
         remoteTrackList.forEach((stats) => {
             const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
             trackSummary.count++;
@@ -162,12 +172,12 @@ export class TrackStatsReporter {
             if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
                 trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
             }
+            if (audioTrackList.length > 0) {
+                trackSummary.concealedAudio += stats.getAudioConcealment()?.concealedAudio;
+                trackSummary.totalAudio += stats.getAudioConcealment()?.totalAudioDuration;
+            }
         });
 
-        const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
-        audioTrackList.forEach((stats) => {
-            audioTrackSummary.concealedAudioRatio += stats.getAudioConcealment()?.ratio / audioTrackList.length;
-        });
         return { audioTrackSummary, videoTrackSummary };
     }
 

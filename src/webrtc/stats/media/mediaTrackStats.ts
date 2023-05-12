@@ -35,7 +35,7 @@ export interface Bitrate {
 }
 export interface ConcealedAudio {
     /**
-     * durtation in ms
+     * duration in ms
      */
     duration: number;
 

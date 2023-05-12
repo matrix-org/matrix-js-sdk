@@ -97,7 +97,7 @@ describe("StatsReportBuilder", () => {
                 totalAudioConcealment: {
                     concealedAudio: 3000,
                     ratio: 0.05,
-                    totalAudioDuration: 60000,
+                    totalAudioDuration: (1 / 0.05) * 3000,
                 },
             });
         });
