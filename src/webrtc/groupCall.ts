@@ -625,9 +625,8 @@ export class GroupCall extends TypedEventEmitter<
         if (this.isPtt) {
             // Set or clear the max transmit timer
             if (!muted && this.isMicrophoneMuted()) {
-                const slf = this;
                 this.transmitTimer = setTimeout(() => {
-                    slf.setMicrophoneMuted(true);
+                    this.setMicrophoneMuted(true);
                 }, this.pttMaxTransmitTime);
             } else if (muted && !this.isMicrophoneMuted()) {
                 if (this.transmitTimer !== null) clearTimeout(this.transmitTimer);
@@ -691,8 +690,6 @@ export class GroupCall extends TypedEventEmitter<
      * `this.client.getMediaHandler().getUserMediaStream` clones the current stream, so it only wanted to be called when
      * not Audio Track exists.
      * As such, this is a compromise, because, the access rights should always be queried before the call.
-     * @param muted
-     * @private
      */
     private async checkAudioPermissionIfNecessary(muted: boolean): Promise<boolean> {
         // We needed this here to avoid an error in case user join a call without a device.
