@@ -18,11 +18,10 @@ limitations under the License.
  * This is an internal module which manages queuing, scheduling and retrying
  * of requests.
  */
-import * as utils from "./utils";
 import { logger } from "./logger";
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
-import { IDeferred } from "./utils";
+import { defer, IDeferred, removeElement } from "./utils";
 import { ConnectionError, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
 
@@ -175,7 +174,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
             return false;
         }
         let removed = false;
-        utils.removeElement(this.queues[name], (element) => {
+        removeElement(this.queues[name], (element) => {
             if (element.event.getId() === event.getId()) {
                 // XXX we should probably reject the promise?
                 // https://github.com/matrix-org/matrix-js-sdk/issues/496
@@ -214,15 +213,15 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (!this.queues[queueName]) {
             this.queues[queueName] = [];
         }
-        const defer = utils.defer<T>();
+        const deferred = defer<T>();
         this.queues[queueName].push({
             event: event,
-            defer: defer,
+            defer: deferred,
             attempts: 0,
         });
         debuglog("Queue algorithm dumped event %s into queue '%s'", event.getId(), queueName);
         this.startProcessingQueues();
-        return defer.promise;
+        return deferred.promise;
     }
 
     private startProcessingQueues(): void {

@@ -20,7 +20,7 @@ import {
     WrappedReceipt,
 } from "../@types/read_receipts";
 import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
-import * as utils from "../utils";
+import { isSupportedReceiptType } from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
@@ -267,7 +267,7 @@ export abstract class ReadReceipt<
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event)
             .filter(function (receipt) {
-                return utils.isSupportedReceiptType(receipt.type);
+                return isSupportedReceiptType(receipt.type);
             })
             .map(function (receipt) {
                 return receipt.userId;

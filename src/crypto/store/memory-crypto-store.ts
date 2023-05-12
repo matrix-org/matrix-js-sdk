@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../../logger";
-import * as utils from "../../utils";
+import { deepCompare, promiseTry } from "../../utils";
 import {
     CryptoStore,
     IDeviceData,
@@ -90,7 +90,7 @@ export class MemoryCryptoStore implements CryptoStore {
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
         const requestBody = request.requestBody;
 
-        return utils.promiseTry(() => {
+        return promiseTry(() => {
             // first see if we already have an entry for this request.
             const existing = this._getOutgoingRoomKeyRequest(requestBody);
 
@@ -138,7 +138,7 @@ export class MemoryCryptoStore implements CryptoStore {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     private _getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): OutgoingRoomKeyRequest | null {
         for (const existing of this.outgoingRoomKeyRequests) {
-            if (utils.deepCompare(existing.requestBody, requestBody)) {
+            if (deepCompare(existing.requestBody, requestBody)) {
                 return existing;
             }
         }
