@@ -92,7 +92,7 @@ describe("StatsReportBuilder", () => {
                     ["REMOTE_VIDEO_TRACK_ID", 50],
                 ]),
                 audioConcealment: new Map([
-                    ["REMOTE_AUDIO_TRACK_ID", { concealedAudio: 3000, ratio: 1 / 20, totalAudioDuration: 3000 * 20 }],
+                    ["REMOTE_AUDIO_TRACK_ID", { concealedAudio: 3000, totalAudioDuration: 3000 * 20 }],
                 ]),
                 totalAudioConcealment: {
                     concealedAudio: 3000,
