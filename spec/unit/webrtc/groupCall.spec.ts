@@ -1430,6 +1430,27 @@ describe("Group Call", function () {
             ).rejects.toThrow("Cannot find room room_id");
         });
 
+        it("handles GroupCallOpts", () => {
+            const room = new Room("room_id", client, "my_user_id");
+
+            const groupCall = new GroupCall({
+                client,
+                room,
+                type: GroupCallType.Voice,
+                isPtt: false,
+                intent: GroupCallIntent.Prompt,
+                groupCallId: "id",
+                isCallWithoutVideoAndAudio: true,
+            });
+
+            expect(groupCall.room).toBe(room);
+            expect(groupCall.type).toBe(GroupCallType.Voice);
+            expect(groupCall.isPtt).toBe(false);
+            expect(groupCall.intent).toBe(GroupCallIntent.Prompt);
+            expect(groupCall.groupCallId).toBe("id");
+            expect(groupCall.allowCallWithoutVideoAndAudio).toBe(true);
+        });
+
         describe("correctly passes parameters", () => {
             beforeEach(() => {
                 jest.spyOn(client, "getRoom").mockReturnValue(new Room("room_id", client, "my_user_id"));
