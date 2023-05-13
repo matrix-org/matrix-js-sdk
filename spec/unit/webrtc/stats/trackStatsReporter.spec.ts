@@ -226,12 +226,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -245,12 +249,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -266,12 +274,16 @@ describe("TrackStatsReporter", () => {
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -287,17 +299,21 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
 
-        it("and returns summary and build max jitter and packet loss", async () => {
+        it("and returns summary and build max jitter, packet loss and audio conealment", async () => {
             const trackStatsList = buildMockTrackStatsList();
             // video remote
             trackStatsList[1].setJitter(12);
@@ -311,6 +327,8 @@ describe("TrackStatsReporter", () => {
             trackStatsList[5].setJitter(15);
             trackStatsList[2].setLoss({ packetsLost: 5, packetsTotal: 0, isDownloadStream: true });
             trackStatsList[5].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[2].setAudioConcealment(220, 2000);
+            trackStatsList[5].setAudioConcealment(180, 2000);
 
             const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
@@ -319,12 +337,16 @@ describe("TrackStatsReporter", () => {
                     muted: 0,
                     maxJitter: 15,
                     maxPacketLoss: 5,
+                    concealedAudio: 400,
+                    totalAudio: 4000,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 66,
                     maxPacketLoss: 55,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
