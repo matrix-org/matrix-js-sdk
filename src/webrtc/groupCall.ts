@@ -204,6 +204,18 @@ function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
 }
 
+interface GroupCallOpts {
+    client: MatrixClient;
+    room: Room;
+    type: GroupCallType;
+    isPtt: boolean;
+    intent: GroupCallIntent;
+    groupCallId?: string;
+    dataChannelsEnabled?: boolean;
+    dataChannelOptions?: IGroupCallDataChannelOptions;
+    isCallWithoutVideoAndAudio?: boolean;
+}
+
 export class GroupCall extends TypedEventEmitter<
     GroupCallEvent | CallEvent | GroupCallStatsReportEvent,
     GroupCallEventHandlerMap & CallEventHandlerMap & GroupCallStatsReportEventHandlerMap
@@ -214,6 +226,10 @@ export class GroupCall extends TypedEventEmitter<
     public participantTimeout = 1000 * 15;
     public pttMaxTransmitTime = 1000 * 20;
 
+    public room: Room;
+    public type: GroupCallType;
+    public isPtt: boolean;
+    public intent: GroupCallIntent;
     public activeSpeaker?: CallFeed;
     public localCallFeed?: CallFeed;
     public localScreenshareFeed?: CallFeed;
@@ -223,6 +239,7 @@ export class GroupCall extends TypedEventEmitter<
     public groupCallId: string;
     public readonly allowCallWithoutVideoAndAudio: boolean;
 
+    private client: MatrixClient;
     private readonly calls = new Map<string, Map<string, MatrixCall>>(); // user_id -> device_id -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // user_id -> device_id -> ICallHandlers
     private activeSpeakerLoopInterval?: ReturnType<typeof setTimeout>;
@@ -235,6 +252,8 @@ export class GroupCall extends TypedEventEmitter<
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
+    private dataChannelsEnabled?: boolean;
+    private dataChannelOptions?: IGroupCallDataChannelOptions;
 
     private stats: GroupCallStats | undefined;
     /**
@@ -243,25 +262,61 @@ export class GroupCall extends TypedEventEmitter<
      */
     private statsCollectIntervalTime = 0;
 
+    public constructor(opts: GroupCallOpts);
     public constructor(
-        private client: MatrixClient,
-        public room: Room,
-        public type: GroupCallType,
-        public isPtt: boolean,
-        public intent: GroupCallIntent,
+        client: MatrixClient,
+        room: Room,
+        type: GroupCallType,
+        isPtt: boolean,
+        intent: GroupCallIntent,
         groupCallId?: string,
-        private dataChannelsEnabled?: boolean,
-        private dataChannelOptions?: IGroupCallDataChannelOptions,
+        dataChannelsEnabled?: boolean,
+        dataChannelOptions?: IGroupCallDataChannelOptions,
+        isCallWithoutVideoAndAudio?: boolean,
+    );
+    public constructor(
+        optsOrClient: GroupCallOpts | MatrixClient,
+        room?: Room,
+        type?: GroupCallType,
+        isPtt?: boolean,
+        intent?: GroupCallIntent,
+        groupCallId?: string,
+        dataChannelsEnabled?: boolean,
+        dataChannelOptions?: IGroupCallDataChannelOptions,
         isCallWithoutVideoAndAudio?: boolean,
     ) {
         super();
+
+        let client = optsOrClient as MatrixClient;
+        const opts = optsOrClient as GroupCallOpts;
+        if (opts.client) {
+            client = opts.client;
+            room = opts.room;
+            type = opts.type;
+            isPtt = opts.isPtt;
+            intent = opts.intent;
+            dataChannelsEnabled = opts.dataChannelsEnabled;
+            dataChannelOptions = opts.dataChannelOptions;
+            isCallWithoutVideoAndAudio = opts.isCallWithoutVideoAndAudio;
+
+            groupCallId = opts?.groupCallId;
+        }
+
+        this.client = client!;
+        this.room = room!;
+        this.type = type!;
+        this.isPtt = isPtt!;
+        this.intent = intent!;
+        this.dataChannelsEnabled = dataChannelsEnabled;
+        this.dataChannelOptions = dataChannelOptions;
+
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId ?? genCallID();
         this.creationTs =
-            room.currentState.getStateEvents(EventType.GroupCallPrefix, this.groupCallId)?.getTs() ?? null;
+            room!.currentState.getStateEvents(EventType.GroupCallPrefix, this.groupCallId)?.getTs() ?? null;
         this.updateParticipants();
 
-        room.on(RoomStateEvent.Update, this.onRoomState);
+        room!.on(RoomStateEvent.Update, this.onRoomState);
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
