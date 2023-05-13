@@ -1140,6 +1140,8 @@ describe("Group Call", function () {
 
             // Tracks should be enabled
             expect(mockCall.localUsermediaFeed.stream.getTracks().every((t) => t.enabled)).toBe(true);
+
+            aliceLeaves();
         });
 
         describe("handles call being replaced", () => {
