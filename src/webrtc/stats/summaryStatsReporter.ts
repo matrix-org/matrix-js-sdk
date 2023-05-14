@@ -61,6 +61,7 @@ export class SummaryStatsReporter {
                     ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
                     : 0,
             ),
+            peerConnections: summaryTotalCount,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
