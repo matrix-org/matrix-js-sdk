@@ -151,6 +151,10 @@ export class IndexedDBStore extends MemoryStore {
             });
     }
 
+    public destroy(): Promise<void> {
+        return this.backend.destroy();
+    }
+
     private onClose = (): void => {
         this.emitter.emit("closed");
     };
