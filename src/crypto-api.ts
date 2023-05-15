@@ -19,6 +19,13 @@ import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 
+/** Types of cross-signing key */
+export enum CrossSigningKey {
+    Master = "master",
+    SelfSigning = "self_signing",
+    UserSigning = "user_signing",
+}
+
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
@@ -136,6 +143,16 @@ export interface CryptoApi {
      * @returns True if cross-signing is ready to be used on this device
      */
     isCrossSigningReady(): Promise<boolean>;
+
+    /**
+     * Get the ID of one of the user's cross-signing keys.
+     *
+     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigngingKey.SelfSigning`,
+     *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
+     *
+     * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
+     */
+    getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.
