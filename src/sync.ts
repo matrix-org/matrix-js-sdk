@@ -28,7 +28,7 @@ import { Optional } from "matrix-events-sdk";
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import * as utils from "./utils";
+import { promiseMapSeries, defer, deepCopy } from "./utils";
 import { IDeferred, noUnsafeEventProps, unsafeProp } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
@@ -414,7 +414,7 @@ export class SyncApi {
 
             // FIXME: Mostly duplicated from injectRoomEvents but not entirely
             // because "state" in this API is at the BEGINNING of the chunk
-            const oldStateEvents = utils.deepCopy(response.state).map(client.getEventMapper());
+            const oldStateEvents = deepCopy(response.state).map(client.getEventMapper());
             const stateEvents = response.state.map(client.getEventMapper());
             const messages = response.messages.chunk.map(client.getEventMapper());
 
@@ -1247,7 +1247,7 @@ export class SyncApi {
         this.notifEvents = [];
 
         // Handle invites
-        await utils.promiseMapSeries(inviteRooms, async (inviteObj) => {
+        await promiseMapSeries(inviteRooms, async (inviteObj) => {
             const room = inviteObj.room;
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
@@ -1288,7 +1288,7 @@ export class SyncApi {
         });
 
         // Handle joins
-        await utils.promiseMapSeries(joinRooms, async (joinObj) => {
+        await promiseMapSeries(joinRooms, async (joinObj) => {
             const room = joinObj.room;
             const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
             // Prevent events from being decrypted ahead of time
@@ -1471,7 +1471,7 @@ export class SyncApi {
         });
 
         // Handle leaves (e.g. kicked rooms)
-        await utils.promiseMapSeries(leaveRooms, async (leaveObj) => {
+        await promiseMapSeries(leaveRooms, async (leaveObj) => {
             const room = leaveObj.room;
             const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
@@ -1552,7 +1552,7 @@ export class SyncApi {
             this.pokeKeepAlive();
         }
         if (!this.connectionReturnedDefer) {
-            this.connectionReturnedDefer = utils.defer();
+            this.connectionReturnedDefer = defer();
         }
         return this.connectionReturnedDefer.promise;
     }

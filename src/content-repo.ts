@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as utils from "./utils";
+import { encodeParams } from "./utils";
 
 /**
  * Get the HTTP URL for an MXC URI.
@@ -74,6 +74,6 @@ export function getHttpUriForMxc(
         serverAndMediaId = serverAndMediaId.slice(0, fragmentOffset);
     }
 
-    const urlParams = Object.keys(params).length === 0 ? "" : "?" + utils.encodeParams(params);
+    const urlParams = Object.keys(params).length === 0 ? "" : "?" + encodeParams(params);
     return baseUrl + prefix + serverAndMediaId + urlParams + fragment;
 }

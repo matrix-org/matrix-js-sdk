@@ -17,7 +17,7 @@ limitations under the License.
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
-import * as utils from "./utils";
+import { promiseMapSeries } from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
 import {
@@ -726,8 +726,8 @@ export class SlidingSyncSdk {
             }
         };
 
-        await utils.promiseMapSeries(stateEvents, processRoomEvent);
-        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
+        await promiseMapSeries(stateEvents, processRoomEvent);
+        await promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function (e) {
             client.emit(ClientEvent.Event, e);
         });
