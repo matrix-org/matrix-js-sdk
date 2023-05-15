@@ -24,11 +24,12 @@ import {
     KeysUploadRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
+    SigningKeysUploadRequest,
     ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-js";
 
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
+import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, UIAuthCallback } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 
 describe("OutgoingRequestProcessor", () => {
@@ -80,6 +81,12 @@ describe("OutgoingRequestProcessor", () => {
             "https://example.com/_matrix/client/v3/keys/signatures/upload",
         ],
         ["KeysBackupRequest", KeysBackupRequest, "PUT", "https://example.com/_matrix/client/v3/room_keys/keys"],
+        [
+            "SigningKeysUploadRequest",
+            SigningKeysUploadRequest,
+            "POST",
+            "https://example.com/_matrix/client/v3/keys/device_signing/upload",
+        ],
     ];
 
     test.each(tests)(`should handle %ss`, async (_, RequestClass, expectedMethod, expectedPath) => {
@@ -157,6 +164,40 @@ describe("OutgoingRequestProcessor", () => {
                     "https://example.com/_matrix/client/v3/room/test%2Froom/send/test%2Ftype/test%2Ftxnid",
                 );
                 expect(req.rawData).toEqual(testBody);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
+
+        // ... and that it calls OlmMachine.markAsSent.
+        const markSentCallPromise = awaitCallToMarkAsSent();
+        await httpBackend.flushAllExpected();
+
+        await Promise.all([reqProm, markSentCallPromise]);
+        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
+    it("should handle SigningKeysUploadRequests with UIA", async () => {
+        // first, mock up a request as we might expect to receive it from the Rust layer ...
+        const testReq = { foo: "bar" };
+        const outgoingRequest = new SigningKeysUploadRequest("1234", JSON.stringify(testReq));
+
+        // also create a UIA callback
+        const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
+            return await makeRequest({ type: "test" });
+        };
+
+        // ... then poke the request into the OutgoingRequestProcessor under test
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest, authCallback);
+
+        // Now: check that it makes a matching HTTP request ...
+        const testResponse = '{"result":1}';
+        httpBackend
+            .when("POST", "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual("https://example.com/_matrix/client/v3/keys/device_signing/upload");
+                expect(JSON.parse(req.rawData)).toEqual({ foo: "bar", auth: { type: "test" } });
                 expect(req.headers["Accept"]).toEqual("application/json");
                 expect(req.headers["Content-Type"]).toEqual("application/json");
             })
