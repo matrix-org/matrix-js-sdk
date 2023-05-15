@@ -151,6 +151,9 @@ export class IndexedDBStore extends MemoryStore {
             });
     }
 
+    /*
+     * Close the database and destroy any associated workers
+     */
     public destroy(): Promise<void> {
         return this.backend.destroy();
     }

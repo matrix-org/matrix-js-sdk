@@ -201,6 +201,9 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         }
     };
 
+    /*
+     * Destroy the web worker
+     */
     public async destroy(): Promise<void> {
         this.worker?.terminate();
     }
