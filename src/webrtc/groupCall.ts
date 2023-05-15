@@ -698,7 +698,7 @@ export class GroupCall extends TypedEventEmitter<
                 const stream = await this.client
                     .getMediaHandler()
                     .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
-                if (stream === null) {
+                if (stream?.getTracks().length === 0) {
                     // if case permission denied to get a stream stop this here
                     /* istanbul ignore next */
                     logger.log(

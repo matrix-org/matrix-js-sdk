@@ -913,7 +913,10 @@ describe("Group Call", function () {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
                 // @ts-ignore
                 jest.spyOn(groupCall.localCallFeed, "hasAudioTrack", "get").mockReturnValue(false);
-                jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockResolvedValue(null);
+                // @ts-ignore
+                jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockResolvedValue(
+                    new MockMediaStream("new"),
+                );
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
             });
 
