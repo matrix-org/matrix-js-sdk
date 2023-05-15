@@ -909,6 +909,14 @@ describe("Group Call", function () {
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
             });
 
+            it("returns false when user media stream null", async () => {
+                const groupCall = await createAndEnterGroupCall(mockClient, room);
+                // @ts-ignore
+                jest.spyOn(groupCall.localCallFeed, "hasAudioTrack", "get").mockReturnValue(false);
+                jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockResolvedValue(null);
+                expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
+            });
+
             it("returns true when no permission for audio stream but localCallFeed has a audio track already", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
                 // @ts-ignore
