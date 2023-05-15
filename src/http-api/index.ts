@@ -17,7 +17,7 @@ limitations under the License.
 import { FetchHttpApi } from "./fetch";
 import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface";
 import { MediaPrefix } from "./prefix";
-import * as utils from "../utils";
+import { defer, QueryDict, removeElement } from "../utils";
 import * as callbacks from "../realtime-callbacks";
 import { Method } from "./method";
 import { ConnectionError } from "./errors";
@@ -58,14 +58,14 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const defer = utils.defer<UploadResponse>();
+        const deferred = defer<UploadResponse>();
 
         if (global.XMLHttpRequest) {
             const xhr = new global.XMLHttpRequest();
 
             const timeoutFn = function (): void {
                 xhr.abort();
-                defer.reject(new Error("Timeout"));
+                deferred.reject(new Error("Timeout"));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
@@ -84,16 +84,16 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             }
 
                             if (xhr.status >= 400) {
-                                defer.reject(parseErrorResponse(xhr, xhr.responseText));
+                                deferred.reject(parseErrorResponse(xhr, xhr.responseText));
                             } else {
-                                defer.resolve(JSON.parse(xhr.responseText));
+                                deferred.resolve(JSON.parse(xhr.responseText));
                             }
                         } catch (err) {
                             if ((<Error>err).name === "AbortError") {
-                                defer.reject(err);
+                                deferred.reject(err);
                                 return;
                             }
-                            defer.reject(new ConnectionError("request failed", <Error>err));
+                            deferred.reject(new ConnectionError("request failed", <Error>err));
                         }
                         break;
                 }
@@ -131,7 +131,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 xhr.abort();
             });
         } else {
-            const queryParams: utils.QueryDict = {};
+            const queryParams: QueryDict = {};
             if (includeFilename && fileName) {
                 queryParams.filename = fileName;
             }
@@ -146,16 +146,16 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 .then((response) => {
                     return this.opts.onlyData ? <UploadResponse>response : response.json();
                 })
-                .then(defer.resolve, defer.reject);
+                .then(deferred.resolve, deferred.reject);
         }
 
         // remove the upload from the list on completion
-        upload.promise = defer.promise.finally(() => {
-            utils.removeElement(this.uploads, (elem) => elem === upload);
+        upload.promise = deferred.promise.finally(() => {
+            removeElement(this.uploads, (elem) => elem === upload);
         });
         abortController.signal.addEventListener("abort", () => {
-            utils.removeElement(this.uploads, (elem) => elem === upload);
-            defer.reject(new DOMException("Aborted", "AbortError"));
+            removeElement(this.uploads, (elem) => elem === upload);
+            deferred.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
         return upload.promise;

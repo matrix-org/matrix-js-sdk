@@ -14,59 +14,77 @@ import { StatsReportEmitter } from "./statsReportEmitter";
 import { SummaryStats } from "./summaryStats";
 import { SummaryStatsReport } from "./statsReport";
 
-interface ReceivedMedia {
-    audio: number;
-    video: number;
-    media: number;
+interface SummaryCounter {
+    receivedAudio: number;
+    receivedVideo: number;
+    receivedMedia: number;
+    concealedAudio: number;
+    totalAudio: number;
 }
 
 export class SummaryStatsReporter {
     public constructor(private emitter: StatsReportEmitter) {}
 
     public build(summary: SummaryStats[]): void {
-        const entiretyTracksCount = summary.length;
-        if (entiretyTracksCount === 0) {
+        const summaryTotalCount = summary.length;
+        if (summaryTotalCount === 0) {
             return;
         }
-        const receivedCounter: ReceivedMedia = { audio: 0, video: 0, media: 0 };
+        const summaryCounter: SummaryCounter = {
+            receivedAudio: 0,
+            receivedVideo: 0,
+            receivedMedia: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
         let maxJitter = 0;
         let maxPacketLoss = 0;
-
         summary.forEach((stats) => {
-            this.countTrackListReceivedMedia(receivedCounter, stats);
+            this.countTrackListReceivedMedia(summaryCounter, stats);
+            this.countConcealedAudio(summaryCounter, stats);
             maxJitter = this.buildMaxJitter(maxJitter, stats);
             maxPacketLoss = this.buildMaxPacketLoss(maxPacketLoss, stats);
         });
-
+        const decimalPlaces = 5;
         const report = {
-            percentageReceivedMedia: Math.round((receivedCounter.media / entiretyTracksCount) * 100) / 100,
-            percentageReceivedVideoMedia: Math.round((receivedCounter.video / entiretyTracksCount) * 100) / 100,
-            percentageReceivedAudioMedia: Math.round((receivedCounter.audio / entiretyTracksCount) * 100) / 100,
+            percentageReceivedMedia: Number((summaryCounter.receivedMedia / summaryTotalCount).toFixed(decimalPlaces)),
+            percentageReceivedVideoMedia: Number(
+                (summaryCounter.receivedVideo / summaryTotalCount).toFixed(decimalPlaces),
+            ),
+            percentageReceivedAudioMedia: Number(
+                (summaryCounter.receivedAudio / summaryTotalCount).toFixed(decimalPlaces),
+            ),
             maxJitter,
             maxPacketLoss,
+            percentageConcealedAudio: Number(
+                summaryCounter.totalAudio > 0
+                    ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
+                    : 0,
+            ),
+            peerConnections: summaryTotalCount,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
 
-    private countTrackListReceivedMedia(counter: ReceivedMedia, stats: SummaryStats): void {
+    private countTrackListReceivedMedia(counter: SummaryCounter, stats: SummaryStats): void {
         let hasReceivedAudio = false;
         let hasReceivedVideo = false;
         if (stats.receivedAudioMedia > 0 || stats.audioTrackSummary.count === 0) {
-            counter.audio++;
+            counter.receivedAudio++;
             hasReceivedAudio = true;
         }
         if (stats.receivedVideoMedia > 0 || stats.videoTrackSummary.count === 0) {
-            counter.video++;
+            counter.receivedVideo++;
             hasReceivedVideo = true;
         } else {
             if (stats.videoTrackSummary.muted > 0 && stats.videoTrackSummary.muted === stats.videoTrackSummary.count) {
-                counter.video++;
+                counter.receivedVideo++;
                 hasReceivedVideo = true;
             }
         }
 
         if (hasReceivedVideo && hasReceivedAudio) {
-            counter.media++;
+            counter.receivedMedia++;
         }
     }
 
@@ -90,5 +108,10 @@ export class SummaryStatsReporter {
             maxPacketLoss = stats.audioTrackSummary.maxPacketLoss;
         }
         return maxPacketLoss;
+    }
+
+    private countConcealedAudio(summaryCounter: SummaryCounter, stats: SummaryStats): void {
+        summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudio;
+        summaryCounter.totalAudio += stats.audioTrackSummary.totalAudio;
     }
 }

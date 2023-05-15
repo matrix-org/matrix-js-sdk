@@ -25,15 +25,25 @@ jobs:
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: 📖 Generate JSDoc
-              run: "yarn gendoc"
+            - name: 🔨 Install symlinks
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y symlinks
+
+            - name: 📖 Generate docs
+              run: |
+                  yarn tpv --yes --out _docs --stale --major 10
+                  yarn gendoc
+                  symlinks -rc _docs
 
             - name: 🚀 Deploy
-              uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3
-              with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  keep_files: true
-                  publish_dir: _docs
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  git add . --all
+                  git commit -m "Update docs"
+                  git push
+              working-directory: _docs
 
     npm:
         name: Publish

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoos } from "./connectionStats";
+import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoss } from "./connectionStats";
 import { TransportStats } from "./transportStats";
 import { Resolution } from "./media/mediaTrackStats";
 
@@ -34,12 +34,19 @@ export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
 export interface ConnectionStatsReport {
     bandwidth: ConnectionStatsBandwidth;
     bitrate: ConnectionStatsBitrate;
-    packetLoss: PacketLoos;
+    packetLoss: PacketLoss;
+    audioConcealment: Map<TrackID, AudioConcealment>;
+    totalAudioConcealment: AudioConcealment;
     resolution: ResolutionMap;
     framerate: FramerateMap;
     codec: CodecMap;
     jitter: Map<TrackID, number>;
     transport: TransportStats[];
+}
+
+export interface AudioConcealment {
+    concealedAudio: number;
+    totalAudioDuration: number;
 }
 
 export interface ResolutionMap {
@@ -70,4 +77,6 @@ export interface SummaryStatsReport {
     percentageReceivedVideoMedia: number;
     maxJitter: number;
     maxPacketLoss: number;
+    percentageConcealedAudio: number;
+    peerConnections: number;
 }

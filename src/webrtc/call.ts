@@ -25,7 +25,7 @@ import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger";
-import * as utils from "../utils";
+import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils";
 import { IContent, MatrixEvent } from "../models/event";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { RoomMember } from "../models/room-member";
@@ -453,7 +453,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             });
         }
         for (const server of this.turnServers) {
-            utils.checkObjectHasKeys(server, ["urls"]);
+            checkObjectHasKeys(server, ["urls"]);
         }
         this.callId = genCallID();
         // If the Client provides calls without audio and video we need a datachannel for a webrtc connection
@@ -1043,7 +1043,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             );
             return false;
         } else if (
-            !utils.isNullOrUndefined(wantedValue) &&
+            !isNullOrUndefined(wantedValue) &&
             wantedValue !== valueOfTheOtherSide &&
             !this.opponentSupportsSDPStreamMetadata()
         ) {
@@ -2030,7 +2030,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
-        this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
+        this.remoteSDPStreamMetadata = recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
             const metadata = this.remoteSDPStreamMetadata![streamId];

@@ -140,23 +140,44 @@ export class TrackStatsReporter {
         audioTrackSummary: TrackSummary;
         videoTrackSummary: TrackSummary;
     } {
-        const audioTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        const videoTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        trackStatsList
-            .filter((t) => t.getType() === "remote")
-            .forEach((stats) => {
-                const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
-                trackSummary.count++;
-                if (stats.alive && stats.muted) {
-                    trackSummary.muted++;
-                }
-                if (trackSummary.maxJitter < stats.getJitter()) {
-                    trackSummary.maxJitter = stats.getJitter();
-                }
-                if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
-                    trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
-                }
-            });
+        const videoTrackSummary: TrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
+        const audioTrackSummary: TrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
+
+        const remoteTrackList = trackStatsList.filter((t) => t.getType() === "remote");
+        const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
+
+        remoteTrackList.forEach((stats) => {
+            const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+            trackSummary.count++;
+            if (stats.alive && stats.muted) {
+                trackSummary.muted++;
+            }
+            if (trackSummary.maxJitter < stats.getJitter()) {
+                trackSummary.maxJitter = stats.getJitter();
+            }
+            if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
+                trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
+            }
+            if (audioTrackList.length > 0) {
+                trackSummary.concealedAudio += stats.getAudioConcealment()?.concealedAudio;
+                trackSummary.totalAudio += stats.getAudioConcealment()?.totalAudioDuration;
+            }
+        });
+
         return { audioTrackSummary, videoTrackSummary };
     }
 
@@ -172,5 +193,15 @@ export class TrackStatsReporter {
         } else {
             trackStats.setJitter(-1);
         }
+    }
+
+    public static buildAudioConcealment(trackStats: MediaTrackStats, statsReport: any): void {
+        if (statsReport.type !== "inbound-rtp") {
+            return;
+        }
+        const msPerSample = (1000 * statsReport?.totalSamplesDuration) / statsReport?.totalSamplesReceived;
+        const concealedAudioDuration = msPerSample * statsReport?.concealedSamples;
+        const totalAudioDuration = 1000 * statsReport?.totalSamplesDuration;
+        trackStats.setAudioConcealment(concealedAudioDuration, totalAudioDuration);
     }
 }

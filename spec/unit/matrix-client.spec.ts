@@ -70,6 +70,7 @@ import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 jest.useFakeTimers();
 
@@ -2747,6 +2748,60 @@ describe("MatrixClient", function () {
             mockSecretStorage.isStored.mockResolvedValue(null);
             expect(await client.isKeyBackupKeyStored()).toBe(null);
             expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
+        });
+    });
+
+    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
+    describe("Crypto wrappers", () => {
+        describe("exception if no crypto", () => {
+            it("isCrossSigningReady", () => {
+                expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
+            });
+
+            it("bootstrapCrossSigning", () => {
+                expect(() => client.bootstrapCrossSigning({})).toThrow("End-to-end encryption disabled");
+            });
+
+            it("isSecretStorageReady", () => {
+                expect(() => client.isSecretStorageReady()).toThrow("End-to-end encryption disabled");
+            });
+        });
+
+        describe("defer to crypto backend", () => {
+            let mockCryptoBackend: Mocked<CryptoBackend>;
+
+            beforeEach(() => {
+                mockCryptoBackend = {
+                    isCrossSigningReady: jest.fn(),
+                    bootstrapCrossSigning: jest.fn(),
+                    isSecretStorageReady: jest.fn(),
+                    stop: jest.fn().mockResolvedValue(undefined),
+                } as unknown as Mocked<CryptoBackend>;
+                client["cryptoBackend"] = mockCryptoBackend;
+            });
+
+            it("isCrossSigningReady", async () => {
+                const testResult = "test";
+                mockCryptoBackend.isCrossSigningReady.mockResolvedValue(testResult as unknown as boolean);
+                expect(await client.isCrossSigningReady()).toBe(testResult);
+                expect(mockCryptoBackend.isCrossSigningReady).toHaveBeenCalledTimes(1);
+            });
+
+            it("bootstrapCrossSigning", async () => {
+                const testOpts = {};
+                mockCryptoBackend.bootstrapCrossSigning.mockResolvedValue(undefined);
+                await client.bootstrapCrossSigning(testOpts);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledTimes(1);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledWith(testOpts);
+            });
+
+            it("isSecretStorageReady", async () => {
+                client["cryptoBackend"] = mockCryptoBackend;
+                const testResult = "test";
+                mockCryptoBackend.isSecretStorageReady.mockResolvedValue(testResult as unknown as boolean);
+                expect(await client.isSecretStorageReady()).toBe(testResult);
+                expect(mockCryptoBackend.isSecretStorageReady).toHaveBeenCalledTimes(1);
+            });
         });
     });
 

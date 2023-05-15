@@ -24,7 +24,7 @@ import {
 } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
-import * as utils from "../utils";
+import { compare, removeElement } from "../utils";
 import { normalize, noUnsafeEventProps } from "../utils";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
@@ -733,7 +733,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             );
         }
 
-        const removed = utils.removeElement(
+        const removed = removeElement(
             this.pendingEventList,
             function (ev) {
                 return ev.getId() == eventId;
@@ -3267,7 +3267,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return true;
             });
             // make sure members have stable order
-            otherMembers.sort((a, b) => utils.compare(a.userId, b.userId));
+            otherMembers.sort((a, b) => compare(a.userId, b.userId));
             // only 5 first members, immitate summaryHeroes
             otherMembers = otherMembers.slice(0, 5);
             otherNames = otherMembers.map((m) => m.name);
