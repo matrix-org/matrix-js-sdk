@@ -18,6 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
+import { IImportRoomKeysOpts } from "./crypto/api";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -81,6 +82,14 @@ export interface CryptoApi {
      *    session export objects
      */
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeys
+     *
+     * @param keys - a list of session export objects
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void>;
 
     /**
      * Get the device information for the given list of users.

@@ -18,7 +18,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import type { IEncryptedEventInfo } from "../crypto/api";
+import type { IEncryptedEventInfo, IImportOpts, IImportRoomKeysOpts } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
@@ -206,10 +206,23 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        // TODO
-        return [];
+        const raw = await this.olmMachine.exportRoomKeys(() => true);
+        return Promise.resolve(JSON.parse(raw));
     }
 
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts | undefined): Promise<void> {
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
+            const importOpt: IImportOpts = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
+        return Promise.resolve();
+    }
     /**
      * Get the device information for the given list of users.
      *
