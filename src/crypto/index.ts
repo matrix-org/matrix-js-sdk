@@ -1420,7 +1420,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns the key ID
      */
-    public getCrossSigningKeyId(type: CrossSigningKey | string = CrossSigningKey.Master): Promise<string | null> {
+    public getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
         return Promise.resolve(this.getCrossSigningId(type));
     }
 

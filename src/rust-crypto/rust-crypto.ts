@@ -328,7 +328,7 @@ export class RustCrypto implements CryptoBackend {
     /**
      * Implementation of {@link CryptoApi#getCrossSigningKeyId}
      */
-    public async getCrossSigningKeyId(type: CrossSigningKey | string = CrossSigningKey.Master): Promise<string | null> {
+    public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
         // TODO
         return null;
     }
