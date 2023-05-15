@@ -75,8 +75,8 @@ class MlsEncryption extends EncryptionAlgorithm {
         mlsProvider.syncMembers(this.roomId, memberMap);
 
         if (group.has_changes() || group.needs_resolve()) {
-            console.log("has changes/needs resolve", group.has_changes(), group.needs_resolve());
-            const [commit, _mls_epoch, creator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
+            console.log("[MLS] has changes/needs resolve", group.has_changes(), group.needs_resolve());
+            const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
             const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
@@ -105,7 +105,7 @@ class MlsEncryption extends EncryptionAlgorithm {
                         }
                         contentMap[userId][deviceId] = payload;
                     } catch (e) {
-                        console.error("Unable to add user", user, e);
+                        console.error("[MLS] Unable to add user", user, e);
                     }
                 }
 
@@ -170,7 +170,7 @@ class MlsDecryption extends DecryptionAlgorithm {
             if (typeof(clearEvent.room_id) !== "string" ||
                 typeof(clearEvent.type) !== "string" ||
                 typeof(clearEvent.content) !== "object") {
-            throw new DecryptionError("MLS_MISSING_FIELDS", "Missing or invalid fields in plaintext");
+                throw new DecryptionError("MLS_MISSING_FIELDS", "Missing or invalid fields in plaintext");
             }
             return {
                 clearEvent
@@ -210,7 +210,7 @@ class WelcomeEncryption extends EncryptionAlgorithm {
 class WelcomeDecryption extends DecryptionAlgorithm {
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         const content = event.getWireContent();
-        console.log("Got welcome", content);
+        console.log("[MLS] Got welcome", content);
         // FIXME: check that it's a to-device event
         if (typeof(content.ciphertext) !== "string" ||
             typeof(content.sender) !== "string" ||
@@ -291,7 +291,7 @@ export class MlsProvider {
 
             const otks = await baseApis.claimOneTimeKeys(devicesToClaim, INIT_KEY_ALGORITHM.name);
 
-            console.log("InitKeys", otks);
+            console.log("[MLS] InitKeys", otks);
 
             const keys: (Uint8Array | undefined)[] = [];
 
@@ -367,7 +367,7 @@ export class MlsProvider {
                         }
                         contentMap[userId][deviceId] = payload;
                     } catch (e) {
-                        console.error("Unable to add user", user, e);
+                        console.error("[MLS] Unable to add user", user, e);
                     }
                 }
 
@@ -387,7 +387,7 @@ export class MlsProvider {
         const group = matrixDmls.DmlsGroup.new_from_welcome(this.backend!, welcome, creator);
         const groupIdArr = group.group_id();
         const groupId = textDecoder.decode(groupIdArr);
-        console.log("Welcome message for", groupId);
+        console.log("[MLS] Welcome message for", groupId);
         // FIXME: check that it's a valid room ID
         if (this.groups.has(groupId)) {
             const oldGroup = this.groups.get(groupId)!;
@@ -432,7 +432,7 @@ export class MlsProvider {
          */
         const recordedMembers = this.members.get(roomId)!;
 
-        console.log("Syncing members", members, recordedMembers);
+        console.log("[MLS] Syncing members", members, recordedMembers);
 
         // find out what devices have been added/removed
         const adds: [string, string][] = [];
@@ -466,7 +466,7 @@ export class MlsProvider {
             }
         }
 
-        console.log(adds, removes);
+        console.log("[MLS] adds, removes", adds, removes);
 
         // sync up the group and recorded members
         const group = this.groups.get(roomId)!;
