@@ -915,7 +915,7 @@ describe("Group Call", function () {
                 jest.spyOn(groupCall.localCallFeed, "hasAudioTrack", "get").mockReturnValue(false);
                 // @ts-ignore
                 jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockResolvedValue(
-                    new MockMediaStream("new"),
+                    {} as MediaStream,
                 );
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
             });
