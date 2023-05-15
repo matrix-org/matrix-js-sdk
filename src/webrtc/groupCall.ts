@@ -655,27 +655,9 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            // We needed this here to avoid an error in case user join a call without a device.
-            // I can not use .then .catch functions because linter :-(
-            try {
-                if (!muted) {
-                    const stream = await this.client
-                        .getMediaHandler()
-                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
-                    if (stream === null) {
-                        // if case permission denied to get a stream stop this here
-                        /* istanbul ignore next */
-                        logger.log(
-                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
-                        );
-                        return false;
-                    }
-                }
-            } catch (e) {
-                /* istanbul ignore next */
-                logger.log(
-                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
-                );
+            const hasPermission = await this.checkAudioPermissionIfNecessary(muted);
+
+            if (!hasPermission) {
                 return false;
             }
 
@@ -696,6 +678,42 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
+
+        return true;
+    }
+
+    /**
+     * If we allow entering a call without a camera and without video, it can happen that the access rights to the
+     * devices have not yet been queried. If a stream does not yet have an audio track, we assume that the rights have
+     * not yet been checked.
+     *
+     * `this.client.getMediaHandler().getUserMediaStream` clones the current stream, so it only wanted to be called when
+     * not Audio Track exists.
+     * As such, this is a compromise, because, the access rights should always be queried before the call.
+     */
+    private async checkAudioPermissionIfNecessary(muted: boolean): Promise<boolean> {
+        // We needed this here to avoid an error in case user join a call without a device.
+        try {
+            if (!muted && this.localCallFeed && !this.localCallFeed.hasAudioTrack) {
+                const stream = await this.client
+                    .getMediaHandler()
+                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                if (stream?.getTracks().length === 0) {
+                    // if case permission denied to get a stream stop this here
+                    /* istanbul ignore next */
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                    );
+                    return false;
+                }
+            }
+        } catch (e) {
+            /* istanbul ignore next */
+            logger.log(
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+            );
+            return false;
+        }
 
         return true;
     }
