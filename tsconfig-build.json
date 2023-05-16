@@ -1,6 +1,7 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        "forceConsistentCasingInFileNames": true,
         "declarationMap": true,
         "sourceMap": true,
         "noEmit": false,
