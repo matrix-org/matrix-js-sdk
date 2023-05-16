@@ -30,6 +30,14 @@ export interface IEncryptedPayload {
     mac: string;
 }
 
+export interface IEncryptedStreamingPayload {
+    [key: string]: any; // extensible
+    /** the initialization vector in base64 */
+    iv: string;
+    /** the ciphertext in base64 */
+    ciphertext: string;
+}
+
 /**
  * encrypt a string
  *
@@ -57,7 +65,7 @@ export async function encryptAES(
         iv[8] &= 0x7f;
     }
 
-    const [aesKey, hmacKey] = await deriveKeys(key, name);
+    const [aesKey, hmacKey] = await deriveKeys(key, name, streaming);
     const encodedData = new TextEncoder().encode(data);
 
     const ciphertext = await subtleCrypto.encrypt(
@@ -80,14 +88,62 @@ export async function encryptAES(
 }
 
 /**
+ * encrypt a string for streaming
+ *
+ * @param data - the plaintext to encrypt
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
+ * @param ivStr - the initialization vector to use
+ */
+export async function encryptStreamingAES(
+    data: string,
+    key: Uint8Array,
+    name: string,
+    blockNumber: number,
+    ivStr?: string,
+): Promise<IEncryptedStreamingPayload> {
+    let iv: Uint8Array;
+    if (ivStr) {
+        iv = decodeBase64(ivStr);
+    } else {
+        iv = new Uint8Array(16);
+        crypto.getRandomValues(iv);
+
+        // assume that AES-GCM doesn't need the 'clear IV bit 63' workaround for Android
+    }
+
+    const [aesKey] = await deriveStreamingKeys(key, name);
+    const encodedData = new TextEncoder().encode(data);
+
+    const ciphertext = await subtleCrypto.encrypt(
+        {
+            name: "AES-GCM",
+            counter: iv,
+            length: 64,
+        },
+        aesKey,
+        encodedData,
+    );
+
+    return {
+        iv: encodeBase64(iv),
+        ciphertext: encodeBase64(ciphertext),
+    };
+}
+
+/**
  * decrypt a string
  *
  * @param data - the encrypted data
  * @param key - the encryption key to use
  * @param name - the name of the secret
  */
-export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
-    const [aesKey, hmacKey] = await deriveKeys(key, name);
+export async function decryptAES(
+    data: IEncryptedPayload,
+    key: Uint8Array,
+    name: string,
+): Promise<string> {
+    const [aesKey, hmacKey] = await deriveKeys(key, name, streaming);
 
     const ciphertext = decodeBase64(data.ciphertext);
 
@@ -98,6 +154,35 @@ export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name:
     const plaintext = await subtleCrypto.decrypt(
         {
             name: "AES-CTR",
+            counter: decodeBase64(data.iv),
+            length: 64,
+        },
+        aesKey,
+        ciphertext,
+    );
+
+    return new TextDecoder().decode(new Uint8Array(plaintext));
+}
+
+/**
+ * decrypt a string for streaming
+ *
+ * @param data - the encrypted data
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
+ */
+export async function decryptStreamingAES(
+    data: IEncryptedPayload,
+    key: Uint8Array,
+    name: string,
+): Promise<string> {
+    const [aesKey] = await deriveStreamingKeys(key, name);
+
+    const ciphertext = decodeBase64(data.ciphertext);
+
+    const plaintext = await subtleCrypto.decrypt(
+        {
+            name: "AES-GCM",
             counter: decodeBase64(data.iv),
             length: 64,
         },
@@ -140,6 +225,27 @@ async function deriveKeys(key: Uint8Array, name: string): Promise<[CryptoKey, Cr
     );
 
     return Promise.all([aesProm, hmacProm]);
+}
+
+async function deriveStreamingKeys(key: Uint8Array, name: string): Promise<[CryptoKey]> {
+    const hkdfkey = await subtleCrypto.importKey("raw", key, { name: "HKDF" }, false, ["deriveBits"]);
+    const keybits = await subtleCrypto.deriveBits(
+        {
+            name: "HKDF",
+            salt: zeroSalt,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
+            info: new TextEncoder().encode(name),
+            hash: "SHA-256",
+        },
+        hkdfkey,
+        256,
+    );
+
+    const aesKey = keybits;
+    const aesProm = subtleCrypto.importKey("raw", aesKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+    return Promise.all([aesProm]);
 }
 
 // string of zeroes, for calculating the key check
