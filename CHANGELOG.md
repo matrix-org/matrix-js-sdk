@@ -1,3 +1,9 @@
+Changes in [25.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.1.1) (2023-05-16)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Rebuild to fix packaging glitch in 25.1.0. Fixes #3363
+
 Changes in [25.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.1.0) (2023-05-09)
 ==================================================================================================
 
