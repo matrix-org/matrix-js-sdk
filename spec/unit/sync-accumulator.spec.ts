@@ -545,7 +545,8 @@ describe("SyncAccumulator", function () {
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
         });
 
-        it("should reset summary properties", function () {
+        it("should correctly update summary properties to zero", function () {
+            // When we receive updates of a summary property, the last of which is 0
             sa.accumulate(
                 createSyncResponseWithSummary({
                     "m.heroes": ["@alice:bar"],
@@ -559,6 +560,7 @@ describe("SyncAccumulator", function () {
                 }),
             );
             const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            // Then we give an answer of 0
             expect(summary["m.invited_member_count"]).toEqual(0);
         });
 
