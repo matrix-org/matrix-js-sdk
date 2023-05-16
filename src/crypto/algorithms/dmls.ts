@@ -53,7 +53,44 @@ class MlsEncryption extends EncryptionAlgorithm {
         if (!this.roomId) {
             throw "No room ID";
         }
-        const group = mlsProvider.getGroup(this.roomId);
+        let group = mlsProvider.getGroup(this.roomId);
+        if (!group) {
+            const timeline = room.getLiveTimeline();
+            const events = timeline.getEvents();
+            events.reverse();
+            let publicGroupStateContents: IContent  | undefined;
+            for (const event of events) {
+                if (event.getWireType() == "m.room.encrypted") {
+                    const contents = event.getWireContent();
+                    if (contents.algorithm == MLS_ALGORITHM.name &&
+                        "public_group_state" in contents &&
+                        "sender" in contents) {
+                        publicGroupStateContents = contents;
+                        break;
+                    }
+                }
+            }
+            // FIXME: search for more events if we still don't have public state
+            // FIXME: search for public group state again if the join fails
+            if (publicGroupStateContents) {
+                const [joinedGroup, message] = mlsProvider.joinByExternalCommit(
+                    publicGroupStateContents.public_group_state,
+                    this.roomId,
+                );
+                const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
+                group = joinedGroup;
+                const publicGroupState = group.public_group_state(mlsProvider.backend!);
+                const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+                await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
+                    algorithm: MLS_ALGORITHM.name,
+                    ciphertext: olmlib.encodeUnpaddedBase64(message),
+                    epoch_creator: publicGroupStateContents.sender,
+                    sender: senderB64,
+                    resolves: [],
+                    public_group_state: publicGroupStateB64,
+                });
+            }
+        }
         if (!group) {
             throw "No group available";
         }
@@ -112,6 +149,10 @@ class MlsEncryption extends EncryptionAlgorithm {
                 await this.baseApis.sendToDevice("m.room.encrypted", contentMap);
             }
 
+            // FIXME: check if external commits are allowed
+            const publicGroupState = group.public_group_state(mlsProvider.backend!);
+            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+
             await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
                 algorithm: MLS_ALGORITHM.name,
                 ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
@@ -120,6 +161,7 @@ class MlsEncryption extends EncryptionAlgorithm {
                 resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
                     return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
                 }),
+                public_group_state: publicGroupStateB64,
             });
         }
 
@@ -375,6 +417,18 @@ export class MlsProvider {
             }
         }
 
+        const publicGroupState = group.public_group_state(this.backend!);
+        const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+        const sender = joinId(baseApis.getUserId()!, baseApis.getDeviceId()!);
+        const senderB64 = olmlib.encodeUnpaddedBase64(sender);
+
+        await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
+            algorithm: MLS_ALGORITHM.name,
+            sender: senderB64,
+            resolves: [],
+            public_group_state: publicGroupStateB64,
+        });
+
         return group;
     }
 
@@ -406,6 +460,37 @@ export class MlsProvider {
 
             this.members.set(groupId, members);
         }
+    }
+
+    joinByExternalCommit(publicGroupStateB64: string, roomId: string): [matrixDmls.DmlsGroup, Uint8Array] {
+        const publicGroupState = olmlib.decodeBase64(publicGroupStateB64);
+        const joinResult = matrixDmls.DmlsGroup.join_by_external_commit(
+            this.backend!,
+            publicGroupState,
+            this.credential!,
+        );
+        const joinMsg = joinResult.message;
+        const group = joinResult.group;
+        const groupIdArr = group.group_id();
+        const groupId = textDecoder.decode(groupIdArr);
+        if (groupId != roomId) {
+            throw "Group ID mismatch";
+        }
+
+        this.groups.set(groupId, group);
+
+        const members: Map<string, Set<string>> = new Map();
+        for (const member of group.members(this.backend!)) {
+            const [userId, deviceId] = splitId(member);
+            if (!members.has(userId)) {
+                members.set(userId, new Set());
+            }
+            members.get(userId)!.add(deviceId);
+        }
+
+        this.members.set(groupId, members);
+
+        return [group, joinMsg];
     }
 
     getGroup(roomId: string): matrixDmls.DmlsGroup | undefined {
