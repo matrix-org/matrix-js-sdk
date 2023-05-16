@@ -38,10 +38,6 @@ const TEST_DEVICE_ID = "xzcvb";
  * to provide the most effective integration tests possible.
  */
 describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
-    // Rust backend. Once we have full support in the rust sdk, it will go away.
-    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-
     let aliceClient: MatrixClient;
 
     beforeEach(async () => {
