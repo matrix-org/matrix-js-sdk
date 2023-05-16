@@ -36,6 +36,7 @@ import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningKey } from "../crypto/api";
+import { CrossSigningIdentity } from "./CrossSigningIdentity";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -56,6 +57,7 @@ export class RustCrypto implements CryptoBackend {
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
+    private crossSigningIdentity: CrossSigningIdentity;
 
     public constructor(
         /** The `OlmMachine` from the underlying rust crypto sdk. */
@@ -80,6 +82,7 @@ export class RustCrypto implements CryptoBackend {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -337,7 +340,7 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#boostrapCrossSigning}
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
-        logger.log("Cross-signing ready");
+        await this.crossSigningIdentity.bootstrapCrossSigning(opts);
     }
 
     /**

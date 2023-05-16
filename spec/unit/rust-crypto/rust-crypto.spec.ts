@@ -103,9 +103,15 @@ describe("RustCrypto", () => {
         await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
     });
 
-    it("bootstrapCrossSigning", async () => {
+    it("bootstrapCrossSigning delegates to CrossSigningIdentity", async () => {
         const rustCrypto = await makeTestRustCrypto();
+        const mockCrossSigningIdentity = {
+            bootstrapCrossSigning: jest.fn().mockResolvedValue(undefined),
+        };
+        // @ts-ignore private property
+        rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
         await rustCrypto.bootstrapCrossSigning({});
+        expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
     });
 
     it("isSecretStorageReady", async () => {
