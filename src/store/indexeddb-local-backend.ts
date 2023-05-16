@@ -594,4 +594,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         store.delete(id);
         await txnAsPromise(txn);
     }
+
+    /*
+     * Close the database
+     */
+    public async destroy(): Promise<void> {
+        this.db?.close();
+    }
 }
