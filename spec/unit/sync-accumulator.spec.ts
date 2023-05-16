@@ -545,6 +545,23 @@ describe("SyncAccumulator", function () {
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
         });
 
+        it("should reset summary properties", function () {
+            sa.accumulate(
+                createSyncResponseWithSummary({
+                    "m.heroes": ["@alice:bar"],
+                    "m.invited_member_count": 2,
+                }),
+            );
+            sa.accumulate(
+                createSyncResponseWithSummary({
+                    "m.heroes": ["@alice:bar"],
+                    "m.invited_member_count": 0,
+                }),
+            );
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            expect(summary["m.invited_member_count"]).toEqual(0);
+        });
+
         it("should return correctly adjusted age attributes", () => {
             const delta = 1000;
             const startingTs = 1000;
