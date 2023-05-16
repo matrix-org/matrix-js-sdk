@@ -245,4 +245,9 @@ export interface IStore {
      * Removes a specific batch of to-device messages from the queue
      */
     removeToDeviceBatch(id: number): Promise<void>;
+
+    /**
+     * Stop the store and perform any appropriate cleanup
+     */
+    destroy(): Promise<void>;
 }
