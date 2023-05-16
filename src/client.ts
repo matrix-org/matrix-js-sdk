@@ -2294,6 +2294,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param forceDownload - Always download the keys even if cached.
      *
      * @returns A promise which resolves to a map userId-\>deviceId-\>`DeviceInfo`
+     *
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         if (!this.crypto) {
@@ -2308,6 +2310,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - the user to list keys for.
      *
      * @returns list of devices
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public getStoredDevicesForUser(userId: string): DeviceInfo[] {
         if (!this.crypto) {
@@ -2323,6 +2326,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param deviceId - unique identifier for the device
      *
      * @returns device or null
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public getStoredDevice(userId: string, deviceId: string): DeviceInfo | null {
         if (!this.crypto) {
@@ -2567,14 +2571,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the user's cross-signing key ID.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * Get the ID of one of the user's cross-signing keys
      *
      * @param type - The type of key to get the ID of.  One of
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
+     * @deprecated prefer {@link CryptoApi#getCrossSigningKeyId}
      */
     public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {

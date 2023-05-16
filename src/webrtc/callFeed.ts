@@ -128,7 +128,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.emit(CallFeedEvent.ConnectedChanged, this.connected);
     }
 
-    private get hasAudioTrack(): boolean {
+    public get hasAudioTrack(): boolean {
         return this.stream.getAudioTracks().length > 0;
     }
 

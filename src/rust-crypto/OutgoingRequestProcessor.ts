@@ -23,11 +23,14 @@ import {
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
+    SigningKeysUploadRequest,
 } from "@matrix-org/matrix-sdk-crypto-js";
 
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
+import { IAuthDict, UIAuthCallback } from "../interactive-auth";
+import { UIAResponse } from "../@types/uia";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -53,7 +56,7 @@ export class OutgoingRequestProcessor {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     ) {}
 
-    public async makeOutgoingRequest(msg: OutgoingRequest): Promise<void> {
+    public async makeOutgoingRequest<T>(msg: OutgoingRequest, uiaCallback?: UIAuthCallback<T>): Promise<void> {
         let resp: string;
 
         /* refer https://docs.rs/matrix-sdk-crypto/0.6.0/matrix_sdk_crypto/requests/enum.OutgoingRequests.html
@@ -79,6 +82,14 @@ export class OutgoingRequestProcessor {
                 `/_matrix/client/v3/room/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
+        } else if (msg instanceof SigningKeysUploadRequest) {
+            resp = await this.makeRequestWithUIA(
+                Method.Post,
+                "/_matrix/client/v3/keys/device_signing/upload",
+                {},
+                msg.body,
+                uiaCallback,
+            );
         } else {
             logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
             resp = "";
@@ -87,6 +98,31 @@ export class OutgoingRequestProcessor {
         if (msg.id) {
             await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
         }
+    }
+
+    private async makeRequestWithUIA<T>(
+        method: Method,
+        path: string,
+        queryParams: QueryDict,
+        body: string,
+        uiaCallback: UIAuthCallback<T> | undefined,
+    ): Promise<string> {
+        if (!uiaCallback) {
+            return await this.rawJsonRequest(method, path, queryParams, body);
+        }
+
+        const parsedBody = JSON.parse(body);
+        const makeRequest = async (auth: IAuthDict): Promise<UIAResponse<T>> => {
+            const newBody = {
+                ...parsedBody,
+                auth,
+            };
+            const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
+            return JSON.parse(resp) as T;
+        };
+
+        const resp = await uiaCallback(makeRequest);
+        return JSON.stringify(resp);
     }
 
     private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {

@@ -98,6 +98,11 @@ describe("RustCrypto", () => {
         await expect(rustCrypto.isCrossSigningReady()).resolves.toBe(false);
     });
 
+    it("getCrossSigningKeyId", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
+    });
+
     it("bootstrapCrossSigning", async () => {
         const rustCrypto = await makeTestRustCrypto();
         await rustCrypto.bootstrapCrossSigning({});
