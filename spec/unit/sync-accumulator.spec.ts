@@ -546,7 +546,7 @@ describe("SyncAccumulator", function () {
         });
 
         it("should correctly update summary properties to zero", function () {
-        // When we receive updates of a summary property, the last of which is 0
+            // When we receive updates of a summary property, the last of which is 0
             sa.accumulate(
                 createSyncResponseWithSummary({
                     "m.heroes": ["@alice:bar"],
