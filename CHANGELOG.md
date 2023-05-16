@@ -1,4 +1,4 @@
-Changes in [25.2.0-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.2.0-rc.3) (2023-05-16)
+Changes in [25.2.0-rc.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v25.2.0-rc.4) (2023-05-16)
 ============================================================================================================
 
 ## 🦖 Deprecations
