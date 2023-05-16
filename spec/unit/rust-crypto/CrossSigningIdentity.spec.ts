@@ -55,7 +55,14 @@ describe("CrossSigningIdentity", () => {
             });
             // TODO: secret storage
             await crossSigning.bootstrapCrossSigning({});
+            expect(olmMachine.bootstrapCrossSigning).not.toHaveBeenCalled();
             expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+        });
+
+        it("should call bootstrapCrossSigning if a reset is forced", async () => {
+            olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
+            await crossSigning.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
         });
 
         it("should call bootstrapCrossSigning if we need new keys", async () => {
