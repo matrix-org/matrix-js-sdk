@@ -152,6 +152,7 @@ class MlsEncryption extends EncryptionAlgorithm {
             // FIXME: check if external commits are allowed
             const publicGroupState = group.public_group_state(mlsProvider.backend!);
             const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+            // FIXME: should we store public group state in media repo instead?
 
             await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
                 algorithm: MLS_ALGORITHM.name,
@@ -381,13 +382,17 @@ export class MlsProvider {
         members.get(userId)!.add(baseApis.getDeviceId()!);
         this.members.set(room.roomId, members);
 
+        const sender = joinId(baseApis.getUserId()!, baseApis.getDeviceId()!);
+        const senderB64 = olmlib.encodeUnpaddedBase64(sender);
+
         if (addedMembers) {
-            const [_commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(this.backend!);
+            const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(this.backend!);
+
+            const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
 
             if (welcomeInfo) {
                 const [welcome, adds] = welcomeInfo;
 
-                const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
                 const welcomeB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(welcome));
 
                 const contentMap: Record<string, Record<string, any>> = {};
@@ -415,19 +420,33 @@ export class MlsProvider {
 
                 await baseApis.sendToDevice("m.room.encrypted", contentMap);
             }
+
+            // FIXME: check if external commits are allowed
+            const publicGroupState = group.public_group_state(this.backend!);
+            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+
+            await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
+                algorithm: MLS_ALGORITHM.name,
+                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
+                epoch_creator: creatorB64,
+                sender: senderB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
+                public_group_state: publicGroupStateB64,
+            });
+        } else {
+            // FIXME: check if external commits are allowed
+            const publicGroupState = group.public_group_state(this.backend!);
+            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+
+            await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
+                algorithm: MLS_ALGORITHM.name,
+                sender: senderB64,
+                resolves: [],
+                public_group_state: publicGroupStateB64,
+            });
         }
-
-        const publicGroupState = group.public_group_state(this.backend!);
-        const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
-        const sender = joinId(baseApis.getUserId()!, baseApis.getDeviceId()!);
-        const senderB64 = olmlib.encodeUnpaddedBase64(sender);
-
-        await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
-            algorithm: MLS_ALGORITHM.name,
-            sender: senderB64,
-            resolves: [],
-            public_group_state: publicGroupStateB64,
-        });
 
         return group;
     }
