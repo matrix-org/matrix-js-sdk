@@ -35,8 +35,6 @@ export class StatsReportGatherer {
 
     private readonly trackStats: MediaTrackStatsHandler;
 
-    // private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
-
     public constructor(
         public readonly callId: string,
         public readonly remoteUserId: string,
