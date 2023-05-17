@@ -486,7 +486,7 @@ describe("SummaryStatsReporter", () => {
             });
         });
 
-        it("should filter the first time summery stats ", async () => {
+        it("should filter the first time summery stats", async () => {
             const summary = [
                 {
                     isFirstCollection: false,
