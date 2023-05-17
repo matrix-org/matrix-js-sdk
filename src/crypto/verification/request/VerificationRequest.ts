@@ -359,6 +359,11 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return this.channel.userId!;
     }
 
+    /** The device id of the other party in this request, for requests happening over to-device messages only. */
+    public get otherDeviceId(): string | undefined {
+        return this.channel.deviceId;
+    }
+
     public get isSelfVerification(): boolean {
         return this.client.getUserId() === this.otherUserId;
     }
