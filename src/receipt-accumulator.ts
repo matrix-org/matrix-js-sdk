@@ -118,6 +118,21 @@ export class ReceiptAccumulator {
                             eventId,
                         };
 
+                        // In a world that supports threads, all read receipts have a
+                        // `thread_id` which is either the thread they belong in or
+                        // `MAIN_ROOM_TIMELINE` and we should always use
+                        // `setThreaded(...)` here. The `MAIN_ROOM_TIMELINE` is just
+                        // treated as another thread.
+                        //
+                        // We still may encounter read receipts from clients that don't
+                        // support threads (unthreaded, without the `thread_id`
+                        // property) which we use `setUnthreaded(...)` for. Or even in a
+                        // threaded-world, a client may choose to use an unthreaded read
+                        // receipt to completely mark the room as read.
+                        //
+                        // Using the wrong method will cause undefined behavior like
+                        // messages re-appearing as "new" when you already read them
+                        // previously.
                         if (!data.thread_id) {
                             this.setUnthreaded(userId, receipt);
                         } else {
