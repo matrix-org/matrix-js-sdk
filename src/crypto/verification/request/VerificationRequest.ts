@@ -257,9 +257,21 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return !this.observeOnly && this._phase !== PHASE_DONE && this._phase !== PHASE_CANCELLED;
     }
 
-    /** Only set after a .ready if the other party can scan a QR code */
+    /** Only set after a .ready if the other party can scan a QR code
+     *
+     * @deprecated Prefer `getQRCodeBytes`.
+     */
     public get qrCodeData(): QRCodeData | null {
         return this._qrCodeData;
+    }
+
+    /**
+     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     */
+    public getQRCodeBytes(): Buffer | undefined {
+        return this._qrCodeData?.getBuffer();
     }
 
     /** Checks whether the other party supports a given verification method.
