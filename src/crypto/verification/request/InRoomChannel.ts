@@ -208,10 +208,17 @@ export class InRoomChannel implements IVerificationChannel {
             this.requestEventId = InRoomChannel.getTransactionId(event);
         }
 
+        // With pendingEventOrdering: "chronological", we will see events that have been sent but not yet reflected
+        // back via /sync. These are "local echoes" and are identifiable by their txnId
+        const isLocalEcho = !!event.getTxnId();
+
+        // Alternatively, we may see an event that we sent that is reflected back via /sync. These are "remote echoes"
+        // and have a transaction ID in the "unsigned" data
         const isRemoteEcho = !!event.getUnsigned().transaction_id;
+
         const isSentByUs = event.getSender() === this.client.getUserId();
 
-        return request.handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs);
+        return request.handleEvent(type, event, isLiveEvent, isLocalEcho || isRemoteEcho, isSentByUs);
     }
 
     /**
