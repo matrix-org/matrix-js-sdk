@@ -48,6 +48,7 @@ export class StatsReportGatherer {
 
     public async processStats(groupCallId: string, localUserId: string): Promise<SummaryStats> {
         const summary = {
+            isFirstCollection: this.previousStatsReport === undefined,
             receivedMedia: 0,
             receivedAudioMedia: 0,
             receivedVideoMedia: 0,

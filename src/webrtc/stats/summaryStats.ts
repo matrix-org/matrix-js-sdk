@@ -16,6 +16,8 @@ export interface SummaryStats {
     receivedVideoMedia: number;
     audioTrackSummary: TrackSummary;
     videoTrackSummary: TrackSummary;
+
+    isFirstCollection: Boolean;
 }
 
 export interface TrackSummary {
