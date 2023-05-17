@@ -92,11 +92,26 @@ describe("GroupCallStats", () => {
             const collector = stats.getStatsReportGatherer("CALL_ID");
             stats.reports.emitSummaryStatsReport = jest.fn();
             const summaryStats = {
+                isFirstCollection: true,
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
-                audioTrackSummary: { count: 0, muted: 0 },
-                videoTrackSummary: { count: 0, muted: 0 },
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
             } as SummaryStats;
             let processStatsSpy;
             if (collector) {

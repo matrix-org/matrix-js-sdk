@@ -25,7 +25,11 @@ interface SummaryCounter {
 export class SummaryStatsReporter {
     public constructor(private emitter: StatsReportEmitter) {}
 
-    public build(summary: SummaryStats[]): void {
+    public build(allSummary: SummaryStats[]): void {
+        // Filter all stats which collect the first time webrtc stats.
+        // Because stats based on time interval and the first collection of a summery stats has no previous
+        // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
+        const summary = allSummary.filter((s) => !s.isFirstCollection);
         const summaryTotalCount = summary.length;
         if (summaryTotalCount === 0) {
             return;

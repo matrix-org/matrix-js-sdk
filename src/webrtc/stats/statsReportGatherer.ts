@@ -35,8 +35,6 @@ export class StatsReportGatherer {
 
     private readonly trackStats: MediaTrackStatsHandler;
 
-    // private readonly ssrcToMid = { local: new Map<Mid, Ssrc[]>(), remote: new Map<Mid, Ssrc[]>() };
-
     public constructor(
         public readonly callId: string,
         public readonly remoteUserId: string,
@@ -50,6 +48,7 @@ export class StatsReportGatherer {
 
     public async processStats(groupCallId: string, localUserId: string): Promise<SummaryStats> {
         const summary = {
+            isFirstCollection: this.previousStatsReport === undefined,
             receivedMedia: 0,
             receivedAudioMedia: 0,
             receivedVideoMedia: 0,

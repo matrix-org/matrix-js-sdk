@@ -40,6 +40,7 @@ describe("StatsReportGatherer", () => {
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
             expect(actual).toEqual({
+                isFirstCollection: true,
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
@@ -79,12 +80,13 @@ describe("StatsReportGatherer", () => {
             expect(collector.getActive()).toBeFalsy();
         });
 
-        it("if active an RTCStatsReport not a promise the collector becomes inactive", async () => {
+        it("if active and getStats returns not an RTCStatsReport inside a promise the collector fails and becomes inactive", async () => {
             const getStats = jest.spyOn(rtcSpy, "getStats");
             // @ts-ignore
             getStats.mockReturnValue({});
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(actual).toEqual({
+                isFirstCollection: true,
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
@@ -107,6 +109,40 @@ describe("StatsReportGatherer", () => {
             });
             expect(getStats).toHaveBeenCalled();
             expect(collector.getActive()).toBeFalsy();
+        });
+
+        it("if active and the collector runs not the first time the Summery Stats is marked as not fits collection", async () => {
+            const getStats = jest.spyOn(rtcSpy, "getStats");
+            // @ts-ignore
+            collector.previousStatsReport = {} as RTCStatsReport;
+            const report = {} as RTCStatsReport;
+            report.forEach = jest.fn().mockReturnValue([]);
+            getStats.mockResolvedValue(report);
+            const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+            expect(getStats).toHaveBeenCalled();
+            expect(actual).toEqual({
+                isFirstCollection: false,
+                receivedMedia: 0,
+                receivedAudioMedia: 0,
+                receivedVideoMedia: 0,
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
+            });
+            expect(collector.getActive()).toBeTruthy();
         });
     });
 });
