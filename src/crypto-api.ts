@@ -260,3 +260,5 @@ export class DeviceVerificationStatus {
         return this.localVerified || (this.trustCrossSignedDevices && this.crossSigningVerified);
     }
 }
+
+export * from "./crypto-api/verification";

@@ -26,25 +26,21 @@ import { VerificationRequest } from "./request/VerificationRequest";
 import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixEvent } from "../../models/event";
+import { ShowQrCodeCallbacks } from "../../crypto-api/verification";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
-
-interface IReciprocateQr {
-    confirm(): void;
-    cancel(): void;
-}
 
 export enum QrCodeEvent {
     ShowReciprocateQr = "show_reciprocate_qr",
 }
 
 type EventHandlerMap = {
-    [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
+    [QrCodeEvent.ShowReciprocateQr]: (qr: ShowQrCodeCallbacks) => void;
 } & VerificationEventHandlerMap;
 
 export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
-    public reciprocateQREvent?: IReciprocateQr;
+    public reciprocateQREvent?: ShowQrCodeCallbacks;
 
     public static factory(
         channel: IVerificationChannel,
