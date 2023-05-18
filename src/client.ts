@@ -7146,13 +7146,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user
+     * Gets a set of room IDs in common with another user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
+     *
      * @param userId - The userId to check.
-     * @returns Promise which resolves to a set of rooms
+     * @returns Promise which resolves to an array of rooms
      * @returns Rejects: with an error response.
      */
-    // eslint-disable-next-line
     // TODO: on spec release, rename this to getMutualRooms
+    // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
         // Initial variant of the MSC
         const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
@@ -7164,7 +7168,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.query_mutual_rooms");
 
         if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
-            throw Error("Server does not support mutual_rooms API");
+            throw Error("Server does not support the Mutual Rooms API");
         }
 
         let path;
