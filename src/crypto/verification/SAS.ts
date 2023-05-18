@@ -33,6 +33,14 @@ import { logger } from "../../logger";
 import { IContent, MatrixEvent } from "../../models/event";
 import { generateDecimalSas } from "./SASDecimal";
 import { EventType } from "../../@types/event";
+import { EmojiMapping, GeneratedSas, ShowSasCallbacks } from "../../crypto-api/verification";
+
+// backwards-compatibility exports
+export {
+    ShowSasCallbacks as ISasEvent,
+    GeneratedSas as IGeneratedSas,
+    EmojiMapping,
+} from "../../crypto-api/verification";
 
 const START_TYPE = EventType.KeyVerificationStart;
 
@@ -43,8 +51,6 @@ let olmutil: Utility;
 const newMismatchedSASError = errorFactory("m.mismatched_sas", "Mismatched short authentication string");
 
 const newMismatchedCommitmentError = errorFactory("m.mismatched_commitment", "Mismatched commitment");
-
-type EmojiMapping = [emoji: string, name: string];
 
 const emojiMapping: EmojiMapping[] = [
     ["🐶", "dog"], //  0
@@ -133,20 +139,8 @@ const sasGenerators = {
     emoji: generateEmojiSas,
 } as const;
 
-export interface IGeneratedSas {
-    decimal?: [number, number, number];
-    emoji?: EmojiMapping[];
-}
-
-export interface ISasEvent {
-    sas: IGeneratedSas;
-    confirm(): Promise<void>;
-    cancel(): void;
-    mismatch(): void;
-}
-
-function generateSas(sasBytes: Uint8Array, methods: string[]): IGeneratedSas {
-    const sas: IGeneratedSas = {};
+function generateSas(sasBytes: Uint8Array, methods: string[]): GeneratedSas {
+    const sas: GeneratedSas = {};
     for (const method of methods) {
         if (method in sasGenerators) {
             // @ts-ignore - ts doesn't like us mixing types like this
@@ -225,14 +219,14 @@ export enum SasEvent {
 }
 
 type EventHandlerMap = {
-    [SasEvent.ShowSas]: (sas: ISasEvent) => void;
+    [SasEvent.ShowSas]: (sas: ShowSasCallbacks) => void;
 } & VerificationEventHandlerMap;
 
 export class SAS extends Base<SasEvent, EventHandlerMap> {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;
     public theirSASPubKey?: string;
-    public sasEvent?: ISasEvent;
+    public sasEvent?: ShowSasCallbacks;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {

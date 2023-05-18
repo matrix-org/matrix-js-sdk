@@ -27,3 +27,52 @@ export interface ShowQrCodeCallbacks {
     /** Cancel the verification flow */
     cancel(): void;
 }
+
+/**
+ * Callbacks for user actions while a SAS is displayed.
+ *
+ * This is exposed as the payload of a `VerifierEvent.ShowSas` event, or directly from the verifier as `sasEvent`.
+ */
+export interface ShowSasCallbacks {
+    /** The generated SAS to be shown to the user */
+    sas: GeneratedSas;
+
+    /** Function to call if the user confirms that the SAS matches.
+     *
+     * @returns A Promise that completes once the m.key.verification.mac is queued.
+     */
+    confirm(): Promise<void>;
+
+    /**
+     * Function to call if the user finds the SAS does not match.
+     *
+     * Sends an `m.key.verification.cancel` event with a `m.mismatched_sas` error code.
+     */
+    mismatch(): void;
+
+    /** Cancel the verification flow */
+    cancel(): void;
+}
+
+/** A generated SAS to be shown to the user, in alternative formats */
+export interface GeneratedSas {
+    /**
+     * The SAS as three numbers between 0 and 8191.
+     *
+     * Only populated if the `decimal` SAS method was negotiated.
+     */
+    decimal?: [number, number, number];
+
+    /**
+     * The SAS as seven emojis.
+     *
+     * Only populated if the `emoji` SAS method was negotiated.
+     */
+    emoji?: EmojiMapping[];
+}
+
+/**
+ * An emoji for the generated SAS. A tuple `[emoji, name]` where `emoji` is the emoji itself and `name` is the
+ * English name.
+ */
+export type EmojiMapping = [emoji: string, name: string];
