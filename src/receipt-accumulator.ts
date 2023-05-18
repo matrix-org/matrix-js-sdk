@@ -123,7 +123,7 @@ export class ReceiptAccumulator {
                         // `MAIN_ROOM_TIMELINE`, so we normally use `setThreaded(...)`
                         // here. The `MAIN_ROOM_TIMELINE` is just treated as another
                         // thread.
-                        // 
+                        //
                         // We still encounter read receipts that are "unthreaded"
                         // (missing the `thread_id` property). These come from clients
                         // that don't support threads, and from threaded clients that
@@ -134,7 +134,7 @@ export class ReceiptAccumulator {
                         // [Note: we have some bugs where we use timestamp order instead
                         // of Sync Order, because we don't correctly remember the Sync
                         // Order. See #3325.]
-                        // 
+                        //
                         // Calling the wrong method will cause incorrect behavior like
                         // messages re-appearing as "new" when you already read them
                         // previously.
