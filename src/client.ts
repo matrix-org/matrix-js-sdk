@@ -7165,7 +7165,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
 
         // Latest variant that changed from path elements to query elements
-        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.query_mutual_rooms");
+        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
+            "uk.half-shot.msc2666.query_mutual_rooms",
+        );
 
         if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
             throw Error("Server does not support the Mutual Rooms API");
@@ -7197,7 +7199,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             const res = await this.http.authedRequest<{
-                joined: string[]; next_batch_token?: string;
+                joined: string[];
+                next_batch_token?: string;
             }>(Method.Get, path, { ...extraQuery, ...additionalQuery }, undefined, {
                 prefix: ClientPrefix.Unstable,
             });
@@ -7209,7 +7212,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else {
                 token = null;
             }
-
         } while (token != null);
 
         return rooms;
