@@ -7152,23 +7152,63 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // eslint-disable-next-line
+    // TODO: on spec release, rename this to getMutualRooms
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
+        // Initial variant of the MSC
         const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
+
+        // Newer variant that renamed shared rooms to mutual rooms
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport) {
+        // Latest variant that changed from path elements to query elements
+        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.query_mutual_rooms");
+
+        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
             throw Error("Server does not support mutual_rooms API");
         }
 
-        const path = utils.encodeUri(
-            `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
-            { $userId: userId },
-        );
+        let path;
+        let extraQuery;
 
-        const res = await this.http.authedRequest<{ joined: string[] }>(Method.Get, path, undefined, undefined, {
-            prefix: ClientPrefix.Unstable,
-        });
-        return res.joined;
+        // Cascading unstable support switching.
+        if (queryMutualRoomsSupport) {
+            path = "/uk.half-shot.msc2666/user/mutual_rooms";
+            extraQuery = { user_id: userId };
+        } else {
+            path = utils.encodeUri(
+                `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
+                { $userId: userId },
+            );
+            extraQuery = {};
+        }
+
+        // Accumulated rooms
+        const rooms: string[] = [];
+        let token = null;
+
+        do {
+            const additionalQuery: Record<string, string> = {};
+            if (token != null) {
+                additionalQuery["batch_token"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[]; next_batch_token?: string;
+            }>(Method.Get, path, { ...extraQuery, ...additionalQuery }, undefined, {
+                prefix: ClientPrefix.Unstable,
+            });
+
+            rooms.concat(res.joined);
+
+            if (res.next_batch_token !== undefined) {
+                token = res.next_batch_token;
+            } else {
+                token = null;
+            }
+
+        } while (token != null);
+
+        return rooms;
     }
 
     /**
