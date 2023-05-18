@@ -7421,6 +7421,11 @@ typedarray@^0.0.6:
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==
 
+typedoc-plugin-coverage@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-2.1.0.tgz#619bf10853c5851c47dc17585e14385647bbb754"
+  integrity sha512-d0Lc/aOPRAMnfABCW2cQqCQdzLUzadeq62r4DBrSchcfzx1X8nOvhXK/n4mVAO4wQQUchTm2ZGAzTtiAc2nl0A==
+
 typedoc-plugin-mdn-links@^3.0.3:
   version "3.0.3"
   resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.0.3.tgz#da8d1a9750d57333e6c21717b38bfc13d4058de2"
