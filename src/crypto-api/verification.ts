@@ -14,6 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { MatrixEvent } from "../models/event";
+
+/** Events emitted by `Verifier`. */
+export enum VerifierEvent {
+    /**
+     * The verification has been cancelled, by us or the other side.
+     *
+     * The payload is either an {@link Error}, or an (incoming or outgoing) {@link MatrixEvent}, depending on
+     * unspecified reasons.
+     */
+    Cancel = "cancel",
+
+    /**
+     * SAS data has been exchanged and should be displayed to the user.
+     *
+     * The payload is the {@link ShowQrCodeCallbacks} object.
+     */
+    ShowSas = "show_sas",
+
+    /**
+     * QR code data should be displayed to the user.
+     *
+     * The payload is the {@link ShowQrCodeCallbacks} object.
+     */
+    ShowReciprocateQr = "show_reciprocate_qr",
+}
+
+/** Listener type map for {@link VerifierEvent}s. */
+export type VerifierEventHandlerMap = {
+    [VerifierEvent.Cancel]: (e: Error | MatrixEvent) => void;
+    [VerifierEvent.ShowSas]: (sas: ShowSasCallbacks) => void;
+    [VerifierEvent.ShowReciprocateQr]: (qr: ShowQrCodeCallbacks) => void;
+};
+
 /**
  * Callbacks for user actions while a QR code is displayed.
  *

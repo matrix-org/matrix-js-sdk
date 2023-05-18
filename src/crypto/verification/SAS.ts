@@ -21,7 +21,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
+import { VerificationBase as Base, SwitchStartEventError } from "./Base";
 import {
     errorFactory,
     newInvalidMessageError,
@@ -33,7 +33,7 @@ import { logger } from "../../logger";
 import { IContent, MatrixEvent } from "../../models/event";
 import { generateDecimalSas } from "./SASDecimal";
 import { EventType } from "../../@types/event";
-import { EmojiMapping, GeneratedSas, ShowSasCallbacks } from "../../crypto-api/verification";
+import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification";
 
 // backwards-compatibility exports
 export {
@@ -214,15 +214,12 @@ function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
     return Array.isArray(anArray) ? anArray.filter((x) => aSet.has(x)) : [];
 }
 
-export enum SasEvent {
-    ShowSas = "show_sas",
-}
+/** @deprecated use VerifierEvent */
+export type SasEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const SasEvent = VerifierEvent;
 
-type EventHandlerMap = {
-    [SasEvent.ShowSas]: (sas: ShowSasCallbacks) => void;
-} & VerificationEventHandlerMap;
-
-export class SAS extends Base<SasEvent, EventHandlerMap> {
+export class SAS extends Base {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;
     public theirSASPubKey?: string;
