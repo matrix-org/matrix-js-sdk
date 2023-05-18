@@ -611,7 +611,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * @deprecated Use {@link CryptoApi#getTrustCrossSignedDevices}.
+     * @deprecated Use {@link Crypto.CryptoApi#getTrustCrossSignedDevices}.
      */
     public getCryptoTrustCrossSignedDevices(): boolean {
         return this.trustCrossSignedDevices;
@@ -641,7 +641,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * @deprecated Use {@link CryptoApi#setTrustCrossSignedDevices}.
+     * @deprecated Use {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
      */
     public setCryptoTrustCrossSignedDevices(val: boolean): void {
         this.setTrustCrossSignedDevices(val);
@@ -1473,7 +1473,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus}.
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         const device = this.deviceList.getStoredDevice(userId, deviceId);
@@ -1486,7 +1486,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userId - The ID of the user whose devices is to be checked.
      * @param device - The device info object to check
      *
-     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus}.
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceInfoTrust(userId: string, device?: DeviceInfo): DeviceTrustLevel {
         const trustedLocally = !!device?.isVerified();
@@ -1835,7 +1835,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param value - whether to blacklist all unverified devices by default
      *
-     * @deprecated Set {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Set {@link Crypto.CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1844,7 +1844,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @returns whether to blacklist all unverified devices by default
      *
-     * @deprecated Reference {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Reference {@link Crypto.CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
