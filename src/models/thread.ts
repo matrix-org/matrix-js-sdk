@@ -306,7 +306,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                  */
                 this.replayEvents?.push(event);
             } else {
-                this.insertEventIntoTimeline(event);
+                const recursionSupport =
+                    this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+                if (recursionSupport === ServerSupport.Unsupported) {
+                    this.insertEventIntoTimeline(event);
+                } else {
+                    this.addEventToTimeline(event, toStartOfTimeline);
+                }
             }
             // Apply annotations and replace relations to the relations of the timeline only
             this.timelineSet.relations?.aggregateParentEvent(event);
