@@ -4688,7 +4688,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const eventType: string = EventType.RoomMessage;
         const sendContent: IContent = content as IContent;
 
-        return this.sendEvent(roomId, threadId, eventType, sendContent, txnId);
+        return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
     }
 
     /**
