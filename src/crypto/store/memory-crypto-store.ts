@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../../logger";
-import { deepCompare, promiseTry } from "../../utils";
+import { safeSet, deepCompare, promiseTry } from "../../utils";
 import {
     CryptoStore,
     IDeviceData,
@@ -33,7 +33,6 @@ import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { safeSet } from "../../utils";
 
 /**
  * Internal module. in-memory storage for e2e.
