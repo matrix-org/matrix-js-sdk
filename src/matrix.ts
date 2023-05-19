@@ -86,7 +86,7 @@ export type { CryptoApi } from "./crypto-api";
  * @internal
  * @deprecated use {@link Crypto.DeviceVerificationStatus}
  */
-export type { DeviceVerificationStatus } from "./crypto-api";
+export { DeviceVerificationStatus } from "./crypto-api";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
