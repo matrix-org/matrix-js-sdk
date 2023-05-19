@@ -236,6 +236,33 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     }
 
+    /**
+     * TEMPORARY. Only call this when MSC3981 is not available, and we have some
+     * late-arriving events to insert, because we recursively found them as part
+     * of populating a thread. When we have MSC3981 we won't need it, because
+     * they will all be supplied by the homeserver in one request, and they will
+     * already be in the right order in that response.
+     * This is a copy of addEventToTimeline above, modified to call
+     * insertEventIntoTimeline so this event is inserted into our best guess of
+     * the right place based on timestamp. (We should be using Sync Order but we
+     * don't have it.)
+     *
+     * @internal
+     */
+    public insertEventIntoTimeline(event: MatrixEvent): void {
+        const eventId = event.getId();
+        if (!eventId) {
+            return;
+        }
+        if (this.findEventById(eventId)) {
+            return;
+        }
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
+
+        // As far as we know, timeline should always be the same as events
+        this.timeline = this.events;
+    }
+
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach((ev) => this.addEvent(ev, toStartOfTimeline, false));
         this.updateThreadMetadata();
@@ -281,7 +308,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                  */
                 this.replayEvents?.push(event);
             } else {
-                this.addEventToTimeline(event, toStartOfTimeline);
+                const recursionSupport =
+                    this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+                if (recursionSupport === ServerSupport.Unsupported) {
+                    this.insertEventIntoTimeline(event);
+                } else {
+                    this.addEventToTimeline(event, toStartOfTimeline);
+                }
             }
             // Apply annotations and replace relations to the relations of the timeline only
             this.timelineSet.relations?.aggregateParentEvent(event);
@@ -460,7 +494,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
-        if (recursionSupport !== ServerSupport.Unsupported) {
+        if (recursionSupport === ServerSupport.Unsupported) {
             return Promise.all(
                 events
                     .filter((e) => e.isEncrypted())
@@ -473,6 +507,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                             .then((relations) => {
                                 if (relations.events.length) {
                                     event.makeReplaced(relations.events[0]);
+                                    this.insertEventIntoTimeline(event);
                                 }
                             })
                             .catch((e) => {
