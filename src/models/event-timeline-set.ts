@@ -811,19 +811,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
 
         const parentEvent = this.findEventById(parentEventId);
-        if (!parentEvent) {
-            // Not related to anything we know about - just append
-            this.addEventToTimeline(event, timeline, {
-                toStartOfTimeline: false,
-                fromCache: false,
-                timelineWasEmpty: false,
-                roomState,
-            });
-            return;
-        }
 
         const timelineEvents = timeline.getEvents();
-        const parentIndex = timelineEvents.indexOf(parentEvent);
+
+        // Start searching from the parent event, or if it's not loaded, start
+        // at the beginning and insert purely using timestamp order.
+        const parentIndex = parentEvent !== undefined ? timelineEvents.indexOf(parentEvent) : 0;
         let insertIndex = parentIndex;
         for (; insertIndex < timelineEvents.length; insertIndex++) {
             const nextEvent = timelineEvents[insertIndex];
