@@ -7174,18 +7174,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let path;
-        let extraQuery;
+        let query;
 
         // Cascading unstable support switching.
         if (queryMutualRoomsSupport) {
             path = "/uk.half-shot.msc2666/user/mutual_rooms";
-            extraQuery = { user_id: userId };
+            query = { user_id: userId };
         } else {
             path = utils.encodeUri(
                 `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
                 { $userId: userId },
             );
-            extraQuery = {};
+            query = {};
         }
 
         // Accumulated rooms
@@ -7193,15 +7193,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let token = null;
 
         do {
-            const additionalQuery: Record<string, string> = {};
+            const tokenQuery: Record<string, string> = {};
             if (token != null) {
-                additionalQuery["batch_token"] = token;
+                tokenQuery["batch_token"] = token;
             }
 
             const res = await this.http.authedRequest<{
                 joined: string[];
                 next_batch_token?: string;
-            }>(Method.Get, path, { ...extraQuery, ...additionalQuery }, undefined, {
+            }>(Method.Get, path, { ...query, ...tokenQuery }, undefined, {
                 prefix: ClientPrefix.Unstable,
             });
 
