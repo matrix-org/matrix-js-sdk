@@ -125,7 +125,7 @@ export class InRoomChannel implements IVerificationChannel {
         // part of a verification request, so be noisy when rejecting something
         if (type === REQUEST_TYPE) {
             if (!content || typeof content.to !== "string" || !content.to.length) {
-                logger.log("InRoomChannel: validateEvent: " + "no valid to " + (content && content.to));
+                logger.log("InRoomChannel: validateEvent: " + "no valid to " + content.to);
                 return false;
             }
 
@@ -134,7 +134,7 @@ export class InRoomChannel implements IVerificationChannel {
                 logger.log(
                     "InRoomChannel: validateEvent: " +
                         `not directed to or sent by me: ${event.getSender()}` +
-                        `, ${content && content.to}`,
+                        `, ${content.to}`,
                 );
                 return false;
             }

@@ -1054,14 +1054,7 @@ describe("Call", function () {
 
             mockSendEvent.mockReset();
 
-            let caught = false;
-            try {
-                call.reject();
-            } catch (e) {
-                caught = true;
-            }
-
-            expect(caught).toEqual(true);
+            expect(() => call.reject()).toThrow();
             expect(client.client.sendEvent).not.toHaveBeenCalled();
 
             call.hangup(CallErrorCode.UserHangup, true);

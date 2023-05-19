@@ -1932,13 +1932,7 @@ describe("Room", function () {
         it("should allow retry on error", async function () {
             const client = createClientMock(new Error("server says no"));
             const room = new Room(roomId, client as any, null!, { lazyLoadMembers: true });
-            let hasThrown = false;
-            try {
-                await room.loadMembersIfNeeded();
-            } catch (err) {
-                hasThrown = true;
-            }
-            expect(hasThrown).toEqual(true);
+            await expect(room.loadMembersIfNeeded()).rejects.toBeTruthy();
 
             client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
