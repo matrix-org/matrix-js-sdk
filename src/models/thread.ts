@@ -254,6 +254,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (!eventId) {
             return;
         }
+        // If the event is already in this thread, bail out
         if (this.findEventById(eventId)) {
             return;
         }
