@@ -125,6 +125,7 @@
         "ts-node": "^10.9.1",
         "tsify": "^5.0.2",
         "typedoc": "^0.24.0",
+        "typedoc-plugin-coverage": "^2.1.0",
         "typedoc-plugin-mdn-links": "^3.0.3",
         "typedoc-plugin-missing-exports": "^2.0.0",
         "typedoc-plugin-versions": "^0.2.3",
