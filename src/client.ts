@@ -4101,12 +4101,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const roomId = res.room_id;
         const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        const room = syncApi.createRoom(roomId);
+        const syncRoom = syncApi.createRoom(roomId);
         if (opts.syncRoom) {
             // v2 will do this for us
             // return syncApi.syncRoom(room);
         }
-        return room;
+        return syncRoom;
     }
 
     /**
