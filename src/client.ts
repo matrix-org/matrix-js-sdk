@@ -497,6 +497,10 @@ export interface IMSC3882GetLoginTokenCapability extends ICapability {}
 
 export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
 
+export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
+export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
+export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
+
 /**
  * A representation of the capabilities advertised by a homeserver as defined by
  * [Capabilities negotiation](https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3capabilities).
@@ -7159,14 +7163,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
         // Initial variant of the MSC
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
+        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
 
         // Newer variant that renamed shared rooms to mutual rooms
-        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
         // Latest variant that changed from path elements to query elements
         const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
-            "uk.half-shot.msc2666.query_mutual_rooms",
+            UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
         if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
@@ -7194,7 +7198,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         do {
             const tokenQuery: Record<string, string> = {};
-            if (token != null) {
+            if (token != null && queryMutualRoomsSupport) {
                 tokenQuery["batch_token"] = token;
             }
 
@@ -7205,7 +7209,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: ClientPrefix.Unstable,
             });
 
-            rooms.concat(res.joined);
+            rooms.push(...res.joined);
 
             if (res.next_batch_token !== undefined) {
                 token = res.next_batch_token;
