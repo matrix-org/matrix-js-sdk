@@ -769,6 +769,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
+     * @internal
+     *
      * @param options - addEventToTimeline options
      *
      * @remarks

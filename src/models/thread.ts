@@ -246,6 +246,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * insertEventIntoTimeline so this event is inserted into our best guess of
      * the right place based on timestamp. (We should be using Sync Order but we
      * don't have it.)
+     *
+     * @internal
      */
     public insertEventIntoTimeline(event: MatrixEvent): void {
         const eventId = event.getId();

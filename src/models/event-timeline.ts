@@ -435,6 +435,8 @@ export class EventTimeline {
      * best guess for Sync Order.
      * This is a copy of addEvent above, modified to allow inserting an event at
      * a specific index.
+     *
+     * @internal
      */
     public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
         const timelineSet = this.getTimelineSet();
