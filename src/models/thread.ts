@@ -306,7 +306,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                  */
                 this.replayEvents?.push(event);
             } else {
-                // TODO: check with Germain is this right?
                 this.insertEventIntoTimeline(event);
             }
             // Apply annotations and replace relations to the relations of the timeline only
@@ -499,7 +498,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                             .then((relations) => {
                                 if (relations.events.length) {
                                     event.makeReplaced(relations.events[0]);
-                                    // TODO: check with Germain: is this right?
                                     this.insertEventIntoTimeline(event);
                                 }
                             })
