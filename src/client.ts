@@ -2577,7 +2577,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
-     * @deprecated prefer {@link CryptoApi#getCrossSigningKeyId}
+     * @deprecated prefer {@link Crypto.CryptoApi#getCrossSigningKeyId}
      */
     public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {
@@ -2624,7 +2624,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - The ID of the user whose devices is to be checked.
      * @param deviceId - The ID of the device to check
      *
-     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         if (!this.crypto) {

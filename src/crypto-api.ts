@@ -114,7 +114,7 @@ export interface CryptoApi {
     /**
      * Return whether we trust other user's signatures of their devices.
      *
-     * @see {@link CryptoApi#setTrustCrossSignedDevices}
+     * @see {@link Crypto.CryptoApi#setTrustCrossSignedDevices}
      *
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
@@ -252,7 +252,7 @@ export class DeviceVerificationStatus {
      * A device is "verified" if either:
      *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
-     *    cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+     *    cross-signed devices via {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
      *
      * @returns true if this device is verified via any means.
      */
