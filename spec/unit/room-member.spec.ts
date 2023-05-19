@@ -533,7 +533,7 @@ describe("MutualRooms", () => {
 
         fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/:user_id", (rawUrl) => {
             const segments = rawUrl.split("/");
-            const lastSegment = decodeURIComponent(segments[segments.length-1]);
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
 
             expect(lastSegment).toEqual(QUERIED_USER);
 
@@ -551,8 +551,8 @@ describe("MutualRooms", () => {
         enableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
         fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/:user_id", (rawUrl) => {
-            const segments = (rawUrl).split("/");
-            const lastSegment = decodeURIComponent(segments[segments.length-1]);
+            const segments = rawUrl.split("/");
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
 
             expect(lastSegment).toEqual(QUERIED_USER);
 
