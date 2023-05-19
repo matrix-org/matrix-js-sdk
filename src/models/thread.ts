@@ -485,7 +485,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
-        if (recursionSupport !== ServerSupport.Unsupported) {
+        if (recursionSupport === ServerSupport.Unsupported) {
             return Promise.all(
                 events
                     .filter((e) => e.isEncrypted())
