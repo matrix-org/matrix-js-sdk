@@ -3563,9 +3563,9 @@ describe("Room", function () {
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
 
-            it("and both events have the same timestamp, it should return the last event from the main timeline", () => {
-                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23, 23).mainEvent!;
-                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
+            it("and both events have the same timestamp, it should return the last event from the thread", () => {
+                lastEventInThread = addRoomMainAndThreadMessages(room, 23, 23).threadEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
         });
     });
