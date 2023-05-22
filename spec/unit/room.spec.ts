@@ -51,7 +51,7 @@ import { TestClient } from "../TestClient";
 import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
-import { mkThread } from "../test-utils/thread";
+import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { IMessageOpts } from "../test-utils/test-utils";
@@ -168,30 +168,45 @@ describe("Room", function () {
             room.client,
         );
 
-    const addRoomMainAndThreadMessages = (
-        room: Room,
-        tsMain?: number,
-        tsThread?: number,
-    ): { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } => {
-        const result: { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } = {};
-        const { rootEvent, thread } = mkThread({
+    /**
+     * Starts a new thread in a room by creating a message as thread root.
+     * Also creates a Thread model and adds it to the room.
+     * Does not insert the messages into a timeline.
+     */
+    const mkThread = (args: Partial<typeof threadUtils.mkThread>) => {
+        return threadUtils.mkThread({
             room,
             client: new TestClient().client,
             authorId: "@bob:example.org",
             participantUserIds: ["@bob:example.org"],
+            ...args,
         });
+    };
 
-        if (tsMain) {
-            result.mainEvent = mkMessage({ ts: tsMain });
-            room.addLiveEvents([result.mainEvent]);
-        }
+    /**
+     * Creates a message and adds it to the live timeline.
+     *
+     * @param room - Room to add the message to
+     * @param timestamp - Timestamp of the message
+     * @return The message event
+     */
+    const mkMessageInRoom = (room: Room, timestamp: number) => {
+        const message = mkMessage({ ts: timestamp });
+        room.addLiveEvents([message]);
+        return message;
+    };
 
-        if (tsThread) {
-            result.threadEvent = mkThreadResponse(rootEvent, { ts: tsThread });
-            thread.liveTimeline.addEvent(result.threadEvent, { toStartOfTimeline: true });
-        }
-
-        return result;
+    /**
+     * Creates a message in a thread and adds it to the thread live timeline.
+     *
+     * @param thread - Thread to add the message to
+     * @param timestamp - Timestamp of the message
+     * @returns The thread message event
+     */
+    const mkMessageInThread = (thread: Thread, timestamp: number) => {
+        const message = mkThreadResponse(thread.rootEvent!, { ts: timestamp });
+        thread.liveTimeline.addEvent(message, { toStartOfTimeline: true });
+        return message;
     };
 
     const addRoomThreads = (
@@ -202,24 +217,14 @@ describe("Room", function () {
         const result: { thread1?: Thread; thread2?: Thread } = {};
 
         if (thread1EventTs !== null) {
-            const { rootEvent: thread1RootEvent, thread: thread1 } = mkThread({
-                room,
-                client: new TestClient().client,
-                authorId: "@bob:example.org",
-                participantUserIds: ["@bob:example.org"],
-            });
+            const { rootEvent: thread1RootEvent, thread: thread1 } = mkThread({ room });
             const thread1Event = mkThreadResponse(thread1RootEvent, { ts: thread1EventTs });
             thread1.liveTimeline.addEvent(thread1Event, { toStartOfTimeline: true });
             result.thread1 = thread1;
         }
 
         if (thread2EventTs !== null) {
-            const { rootEvent: thread2RootEvent, thread: thread2 } = mkThread({
-                room,
-                client: new TestClient().client,
-                authorId: "@bob:example.org",
-                participantUserIds: ["@bob:example.org"],
-            });
+            const { rootEvent: thread2RootEvent, thread: thread2 } = mkThread({ room });
             const thread2Event = mkThreadResponse(thread2RootEvent, { ts: thread2EventTs });
             thread2.liveTimeline.addEvent(thread2Event, { toStartOfTimeline: true });
             result.thread2 = thread2;
@@ -2504,12 +2509,7 @@ describe("Room", function () {
         });
 
         it("returns the same model when creating a thread twice", () => {
-            const { thread, rootEvent } = mkThread({
-                room,
-                client: new TestClient().client,
-                authorId: "@bob:example.org",
-                participantUserIds: ["@bob:example.org"],
-            });
+            const { thread, rootEvent } = mkThread({ room });
 
             expect(thread).toBeInstanceOf(Thread);
 
@@ -3534,38 +3534,47 @@ describe("Room", function () {
     });
 
     describe("getLastLiveEvent", () => {
-        let lastEventInMainTimeline: MatrixEvent;
-        let lastEventInThread: MatrixEvent;
-
         it("when there are no events, it should return undefined", () => {
             expect(room.getLastLiveEvent()).toBeUndefined();
         });
 
         it("when there is only an event in the main timeline and there are no threads, it should return the last event from the main timeline", () => {
-            lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23).mainEvent!;
-            room.addLiveEvents([lastEventInMainTimeline]);
+            const lastEventInMainTimeline = mkMessageInRoom(room, 23);
             expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
         });
 
         it("when there is no event in the room live timeline but in a thread, it should return the last event from the thread", () => {
-            lastEventInThread = addRoomMainAndThreadMessages(room, undefined, 42).threadEvent!;
+            const { thread } = mkThread({ room, length: 0 });
+            const lastEventInThread = mkMessageInThread(thread, 42);
             expect(room.getLastLiveEvent()).toBe(lastEventInThread);
         });
 
         describe("when there are events in both, the main timeline and threads", () => {
             it("and the last event is in a thread, it should return the last event from the thread", () => {
-                lastEventInThread = addRoomMainAndThreadMessages(room, 23, 42).threadEvent!;
+                mkMessageInRoom(room, 23);
+                const { thread } = mkThread({ room, length: 0 });
+                const lastEventInThread = mkMessageInThread(thread, 42);
                 expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
 
             it("and the last event is in the main timeline, it should return the last event from the main timeline", () => {
-                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 42, 23).mainEvent!;
+                const lastEventInMainTimeline = mkMessageInRoom(room, 42);
+                const { thread } = mkThread({ room, length: 0 });
+                mkMessageInThread(thread, 23);
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
 
             it("and both events have the same timestamp, it should return the last event from the thread", () => {
-                lastEventInThread = addRoomMainAndThreadMessages(room, 23, 23).threadEvent!;
+                mkMessageInRoom(room, 23);
+                const { thread } = mkThread({ room, length: 0 });
+                const lastEventInThread = mkMessageInThread(thread, 23);
                 expect(room.getLastLiveEvent()).toBe(lastEventInThread);
+            });
+
+            it("and there is a thread without last message, it should return the last event from the main timeline", () => {
+                const lastEventInMainTimeline = mkMessageInRoom(room, 23);
+                mkThread({ room, length: 0 });
+                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
         });
     });
