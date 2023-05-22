@@ -174,6 +174,12 @@ describe("Room", function () {
         tsThread?: number,
     ): { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } => {
         const result: { mainEvent?: MatrixEvent; threadEvent?: MatrixEvent } = {};
+        const { rootEvent, thread } = mkThread({
+            room,
+            client: new TestClient().client,
+            authorId: "@bob:example.org",
+            participantUserIds: ["@bob:example.org"],
+        });
 
         if (tsMain) {
             result.mainEvent = mkMessage({ ts: tsMain });
@@ -181,12 +187,6 @@ describe("Room", function () {
         }
 
         if (tsThread) {
-            const { rootEvent, thread } = mkThread({
-                room,
-                client: new TestClient().client,
-                authorId: "@bob:example.org",
-                participantUserIds: ["@bob:example.org"],
-            });
             result.threadEvent = mkThreadResponse(rootEvent, { ts: tsThread });
             thread.liveTimeline.addEvent(result.threadEvent, { toStartOfTimeline: true });
         }
@@ -3560,6 +3560,11 @@ describe("Room", function () {
 
             it("and the last event is in the main timeline, it should return the last event from the main timeline", () => {
                 lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 42, 23).mainEvent!;
+                expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
+            });
+
+            it("and both events have the same timestamp, it should return the last event from the main timeline", () => {
+                lastEventInMainTimeline = addRoomMainAndThreadMessages(room, 23, 23).mainEvent!;
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
         });
