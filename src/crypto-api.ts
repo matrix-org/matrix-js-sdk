@@ -18,7 +18,6 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { IImportRoomKeysOpts } from "./crypto/api";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -87,9 +86,10 @@ export interface CryptoApi {
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
+     * @param opts - progress reporting, safety and key source in the form of a ImportRoomKeysOpts
      * @returns a promise which resolves once the keys have been imported
      */
-    importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void>;
+    importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
      * Get the device information for the given list of users.
@@ -268,4 +268,18 @@ export class DeviceVerificationStatus {
     public isVerified(): boolean {
         return this.localVerified || (this.trustCrossSignedDevices && this.crossSigningVerified);
     }
+}
+
+export interface ImportOpts {
+    stage: string; // TODO: Enum
+    successes: number;
+    failures: number;
+    total: number;
+}
+
+export interface ImportRoomKeysOpts {
+    /** called with an object that has a "stage" param */
+    progressCallback?: (stage: ImportOpts) => void;
+    untrusted?: boolean;
+    source?: string; // TODO: Enum
 }

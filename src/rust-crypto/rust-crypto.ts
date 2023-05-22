@@ -18,7 +18,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import type { IEncryptedEventInfo, IImportOpts, IImportRoomKeysOpts } from "../crypto/api";
+import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
@@ -30,7 +30,7 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus, ImportOpts, ImportRoomKeysOpts } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
@@ -207,22 +207,23 @@ export class RustCrypto implements CryptoBackend {
 
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         const raw = await this.olmMachine.exportRoomKeys(() => true);
-        return Promise.resolve(JSON.parse(raw));
+        return JSON.parse(raw);
     }
 
-    public async importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts | undefined): Promise<void> {
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         const jsonKeys = JSON.stringify(keys);
         await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
-            const importOpt: IImportOpts = {
+            const importOpt: ImportOpts = {
                 total: Number(total),
                 successes: Number(progress),
-                stage: "",
+                stage: "load_keys",
                 failures: 0,
             };
             opts?.progressCallback?.(importOpt);
         });
-        return Promise.resolve();
+        return;
     }
+
     /**
      * Get the device information for the given list of users.
      *

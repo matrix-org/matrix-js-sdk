@@ -26,9 +26,9 @@ import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../..
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { IImportRoomKeysOpts } from "../../../src/crypto/api";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import { ImportRoomKeysOpts } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -76,7 +76,7 @@ describe("RustCrypto", () => {
                 },
             ];
             let importTotal = 0;
-            const opt: IImportRoomKeysOpts = {
+            const opt: ImportRoomKeysOpts = {
                 progressCallback: (stage) => {
                     importTotal = stage.total;
                 },
