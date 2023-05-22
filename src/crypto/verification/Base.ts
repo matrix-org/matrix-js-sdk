@@ -51,6 +51,8 @@ export type VerificationEventHandlerMap = {
     [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
+// The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
+// backwards compatibility with applications that reference the class.
 export class VerificationBase<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     Events extends string = VerifierEvent,
