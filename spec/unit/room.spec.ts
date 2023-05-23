@@ -205,7 +205,7 @@ describe("Room", function () {
      */
     const mkMessageInThread = (thread: Thread, timestamp: number) => {
         const message = mkThreadResponse(thread.rootEvent!, { ts: timestamp });
-        thread.liveTimeline.addEvent(message, { toStartOfTimeline: true });
+        thread.liveTimeline.addEvent(message, { toStartOfTimeline: false });
         return message;
     };
 
