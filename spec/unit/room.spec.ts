@@ -55,7 +55,6 @@ import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { IMessageOpts } from "../test-utils/test-utils";
-import { MakeThreadProps } from "../test-utils/thread";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -170,11 +169,11 @@ describe("Room", function () {
         );
 
     /**
-     * Starts a new thread in a room by creating a message as thread root.
-     * Also creates a Thread model and adds it to the room.
-     * Does not insert the messages into a timeline.
+     * @see threadUtils.mkThread
      */
-    const mkThread = (opts: Partial<Parameters<typeof threadUtils.mkThread>[0]>) => {
+    const mkThread = (
+        opts: Partial<Parameters<typeof threadUtils.mkThread>[0]>,
+    ): ReturnType<typeof threadUtils.mkThread> => {
         return threadUtils.mkThread({
             room,
             client: new TestClient().client,
@@ -185,7 +184,7 @@ describe("Room", function () {
     };
 
     /**
-     * Creates a message and adds it to the live timeline.
+     * Creates a message and adds it to the end of the main live timeline.
      *
      * @param room - Room to add the message to
      * @param timestamp - Timestamp of the message
@@ -198,7 +197,7 @@ describe("Room", function () {
     };
 
     /**
-     * Creates a message in a thread and adds it to the thread live timeline.
+     * Creates a message in a thread and adds it to the end of the thread live timeline.
      *
      * @param thread - Thread to add the message to
      * @param timestamp - Timestamp of the message
@@ -3572,7 +3571,7 @@ describe("Room", function () {
                 expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
 
-            it("and there is a thread without last message, it should return the last event from the main timeline", () => {
+            it("and there is a thread without any messages, it should return the last event from the main timeline", () => {
                 const lastEventInMainTimeline = mkMessageInRoom(room, 23);
                 mkThread({ room, length: 0 });
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
