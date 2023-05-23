@@ -64,6 +64,7 @@ export abstract class ReadReceipt<
 
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
     public abstract timeline: MatrixEvent[];
+    public abstract findEventById(eventId: string): MatrixEvent | undefined;
 
     /**
      * Gets the latest receipt for a given user in the room
@@ -306,7 +307,30 @@ export abstract class ReadReceipt<
             if (ev.getId() === readUpToId) return true;
         }
 
-        // We don't know if the user has read it, so assume not.
-        return false;
+        // We get here if the read receipt doesn't match any event in the
+        // timeline, then either the receipt refers to something very old, or
+        // maybe it refers to something that got accidentally added to the wrong
+        // timeline (e.g. because it was a reaction to an event in a thread that
+        // we had not yet loaded, so we added the reaction to the main timeline
+        // incorrectly).
+        //
+        // In this case, we guess whether you've read this event using the
+        // timestamp of the receipt. This assumes that receipts tend to be
+        // created around the same time as the message they are for.
+        //
+        // BUG: this means that if you recently read an old message, we will
+        // incorrectly consider new messages read.
+
+        const event = this.findEventById(eventId);
+        const receipt = this.getReadReceiptForUserId(userId);
+
+        if (event && receipt) {
+            return event.getTs() <= receipt.data.ts;
+        } else {
+            // We couldn't find an event and receipt to compare timestamps, so
+            // we must assume this is unread to be safe (to avoid users missing
+            // messages).
+            return false;
+        }
     }
 }
