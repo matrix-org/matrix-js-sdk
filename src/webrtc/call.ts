@@ -2833,7 +2833,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private createPeerConnection(): RTCPeerConnection {
         const pc = new window.RTCPeerConnection({
-            iceTransportPolicy: this.forceTURN ? "relay" : undefined,
+            iceTransportPolicy: "relay",
             iceServers: this.turnServers,
             iceCandidatePoolSize: this.client.iceCandidatePoolSize,
             bundlePolicy: "max-bundle",
@@ -2908,9 +2908,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 );
 
                 // Force to use TURN
-                if (candidate.type !== "relay") {
-                    return;
-                }
+                // if (candidate.type !== "relay") {
+                //     return;
+                // }
             }
 
 
