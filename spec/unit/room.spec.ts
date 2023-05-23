@@ -55,6 +55,7 @@ import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { IMessageOpts } from "../test-utils/test-utils";
+import { MakeThreadProps } from "../test-utils/thread";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -173,13 +174,13 @@ describe("Room", function () {
      * Also creates a Thread model and adds it to the room.
      * Does not insert the messages into a timeline.
      */
-    const mkThread = (args: Partial<typeof threadUtils.mkThread>) => {
+    const mkThread = (opts: Partial<Parameters<typeof threadUtils.mkThread>[0]>) => {
         return threadUtils.mkThread({
             room,
             client: new TestClient().client,
             authorId: "@bob:example.org",
             participantUserIds: ["@bob:example.org"],
-            ...args,
+            ...opts,
         });
     };
 
