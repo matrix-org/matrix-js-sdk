@@ -2906,11 +2906,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.debug(
                     `Call ${this.callId} addIceCandidates() got remote ICE candidate (sdpMid=${candidate.sdpMid}, candidate=${candidate.candidate})`,
                 );
-
-                // Force to use TURN
-                if (candidate.type !== "relay") {
-                    return;
-                }
+            }
+            // Force to use TURN
+            if (!!candidate && candidate.type !== "relay") {
+                return;
             }
 
             try {
