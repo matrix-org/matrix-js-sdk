@@ -533,21 +533,14 @@ describe("Thread", () => {
                 });
                 await thread.addEvent(messageToEdit, false);
 
-                // THIS IS THE CORRECT BEHAVIOUR
                 // Then both events end up in the timeline
-                //const lastEvent = thread.timeline.at(-1)!;
-                //const secondLastEvent = thread.timeline.at(-2)!;
-                //expect(lastEvent).toBe(editEvent);
-                //expect(secondLastEvent).toBe(messageToEdit);
-
-                //// And the first message has been edited
-                //expect(secondLastEvent.getContent().body).toEqual("edit");
-
-                // TODO: For now, we incorrecly DON'T add the event to the timeline
                 const lastEvent = thread.timeline.at(-1)!;
-                expect(lastEvent).toBe(messageToEdit);
-                // But the original is edited, as expected
-                expect(lastEvent.getContent().body).toEqual("edit");
+                const secondLastEvent = thread.timeline.at(-2)!;
+                expect(lastEvent).toBe(editEvent);
+                expect(secondLastEvent).toBe(messageToEdit);
+
+                // And the first message has been edited
+                expect(secondLastEvent.getContent().body).toEqual("edit");
             });
         });
     });
