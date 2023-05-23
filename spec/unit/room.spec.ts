@@ -3543,6 +3543,10 @@ describe("Room", function () {
             expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
         });
 
+        /**
+         * This should normally not happen. The test exists only for the sake of completeness.
+         * No event is added to the room's live timeline here.
+         */
         it("when there is no event in the room live timeline but in a thread, it should return the last event from the thread", () => {
             const { thread } = mkThread({ room, length: 0 });
             const lastEventInThread = mkMessageInThread(thread, 42);
