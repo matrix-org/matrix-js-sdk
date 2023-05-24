@@ -26,7 +26,7 @@ const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
 
 export interface UIAFlow {
-    stages: AuthType[];
+    stages: Array<AuthType | string>;
 }
 
 export interface IInputs {
@@ -181,7 +181,7 @@ interface IOpts {
      *     m.login.email.identity:
      *         * emailSid: string, the sid of the active email auth session
      */
-    stateUpdated(nextStage: AuthType, status: IStageStatus): void;
+    stateUpdated(nextStage: AuthType | string, status: IStageStatus): void;
 
     /**
      * A function that takes the email address (string), clientSecret (string), attempt number (int) and
@@ -578,7 +578,7 @@ export class InteractiveAuth {
      * @returns login type
      * @throws {@link NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    private chooseStage(): AuthType | undefined {
+    private chooseStage(): AuthType | string | undefined {
         if (this.chosenFlow === null) {
             this.chosenFlow = this.chooseFlow();
         }
@@ -654,7 +654,7 @@ export class InteractiveAuth {
      * @internal
      * @returns login type
      */
-    private firstUncompletedStage(flow: UIAFlow): AuthType | undefined {
+    private firstUncompletedStage(flow: UIAFlow): AuthType | string | undefined {
         const completed = this.data.completed || [];
         return flow.stages.find((stageType) => !completed.includes(stageType));
     }
