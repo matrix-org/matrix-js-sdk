@@ -503,7 +503,7 @@ describe("Thread", () => {
                 const root = mkMessage({ event: true, user: sender, msg: "Thread root" });
                 room.addLiveEvents([root]);
 
-                const threadReply = makeThreadEvent({
+                const messageToEdit = makeThreadEvent({
                     event: true,
                     user: sender,
                     msg: "Thread reply",
@@ -511,7 +511,7 @@ describe("Thread", () => {
                     replyToEventId: root.getId(),
                 });
 
-                const editToThreadReply = mkEdit(threadReply, client, sender, room.roomId, "edit");
+                const editEvent = mkEdit(messageToEdit, client, sender, room.roomId, "edit");
 
                 // Mock methods that call out to HTTP endpoints
                 jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
@@ -523,14 +523,14 @@ describe("Thread", () => {
                 await new Promise<void>((res) => thread.once(RoomEvent.TimelineReset, () => res()));
 
                 // When a message and an edit are added to the thread
-                await thread.addEvent(threadReply, false);
-                await thread.addEvent(editToThreadReply, false);
+                await thread.addEvent(messageToEdit, false);
+                await thread.addEvent(editEvent, false);
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
                 const secondLastEvent = thread.timeline.at(-2)!;
-                expect(lastEvent).toBe(editToThreadReply);
-                expect(secondLastEvent).toBe(threadReply);
+                expect(lastEvent).toBe(editEvent);
+                expect(secondLastEvent).toBe(messageToEdit);
 
                 // And the first message has been edited
                 expect(secondLastEvent.getContent().body).toEqual("edit");
