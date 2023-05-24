@@ -158,6 +158,7 @@ interface IOpts {
 
     /**
      * If specified, will prefer flows which entirely consist of listed stages.
+     * These should normally be of type AuthTypes but can be string when supporting custom auth stages.
      *
      * This can be used to avoid needing the fallback mechanism.
      */
