@@ -157,9 +157,11 @@ interface IOpts {
     emailSid?: string;
 
     /**
-     * If specified will prefer flows which entirely consist of supported stages to avoid needing the fallback mechanism
+     * If specified, will prefer flows which entirely consist of listed stages.
+     *
+     * This can be used to avoid needing the fallback mechanism.
      */
-    supportedStages?: string[];
+    supportedStages?: Array<AuthType | string>;
 
     /**
      * Called with the new auth dict to submit the request.
@@ -249,7 +251,7 @@ export class InteractiveAuth {
         if (opts.sessionId) this.data.session = opts.sessionId;
         this.clientSecret = opts.clientSecret || this.matrixClient.generateClientSecret();
         this.emailSid = opts.emailSid;
-        if (opts.supportedStages) this.supportedStages = new Set(opts.supportedStages);
+        if (opts.supportedStages !== undefined) this.supportedStages = new Set(opts.supportedStages);
     }
 
     /**
@@ -588,11 +590,12 @@ export class InteractiveAuth {
         return nextStage;
     }
 
-    // Returns a low number for flows we consider best, counts increase for longer flows and even more so
-    // for flows which contain stages we do not have built-in support for.
+    // Returns a low number for flows we consider best. Counts increase for longer flows and even more so
+    // for flows which contain stages not listed in `supportedStages`.
     private scoreFlow(flow: UIAFlow): number {
         let score = flow.stages.length;
-        if (this.supportedStages) {
+        if (this.supportedStages !== undefined) {
+            // Add 10 points to the score for each unsupported stage in the flow.
             score += flow.stages.filter((stage) => !this.supportedStages!.has(stage)).length * 10;
         }
         return score;
