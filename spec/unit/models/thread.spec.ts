@@ -19,10 +19,10 @@ import { mocked } from "jest-mock";
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
-import { mkThread } from "../../test-utils/thread";
+import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
-import { emitPromise, mkEvent, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
-import { Direction, EventStatus, EventType, MatrixEvent, RelationType } from "../../../src";
+import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
+import { Direction, EventStatus, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
@@ -500,46 +500,18 @@ describe("Thread", () => {
 
                 const sender = "@alice:matrix.org";
 
-                const root = mkEvent({
-                    event: true,
-                    content: {
-                        body: "Thread root",
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
-                });
+                const root = mkMessage({ event: true, user: sender, msg: "Thread root" });
                 room.addLiveEvents([root]);
 
-                const threadReply = mkEvent({
+                const threadReply = makeThreadEvent({
                     event: true,
-                    content: {
-                        "body": "Thread reply",
-                        "m.relates_to": {
-                            event_id: root.getId()!,
-                            rel_type: RelationType.Thread,
-                        },
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
+                    user: sender,
+                    msg: "Thread reply",
+                    rootEventId: root.getId(),
+                    replyToEventId: root.getId(),
                 });
 
-                const editToThreadReply = mkEvent({
-                    event: true,
-                    content: {
-                        "body": " * edit",
-                        "m.new_content": {
-                            "body": "edit",
-                            "msgtype": "m.text",
-                            "org.matrix.msc1767.text": "edit",
-                        },
-                        "m.relates_to": {
-                            event_id: threadReply.getId()!,
-                            rel_type: RelationType.Replace,
-                        },
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
-                });
+                const editToThreadReply = mkEdit(threadReply, client, sender, room.roomId, "edit");
 
                 // Mock methods that call out to HTTP endpoints
                 jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
