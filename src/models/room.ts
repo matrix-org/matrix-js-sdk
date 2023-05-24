@@ -809,7 +809,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
 
-        return (lastRoomEvent?.getTs() ?? 0) > (lastThreadEvent.getTs() ?? 0) ? lastRoomEvent : lastThreadEvent;
+        return (lastRoomEvent?.getTs() ?? 0) > (lastThreadEvent?.getTs() ?? 0) ? lastRoomEvent : lastThreadEvent;
     }
 
     /**
