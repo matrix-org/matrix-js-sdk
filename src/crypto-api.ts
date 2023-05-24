@@ -86,7 +86,7 @@ export interface CryptoApi {
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
-     * @param opts - progress reporting, safety and key source in the form of a ImportRoomKeysOpts
+     * @param opts - options object
      * @returns a promise which resolves once the keys have been imported
      */
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
@@ -270,16 +270,23 @@ export class DeviceVerificationStatus {
     }
 }
 
-export interface ImportOpts {
+/**
+ * Room key import progress report.
+ */
+export interface ImportRoomKeyProgressData {
     stage: string; // TODO: Enum
     successes: number;
     failures: number;
     total: number;
 }
 
+/**
+ * Options object for {@link CryptoApi#importRoomKeys}.
+ */
 export interface ImportRoomKeysOpts {
-    /** called with an object that has a "stage" param */
-    progressCallback?: (stage: ImportOpts) => void;
+    /** Reports ongoing progress of the import process, can be used for feedback. */
+    progressCallback?: (stage: ImportRoomKeyProgressData) => void;
+    // TODO, the rust SDK will always such imported keys as untrusted
     untrusted?: boolean;
-    source?: string; // TODO: Enum
+    source?: String; // TODO: Enum (backup, file, ??)
 }

@@ -3190,7 +3190,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
-     * @param opts - progress reporting, safety and key source in the form of a ImportRoomKeysOpts
+     * @param opts - options object
      *
      * @returns a promise which resolves when the keys have been imported
      *

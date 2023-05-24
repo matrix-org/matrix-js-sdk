@@ -20,6 +20,12 @@ import type { AddSecretStorageKeyOpts } from "../secret-storage";
 
 /* re-exports for backwards compatibility. */
 export { CrossSigningKey } from "../crypto-api";
+
+export type {
+    ImportRoomKeyProgressData as IImportOpts,
+    ImportRoomKeysOpts as IImportRoomKeysOpts,
+} from "../crypto-api";
+
 export type {
     AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
