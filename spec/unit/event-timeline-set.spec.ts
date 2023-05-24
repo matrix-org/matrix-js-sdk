@@ -273,19 +273,27 @@ describe("EventTimelineSet", () => {
                 sender,
             });
 
-            jest.spyOn(client, "paginateEventTimeline").mockImplementation(async () => {
-                thread.timelineSet.getLiveTimeline().addEvent(threadReply, { toStartOfTimeline: true });
-                return true;
-            });
-            jest.spyOn(client, "relations").mockResolvedValue({
-                events: [],
-            });
+            // Mock methods that call out to HTTP endpoints
+            jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
+            jest.spyOn(client, "relations").mockResolvedValue({ events: [] });
+            jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
 
-            const thread = room.createThread(root.getId()!, root, [threadReply, editToThreadReply], false);
-            thread.once(RoomEvent.TimelineReset, () => {
-                const lastEvent = thread.timeline.at(-1)!;
-                expect(lastEvent.getContent().body).toBe(" * edit");
-            });
+            // Create a thread and wait for it to be initialised
+            const thread = room.createThread(root.getId()!, root, [], false);
+            await new Promise<void>((res) => thread.once(RoomEvent.TimelineReset, () => res()));
+
+            // When a message and an edit are added to the thread
+            await thread.addEvent(threadReply, false);
+            await thread.addEvent(editToThreadReply, false);
+
+            // Then both events end up in the timeline
+            const lastEvent = thread.timeline.at(-1)!;
+            const secondLastEvent = thread.timeline.at(-2)!;
+            expect(lastEvent).toBe(editToThreadReply);
+            expect(secondLastEvent).toBe(threadReply);
+
+            // And the first message has been edited
+            expect(secondLastEvent.getContent().body).toEqual("edit");
         });
 
         describe("non-room timeline", () => {
