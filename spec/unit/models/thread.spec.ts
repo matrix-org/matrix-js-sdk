@@ -498,20 +498,20 @@ describe("Thread", () => {
                 jest.spyOn(client, "supportsThreads").mockReturnValue(true);
                 jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
 
-                const sender = "@alice:matrix.org";
+                const user = "@alice:matrix.org";
 
-                const root = mkMessage({ event: true, user: sender, msg: "Thread root" });
+                const root = mkMessage({ event: true, user, msg: "Thread root" });
                 room.addLiveEvents([root]);
 
                 const messageToEdit = makeThreadEvent({
                     event: true,
-                    user: sender,
+                    user,
                     msg: "Thread reply",
                     rootEventId: root.getId(),
                     replyToEventId: root.getId(),
                 });
 
-                const editEvent = mkEdit(messageToEdit, client, sender, room.roomId, "edit");
+                const editEvent = mkEdit(messageToEdit, client, user, room.roomId, "edit");
 
                 // Mock methods that call out to HTTP endpoints
                 jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
