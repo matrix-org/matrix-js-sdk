@@ -489,16 +489,13 @@ describe("Thread", () => {
             });
 
             it("should allow edits to be added to thread timeline", async () => {
-                const roomId = "!foo:bar";
-                const userA = "@alice:bar";
+                const user = "@alice:matrix.org";
                 const client = mock(MatrixClient, "MatrixClient");
                 client.reEmitter = mock(ReEmitter, "ReEmitter");
                 client.canSupport = new Map();
-                const room = new Room(roomId, client, userA);
+                const room = new Room("!foo:bar", client, user);
                 jest.spyOn(client, "supportsThreads").mockReturnValue(true);
                 jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
-
-                const user = "@alice:matrix.org";
 
                 const root = mkMessage({ event: true, user, msg: "Thread root" });
                 room.addLiveEvents([root]);
