@@ -157,6 +157,11 @@ interface IOpts {
     emailSid?: string;
 
     /**
+     * If specified will prefer flows which entirely consist of supported stages to avoid needing the fallback mechanism
+     */
+    supportedStages?: string[];
+
+    /**
      * Called with the new auth dict to submit the request.
      * Also passes a second deprecated arg which is a flag set to true if this request is a background request.
      * The busyChanged callback should be used instead of the background flag.
@@ -216,6 +221,7 @@ export class InteractiveAuth {
     private readonly busyChangedCallback?: IOpts["busyChanged"];
     private readonly stateUpdatedCallback: IOpts["stateUpdated"];
     private readonly requestEmailTokenCallback: IOpts["requestEmailToken"];
+    private readonly supportedStages?: Set<string>;
 
     private data: IAuthData;
     private emailSid?: string;
@@ -243,6 +249,7 @@ export class InteractiveAuth {
         if (opts.sessionId) this.data.session = opts.sessionId;
         this.clientSecret = opts.clientSecret || this.matrixClient.generateClientSecret();
         this.emailSid = opts.emailSid;
+        if (opts.supportedStages) this.supportedStages = new Set(opts.supportedStages);
     }
 
     /**
@@ -581,6 +588,16 @@ export class InteractiveAuth {
         return nextStage;
     }
 
+    // Returns a low number for flows we consider best, counts increase for longer flows and even more so
+    // for flows which contain stages we do not have built-in support for.
+    private scoreFlow(flow: UIAFlow): number {
+        let score = flow.stages.length;
+        if (this.supportedStages) {
+            score += flow.stages.filter((stage) => !this.supportedStages!.has(stage)).length * 10;
+        }
+        return score;
+    }
+
     /**
      * Pick one of the flows from the returned list
      * If a flow using all of the inputs is found, it will
@@ -602,6 +619,10 @@ export class InteractiveAuth {
         // we've been given an email or we've already done an email part
         const haveEmail = Boolean(this.inputs.emailAddress) || Boolean(this.emailSid);
         const haveMsisdn = Boolean(this.inputs.phoneCountry) && Boolean(this.inputs.phoneNumber);
+
+        // Flows are not represented in a significant order, so we can choose any we support best
+        // Sort flows based on how many unsupported stages they contain ascending
+        flows.sort((a, b) => this.scoreFlow(a) - this.scoreFlow(b));
 
         for (const flow of flows) {
             let flowHasEmail = false;
