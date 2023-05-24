@@ -16,13 +16,13 @@ limitations under the License.
 import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { CallStatsReportSummaryReporter } from "./callStatsReportSummaryReporter";
+import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
     private readonly gatherers: Map<string, CallStatsReportGatherer> = new Map<string, CallStatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
-    private readonly summaryStatsReporter = new CallStatsReportSummaryReporter(this.reports);
+    private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
@@ -67,7 +67,7 @@ export class GroupCallStats {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReporter.build(s));
+        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s));
     }
 
     public setInterval(interval: number): void {
