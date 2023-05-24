@@ -523,25 +523,6 @@ describe("Thread", () => {
                     sender,
                 });
 
-                root.setUnsigned({
-                    "m.relations": {
-                        [RelationType.Thread]: {
-                            count: 1,
-                            latest_event: {
-                                content: threadReply.getContent(),
-                                origin_server_ts: 5,
-                                room_id: room.roomId,
-                                sender,
-                                type: EventType.RoomMessage,
-                                event_id: threadReply.getId()!,
-                                user_id: sender,
-                                age: 1,
-                            },
-                            current_user_participated: true,
-                        },
-                    },
-                });
-
                 const editToThreadReply = mkEvent({
                     event: true,
                     content: {
