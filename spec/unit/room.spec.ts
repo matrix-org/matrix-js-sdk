@@ -172,9 +172,9 @@ describe("Room", function () {
      * @param timestamp - Timestamp of the message
      * @return The message event
      */
-    const mkMessageInRoom = async (room: Room, timestamp: number) => {
+    const mkMessageInRoom = (room: Room, timestamp: number) => {
         const message = mkMessage({ ts: timestamp });
-        await room.addLiveEvents([message]);
+        room.addLiveEvents([message]);
         return message;
     };
 
@@ -3528,8 +3528,8 @@ describe("Room", function () {
             expect(room.getLastLiveEvent()).toBeUndefined();
         });
 
-        it("when there is only an event in the main timeline and there are no threads, it should return the last event from the main timeline", async () => {
-            const lastEventInMainTimeline = await mkMessageInRoom(room, 23);
+        it("when there is only an event in the main timeline and there are no threads, it should return the last event from the main timeline", () => {
+            const lastEventInMainTimeline = mkMessageInRoom(room, 23);
             expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
         });
 
@@ -3544,29 +3544,29 @@ describe("Room", function () {
         });
 
         describe("when there are events in both, the main timeline and threads", () => {
-            it("and the last event is in a thread, it should return the last event from the thread", async () => {
-                await mkMessageInRoom(room, 23);
+            it("and the last event is in a thread, it should return the last event from the thread", () => {
+                mkMessageInRoom(room, 23);
                 const { thread } = mkThread({ room, length: 0 });
                 const lastEventInThread = mkMessageInThread(thread, 42);
                 expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
 
-            it("and the last event is in the main timeline, it should return the last event from the main timeline", async () => {
-                const lastEventInMainTimeline = await mkMessageInRoom(room, 42);
+            it("and the last event is in the main timeline, it should return the last event from the main timeline", () => {
+                const lastEventInMainTimeline = mkMessageInRoom(room, 42);
                 const { thread } = mkThread({ room, length: 0 });
                 mkMessageInThread(thread, 23);
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
 
-            it("and both events have the same timestamp, it should return the last event from the thread", async () => {
-                await mkMessageInRoom(room, 23);
+            it("and both events have the same timestamp, it should return the last event from the thread", () => {
+                mkMessageInRoom(room, 23);
                 const { thread } = mkThread({ room, length: 0 });
                 const lastEventInThread = mkMessageInThread(thread, 23);
                 expect(room.getLastLiveEvent()).toBe(lastEventInThread);
             });
 
-            it("and there is a thread without any messages, it should return the last event from the main timeline", async () => {
-                const lastEventInMainTimeline = await mkMessageInRoom(room, 23);
+            it("and there is a thread without any messages, it should return the last event from the main timeline", () => {
+                const lastEventInMainTimeline = mkMessageInRoom(room, 23);
                 mkThread({ room, length: 0 });
                 expect(room.getLastLiveEvent()).toBe(lastEventInMainTimeline);
             });
