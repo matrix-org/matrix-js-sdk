@@ -45,11 +45,15 @@ export class GroupCallStats {
         return this.gatherers.has(callId);
     }
 
-    public addStatsReportGatherer(callId: string, userId: string, peerConnection: RTCPeerConnection): boolean {
+    public addStatsReportGatherer(
+        callId: string,
+        opponentMemberId: string,
+        peerConnection: RTCPeerConnection,
+    ): boolean {
         if (this.hasStatsReportGatherer(callId)) {
             return false;
         }
-        this.gatherers.set(callId, new CallStatsReportGatherer(callId, userId, peerConnection, this.reports));
+        this.gatherers.set(callId, new CallStatsReportGatherer(callId, opponentMemberId, peerConnection, this.reports));
         return true;
     }
 

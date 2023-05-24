@@ -37,7 +37,7 @@ export class CallStatsReportGatherer {
 
     public constructor(
         public readonly callId: string,
-        public readonly remoteUserId: string,
+        public readonly opponentMemberId: string,
         private readonly pc: RTCPeerConnection,
         private readonly emitter: StatsReportEmitter,
         private readonly isFocus = true,
@@ -93,7 +93,9 @@ export class CallStatsReportGatherer {
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStatsReport: ByteSentStatsReport = new Map<TrackID, ByteSend>();
+        const byteSentStatsReport: ByteSentStatsReport = new Map<TrackID, ByteSend>() as ByteSentStatsReport;
+        byteSentStatsReport.callId = this.callId;
+        byteSentStatsReport.opponentMemberId = this.opponentMemberId;
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
@@ -175,7 +177,11 @@ export class CallStatsReportGatherer {
     }
 
     private processAndEmitConnectionStatsReport(): void {
-        const report = ConnectionStatsReportBuilder.build(this.trackStats.getTrack2stats());
+        const report = ConnectionStatsReportBuilder.build(
+            this.callId,
+            this.opponentMemberId,
+            this.trackStats.getTrack2stats(),
+        );
 
         this.connectionStats.bandwidth = report.bandwidth;
         this.connectionStats.bitrate = report.bitrate;

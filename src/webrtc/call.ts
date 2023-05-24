@@ -2848,7 +2848,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener("negotiationneeded", this.onNegotiationNeeded);
         pc.addEventListener("datachannel", this.onDataChannel);
 
-        this.stats?.addStatsReportGatherer(this.callId, "unknown", pc);
+        const opponentMember: RoomMember | undefined = this.getOpponentMember();
+        const opponentMemberId = opponentMember ? opponentMember.userId : "unknown";
+        this.stats?.addStatsReportGatherer(this.callId, opponentMemberId, pc);
         return pc;
     }
 
