@@ -13,16 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { SummaryStatsReporter } from "../../../../src/webrtc/stats/summaryStatsReporter";
+import { CallStatsReportSummaryReporter } from "../../../../src/webrtc/stats/callStatsReportSummaryReporter";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 
-describe("SummaryStatsReporter", () => {
-    let reporter: SummaryStatsReporter;
+describe("CallStatsReportSummaryReporter", () => {
+    let reporter: CallStatsReportSummaryReporter;
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         emitter = new StatsReportEmitter();
         emitter.emitSummaryStatsReport = jest.fn();
-        reporter = new SummaryStatsReporter(emitter);
+        reporter = new CallStatsReportSummaryReporter(emitter);
     });
 
     describe("build Summary Stats Report", () => {

@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TrackID } from "../../../../src/webrtc/stats/statsReport";
 import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackStats";
-import { StatsReportBuilder } from "../../../../src/webrtc/stats/statsReportBuilder";
+import { ConnectionStatsReportBuilder } from "../../../../src/webrtc/stats/connectionStatsReportBuilder";
 
 describe("StatsReportBuilder", () => {
     const LOCAL_VIDEO_TRACK_ID = "LOCAL_VIDEO_TRACK_ID";
@@ -39,7 +39,7 @@ describe("StatsReportBuilder", () => {
 
     describe("should build stats", () => {
         it("by media track stats.", async () => {
-            expect(StatsReportBuilder.build(stats)).toEqual({
+            expect(ConnectionStatsReportBuilder.build(stats)).toEqual({
                 bitrate: {
                     audio: {
                         download: 4000,

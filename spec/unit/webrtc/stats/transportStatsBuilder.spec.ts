@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TransportStatsReporter } from "../../../../src/webrtc/stats/transportStatsReporter";
+import { TransportStatsBuilder } from "../../../../src/webrtc/stats/transportStatsBuilder";
 import { TransportStats } from "../../../../src/webrtc/stats/transportStats";
 
 describe("TransportStatsReporter", () => {
@@ -35,7 +35,7 @@ describe("TransportStatsReporter", () => {
         it("build new transport stats if all properties there", () => {
             const { report, stats } = mockStatsReport(isFocus, 0);
             const conferenceStatsTransport: TransportStats[] = [];
-            const transportStats = TransportStatsReporter.buildReport(report, stats, conferenceStatsTransport, isFocus);
+            const transportStats = TransportStatsBuilder.buildReport(report, stats, conferenceStatsTransport, isFocus);
             expect(transportStats).toEqual([
                 {
                     ip: `${remoteIC.ip + 0}:${remoteIC.port}`,
@@ -54,8 +54,8 @@ describe("TransportStatsReporter", () => {
             const mock1 = mockStatsReport(isFocus, 0);
             const mock2 = mockStatsReport(isFocus, 1);
             let transportStats: TransportStats[] = [];
-            transportStats = TransportStatsReporter.buildReport(mock1.report, mock1.stats, transportStats, isFocus);
-            transportStats = TransportStatsReporter.buildReport(mock2.report, mock2.stats, transportStats, isFocus);
+            transportStats = TransportStatsBuilder.buildReport(mock1.report, mock1.stats, transportStats, isFocus);
+            transportStats = TransportStatsBuilder.buildReport(mock2.report, mock2.stats, transportStats, isFocus);
             expect(transportStats).toEqual([
                 {
                     ip: `${remoteIC.ip + 0}:${remoteIC.port}`,
@@ -84,8 +84,8 @@ describe("TransportStatsReporter", () => {
             const mock1 = mockStatsReport(isFocus, 0);
             const mock2 = mockStatsReport(isFocus, 0);
             let transportStats: TransportStats[] = [];
-            transportStats = TransportStatsReporter.buildReport(mock1.report, mock1.stats, transportStats, isFocus);
-            transportStats = TransportStatsReporter.buildReport(mock2.report, mock2.stats, transportStats, isFocus);
+            transportStats = TransportStatsBuilder.buildReport(mock1.report, mock1.stats, transportStats, isFocus);
+            transportStats = TransportStatsBuilder.buildReport(mock2.report, mock2.stats, transportStats, isFocus);
             expect(transportStats).toEqual([
                 {
                     ip: `${remoteIC.ip + 0}:${remoteIC.port}`,

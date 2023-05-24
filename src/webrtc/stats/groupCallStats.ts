@@ -13,16 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { StatsReportGatherer } from "./statsReportGatherer";
+import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { SummaryStats } from "./summaryStats";
-import { SummaryStatsReporter } from "./summaryStatsReporter";
+import { CallStatsReportSummary } from "./callStatsReportSummary";
+import { CallStatsReportSummaryReporter } from "./callStatsReportSummaryReporter";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
-    private readonly gatherers: Map<string, StatsReportGatherer> = new Map<string, StatsReportGatherer>();
+    private readonly gatherers: Map<string, CallStatsReportGatherer> = new Map<string, CallStatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
-    private readonly summaryStatsReporter = new SummaryStatsReporter(this.reports);
+    private readonly summaryStatsReporter = new CallStatsReportSummaryReporter(this.reports);
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
@@ -49,7 +49,7 @@ export class GroupCallStats {
         if (this.hasStatsReportGatherer(callId)) {
             return false;
         }
-        this.gatherers.set(callId, new StatsReportGatherer(callId, userId, peerConnection, this.reports));
+        this.gatherers.set(callId, new CallStatsReportGatherer(callId, userId, peerConnection, this.reports));
         return true;
     }
 
@@ -57,17 +57,17 @@ export class GroupCallStats {
         return this.gatherers.delete(callId);
     }
 
-    public getStatsReportGatherer(callId: string): StatsReportGatherer | undefined {
+    public getStatsReportGatherer(callId: string): CallStatsReportGatherer | undefined {
         return this.hasStatsReportGatherer(callId) ? this.gatherers.get(callId) : undefined;
     }
 
     private processStats(): void {
-        const summary: Promise<SummaryStats>[] = [];
+        const summary: Promise<CallStatsReportSummary>[] = [];
         this.gatherers.forEach((c) => {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<SummaryStats>[]) => this.summaryStatsReporter.build(s));
+        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReporter.build(s));
     }
 
     public setInterval(interval: number): void {

@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { StatsReportGatherer } from "../../../../src/webrtc/stats/statsReportGatherer";
+import { CallStatsReportGatherer } from "../../../../src/webrtc/stats/callStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 
 const CALL_ID = "CALL_ID";
 const USER_ID = "USER_ID";
 
-describe("StatsReportGatherer", () => {
-    let collector: StatsReportGatherer;
+describe("CallStatsReportGatherer", () => {
+    let collector: CallStatsReportGatherer;
     let rtcSpy: RTCPeerConnection;
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
         rtcSpy.addEventListener = jest.fn();
         emitter = new StatsReportEmitter();
-        collector = new StatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
+        collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
     });
 
     describe("on process stats", () => {
