@@ -14,17 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room } from "../../../src/models/room";
-import { Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
+import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
 import { mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
-import { emitPromise, mkMessage, mock } from "../../test-utils/test-utils";
+import { emitPromise, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
 import { Feature, ServerSupport } from "../../../src/feature";
+import { eventMapperFor } from "../../../src/event-mapper";
 
 describe("Thread", () => {
     describe("constructor", () => {
@@ -423,5 +426,52 @@ describe("Thread", () => {
             room.resetLiveTimeline("b1", "f1");
             expect(mock).toHaveBeenCalledWith("b1", "f1");
         });
+    });
+
+    describe("insertEventIntoTimeline", () => {
+        it("Inserts a reply in timestamp order", () => {
+            // Assumption: no server side support because if we have it, events
+            // can only be added to the timeline after the thread has been
+            // initialised, and we are not properly initialising it here.
+            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+            const client = createClientWithEventMapper();
+            const userId = "user1";
+            const room = new Room("room1", client, userId);
+
+            // Given a thread with a root plus 5 messages
+            const { thread, events } = mkThread({
+                room,
+                client,
+                authorId: userId,
+                participantUserIds: ["@bob:hs", "@chia:hs", "@dv:hs"],
+                length: 6,
+                ts: 100, // Events will be at ts 100, 101, 102, 103, 104 and 105
+            });
+
+            // When we insert a reply to the second thread message
+            const replyEvent = mkReaction(events[2], client, userId, room.roomId, 104);
+            thread.insertEventIntoTimeline(replyEvent);
+
+            // Then the reply is inserted based on its timestamp
+            expect(thread.events.map((ev) => ev.getId())).toEqual([
+                events[0].getId(),
+                events[1].getId(),
+                events[2].getId(),
+                events[3].getId(),
+                events[4].getId(),
+                replyEvent.getId(),
+                events[5].getId(),
+            ]);
+        });
+
+        function createClientWithEventMapper(): MatrixClient {
+            const client = mock(MatrixClient, "MatrixClient");
+            client.reEmitter = mock(ReEmitter, "ReEmitter");
+            client.canSupport = new Map();
+            jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
+            mocked(client.supportsThreads).mockReturnValue(true);
+            return client;
+        }
     });
 });

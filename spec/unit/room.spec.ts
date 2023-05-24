@@ -137,24 +137,6 @@ describe("Room", function () {
             room.client,
         );
 
-    const mkReaction = (target: MatrixEvent) =>
-        utils.mkEvent(
-            {
-                event: true,
-                type: EventType.Reaction,
-                user: userA,
-                room: roomId,
-                content: {
-                    "m.relates_to": {
-                        rel_type: RelationType.Annotation,
-                        event_id: target.getId()!,
-                        key: Math.random().toString(),
-                    },
-                },
-            },
-            room.client,
-        );
-
     const mkRedaction = (target: MatrixEvent) =>
         utils.mkEvent(
             {
@@ -2674,7 +2656,7 @@ describe("Room", function () {
             threadResponse1.localTimestamp += 1000;
             const threadResponse2 = mkThreadResponse(threadRoot);
             threadResponse2.localTimestamp += 2000;
-            const threadResponse2Reaction = mkReaction(threadResponse2);
+            const threadResponse2Reaction = utils.mkReaction(threadResponse2, room.client, userA, roomId);
 
             room.client.fetchRoomEvent = (eventId: string) =>
                 Promise.resolve({
@@ -2714,7 +2696,7 @@ describe("Room", function () {
             threadResponse1.localTimestamp += 1000;
             const threadResponse2 = mkThreadResponse(threadRoot);
             threadResponse2.localTimestamp += 2000;
-            const threadResponse2Reaction = mkReaction(threadResponse2);
+            const threadResponse2Reaction = utils.mkReaction(threadResponse2, room.client, userA, roomId);
 
             room.client.fetchRoomEvent = (eventId: string) =>
                 Promise.resolve({
@@ -2862,8 +2844,8 @@ describe("Room", function () {
             const randomMessage = mkMessage();
             const threadRoot = mkMessage();
             const threadResponse1 = mkThreadResponse(threadRoot);
-            const threadReaction1 = mkReaction(threadRoot);
-            const threadReaction2 = mkReaction(threadRoot);
+            const threadReaction1 = utils.mkReaction(threadRoot, room.client, userA, roomId);
+            const threadReaction2 = utils.mkReaction(threadRoot, room.client, userA, roomId);
             const threadReaction2Redaction = mkRedaction(threadReaction2);
 
             const roots = new Set([threadRoot.getId()!]);
@@ -2900,8 +2882,8 @@ describe("Room", function () {
         it("thread response and its relations&redactions should be only in thread timeline", () => {
             const threadRoot = mkMessage();
             const threadResponse1 = mkThreadResponse(threadRoot);
-            const threadReaction1 = mkReaction(threadResponse1);
-            const threadReaction2 = mkReaction(threadResponse1);
+            const threadReaction1 = utils.mkReaction(threadResponse1, room.client, userA, roomId);
+            const threadReaction2 = utils.mkReaction(threadResponse1, room.client, userA, roomId);
             const threadReaction2Redaction = mkRedaction(threadReaction2);
 
             const roots = new Set([threadRoot.getId()!]);
@@ -2922,8 +2904,8 @@ describe("Room", function () {
             const threadRoot = mkMessage();
             const threadResponse1 = mkThreadResponse(threadRoot);
             const reply1 = mkReply(threadResponse1);
-            const reaction1 = mkReaction(reply1);
-            const reaction2 = mkReaction(reply1);
+            const reaction1 = utils.mkReaction(reply1, room.client, userA, roomId);
+            const reaction2 = utils.mkReaction(reply1, room.client, userA, roomId);
             const reaction2Redaction = mkRedaction(reply1);
 
             const roots = new Set([threadRoot.getId()!]);
@@ -2957,9 +2939,9 @@ describe("Room", function () {
         it("should aggregate relations in thread event timeline set", async () => {
             Thread.setServerSideSupport(FeatureSupport.Stable);
             const threadRoot = mkMessage();
-            const rootReaction = mkReaction(threadRoot);
+            const rootReaction = utils.mkReaction(threadRoot, room.client, userA, roomId);
             const threadResponse = mkThreadResponse(threadRoot);
-            const threadReaction = mkReaction(threadResponse);
+            const threadReaction = utils.mkReaction(threadResponse, room.client, userA, roomId);
 
             const events = [threadRoot, rootReaction, threadResponse, threadReaction];
 
