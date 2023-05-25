@@ -519,21 +519,25 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
         if (recursionSupport === ServerSupport.Unsupported) {
             return Promise.all(
-                events.filter(isAnEncryptedThreadMessage).map((event: MatrixEvent) => {
-                    return this.client
-                        .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
-                            limit: 1,
-                        })
-                        .then((relations) => {
-                            if (relations.events.length) {
-                                const editEvent = relations.events[0];
-                                event.makeReplaced(editEvent);
-                                this.insertEventIntoTimeline(editEvent);
-                            }
-                        })
-                        .catch((e) => {
-                            logger.error("Failed to load edits for encrypted thread event", e);
-                        });
+                events.filter(isAnEncryptedThreadMessage).map(async (event: MatrixEvent) => {
+                    try {
+                        const relations = await this.client.relations(
+                            this.roomId,
+                            event.getId()!,
+                            RelationType.Replace,
+                            event.getType(),
+                            {
+                                limit: 1,
+                            },
+                        );
+                        if (relations.events.length) {
+                            const editEvent = relations.events[0];
+                            event.makeReplaced(editEvent);
+                            this.insertEventIntoTimeline(editEvent);
+                        }
+                    } catch (e) {
+                        logger.error("Failed to load edits for encrypted thread event", e);
+                    }
                 }),
             );
         }
@@ -708,10 +712,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
  * Decide whether an event deserves to have its potential edits fetched.
  *
  * @returns true if this event is encrypted and is a message that is part of a
- * thread.
+ * thread - either inside it, or a root.
  */
 function isAnEncryptedThreadMessage(event: MatrixEvent): boolean {
-    return event.isEncrypted() && event.isRelation(THREAD_RELATION_TYPE.name);
+    return event.isEncrypted() && (event.isRelation(THREAD_RELATION_TYPE.name) || event.isThreadRoot);
 }
 
 export const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(
