@@ -17,9 +17,9 @@ limitations under the License.
 import { mocked } from "jest-mock";
 
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
-import { Room } from "../../../src/models/room";
+import { Room, RoomEvent } from "../../../src/models/room";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
-import { mkThread } from "../../test-utils/thread";
+import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, MatrixEvent } from "../../../src";
@@ -429,7 +429,7 @@ describe("Thread", () => {
     });
 
     describe("insertEventIntoTimeline", () => {
-        it("Inserts a reply in timestamp order", () => {
+        it("Inserts a reaction in timestamp order", () => {
             // Assumption: no server side support because if we have it, events
             // can only be added to the timeline after the thread has been
             // initialised, and we are not properly initialising it here.
@@ -449,11 +449,11 @@ describe("Thread", () => {
                 ts: 100, // Events will be at ts 100, 101, 102, 103, 104 and 105
             });
 
-            // When we insert a reply to the second thread message
+            // When we insert a reaction to the second thread message
             const replyEvent = mkReaction(events[2], client, userId, room.roomId, 104);
             thread.insertEventIntoTimeline(replyEvent);
 
-            // Then the reply is inserted based on its timestamp
+            // Then the reaction is inserted based on its timestamp
             expect(thread.events.map((ev) => ev.getId())).toEqual([
                 events[0].getId(),
                 events[1].getId(),
@@ -463,6 +463,50 @@ describe("Thread", () => {
                 replyEvent.getId(),
                 events[5].getId(),
             ]);
+        });
+
+        it("Creates a local echo receipt for new events", async () => {
+            // Assumption: no server side support because if we have it, events
+            // can only be added to the timeline after the thread has been
+            // initialised, and we are not properly initialising it here.
+            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+            const client = createClientWithEventMapper();
+            const userId = "user1";
+            const room = new Room("room1", client, userId);
+
+            // Given a thread
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: userId,
+                participantUserIds: [],
+                ts: 1,
+            });
+
+            const awaitTimelineEvent = new Promise<void>((res) => thread.on(RoomEvent.Timeline, () => res()));
+
+            // When we add a message
+            const message = makeThreadEvent({
+                event: true,
+                rootEventId: thread.id,
+                replyToEventId: thread.id,
+                user: userId,
+                room: room.roomId,
+                ts: 100,
+            });
+            await thread.addEvent(message, false, true);
+            await awaitTimelineEvent;
+
+            // Then a receipt was added to the thread
+            const receipt = thread.getReadReceiptForUserId(userId);
+            expect(receipt).toBeTruthy();
+            expect(receipt?.eventId).toEqual(message.getId());
+            expect(receipt?.data.ts).toEqual(100);
+            expect(receipt?.data.thread_id).toEqual(thread.id);
+
+            // (And the receipt was synthetic)
+            expect(thread.getReadReceiptForUserId(userId, true)).toBeNull();
         });
 
         function createClientWithEventMapper(): MatrixClient {
