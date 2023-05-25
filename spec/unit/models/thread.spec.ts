@@ -22,7 +22,7 @@ import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../..
 import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
-import { Direction, EventStatus, MatrixEvent } from "../../../src";
+import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
@@ -488,7 +488,7 @@ describe("Thread", () => {
                 Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
             });
 
-            it("should allow edits to be added to thread timeline", async () => {
+            it("Adds edits from sync to the thread timeline and applies them", async () => {
                 // Given a thread
                 const client = createClient();
                 const user = "@alice:matrix.org";
@@ -509,6 +509,45 @@ describe("Thread", () => {
 
                 // And the first message has been edited
                 expect(secondLastEvent.getContent().body).toEqual("edit");
+            });
+
+            it("Adds edits fetched on demand to the thread timeline and applies them", async () => {
+                // Given we don't support recursive relations
+                const client = createClient(new Map([[Feature.RelationsRecursion, ServerSupport.Unsupported]]));
+                // And we have a thread
+                const user = "@alice:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+
+                // When a message is added to the thread, and an edit to it is provided on demand
+                const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
+                // (fetchEditsWhereNeeded only applies to encrypted messages for some reason)
+                messageToEdit.event.type = EventType.RoomMessageEncrypted;
+                const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
+                mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
+                    if (eventId === messageToEdit.getId()) {
+                        return { events: [editEvent] };
+                    } else {
+                        return { events: [] };
+                    }
+                });
+                await thread.addEvent(messageToEdit, false);
+
+                // THIS IS THE CORRECT BEHAVIOUR
+                // Then both events end up in the timeline
+                //const lastEvent = thread.timeline.at(-1)!;
+                //const secondLastEvent = thread.timeline.at(-2)!;
+                //expect(lastEvent).toBe(editEvent);
+                //expect(secondLastEvent).toBe(messageToEdit);
+
+                //// And the first message has been edited
+                //expect(secondLastEvent.getContent().body).toEqual("edit");
+
+                // TODO: For now, we incorrecly DON'T add the event to the timeline
+                const lastEvent = thread.timeline.at(-1)!;
+                expect(lastEvent).toBe(messageToEdit);
+                // But the original is edited, as expected
+                expect(lastEvent.getContent().body).toEqual("edit");
             });
         });
     });
@@ -534,8 +573,10 @@ function createThreadMessage(threadId: string, user: string, room: string, msg: 
  */
 async function createThread(client: MatrixClient, user: string, roomId: string): Promise<Thread> {
     const root = mkMessage({ event: true, user, room: roomId, msg: "Thread root" });
-
     const room = new Room(roomId, client, "@roomcreator:x");
+
+    // Ensure the root is in the room timeline
+    root.setThreadId(root.getId());
     room.addLiveEvents([root]);
 
     // Create the thread and wait for it to be initialised
@@ -549,10 +590,10 @@ async function createThread(client: MatrixClient, user: string, roomId: string):
  * Create a MatrixClient that supports threads and has all the methods used when
  * creating a thread that call out to HTTP endpoints mocked out.
  */
-function createClient(): MatrixClient {
+function createClient(canSupport = new Map()): MatrixClient {
     const client = mock(MatrixClient, "MatrixClient");
     client.reEmitter = mock(ReEmitter, "ReEmitter");
-    client.canSupport = new Map();
+    client.canSupport = canSupport;
 
     jest.spyOn(client, "supportsThreads").mockReturnValue(true);
     jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
