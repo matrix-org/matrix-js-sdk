@@ -522,7 +522,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                 events
                     .filter((e) => e.isEncrypted())
                     .map((event: MatrixEvent) => {
-                        if (event.isRelation()) return; // skip - relations don't get edits
+                        // The only type of relation that gets edits is a thread message.
+                        if (event.getThread() === undefined && event.isRelation()) return;
                         return this.client
                             .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
                                 limit: 1,
