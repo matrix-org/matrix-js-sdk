@@ -509,6 +509,46 @@ describe("Thread", () => {
             expect(thread.getReadReceiptForUserId(userId, true)).toBeNull();
         });
 
+        it("Doesn't create a local echo receipt for events before an existing receipt", async () => {
+            // Assumption: no server side support because if we have it, events
+            // can only be added to the timeline after the thread has been
+            // initialised, and we are not properly initialising it here.
+            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+            const client = createClientWithEventMapper();
+            const userId = "user1";
+            const room = new Room("room1", client, userId);
+
+            // Given a thread
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: userId,
+                participantUserIds: [],
+                ts: 200, // Timestamp is after the event we add in a second
+            });
+            // Sanity: the current receipt is for the thread root
+            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
+
+            const awaitTimelineEvent = new Promise<void>((res) => thread.on(RoomEvent.Timeline, () => res()));
+
+            // When we add a message that is before the latest receipt
+            const message = makeThreadEvent({
+                event: true,
+                rootEventId: thread.id,
+                replyToEventId: thread.id,
+                user: userId,
+                room: room.roomId,
+                ts: 100,
+            });
+            await thread.addEvent(message, false, true);
+            await awaitTimelineEvent;
+
+            // Then no receipt was added to the thread (the receipt is still for
+            // the thread root).
+            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
+        });
+
         function createClientWithEventMapper(): MatrixClient {
             const client = mock(MatrixClient, "MatrixClient");
             client.reEmitter = mock(ReEmitter, "ReEmitter");

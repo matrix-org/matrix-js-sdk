@@ -203,10 +203,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     ): void => {
         // Add a synthesized receipt when paginating forward in the timeline
         if (!toStartOfTimeline) {
-            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+            const sender = event.getSender();
+            if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
+                room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+            }
         }
         this.onEcho(event, toStartOfTimeline ?? false);
     };
+
+    private shouldSendLocalEchoReceipt(sender: string, event: MatrixEvent): boolean {
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+        if (recursionSupport === ServerSupport.Unsupported) {
+            // Normally we add a local receipt, but if we don't have
+            // recursion support, then events may arrive out of order, so we
+            // only create a receipt if it's after our existing receipt.
+            const oldReceiptEventId = this.getReadReceiptForUserId(sender)?.eventId;
+            if (oldReceiptEventId) {
+                const receiptEvent = this.findEventById(oldReceiptEventId);
+                if (receiptEvent && receiptEvent.getTs() > event.getTs()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private onLocalEcho = (event: MatrixEvent): void => {
         this.onEcho(event, false);
