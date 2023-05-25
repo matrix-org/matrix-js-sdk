@@ -208,7 +208,7 @@ export class CallStatsReportGatherer {
         }
     }
 
-    public setOpponentMemberId(id: string) {
+    public setOpponentMemberId(id: string): void {
         this.opponentMemberId = id;
     }
 }
