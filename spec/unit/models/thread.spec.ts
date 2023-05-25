@@ -21,8 +21,8 @@ import { Room, RoomEvent } from "../../../src/models/room";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
 import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
-import { emitPromise, mkEvent, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
-import { Direction, EventStatus, EventType, MatrixEvent, RelationType } from "../../../src";
+import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
+import { Direction, EventStatus, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
@@ -603,100 +603,91 @@ describe("Thread", () => {
     });
 
     describe("Editing events", () => {
-        it("should allow edits to be added to thread timeline", async () => {
-            const roomId = "!foo:bar";
-            const userA = "@alice:bar";
-            const client = mock(MatrixClient, "MatrixClient");
-            client.reEmitter = mock(ReEmitter, "ReEmitter");
-            client.canSupport = new Map();
-            const room = new Room(roomId, client, userA);
-            jest.spyOn(client, "supportsThreads").mockReturnValue(true);
-            jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
-            Thread.hasServerSideSupport = FeatureSupport.Stable;
+        describe("Given server support for threads", () => {
+            let previousThreadHasServerSideSupport: FeatureSupport;
 
-            const sender = "@alice:matrix.org";
-
-            const root = mkEvent({
-                event: true,
-                content: {
-                    body: "Thread root",
-                },
-                type: EventType.RoomMessage,
-                sender,
-            });
-            room.addLiveEvents([root]);
-
-            const threadReply = mkEvent({
-                event: true,
-                content: {
-                    "body": "Thread reply",
-                    "m.relates_to": {
-                        event_id: root.getId()!,
-                        rel_type: RelationType.Thread,
-                    },
-                },
-                type: EventType.RoomMessage,
-                sender,
+            beforeAll(() => {
+                previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+                Thread.hasServerSideSupport = FeatureSupport.Stable;
             });
 
-            root.setUnsigned({
-                "m.relations": {
-                    [RelationType.Thread]: {
-                        count: 1,
-                        latest_event: {
-                            content: threadReply.getContent(),
-                            origin_server_ts: 5,
-                            room_id: room.roomId,
-                            sender,
-                            type: EventType.RoomMessage,
-                            event_id: threadReply.getId()!,
-                            user_id: sender,
-                            age: 1,
-                        },
-                        current_user_participated: true,
-                    },
-                },
+            afterAll(() => {
+                Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
             });
 
-            const editToThreadReply = mkEvent({
-                event: true,
-                content: {
-                    "body": " * edit",
-                    "m.new_content": {
-                        "body": "edit",
-                        "msgtype": "m.text",
-                        "org.matrix.msc1767.text": "edit",
-                    },
-                    "m.relates_to": {
-                        event_id: threadReply.getId()!,
-                        rel_type: RelationType.Replace,
-                    },
-                },
-                type: EventType.RoomMessage,
-                sender,
+            it("should allow edits to be added to thread timeline", async () => {
+                // Given a thread
+                const client = createClient();
+                const user = "@alice:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+
+                // When a message and an edit are added to the thread
+                const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
+                const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
+                await thread.addEvent(messageToEdit, false);
+                await thread.addEvent(editEvent, false);
+
+                // Then both events end up in the timeline
+                const lastEvent = thread.timeline.at(-1)!;
+                const secondLastEvent = thread.timeline.at(-2)!;
+                expect(lastEvent).toBe(editEvent);
+                expect(secondLastEvent).toBe(messageToEdit);
+
+                // And the first message has been edited
+                expect(secondLastEvent.getContent().body).toEqual("edit");
             });
-
-            // Mock methods that call out to HTTP endpoints
-            jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
-            jest.spyOn(client, "relations").mockResolvedValue({ events: [] });
-            jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
-
-            // Create a thread and wait for it to be initialised
-            const thread = room.createThread(root.getId()!, root, [], false);
-            await new Promise<void>((res) => thread.once(RoomEvent.TimelineReset, () => res()));
-
-            // When a message and an edit are added to the thread
-            await thread.addEvent(threadReply, false);
-            await thread.addEvent(editToThreadReply, false);
-
-            // Then both events end up in the timeline
-            const lastEvent = thread.timeline.at(-1)!;
-            const secondLastEvent = thread.timeline.at(-2)!;
-            expect(lastEvent).toBe(editToThreadReply);
-            expect(secondLastEvent).toBe(threadReply);
-
-            // And the first message has been edited
-            expect(secondLastEvent.getContent().body).toEqual("edit");
         });
     });
 });
+
+/**
+ * Create a message event that lives in a thread
+ */
+function createThreadMessage(threadId: string, user: string, room: string, msg: string): MatrixEvent {
+    return makeThreadEvent({
+        event: true,
+        user,
+        room,
+        msg,
+        rootEventId: threadId,
+        replyToEventId: threadId,
+    });
+}
+
+/**
+ * Create a thread and wait for it to be properly initialised (so you can safely
+ * add events to it and expect them to appear in the timeline.
+ */
+async function createThread(client: MatrixClient, user: string, roomId: string): Promise<Thread> {
+    const root = mkMessage({ event: true, user, room: roomId, msg: "Thread root" });
+
+    const room = new Room(roomId, client, "@roomcreator:x");
+    room.addLiveEvents([root]);
+
+    // Create the thread and wait for it to be initialised
+    const thread = room.createThread(root.getId()!, root, [], false);
+    await new Promise<void>((res) => thread.once(RoomEvent.TimelineReset, () => res()));
+
+    return thread;
+}
+
+/**
+ * Create a MatrixClient that supports threads and has all the methods used when
+ * creating a thread that call out to HTTP endpoints mocked out.
+ */
+function createClient(): MatrixClient {
+    const client = mock(MatrixClient, "MatrixClient");
+    client.reEmitter = mock(ReEmitter, "ReEmitter");
+    client.canSupport = new Map();
+
+    jest.spyOn(client, "supportsThreads").mockReturnValue(true);
+    jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
+
+    // Mock methods that call out to HTTP endpoints
+    jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
+    jest.spyOn(client, "relations").mockResolvedValue({ events: [] });
+    jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
+
+    return client;
+}
