@@ -36,7 +36,7 @@ import { EventType } from "../../@types/event";
 import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification";
 
 // backwards-compatibility exports
-export {
+export type {
     ShowSasCallbacks as ISasEvent,
     GeneratedSas as IGeneratedSas,
     EmojiMapping,
