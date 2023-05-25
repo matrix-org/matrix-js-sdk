@@ -29,7 +29,12 @@ import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { VerificationRequest } from "./request/VerificationRequest";
 import { TypedEventEmitter } from "../../models/typed-event-emitter";
-import { VerifierEvent, VerifierEventHandlerMap } from "../../crypto-api/verification";
+import {
+    ShowQrCodeCallbacks,
+    ShowSasCallbacks,
+    VerifierEvent,
+    VerifierEventHandlerMap,
+} from "../../crypto-api/verification";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -372,5 +377,25 @@ export class VerificationBase<
 
     public get events(): string[] | undefined {
         return undefined;
+    }
+
+    /**
+     * Get the details for an SAS verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
+     * the SAS matches.
+     */
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return null;
+    }
+
+    /**
+     * Get the details for a QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a QR-code-based verification and we are waiting for the user to
+     * confirm a match.
+     */
+    public getShowQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return null;
     }
 }
