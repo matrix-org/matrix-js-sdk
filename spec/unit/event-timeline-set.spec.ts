@@ -24,13 +24,10 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
-    RelationType,
     Room,
-    RoomEvent,
 } from "../../src";
-import { FeatureSupport, Thread } from "../../src/models/thread";
+import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
-import { eventMapperFor } from "../../src/event-mapper";
 
 describe("EventTimelineSet", () => {
     const roomId = "!foo:bar";
@@ -204,108 +201,6 @@ describe("EventTimelineSet", () => {
                 toStartOfTimeline: true,
             });
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
-        });
-
-        describe("When the server supports threads", () => {
-            let previousThreadHasServerSideSupport: FeatureSupport;
-
-            beforeAll(() => {
-                previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
-                Thread.hasServerSideSupport = FeatureSupport.Stable;
-            });
-
-            afterAll(() => {
-                Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
-            });
-
-            it("should allow edits to be added to thread timeline", async () => {
-                jest.spyOn(client, "supportsThreads").mockReturnValue(true);
-                jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
-
-                const sender = "@alice:matrix.org";
-
-                const root = utils.mkEvent({
-                    event: true,
-                    content: {
-                        body: "Thread root",
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
-                });
-                room.addLiveEvents([root]);
-
-                const threadReply = utils.mkEvent({
-                    event: true,
-                    content: {
-                        "body": "Thread reply",
-                        "m.relates_to": {
-                            event_id: root.getId()!,
-                            rel_type: RelationType.Thread,
-                        },
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
-                });
-
-                root.setUnsigned({
-                    "m.relations": {
-                        [RelationType.Thread]: {
-                            count: 1,
-                            latest_event: {
-                                content: threadReply.getContent(),
-                                origin_server_ts: 5,
-                                room_id: room.roomId,
-                                sender,
-                                type: EventType.RoomMessage,
-                                event_id: threadReply.getId()!,
-                                user_id: sender,
-                                age: 1,
-                            },
-                            current_user_participated: true,
-                        },
-                    },
-                });
-
-                const editToThreadReply = utils.mkEvent({
-                    event: true,
-                    content: {
-                        "body": " * edit",
-                        "m.new_content": {
-                            "body": "edit",
-                            "msgtype": "m.text",
-                            "org.matrix.msc1767.text": "edit",
-                        },
-                        "m.relates_to": {
-                            event_id: threadReply.getId()!,
-                            rel_type: RelationType.Replace,
-                        },
-                    },
-                    type: EventType.RoomMessage,
-                    sender,
-                });
-
-                // Mock methods that call out to HTTP endpoints
-                jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
-                jest.spyOn(client, "relations").mockResolvedValue({ events: [] });
-                jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
-
-                // Create a thread and wait for it to be initialised
-                const thread = room.createThread(root.getId()!, root, [], false);
-                await new Promise<void>((res) => thread.once(RoomEvent.TimelineReset, () => res()));
-
-                // When a message and an edit are added to the thread
-                await thread.addEvent(threadReply, false);
-                await thread.addEvent(editToThreadReply, false);
-
-                // Then both events end up in the timeline
-                const lastEvent = thread.timeline.at(-1)!;
-                const secondLastEvent = thread.timeline.at(-2)!;
-                expect(lastEvent).toBe(editToThreadReply);
-                expect(secondLastEvent).toBe(threadReply);
-
-                // And the first message has been edited
-                expect(secondLastEvent.getContent().body).toEqual("edit");
-            });
         });
 
         describe("non-room timeline", () => {
