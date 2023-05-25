@@ -429,7 +429,7 @@ describe("Thread", () => {
     });
 
     describe("insertEventIntoTimeline", () => {
-        it("Inserts a reply in timestamp order", () => {
+        it("Inserts a reaction in timestamp order", () => {
             // Assumption: no server side support because if we have it, events
             // can only be added to the timeline after the thread has been
             // initialised, and we are not properly initialising it here.
@@ -449,11 +449,11 @@ describe("Thread", () => {
                 ts: 100, // Events will be at ts 100, 101, 102, 103, 104 and 105
             });
 
-            // When we insert a reply to the second thread message
+            // When we insert a reaction to the second thread message
             const replyEvent = mkReaction(events[2], client, userId, room.roomId, 104);
             thread.insertEventIntoTimeline(replyEvent);
 
-            // Then the reply is inserted based on its timestamp
+            // Then the reaction is inserted based on its timestamp
             expect(thread.events.map((ev) => ev.getId())).toEqual([
                 events[0].getId(),
                 events[1].getId(),
@@ -465,10 +465,137 @@ describe("Thread", () => {
             ]);
         });
 
-        function createClientWithEventMapper(): MatrixClient {
+        describe("Without relations recursion support", () => {
+            it("Creates a local echo receipt for new events", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+                // Given a client without relations recursion support
+                const client = createClientWithEventMapper();
+
+                // And a thread with an added event (with later timestamp)
+                const userId = "user1";
+                const { thread, message } = await createThreadAndEvent(client, 1, 100, userId);
+
+                // Then a receipt was added to the thread
+                const receipt = thread.getReadReceiptForUserId(userId);
+                expect(receipt).toBeTruthy();
+                expect(receipt?.eventId).toEqual(message.getId());
+                expect(receipt?.data.ts).toEqual(100);
+                expect(receipt?.data.thread_id).toEqual(thread.id);
+
+                // (And the receipt was synthetic)
+                expect(thread.getReadReceiptForUserId(userId, true)).toBeNull();
+            });
+
+            it("Doesn't create a local echo receipt for events before an existing receipt", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+                // Given a client without relations recursion support
+                const client = createClientWithEventMapper();
+
+                // And a thread with an added event with a lower timestamp than its other events
+                const userId = "user1";
+                const { thread } = await createThreadAndEvent(client, 200, 100, userId);
+
+                // Then no receipt was added to the thread (the receipt is still
+                // for the thread root). This happens because since we have no
+                // recursive relations support, we know that sometimes events
+                // appear out of order, so we have to check their timestamps as
+                // a guess of the correct order.
+                expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
+            });
+        });
+
+        describe("With relations recursion support", () => {
+            it("Creates a local echo receipt for new events", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+                // Given a client WITH relations recursion support
+                const client = createClientWithEventMapper(
+                    new Map([[Feature.RelationsRecursion, ServerSupport.Stable]]),
+                );
+
+                // And a thread with an added event (with later timestamp)
+                const userId = "user1";
+                const { thread, message } = await createThreadAndEvent(client, 1, 100, userId);
+
+                // Then a receipt was added to the thread
+                const receipt = thread.getReadReceiptForUserId(userId);
+                expect(receipt?.eventId).toEqual(message.getId());
+            });
+
+            it("Creates a local echo receipt even for events BEFORE an existing receipt", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+
+                // Given a client WITH relations recursion support
+                const client = createClientWithEventMapper(
+                    new Map([[Feature.RelationsRecursion, ServerSupport.Stable]]),
+                );
+
+                // And a thread with an added event with a lower timestamp than its other events
+                const userId = "user1";
+                const { thread, message } = await createThreadAndEvent(client, 200, 100, userId);
+
+                // Then a receipt was added to the thread, because relations
+                // recursion is available, so we trust the server to have
+                // provided us with events in the right order.
+                const receipt = thread.getReadReceiptForUserId(userId);
+                expect(receipt?.eventId).toEqual(message.getId());
+            });
+        });
+
+        async function createThreadAndEvent(
+            client: MatrixClient,
+            rootTs: number,
+            eventTs: number,
+            userId: string,
+        ): Promise<{ thread: Thread; message: MatrixEvent }> {
+            const room = new Room("room1", client, userId);
+
+            // Given a thread
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: userId,
+                participantUserIds: [],
+                ts: rootTs,
+            });
+            // Sanity: the current receipt is for the thread root
+            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
+
+            const awaitTimelineEvent = new Promise<void>((res) => thread.on(RoomEvent.Timeline, () => res()));
+
+            // When we add a message that is before the latest receipt
+            const message = makeThreadEvent({
+                event: true,
+                rootEventId: thread.id,
+                replyToEventId: thread.id,
+                user: userId,
+                room: room.roomId,
+                ts: eventTs,
+            });
+            await thread.addEvent(message, false, true);
+            await awaitTimelineEvent;
+
+            return { thread, message };
+        }
+
+        function createClientWithEventMapper(canSupport: Map<Feature, ServerSupport> = new Map()): MatrixClient {
             const client = mock(MatrixClient, "MatrixClient");
             client.reEmitter = mock(ReEmitter, "ReEmitter");
-            client.canSupport = new Map();
+            client.canSupport = canSupport;
             jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
             mocked(client.supportsThreads).mockReturnValue(true);
             return client;
