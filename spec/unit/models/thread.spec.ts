@@ -465,58 +465,55 @@ describe("Thread", () => {
             ]);
         });
 
-        it("Creates a local echo receipt for new events", async () => {
-            // Assumption: no server side support because if we have it, events
-            // can only be added to the timeline after the thread has been
-            // initialised, and we are not properly initialising it here.
-            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+        describe("Without relations recursion support", () => {
+            it("Creates a local echo receipt for new events", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
 
-            const client = createClientWithEventMapper();
-            const userId = "user1";
-            const room = new Room("room1", client, userId);
+                // Given a client without relations recursion support
+                const client = createClientWithEventMapper();
 
-            // Given a thread
-            const { thread } = mkThread({
-                room,
-                client,
-                authorId: userId,
-                participantUserIds: [],
-                ts: 1,
+                // And a thread with an added event (with later timestamp)
+                const userId = "user1";
+                const { thread, message } = await createThreadAndEvent(client, 1, 100, userId);
+
+                // Then a receipt was added to the thread
+                const receipt = thread.getReadReceiptForUserId(userId);
+                expect(receipt).toBeTruthy();
+                expect(receipt?.eventId).toEqual(message.getId());
+                expect(receipt?.data.ts).toEqual(100);
+                expect(receipt?.data.thread_id).toEqual(thread.id);
+
+                // (And the receipt was synthetic)
+                expect(thread.getReadReceiptForUserId(userId, true)).toBeNull();
             });
 
-            const awaitTimelineEvent = new Promise<void>((res) => thread.on(RoomEvent.Timeline, () => res()));
+            it("Doesn't create a local echo receipt for events before an existing receipt", async () => {
+                // Assumption: no server side support because if we have it, events
+                // can only be added to the timeline after the thread has been
+                // initialised, and we are not properly initialising it here.
+                expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
 
-            // When we add a message
-            const message = makeThreadEvent({
-                event: true,
-                rootEventId: thread.id,
-                replyToEventId: thread.id,
-                user: userId,
-                room: room.roomId,
-                ts: 100,
+                // Given a client without relations recursion support
+                const client = createClientWithEventMapper();
+
+                // And a thread with an added event with a lower timestamp than its other events
+                const userId = "user1";
+                const { thread } = await createThreadAndEvent(client, 200, 100, userId);
+
+                // Then no receipt was added to the thread (the receipt is still for the thread root).
+                expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
             });
-            await thread.addEvent(message, false, true);
-            await awaitTimelineEvent;
-
-            // Then a receipt was added to the thread
-            const receipt = thread.getReadReceiptForUserId(userId);
-            expect(receipt).toBeTruthy();
-            expect(receipt?.eventId).toEqual(message.getId());
-            expect(receipt?.data.ts).toEqual(100);
-            expect(receipt?.data.thread_id).toEqual(thread.id);
-
-            // (And the receipt was synthetic)
-            expect(thread.getReadReceiptForUserId(userId, true)).toBeNull();
         });
 
-        it("Doesn't create a local echo receipt for events before an existing receipt", async () => {
-            // Assumption: no server side support because if we have it, events
-            // can only be added to the timeline after the thread has been
-            // initialised, and we are not properly initialising it here.
-            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
-
-            const client = createClientWithEventMapper();
-            const userId = "user1";
+        async function createThreadAndEvent(
+            client: MatrixClient,
+            rootTs: number,
+            eventTs: number,
+            userId: string,
+        ): Promise<{ thread: Thread; message: MatrixEvent }> {
             const room = new Room("room1", client, userId);
 
             // Given a thread
@@ -525,7 +522,7 @@ describe("Thread", () => {
                 client,
                 authorId: userId,
                 participantUserIds: [],
-                ts: 200, // Timestamp is after the event we add in a second
+                ts: rootTs,
             });
             // Sanity: the current receipt is for the thread root
             expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
@@ -539,15 +536,13 @@ describe("Thread", () => {
                 replyToEventId: thread.id,
                 user: userId,
                 room: room.roomId,
-                ts: 100,
+                ts: eventTs,
             });
             await thread.addEvent(message, false, true);
             await awaitTimelineEvent;
 
-            // Then no receipt was added to the thread (the receipt is still for
-            // the thread root).
-            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
-        });
+            return { thread, message };
+        }
 
         function createClientWithEventMapper(): MatrixClient {
             const client = mock(MatrixClient, "MatrixClient");
