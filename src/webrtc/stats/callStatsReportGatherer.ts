@@ -37,7 +37,7 @@ export class CallStatsReportGatherer {
 
     public constructor(
         public readonly callId: string,
-        public readonly opponentMemberId: string,
+        private opponentMemberId: string,
         private readonly pc: RTCPeerConnection,
         private readonly emitter: StatsReportEmitter,
         private readonly isFocus = true,
@@ -206,5 +206,9 @@ export class CallStatsReportGatherer {
                 this.trackStats.mediaSsrcHandler.parse(this.pc.currentLocalDescription.sdp, "local");
             }
         }
+    }
+
+    public setOpponentMemberId(id: string) {
+        this.opponentMemberId = id;
     }
 }

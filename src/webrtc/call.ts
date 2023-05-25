@@ -2884,6 +2884,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.opponentCaps = msg.capabilities || ({} as CallCapabilities);
         this.opponentMember = this.client.getRoom(this.roomId)!.getMember(ev.getSender()!) ?? undefined;
+        if (this.opponentMember) {
+            this.stats?.updateOpponentMember(this.callId, this.opponentMember.userId);
+        }
     }
 
     private async addBufferedIceCandidates(): Promise<void> {

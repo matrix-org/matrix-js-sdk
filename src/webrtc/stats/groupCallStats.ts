@@ -65,6 +65,10 @@ export class GroupCallStats {
         return this.hasStatsReportGatherer(callId) ? this.gatherers.get(callId) : undefined;
     }
 
+    public updateOpponentMember(callId: string, opponentMember: string): void {
+        this.getStatsReportGatherer(callId)?.setOpponentMemberId(opponentMember);
+    }
+
     private processStats(): void {
         const summary: Promise<CallStatsReportSummary>[] = [];
         this.gatherers.forEach((c) => {
