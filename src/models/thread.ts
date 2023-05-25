@@ -530,8 +530,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                             })
                             .then((relations) => {
                                 if (relations.events.length) {
-                                    event.makeReplaced(relations.events[0]);
-                                    this.insertEventIntoTimeline(event);
+                                    const editEvent = relations.events[0];
+                                    event.makeReplaced(editEvent);
+                                    this.insertEventIntoTimeline(editEvent);
                                 }
                             })
                             .catch((e) => {
