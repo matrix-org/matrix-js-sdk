@@ -158,7 +158,7 @@ describe("CallStatsReportGatherer", () => {
 
             collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
         });
-        it("switch to stable parse remote and local description", async () => {
+        it("in case of stable, parse remote and local description", async () => {
             // @ts-ignore
             const mediaSsrcHandler = {
                 parse: jest.fn(),
