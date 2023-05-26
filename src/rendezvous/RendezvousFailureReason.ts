@@ -16,7 +16,7 @@ limitations under the License.
 
 export type RendezvousFailureListener = (reason: RendezvousFailureReason) => void;
 
-export enum RendezvousFailureReason {
+export const enum RendezvousFailureReason {
     UserDeclined = "user_declined",
     OtherDeviceNotSignedIn = "other_device_not_signed_in",
     OtherDeviceAlreadySignedIn = "other_device_already_signed_in",

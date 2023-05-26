@@ -18,7 +18,7 @@ import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoss } from "./
 import { TransportStats } from "./transportStats";
 import { Resolution } from "./media/mediaTrackStats";
 
-export enum StatsReport {
+export const enum StatsReport {
     CONNECTION_STATS = "StatsReport.connection_stats",
     BYTE_SENT_STATS = "StatsReport.byte_sent_stats",
     SUMMARY_STATS = "StatsReport.summary_stats",

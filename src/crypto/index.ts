@@ -226,7 +226,7 @@ export interface IMegolmEncryptedContent {
 
 export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
-export enum CryptoEvent {
+export const enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
     UserCrossSigningUpdated = "userCrossSigningUpdated",

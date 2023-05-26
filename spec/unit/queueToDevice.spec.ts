@@ -44,7 +44,7 @@ const FAKE_MSG = {
     payload: FAKE_PAYLOAD,
 };
 
-enum StoreType {
+const enum StoreType {
     Memory = "Memory",
     IndexedDB = "IndexedDB",
 }

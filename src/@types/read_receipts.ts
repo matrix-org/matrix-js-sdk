@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum ReceiptType {
+export const enum ReceiptType {
     Read = "m.read",
     FullyRead = "m.fully_read",
     ReadPrivate = "m.read.private",

@@ -20,7 +20,7 @@ import { EitherAnd } from "matrix-events-sdk";
 import { UnstableValue } from "../NamespacedValue";
 import { M_TEXT } from "./extensible_events";
 
-export enum LocationAssetType {
+export const enum LocationAssetType {
     Self = "m.self",
     Pin = "m.pin",
 }

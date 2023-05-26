@@ -23,7 +23,7 @@ import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
 
-export enum RoomMemberEvent {
+export const enum RoomMemberEvent {
     Membership = "RoomMember.membership",
     Name = "RoomMember.name",
     PowerLevel = "RoomMember.powerLevel",

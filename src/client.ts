@@ -398,7 +398,7 @@ export interface IMatrixClientCreateOpts extends ICreateClientOpts {
     usingExternalCrypto?: boolean;
 }
 
-export enum PendingEventOrdering {
+export const enum PendingEventOrdering {
     Chronological = "chronological",
     Detached = "detached",
 }
@@ -478,7 +478,7 @@ export interface IStartClientOpts {
 
 export interface IStoredClientOpts extends IStartClientOpts {}
 
-export enum RoomVersionStability {
+export const enum RoomVersionStability {
     Stable = "stable",
     Unstable = "unstable",
 }
@@ -521,7 +521,7 @@ export interface ICrossSigningKey {
     user_id: string;
 }
 
-enum CrossSigningKeyType {
+const enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
     UserSigningKey = "user_signing_key",
@@ -879,7 +879,7 @@ interface IWhoamiResponse {
 // Probably not the most graceful solution but does a good enough job for now
 const EVENT_ID_PREFIX = "$";
 
-export enum ClientEvent {
+export const enum ClientEvent {
     Sync = "sync",
     Event = "event",
     ToDeviceEvent = "toDeviceEvent",

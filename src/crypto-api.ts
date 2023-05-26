@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 
 /** Types of cross-signing key */
-export enum CrossSigningKey {
+export const enum CrossSigningKey {
     Master = "master",
     SelfSigning = "self_signing",
     UserSigning = "user_signing",

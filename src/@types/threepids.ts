@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum ThreepidMedium {
+export const enum ThreepidMedium {
     Email = "email",
     Phone = "msisdn",
 }

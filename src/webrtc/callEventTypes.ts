@@ -6,7 +6,7 @@ import { CallErrorCode } from "./call";
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
 export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
 
-export enum SDPStreamMetadataPurpose {
+export const enum SDPStreamMetadataPurpose {
     Usermedia = "m.usermedia",
     Screenshare = "m.screenshare",
 }

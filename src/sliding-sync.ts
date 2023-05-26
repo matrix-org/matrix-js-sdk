@@ -142,7 +142,7 @@ export interface MSC3575SlidingSyncResponse {
     extensions: Record<string, object>;
 }
 
-export enum SlidingSyncState {
+export const enum SlidingSyncState {
     /**
      * Fired by SlidingSyncEvent.Lifecycle event immediately before processing the response.
      */
@@ -251,7 +251,7 @@ class SlidingList {
 /**
  * When onResponse extensions should be invoked: before or after processing the main response.
  */
-export enum ExtensionState {
+export const enum ExtensionState {
     // Call onResponse before processing the response body. This is useful when your extension is
     // preparing the ground for the response body e.g. processing to-device messages before the
     // encrypted event arrives.
@@ -302,7 +302,7 @@ export interface Extension<Req extends {}, Res extends {}> {
  *  - Lifecycle (state=Complete)
  *  - List (at most once per list)
  */
-export enum SlidingSyncEvent {
+export const enum SlidingSyncEvent {
     /**
      * This event fires when there are updates for a room. Fired as and when rooms are encountered
      * in the response.

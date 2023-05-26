@@ -38,7 +38,7 @@ export interface IAddEventOptions extends Pick<IMarkerFoundOptions, "timelineWas
     roomState?: RoomState;
 }
 
-export enum Direction {
+export const enum Direction {
     Backward = "b",
     Forward = "f",
 }

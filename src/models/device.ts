@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /** State of the verification of the device. */
-export enum DeviceVerification {
+export const enum DeviceVerification {
     Blocked = -1,
     Unverified = 0,
     Verified = 1,

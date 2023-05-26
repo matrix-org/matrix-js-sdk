@@ -28,12 +28,12 @@ export interface IImageInfo {
     h?: number;
 }
 
-export enum Visibility {
+export const enum Visibility {
     Public = "public",
     Private = "private",
 }
 
-export enum Preset {
+export const enum Preset {
     PrivateChat = "private_chat",
     TrustedPrivateChat = "trusted_private_chat",
     PublicChat = "public_chat",
@@ -44,7 +44,7 @@ export type ResizeMethod = "crop" | "scale";
 export type IdServerUnbindResult = "no-support" | "success";
 
 // Knock and private are reserved keywords which are not yet implemented.
-export enum JoinRule {
+export const enum JoinRule {
     Public = "public",
     Invite = "invite",
     /**
@@ -55,7 +55,7 @@ export enum JoinRule {
     Restricted = "restricted",
 }
 
-export enum RestrictedAllowType {
+export const enum RestrictedAllowType {
     RoomMembership = "m.room_membership",
 }
 
@@ -67,12 +67,12 @@ export interface IJoinRuleEventContent {
     }[];
 }
 
-export enum GuestAccess {
+export const enum GuestAccess {
     CanJoin = "can_join",
     Forbidden = "forbidden",
 }
 
-export enum HistoryVisibility {
+export const enum HistoryVisibility {
     Invited = "invited",
     Joined = "joined",
     Shared = "shared",

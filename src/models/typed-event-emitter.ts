@@ -18,7 +18,7 @@ limitations under the License.
 import { EventEmitter } from "events";
 
 /** Events emitted by EventEmitter itself */
-export enum EventEmitterEvents {
+export const enum EventEmitterEvents {
     NewListener = "newListener",
     RemoveListener = "removeListener",
     Error = "error",

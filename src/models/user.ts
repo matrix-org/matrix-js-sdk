@@ -17,7 +17,7 @@ limitations under the License.
 import { MatrixEvent } from "./event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-export enum UserEvent {
+export const enum UserEvent {
     DisplayName = "User.displayName",
     AvatarUrl = "User.avatarUrl",
     Presence = "User.presence",

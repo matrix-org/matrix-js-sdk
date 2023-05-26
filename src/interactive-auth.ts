@@ -69,7 +69,7 @@ export interface IAuthData {
     access_token?: string;
 }
 
-export enum AuthType {
+export const enum AuthType {
     Password = "m.login.password",
     Recaptcha = "m.login.recaptcha",
     Terms = "m.login.terms",

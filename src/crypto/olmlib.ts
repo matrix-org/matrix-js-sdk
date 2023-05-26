@@ -32,7 +32,7 @@ import { EventType } from "../@types/event";
 import { IMessage } from "./algorithms/olm";
 import { MapWithDefault } from "../utils";
 
-enum Algorithm {
+const enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
     Megolm = "m.megolm.v1.aes-sha2",
     MegolmBackup = "m.megolm_backup.v1.curve25519-aes-sha2",

@@ -75,7 +75,7 @@ const BUFFER_PERIOD_MS = 80 * 1000;
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
-export enum SyncState {
+export const enum SyncState {
     /** Emitted after we try to sync more than `FAILED_SYNC_ERROR_THRESHOLD`
      * times and are still failing. Or when we enounter a hard error like the
      * token being invalid. */
@@ -168,7 +168,7 @@ export interface ISyncStateData {
     fromCache?: boolean;
 }
 
-enum SetPresence {
+const enum SetPresence {
     Offline = "offline",
     Online = "online",
     Unavailable = "unavailable",

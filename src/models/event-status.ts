@@ -18,7 +18,7 @@ limitations under the License.
  * Enum for event statuses.
  * @readonly
  */
-export enum EventStatus {
+export const enum EventStatus {
     /** The event was not sent and will no longer be retried. */
     NOT_SENT = "not_sent",
 

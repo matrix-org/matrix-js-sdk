@@ -124,7 +124,7 @@ export class ReciprocateQRCode extends Base {
 const CODE_VERSION = 0x02; // the version of binary QR codes we support
 const BINARY_PREFIX = "MATRIX"; // ASCII, used to prefix the binary format
 
-enum Mode {
+const enum Mode {
     VerifyOtherUser = 0x00, // Verifying someone who isn't us
     VerifySelfTrusted = 0x01, // We trust the master key
     VerifySelfUntrusted = 0x02, // We do not trust the master key

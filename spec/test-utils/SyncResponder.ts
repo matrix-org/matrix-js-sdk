@@ -31,7 +31,7 @@ export interface ISyncResponder {
     sendOrQueueSyncResponse(response: object): void;
 }
 
-enum SyncResponderState {
+const enum SyncResponderState {
     IDLE,
     WAITING_FOR_REQUEST,
     WAITING_FOR_RESPONSE,

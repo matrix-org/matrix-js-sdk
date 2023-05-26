@@ -48,7 +48,7 @@ export interface ISearchResult {
     context: IResultContext;
 }
 
-enum GroupKey {
+const enum GroupKey {
     RoomId = "room_id",
     Sender = "sender",
 }
@@ -76,7 +76,7 @@ interface IResultCategories {
 
 export type SearchKey = "content.body" | "content.name" | "content.topic";
 
-export enum SearchOrderBy {
+export const enum SearchOrderBy {
     Recent = "recent",
     Rank = "rank",
 }

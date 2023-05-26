@@ -16,7 +16,7 @@ limitations under the License.
 
 import { IServerVersions } from "./client";
 
-export enum ServerSupport {
+export const enum ServerSupport {
     Stable,
     Unstable,
     Unsupported,

@@ -24,7 +24,7 @@ import { logger } from "../logger";
 import { EventType } from "../@types/event";
 import { SyncState } from "../sync";
 
-export enum GroupCallEventHandlerEvent {
+export const enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
     Outgoing = "GroupCall.outgoing",
     Ended = "GroupCall.ended",

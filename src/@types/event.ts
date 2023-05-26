@@ -16,7 +16,7 @@ limitations under the License.
 
 import { UnstableValue } from "../NamespacedValue";
 
-export enum EventType {
+export const enum EventType {
     // Room state events
     RoomCanonicalAlias = "m.room.canonical_alias",
     RoomCreate = "m.room.create",
@@ -95,14 +95,14 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 }
 
-export enum RelationType {
+export const enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
     Reference = "m.reference",
     Thread = "m.thread",
 }
 
-export enum MsgType {
+export const enum MsgType {
     Text = "m.text",
     Emote = "m.emote",
     Notice = "m.notice",
@@ -116,7 +116,7 @@ export enum MsgType {
 
 export const RoomCreateTypeField = "type";
 
-export enum RoomType {
+export const enum RoomType {
     Space = "m.space",
     UnstableCall = "org.matrix.msc3417.call",
     ElementVideo = "io.element.video",

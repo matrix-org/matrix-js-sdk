@@ -582,7 +582,7 @@ function deviceToObject(device: DeviceInfo, userId: string): DeviceObject {
     };
 }
 
-export enum CrossSigningLevel {
+export const enum CrossSigningLevel {
     MASTER = 4,
     USER_SIGNING = 2,
     SELF_SIGNING = 1,

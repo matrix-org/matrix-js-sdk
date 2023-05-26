@@ -21,7 +21,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { MatrixClient } from "../client";
 import { Room } from "./room";
 
-export enum RelationsEvent {
+export const enum RelationsEvent {
     Add = "Relations.add",
     Remove = "Relations.remove",
     Redaction = "Relations.redaction",

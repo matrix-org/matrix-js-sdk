@@ -45,7 +45,7 @@ interface IOpts {
     pendingEvents?: boolean;
 }
 
-export enum DuplicateStrategy {
+export const enum DuplicateStrategy {
     Ignore = "ignore",
     Replace = "replace",
 }

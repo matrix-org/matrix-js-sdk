@@ -63,7 +63,7 @@ export interface ISSOFlow extends ILoginFlow {
     [DELEGATED_OIDC_COMPATIBILITY.altName]?: boolean;
 }
 
-export enum IdentityProviderBrand {
+export const enum IdentityProviderBrand {
     Gitlab = "gitlab",
     Github = "github",
     Apple = "apple",
@@ -92,7 +92,7 @@ export interface ILoginParams {
 }
 /* eslint-enable camelcase */
 
-export enum SSOAction {
+export const enum SSOAction {
     /** The user intends to login to an existing account */
     LOGIN = "login",
 

@@ -115,7 +115,7 @@ const MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH = 30;
 
 export type NotificationCount = Partial<Record<NotificationCountType, number>>;
 
-export enum NotificationCountType {
+export const enum NotificationCountType {
     Highlight = "highlight",
     Total = "total",
 }
@@ -129,7 +129,7 @@ export interface ICreateFilterOpts {
     pendingEvents?: boolean;
 }
 
-export enum RoomEvent {
+export const enum RoomEvent {
     MyMembership = "Room.myMembership",
     Tags = "Room.tags",
     AccountData = "Room.accountData",
@@ -3535,7 +3535,7 @@ const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.CANCELLED]: [],
 };
 
-export enum RoomNameType {
+export const enum RoomNameType {
     EmptyRoom,
     Generated,
     Actual,

@@ -85,12 +85,12 @@ interface AssertedIdentity {
     displayName: string;
 }
 
-enum MediaType {
+const enum MediaType {
     AUDIO = "audio",
     VIDEO = "video",
 }
 
-enum CodecName {
+const enum CodecName {
     OPUS = "opus",
     // add more as needed
 }
@@ -115,22 +115,22 @@ export enum CallState {
     Ended = "ended",
 }
 
-export enum CallType {
+export const enum CallType {
     Voice = "voice",
     Video = "video",
 }
 
-export enum CallDirection {
+export const enum CallDirection {
     Inbound = "inbound",
     Outbound = "outbound",
 }
 
-export enum CallParty {
+export const enum CallParty {
     Local = "local",
     Remote = "remote",
 }
 
-export enum CallEvent {
+export const enum CallEvent {
     Hangup = "hangup",
     State = "state",
     Error = "error",
@@ -158,7 +158,7 @@ export enum CallEvent {
     PeerConnectionCreated = "peer_connection_created",
 }
 
-export enum CallErrorCode {
+export const enum CallErrorCode {
     /** The user chose to end the call */
     UserHangup = "user_hangup",
 

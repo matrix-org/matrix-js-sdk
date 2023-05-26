@@ -17,7 +17,7 @@ limitations under the License.
 import { MatrixEvent } from "../models/event";
 
 /** Events emitted by `Verifier`. */
-export enum VerifierEvent {
+export const enum VerifierEvent {
     /**
      * The verification has been cancelled, by us or the other side.
      *

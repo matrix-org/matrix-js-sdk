@@ -38,7 +38,7 @@ export enum GroupCallType {
     Voice = "m.voice",
 }
 
-export enum GroupCallTerminationReason {
+export const enum GroupCallTerminationReason {
     CallEnded = "call_ended",
 }
 
@@ -49,7 +49,7 @@ export type CallsByUserAndDevice = Map<string, Map<string, MatrixCall>>;
  * to be unique over all event types of event emitter.
  * Some objects could emit more then one set of events.
  */
-export enum GroupCallEvent {
+export const enum GroupCallEvent {
     GroupCallStateChanged = "group_call_state_changed",
     ActiveSpeakerChanged = "active_speaker_changed",
     CallsChanged = "calls_changed",
@@ -92,7 +92,7 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
-export enum GroupCallStatsReportEvent {
+export const enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
     SummaryStats = "GroupCall.summary_stats",
@@ -104,7 +104,7 @@ export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
 };
 
-export enum GroupCallErrorCode {
+export const enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
     PlaceCallFailed = "place_call_failed",

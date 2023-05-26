@@ -63,7 +63,7 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  * (deleted)  <---------------------------+
  * ```
  */
-export enum RoomKeyRequestState {
+export const enum RoomKeyRequestState {
     /** request not yet sent */
     Unsent,
     /** request sent, awaiting reply */

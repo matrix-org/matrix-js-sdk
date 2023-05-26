@@ -20,7 +20,7 @@ import { MatrixEvent } from "./event";
 import { sortEventsByLatestContentTimestamp } from "../utils";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-export enum BeaconEvent {
+export const enum BeaconEvent {
     New = "Beacon.new",
     Update = "Beacon.update",
     LivenessChange = "Beacon.LivenessChange",

@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
-export enum LocalStorageErrors {
+export const enum LocalStorageErrors {
     Global = "Global",
     SetItemError = "setItem",
     GetItemError = "getItem",

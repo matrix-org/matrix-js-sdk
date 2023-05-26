@@ -30,7 +30,7 @@ import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
 
-export enum ThreadEvent {
+export const enum ThreadEvent {
     New = "Thread.new",
     Update = "Thread.update",
     NewReply = "Thread.newReply",
@@ -54,7 +54,7 @@ interface IThreadOpts {
     receipts?: CachedReceiptStructure[];
 }
 
-export enum FeatureSupport {
+export const enum FeatureSupport {
     None = 0,
     Experimental = 1,
     Stable = 2,
@@ -716,7 +716,7 @@ export const FILTER_RELATED_BY_REL_TYPES = new ServerControlledNamespacedValue(
 );
 export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue("m.thread", "io.element.thread");
 
-export enum ThreadFilterType {
+export const enum ThreadFilterType {
     "My",
     "All",
 }

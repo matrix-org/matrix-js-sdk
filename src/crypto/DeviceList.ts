@@ -51,7 +51,7 @@ import { CryptoEvent, CryptoEventHandlerMap } from "./index";
  */
 
 // constants for DeviceList.deviceTrackingStatus
-export enum TrackingStatus {
+export const enum TrackingStatus {
     NotTracked,
     PendingDownload,
     DownloadInProgress,

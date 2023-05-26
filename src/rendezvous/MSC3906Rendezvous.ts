@@ -24,13 +24,13 @@ import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
 
-enum PayloadType {
+const enum PayloadType {
     Start = "m.login.start",
     Finish = "m.login.finish",
     Progress = "m.login.progress",
 }
 
-enum Outcome {
+const enum Outcome {
     Success = "success",
     Failure = "failure",
     Verified = "verified",

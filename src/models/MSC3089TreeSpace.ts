@@ -71,7 +71,7 @@ export const DEFAULT_TREE_POWER_LEVELS_TEMPLATE = {
  * Ease-of-use representation for power levels represented as simple roles.
  * Note that this is UNSTABLE and subject to breaking changes without notice.
  */
-export enum TreePermissions {
+export const enum TreePermissions {
     Viewer = "viewer", // Default
     Editor = "editor", // "Moderator" or ~PL50
     Owner = "owner", // "Admin" or PL100

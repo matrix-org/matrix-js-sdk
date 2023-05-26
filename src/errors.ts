@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum InvalidStoreState {
+export const enum InvalidStoreState {
     ToggledLazyLoading,
 }
 
@@ -30,7 +30,7 @@ export class InvalidStoreError extends Error {
     }
 }
 
-export enum InvalidCryptoStoreState {
+export const enum InvalidCryptoStoreState {
     TooNew = "TOO_NEW",
 }
 

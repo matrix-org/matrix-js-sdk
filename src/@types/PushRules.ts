@@ -17,13 +17,13 @@ limitations under the License.
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
 
-export enum PushRuleActionName {
+export const enum PushRuleActionName {
     DontNotify = "dont_notify",
     Notify = "notify",
     Coalesce = "coalesce",
 }
 
-export enum TweakName {
+export const enum TweakName {
     Highlight = "highlight",
     Sound = "sound",
 }
@@ -38,7 +38,7 @@ export type TweakSound = Tweak<TweakName.Sound, string>;
 
 export type Tweaks = TweakHighlight | TweakSound;
 
-export enum ConditionOperator {
+export const enum ConditionOperator {
     ExactEquals = "==",
     LessThan = "<",
     GreaterThan = ">",
@@ -60,7 +60,7 @@ export function isDmMemberCountCondition(condition: AnyMemberCountCondition): bo
     return condition === "==2" || condition === "2";
 }
 
-export enum ConditionKind {
+export const enum ConditionKind {
     EventMatch = "event_match",
     EventPropertyIs = "event_property_is",
     EventPropertyContains = "event_property_contains",
@@ -127,7 +127,7 @@ export type PushRuleCondition =
     | ICallStartedCondition
     | ICallStartedPrefixCondition;
 
-export enum PushRuleKind {
+export const enum PushRuleKind {
     Override = "override",
     ContentSpecific = "content",
     RoomSpecific = "room",
@@ -135,7 +135,7 @@ export enum PushRuleKind {
     Underride = "underride",
 }
 
-export enum RuleId {
+export const enum RuleId {
     Master = ".m.rule.master",
     IsUserMention = ".org.matrix.msc3952.is_user_mention",
     IsRoomMention = ".org.matrix.msc3952.is_room_mention",

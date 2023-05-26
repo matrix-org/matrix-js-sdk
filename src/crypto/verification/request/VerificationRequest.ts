@@ -44,7 +44,7 @@ export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
 export const READY_TYPE = EVENT_PREFIX + "ready";
 
-export enum Phase {
+export const enum Phase {
     Unsent = 1,
     Requested,
     Ready,
@@ -71,7 +71,7 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
-export enum VerificationRequestEvent {
+export const enum VerificationRequestEvent {
     Change = "change",
 }
 

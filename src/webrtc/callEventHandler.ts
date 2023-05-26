@@ -27,7 +27,7 @@ import { RoomEvent } from "../models/room";
 // time to press the 'accept' button
 const RING_GRACE_PERIOD = 3000;
 
-export enum CallEventHandlerEvent {
+export const enum CallEventHandlerEvent {
     Incoming = "Call.incoming",
 }
 

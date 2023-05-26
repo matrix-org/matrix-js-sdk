@@ -70,7 +70,7 @@ export interface IContentUri {
     };
 }
 
-export enum HttpApiEvent {
+export const enum HttpApiEvent {
     SessionLoggedOut = "Session.logged_out",
     NoConsent = "no_consent",
 }

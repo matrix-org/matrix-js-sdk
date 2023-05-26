@@ -152,7 +152,7 @@ export interface ISyncResponse {
 }
 /* eslint-enable camelcase */
 
-export enum Category {
+export const enum Category {
     Invite = "invite",
     Leave = "leave",
     Join = "join",

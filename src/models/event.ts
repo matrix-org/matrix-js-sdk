@@ -197,7 +197,7 @@ export interface IMessageVisibilityHidden {
 // A singleton implementing `IMessageVisibilityVisible`.
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
 
-export enum MatrixEventEvent {
+export const enum MatrixEventEvent {
     Decrypted = "Event.decrypted",
     BeforeRedaction = "Event.beforeRedaction",
     VisibilityChange = "Event.visibilityChange",

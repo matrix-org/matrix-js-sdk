@@ -22,7 +22,7 @@ import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
 import { logger } from "../logger";
 import { MatrixClient } from "../client";
 
-export enum MediaHandlerEvent {
+export const enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",
 }
 

@@ -22,7 +22,7 @@ import { MatrixError, Method, timeoutSignal } from "./http-api";
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
 
-export enum AutoDiscoveryAction {
+export const enum AutoDiscoveryAction {
     SUCCESS = "SUCCESS",
     IGNORE = "IGNORE",
     PROMPT = "PROMPT",

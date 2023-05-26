@@ -43,7 +43,7 @@ export interface IMarkerFoundOptions {
 }
 
 // possible statuses for out-of-band member loading
-enum OobStatus {
+const enum OobStatus {
     NotStarted,
     InProgress,
     Finished,
@@ -63,7 +63,7 @@ export interface IPowerLevelsContent {
     redact?: number;
 }
 
-export enum RoomStateEvent {
+export const enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",

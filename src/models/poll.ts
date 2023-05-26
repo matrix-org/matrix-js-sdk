@@ -24,7 +24,7 @@ import { Relations } from "./relations";
 import { Room } from "./room";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
-export enum PollEvent {
+export const enum PollEvent {
     New = "Poll.new",
     End = "Poll.end",
     Update = "Poll.update",

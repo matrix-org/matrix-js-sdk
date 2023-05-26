@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum SERVICE_TYPES {
+export const enum SERVICE_TYPES {
     IS = "SERVICE_TYPE_IS", // An identity server
     IM = "SERVICE_TYPE_IM", // An integration manager
 }

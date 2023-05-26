@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum ClientPrefix {
+export const enum ClientPrefix {
     /**
      * A constant representing the URI path for release 0 of the Client-Server HTTP API.
      */
@@ -33,14 +33,14 @@ export enum ClientPrefix {
     Unstable = "/_matrix/client/unstable",
 }
 
-export enum IdentityPrefix {
+export const enum IdentityPrefix {
     /**
      * URI path for the v2 identity API
      */
     V2 = "/_matrix/identity/v2",
 }
 
-export enum MediaPrefix {
+export const enum MediaPrefix {
     /**
      * URI path for the media repo API
      */

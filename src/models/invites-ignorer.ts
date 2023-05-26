@@ -37,14 +37,14 @@ export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
 );
 
 /// The types of recommendations understood.
-enum PolicyRecommendation {
+const enum PolicyRecommendation {
     Ban = "m.ban",
 }
 
 /**
  * The various scopes for policies.
  */
-export enum PolicyScope {
+export const enum PolicyScope {
     /**
      * The policy deals with an individual user, e.g. reject invites
      * from this user.

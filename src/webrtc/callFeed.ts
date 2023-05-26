@@ -47,7 +47,7 @@ export interface ICallFeedOpts {
     call?: MatrixCall;
 }
 
-export enum CallFeedEvent {
+export const enum CallFeedEvent {
     NewStream = "new_stream",
     MuteStateChanged = "mute_state_changed",
     LocalVolumeChanged = "local_volume_changed",
