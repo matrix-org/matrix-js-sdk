@@ -14,21 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { StatsReportGatherer } from "../../../../src/webrtc/stats/statsReportGatherer";
+import { CallStatsReportGatherer } from "../../../../src/webrtc/stats/callStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
+import { MediaSsrcHandler } from "../../../../src/webrtc/stats/media/mediaSsrcHandler";
 
 const CALL_ID = "CALL_ID";
 const USER_ID = "USER_ID";
 
-describe("StatsReportGatherer", () => {
-    let collector: StatsReportGatherer;
+describe("CallStatsReportGatherer", () => {
+    let collector: CallStatsReportGatherer;
     let rtcSpy: RTCPeerConnection;
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
         rtcSpy.addEventListener = jest.fn();
         emitter = new StatsReportEmitter();
-        collector = new StatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
+        collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
     });
 
     describe("on process stats", () => {
@@ -143,6 +144,46 @@ describe("StatsReportGatherer", () => {
                 },
             });
             expect(collector.getActive()).toBeTruthy();
+        });
+    });
+
+    describe("on signal state change event", () => {
+        let events: { [key: string]: any };
+        beforeEach(() => {
+            events = [];
+            // Define the addEventListener method with a Jest mock function
+            rtcSpy.addEventListener = jest.fn((event: any, callback: any) => {
+                events[event] = callback;
+            });
+
+            collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
+        });
+        it("in case of stable, parse remote and local description", async () => {
+            // @ts-ignore
+            const mediaSsrcHandler = {
+                parse: jest.fn(),
+                ssrcToMid: jest.fn(),
+                findMidBySsrc: jest.fn(),
+                getSsrcToMidMap: jest.fn(),
+            } as MediaSsrcHandler;
+
+            const remoteSDP = "sdp";
+            const localSDP = "sdp";
+
+            // @ts-ignore
+            rtcSpy.signalingState = "stable";
+
+            // @ts-ignore
+            rtcSpy.currentRemoteDescription = <RTCSessionDescription>{ sdp: remoteSDP };
+            // @ts-ignore
+            rtcSpy.currentLocalDescription = <RTCSessionDescription>{ sdp: localSDP };
+
+            // @ts-ignore
+            collector.trackStats.mediaSsrcHandler = mediaSsrcHandler;
+
+            events["signalingstatechange"]();
+            expect(mediaSsrcHandler.parse).toHaveBeenCalledWith(remoteSDP, "remote");
+            expect(mediaSsrcHandler.parse).toHaveBeenCalledWith(localSDP, "local");
         });
     });
 });
