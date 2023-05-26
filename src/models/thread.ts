@@ -203,10 +203,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     ): void => {
         // Add a synthesized receipt when paginating forward in the timeline
         if (!toStartOfTimeline) {
-            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+            const sender = event.getSender();
+            if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
+                room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+            }
         }
         this.onEcho(event, toStartOfTimeline ?? false);
     };
+
+    private shouldSendLocalEchoReceipt(sender: string, event: MatrixEvent): boolean {
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+        if (recursionSupport === ServerSupport.Unsupported) {
+            // Normally we add a local receipt, but if we don't have
+            // recursion support, then events may arrive out of order, so we
+            // only create a receipt if it's after our existing receipt.
+            const oldReceiptEventId = this.getReadReceiptForUserId(sender)?.eventId;
+            if (oldReceiptEventId) {
+                const receiptEvent = this.findEventById(oldReceiptEventId);
+                if (receiptEvent && receiptEvent.getTs() > event.getTs()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private onLocalEcho = (event: MatrixEvent): void => {
         this.onEcho(event, false);
@@ -500,15 +522,17 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                 events
                     .filter((e) => e.isEncrypted())
                     .map((event: MatrixEvent) => {
-                        if (event.isRelation()) return; // skip - relations don't get edits
+                        // The only type of relation that gets edits is a thread message.
+                        if (event.getThread() === undefined && event.isRelation()) return;
                         return this.client
                             .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
                                 limit: 1,
                             })
                             .then((relations) => {
                                 if (relations.events.length) {
-                                    event.makeReplaced(relations.events[0]);
-                                    this.insertEventIntoTimeline(event);
+                                    const editEvent = relations.events[0];
+                                    event.makeReplaced(editEvent);
+                                    this.insertEventIntoTimeline(editEvent);
                                 }
                             })
                             .catch((e) => {

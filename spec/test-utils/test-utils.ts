@@ -370,6 +370,37 @@ export function mkReaction(
     );
 }
 
+export function mkEdit(
+    target: MatrixEvent,
+    client: MatrixClient,
+    userId: string,
+    roomId: string,
+    msg?: string,
+    ts?: number,
+) {
+    msg = msg ?? `Edit of ${target.getId()}`;
+    return mkEvent(
+        {
+            event: true,
+            type: EventType.RoomMessage,
+            user: userId,
+            room: roomId,
+            content: {
+                "body": `* ${msg}`,
+                "m.new_content": {
+                    body: msg,
+                },
+                "m.relates_to": {
+                    rel_type: RelationType.Replace,
+                    event_id: target.getId()!,
+                },
+            },
+            ts,
+        },
+        client,
+    );
+}
+
 /**
  * A mock implementation of webstorage
  */
