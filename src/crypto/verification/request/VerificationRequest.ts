@@ -163,6 +163,22 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return true;
     }
 
+    /**
+     * Unique ID for this verification request.
+     *
+     * An ID isn't assigned until the first message is sent, so this may be `undefined` in the early phases.
+     */
+    public get transactionId(): string | undefined {
+        return this.channel.transactionId;
+    }
+
+    /**
+     * For an in-room verification, the ID of the room.
+     */
+    public get roomId(): string | undefined {
+        return this.channel.roomId;
+    }
+
     public get invalid(): boolean {
         return this.phase === PHASE_UNSENT;
     }
