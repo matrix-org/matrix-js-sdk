@@ -244,6 +244,7 @@ export interface LoginResponse {
 
 /**
  * The result of a successful `m.login.token` issuance request as per https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv1loginget_token
+ *
  */
 export interface LoginTokenPostResponse {
     /**
