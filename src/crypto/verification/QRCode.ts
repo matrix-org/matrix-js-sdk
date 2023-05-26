@@ -36,6 +36,7 @@ export type QrCodeEvent = VerifierEvent;
 /** @deprecated use VerifierEvent */
 export const QrCodeEvent = VerifierEvent;
 
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
 export class ReciprocateQRCode extends Base {
     public reciprocateQREvent?: ShowQrCodeCallbacks;
 

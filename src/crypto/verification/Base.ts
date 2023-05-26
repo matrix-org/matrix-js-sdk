@@ -57,6 +57,7 @@ export type VerificationEventHandlerMap = {
     [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
 // The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
 // backwards compatibility with applications that reference the class.
 export class VerificationBase<
