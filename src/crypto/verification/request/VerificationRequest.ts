@@ -24,10 +24,14 @@ import { EventType } from "../../../@types/event";
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
-import { VerificationRequestEvent, VerificationRequestEventHandlerMap } from "../../../crypto-api/verification";
+import {
+    VerificationPhase as Phase,
+    VerificationRequestEvent,
+    VerificationRequestEventHandlerMap,
+} from "../../../crypto-api/verification";
 
 // backwards-compatibility exports
-export { VerificationRequestEvent } from "../../../crypto-api/verification";
+export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -47,15 +51,6 @@ export const START_TYPE = EVENT_PREFIX + "start";
 export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
 export const READY_TYPE = EVENT_PREFIX + "ready";
-
-export enum Phase {
-    Unsent = 1,
-    Requested,
-    Ready,
-    Started,
-    Cancelled,
-    Done,
-}
 
 // Legacy export fields
 export const PHASE_UNSENT = Phase.Unsent;

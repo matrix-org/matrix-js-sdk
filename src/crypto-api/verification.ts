@@ -36,6 +36,27 @@ export type VerificationRequestEventHandlerMap = {
     [VerificationRequestEvent.Change]: () => void;
 };
 
+/** The current phase of a verification request. */
+export enum VerificationPhase {
+    /** Initial state: no event yet exchanged */
+    Unsent = 1,
+
+    /** An `m.key.verification.request` event has been sent or received */
+    Requested,
+
+    /** An `m.key.verification.ready` event has been sent or received, indicating the verification request is accepted. */
+    Ready,
+
+    /** An `m.key.verification.start` event has been sent or received, choosing a verification method */
+    Started,
+
+    /** An `m.key.verification.cancel` event has been sent or received at any time before the `done` event, cancelling the verification request */
+    Cancelled,
+
+    /** An `m.key.verification.done` event has been **sent**, completing the verification request. */
+    Done,
+}
+
 /**
  * A `Verifier` is responsible for performing the verification using a particular method, such as via QR code or SAS
  * (emojis).
