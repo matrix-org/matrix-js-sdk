@@ -1206,13 +1206,11 @@ describe("MatrixClient", function () {
         it("should hit the expected API endpoint with UIA", async () => {
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
-            httpBackend
-                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
-                .respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
@@ -1220,22 +1218,22 @@ describe("MatrixClient", function () {
         it("should hit the expected API endpoint without UIA", async () => {
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
         });
 
-        it("should hit the r1 endpoint when capability is disabled", async () => {
+        it("should hit the stable endpoint when capability is disabled", async () => {
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: false } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });

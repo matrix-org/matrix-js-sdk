@@ -17,12 +17,7 @@ limitations under the License.
 import { UnstableValue } from "matrix-events-sdk";
 
 import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
-import {
-    ICrossSigningKey,
-    IMSC3882GetLoginTokenCapability,
-    MatrixClient,
-    UNSTABLE_MSC3882_CAPABILITY,
-} from "../client";
+import { ICrossSigningKey, IGetLoginTokenCapability, MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
@@ -105,15 +100,15 @@ export class MSC3906Rendezvous {
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
-        // in r1 of MSC3882 the availability is exposed as a capability
+        // in stable and unstable r1 the availability is exposed as a capability
         const capabilities = await this.client.getCapabilities();
         // in r0 of MSC3882 the availability is exposed as a feature flag
         const features = await buildFeatureSupportMap(await this.client.getVersions());
-        const capability = UNSTABLE_MSC3882_CAPABILITY.findIn<IMSC3882GetLoginTokenCapability>(capabilities);
+        const capability = GET_LOGIN_TOKEN_CAPABILITY.findIn<IGetLoginTokenCapability>(capabilities);
 
         // determine available protocols
         if (!capability?.enabled && features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
-            logger.info("Server doesn't support MSC3882");
+            logger.info("Server doesn't support get_login_token");
             await this.send({ type: PayloadType.Finish, outcome: Outcome.Unsupported });
             await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
             return undefined;
