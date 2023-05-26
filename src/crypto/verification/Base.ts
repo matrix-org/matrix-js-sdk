@@ -41,14 +41,9 @@ export class SwitchStartEventError extends Error {
 
 export type KeyVerifier = (keyId: string, device: DeviceInfo, keyInfo: string) => void;
 
-/** @deprecated use VerifierEvent */
-export type VerificationEvent = VerifierEvent;
-/** @deprecated use VerifierEvent */
-export const VerificationEvent = VerifierEvent;
-
 /** @deprecated use VerifierEventHandlerMap */
 export type VerificationEventHandlerMap = {
-    [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
+    [VerifierEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
 // The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
@@ -271,7 +266,7 @@ export class VerificationBase<
             }
             // Also emit a 'cancel' event that the app can listen for to detect cancellation
             // before calling verify()
-            this.emit(VerificationEvent.Cancel, e);
+            this.emit(VerifierEvent.Cancel, e);
         }
     }
 

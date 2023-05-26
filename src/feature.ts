@@ -22,6 +22,8 @@ export const enum ServerSupport {
     Unsupported,
 }
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 export enum Feature {
     Thread = "Thread",
     ThreadUnreadNotifications = "ThreadUnreadNotifications",

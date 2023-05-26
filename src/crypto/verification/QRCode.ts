@@ -31,11 +31,6 @@ import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verificatio
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
 
-/** @deprecated use VerifierEvent */
-export type QrCodeEvent = VerifierEvent;
-/** @deprecated use VerifierEvent */
-export const QrCodeEvent = VerifierEvent;
-
 export class ReciprocateQRCode extends Base {
     public reciprocateQREvent?: ShowQrCodeCallbacks;
 
@@ -73,7 +68,7 @@ export class ReciprocateQRCode extends Base {
                 confirm: resolve,
                 cancel: () => reject(newUserCancelledError()),
             };
-            this.emit(QrCodeEvent.ShowReciprocateQr, this.reciprocateQREvent);
+            this.emit(VerifierEvent.ShowReciprocateQr, this.reciprocateQREvent);
         });
 
         // 3. determine key to sign / mark as trusted

@@ -30,6 +30,8 @@ export const enum AutoDiscoveryAction {
     FAIL_ERROR = "FAIL_ERROR",
 }
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 enum AutoDiscoveryError {
     Invalid = "Invalid homeserver discovery response",
     GenericFailure = "Failed to get autodiscovery configuration from server",

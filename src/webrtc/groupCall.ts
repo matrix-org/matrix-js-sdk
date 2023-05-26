@@ -27,12 +27,16 @@ import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
 import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 export enum GroupCallIntent {
     Ring = "m.ring",
     Prompt = "m.prompt",
     Room = "m.room",
 }
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 export enum GroupCallType {
     Video = "m.video",
     Voice = "m.voice",
@@ -178,6 +182,8 @@ export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
 }
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 export enum GroupCallState {
     LocalCallFeedUninitialized = "local_call_feed_uninitialized",
     InitializingLocalCallFeed = "initializing_local_call_feed",

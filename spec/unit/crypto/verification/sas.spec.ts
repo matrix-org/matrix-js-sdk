@@ -17,7 +17,7 @@ limitations under the License.
 import "../../../olm-loader";
 import { makeTestClients } from "./util";
 import { MatrixEvent } from "../../../../src/models/event";
-import { ISasEvent, SAS, SasEvent } from "../../../../src/crypto/verification/SAS";
+import { ISasEvent, SAS } from "../../../../src/crypto/verification/SAS";
 import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
@@ -28,6 +28,7 @@ import { IVerificationChannel } from "../../../../src/crypto/verification/reques
 import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { TestClient } from "../../../TestClient";
+import { VerifierEvent } from "../../../../src/crypto-api/verification";
 
 const Olm = global.Olm;
 
@@ -134,7 +135,7 @@ describe("SAS verification", function () {
 
             bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
                 bob.client.on(CryptoEvent.VerificationRequest, (request) => {
-                    (<SAS>request.verifier!).on(SasEvent.ShowSas, (e) => {
+                    (<SAS>request.verifier!).on(VerifierEvent.ShowSas, (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -159,7 +160,7 @@ describe("SAS verification", function () {
                 bob.client.getUserId()!,
                 bob.deviceId!,
             ) as SAS;
-            aliceVerifier.on(SasEvent.ShowSas, (e) => {
+            aliceVerifier.on(VerifierEvent.ShowSas, (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
                 } else if (!bobSasEvent) {
@@ -418,7 +419,7 @@ describe("SAS verification", function () {
 
         const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
             bob.client.on(CryptoEvent.VerificationRequest, (request) => {
-                (<SAS>request.verifier!).on(SasEvent.ShowSas, (e) => {
+                (<SAS>request.verifier!).on(VerifierEvent.ShowSas, (e) => {
                     e.mismatch();
                 });
                 resolve(request.verifier!);
@@ -509,7 +510,7 @@ describe("SAS verification", function () {
             bobPromise = new Promise<void>((resolve, reject) => {
                 bob.client.on(CryptoEvent.VerificationRequest, async (request) => {
                     const verifier = request.beginKeyVerification(SAS.NAME) as SAS;
-                    verifier.on(SasEvent.ShowSas, (e) => {
+                    verifier.on(VerifierEvent.ShowSas, (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -533,7 +534,7 @@ describe("SAS verification", function () {
             const aliceRequest = await alice.client.requestVerificationDM(bob.client.getUserId()!, "!room_id");
             await aliceRequest.waitFor((r) => r.started);
             aliceVerifier = aliceRequest.verifier! as SAS;
-            aliceVerifier.on(SasEvent.ShowSas, (e) => {
+            aliceVerifier.on(VerifierEvent.ShowSas, (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
                 } else if (!bobSasEvent) {

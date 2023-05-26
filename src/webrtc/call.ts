@@ -103,6 +103,8 @@ interface CodecParamsMod {
     maxAverageBitrate?: number; // sets the max average bitrate, or undefined to leave as-is
 }
 
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
 export enum CallState {
     Fledgling = "fledgling",
     InviteSent = "invite_sent",
@@ -130,7 +132,9 @@ export const enum CallParty {
     Remote = "remote",
 }
 
-export const enum CallEvent {
+// Allow this non-const enum
+// eslint-disable-next-line no-restricted-syntax
+export enum CallEvent {
     Hangup = "hangup",
     State = "state",
     Error = "error",

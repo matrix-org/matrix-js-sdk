@@ -19,13 +19,14 @@ limitations under the License.
  * do verification with this method).
  */
 
-import { VerificationBase as Base, VerificationEvent, VerificationEventHandlerMap } from "./Base";
+import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { MatrixEvent } from "../../models/event";
 import { VerificationRequest } from "./request/VerificationRequest";
+import { VerifierEvent } from "../../crypto-api/verification";
 
-export class IllegalMethod extends Base<VerificationEvent, VerificationEventHandlerMap> {
+export class IllegalMethod extends Base<VerifierEvent, VerificationEventHandlerMap> {
     public static factory(
         channel: IVerificationChannel,
         baseApis: MatrixClient,

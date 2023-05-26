@@ -214,11 +214,6 @@ function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
     return Array.isArray(anArray) ? anArray.filter((x) => aSet.has(x)) : [];
 }
 
-/** @deprecated use VerifierEvent */
-export type SasEvent = VerifierEvent;
-/** @deprecated use VerifierEvent */
-export const SasEvent = VerifierEvent;
-
 export class SAS extends Base {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;
@@ -304,7 +299,7 @@ export class SAS extends Base {
                 cancel: () => reject(newUserCancelledError()),
                 mismatch: () => reject(newMismatchedSASError()),
             };
-            this.emit(SasEvent.ShowSas, this.sasEvent);
+            this.emit(VerifierEvent.ShowSas, this.sasEvent);
         });
 
         const [e] = await Promise.all([
