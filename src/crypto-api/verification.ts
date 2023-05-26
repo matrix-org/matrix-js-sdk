@@ -17,6 +17,25 @@ limitations under the License.
 import { MatrixEvent } from "../models/event";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
+/** Events emitted by `VerificationRequest` */
+export enum VerificationRequestEvent {
+    /**
+     * Fires whenever the state of the request object has changed.
+     *
+     * There is no payload to the event.
+     */
+    Change = "change",
+}
+
+/**
+ * Listener type map for {@link VerificationRequestEvent}s.
+ *
+ * @internal
+ */
+export type VerificationRequestEventHandlerMap = {
+    [VerificationRequestEvent.Change]: () => void;
+};
+
 /**
  * A `Verifier` is responsible for performing the verification using a particular method, such as via QR code or SAS
  * (emojis).

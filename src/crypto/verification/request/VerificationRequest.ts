@@ -24,6 +24,10 @@ import { EventType } from "../../../@types/event";
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
+import { VerificationRequestEvent, VerificationRequestEventHandlerMap } from "../../../crypto-api/verification";
+
+// backwards-compatibility exports
+export { VerificationRequestEvent } from "../../../crypto-api/verification";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -71,17 +75,6 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
-export enum VerificationRequestEvent {
-    Change = "change",
-}
-
-type EventHandlerMap = {
-    /**
-     * Fires whenever the state of the request object has changed.
-     */
-    [VerificationRequestEvent.Change]: () => void;
-};
-
 /**
  * State machine for verification requests.
  * Things that differ based on what channel is used to
@@ -89,7 +82,7 @@ type EventHandlerMap = {
  */
 export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends TypedEventEmitter<
     VerificationRequestEvent,
-    EventHandlerMap
+    VerificationRequestEventHandlerMap
 > {
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
