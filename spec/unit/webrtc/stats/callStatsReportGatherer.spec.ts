@@ -16,6 +16,7 @@ limitations under the License.
 
 import { CallStatsReportGatherer } from "../../../../src/webrtc/stats/callStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
+import { MediaSsrcHandler } from "../../../../src/webrtc/stats/media/mediaSsrcHandler";
 
 const CALL_ID = "CALL_ID";
 const USER_ID = "USER_ID";
@@ -143,6 +144,46 @@ describe("CallStatsReportGatherer", () => {
                 },
             });
             expect(collector.getActive()).toBeTruthy();
+        });
+    });
+
+    describe("on signal state change event", () => {
+        let events: { [key: string]: any };
+        beforeEach(() => {
+            events = [];
+            // Define the addEventListener method with a Jest mock function
+            rtcSpy.addEventListener = jest.fn((event: any, callback: any) => {
+                events[event] = callback;
+            });
+
+            collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
+        });
+        it("switch to stable parse remote and local description", async () => {
+            // @ts-ignore
+            const mediaSsrcHandler = {
+                parse: jest.fn(),
+                ssrcToMid: jest.fn(),
+                findMidBySsrc: jest.fn(),
+                getSsrcToMidMap: jest.fn(),
+            } as MediaSsrcHandler;
+
+            const remoteSDP = "sdp";
+            const localSDP = "sdp";
+
+            // @ts-ignore
+            rtcSpy.signalingState = "stable";
+
+            // @ts-ignore
+            rtcSpy.currentRemoteDescription = <RTCSessionDescription>{ sdp: remoteSDP };
+            // @ts-ignore
+            rtcSpy.currentLocalDescription = <RTCSessionDescription>{ sdp: localSDP };
+
+            // @ts-ignore
+            collector.trackStats.mediaSsrcHandler = mediaSsrcHandler;
+
+            events["signalingstatechange"]();
+            expect(mediaSsrcHandler.parse).toHaveBeenCalledWith(remoteSDP, "remote");
+            expect(mediaSsrcHandler.parse).toHaveBeenCalledWith(localSDP, "local");
         });
     });
 });
