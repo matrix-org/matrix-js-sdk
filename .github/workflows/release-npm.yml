@@ -24,18 +24,16 @@ jobs:
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@0f451a94170d1699fd50710966d48fb26194d939 # v1
+              uses: JS-DevTools/npm-publish@a25b4180b728b0279fca97d4e5bccf391685aead # v2.2.0
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public
                   tag: next
+                  ignore-scripts: false
 
             - name: 🎖️ Add `latest` dist-tag to final releases
-              if: github.event.release.prerelease == false
-              run: |
-                  package=$(cat package.json | jq -er .name)
-                  npm dist-tag add "$package@$release" latest
+              if: github.event.release.prerelease == false && steps.npm-publish.outputs.id
+              run: npm dist-tag add "$release" latest
               env:
-                  # JS-DevTools/npm-publish overrides `NODE_AUTH_TOKEN` with `INPUT_TOKEN` in .npmrc
-                  INPUT_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  release: ${{ steps.npm-publish.outputs.version }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  release: ${{ steps.npm-publish.outputs.id }}
