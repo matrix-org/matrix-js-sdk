@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig } from "./client";
+import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, M_AUTHENTICATION, IServerVersions } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
 
@@ -40,6 +40,11 @@ enum AutoDiscoveryError {
     InvalidIs = "Invalid identity server discovery response",
     MissingWellknown = "No .well-known JSON file found",
     InvalidJson = "Invalid JSON",
+    OidcNotSupported = "OIDC authentication not supported",
+    OidcMisconfigured = "OIDC is misconfigured",
+    // @TODO(kerrya) surface more detailed errors
+    OidcGeneral = "Something went wrong with OIDC discovery",
+    OidcOpSupport = "Configured OIDC OP does not support required functions"
 }
 
 interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
@@ -47,9 +52,101 @@ interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
     error?: IWellKnownConfig["error"] | null;
 }
 
+type ValidatedIssuerConfig = {
+    authorizationEndpoint: string;
+    tokenEndpoint: string;
+    registrationEndpoint: string;
+}
+
+interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
+    state: AutoDiscoveryAction;
+    error?: IWellKnownConfig["error"] | null;
+}
+
 export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
+    "m.authentication"?: DelegatedAuthConfig;
+}
+
+/**
+ * Validates MSC2965 m.authentication config
+ * Returns valid configuration
+ * @param {IClientWellKnown} wellKnown 
+ * @returns {IDelegatedAuthConfig} config when present and valid, otherwise undefined
+ * @throws when config is not found or invalid
+ */
+const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): IDelegatedAuthConfig => {
+    const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown);
+
+    if (!authentication) {
+        throw new Error(AutoDiscoveryError.OidcNotSupported);
+    }
+
+    if (
+        typeof authentication.issuer === "string" &&
+        !authentication.account || typeof authentication.account === "string"
+    ) {
+        return {
+            issuer: authentication.issuer,
+            account: authentication.account,
+        }
+    }
+
+    throw new Error(AutoDiscoveryError.OidcMisconfigured)
+}
+
+// force into a record to make accessing properties easier
+const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
+const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
+    if (!wellKnown[key] || typeof wellKnown[key] !== "string") {
+        logger.error(`OIDC issuer configuration: ${key} is invalid`)
+        return false;
+    }
+    return true;
+}
+const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, value: any): boolean => {
+    const array = wellKnown[key];
+    if (!array || !Array.isArray(array) || !array.find(value)) {
+        logger.error(`OIDC issuer configuration: ${key} is invalid. ${value} is required.`)
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Validates issue `.well-known/openid-configuration`
+ * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
+ * validates that OP is compatible with Element's OIDC flow
+ * @param {unknown} wellKnown 
+ * @returns {ValidatedIssuerConfig} valid issuer config
+ * @throws {Error} when issuer config is not found or is invalid
+ */
+const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuerConfig => {
+    if (!isRecord(wellKnown)) {
+        logger.error("Issuer configuration not found");
+        throw new Error(AutoDiscoveryError.OidcOpSupport);
+    }
+
+    const isInvalid = [
+        requiredStringProperty(wellKnown, 'authorization_endpoint'),
+        requiredStringProperty(wellKnown, 'token_endpoint'),
+        requiredStringProperty(wellKnown, 'registration_endpoint'),
+        requiredArrayValue(wellKnown, 'response_types_supported', 'code'),
+        requiredArrayValue(wellKnown, 'grant_types_supported', 'authorization_code'),
+        requiredArrayValue(wellKnown, 'code_challenge_methods_supported', 'S256'),
+    ].some(isValid => !isValid);
+
+    if (!isInvalid) {
+        return {
+            authorizationEndpoint: wellKnown['authorization_endpoint'],
+            tokenEndpoint: wellKnown['token_endpoint'],
+            registrationEndpoint: wellKnown['registration_endpoint'],
+        } as ValidatedIssuerConfig;
+    }
+
+    logger.error("Issuer configuration not valid");
+    throw new Error(AutoDiscoveryError.OidcOpSupport)
 }
 
 /**
@@ -170,7 +267,7 @@ export class AutoDiscovery {
         }
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
+        const hsVersions = await this.fetchWellKnownObject<IServerVersions>(`${hsUrl}/_matrix/client/versions`);
         if (!hsVersions?.raw?.["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
@@ -256,8 +353,53 @@ export class AutoDiscovery {
             }
         });
 
+        await this.validateDiscoveryAuthenticationConfig(wellknown);
+
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
+    }
+
+    public static async validateDiscoveryAuthenticationConfig(wellKnown: IClientWellKnown): Promise<DelegatedAuthConfig> {
+        try {
+            const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
+
+            const issuerOpenIdConfigUrl = `${this.sanitizeWellKnownUrl(homeserverAuthenticationConfig.issuer)}/.well-known/openid-configuration`;
+            const issuerWellKnown = await this.fetchWellKnownObject<unknown>(issuerOpenIdConfigUrl);
+
+            if (issuerWellKnown.action !== AutoDiscoveryAction.SUCCESS) {
+                // @TODO(kerrya) consider more error handling
+                throw new Error(AutoDiscoveryError.OidcGeneral)
+            }
+
+            const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown.raw);
+
+            const delegatedAuthConfig: DelegatedAuthConfig = {
+                state: AutoDiscoveryAction.SUCCESS,
+                error: null,
+                ...homeserverAuthenticationConfig,
+                ...validatedIssuerConfig
+            }
+            return delegatedAuthConfig;
+            
+        } catch (error) {
+            console.log('hhh', error);
+            // @TODO(kerrya) what to do here?
+            // should some be ignore and some fail_error?
+            // if (
+            //     (error as Error).message === AutoDiscoveryError.OidcNotSupported ||
+            //     (error as Error).message === AutoDiscoveryError.OidcMisconfigured   
+            // ) {
+            //     return {
+            //         state: AutoDiscoveryAction.IGNORE,
+            //             error: (error as Error).message as AutoDiscoveryError
+            //         }
+            //     };
+            // }
+            return {
+                state: AutoDiscoveryAction.FAIL_ERROR,
+                error: error.message as AutoDiscoveryError,
+            }
+        }
     }
 
     /**
@@ -412,7 +554,7 @@ export class AutoDiscovery {
      * @returns Promise which resolves to the returned state.
      * @internal
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+    private static async fetchWellKnownObject<T = IWellKnownConfig>(url: string): Promise<IWellKnownConfig<Partial<T>> > {
         let response: Response;
 
         try {

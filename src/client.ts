@@ -597,8 +597,8 @@ export interface IClientWellKnown {
     [M_AUTHENTICATION.name]?: IDelegatedAuthConfig; // MSC2965
 }
 
-export interface IWellKnownConfig {
-    raw?: IClientWellKnown;
+export interface IWellKnownConfig<T = IClientWellKnown> {
+    raw?: T;
     action?: AutoDiscoveryAction;
     reason?: string;
     error?: Error | string;
