@@ -17,6 +17,8 @@ import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
+import { ParticipantState } from "../groupCall";
+import { RoomMember } from "../../matrix";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
@@ -24,7 +26,12 @@ export class GroupCallStats {
     public readonly reports = new StatsReportEmitter();
     private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
 
-    public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
+    public constructor(
+        private groupCallId: string,
+        private userId: string,
+        private participants: Map<RoomMember, Map<string, ParticipantState>>,
+        private interval: number = 10000,
+    ) {}
 
     public start(): void {
         if (this.timer === undefined && this.interval > 0) {
@@ -67,10 +74,16 @@ export class GroupCallStats {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s));
+        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s, this.participants));
     }
 
     public setInterval(interval: number): void {
         this.interval = interval;
+    }
+    public setParticipants(participants: Map<RoomMember, Map<string, ParticipantState>>): void {
+        this.participants = participants;
+    }
+    public getParticipants(): Map<RoomMember, Map<string, ParticipantState>> {
+        return this.participants;
     }
 }

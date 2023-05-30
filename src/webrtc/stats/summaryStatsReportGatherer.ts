@@ -13,6 +13,8 @@ limitations under the License.
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReport } from "./statsReport";
+import { ParticipantState } from "../groupCall";
+import { RoomMember } from "../../matrix";
 
 interface CallStatsReportSummaryCounter {
     receivedAudio: number;
@@ -25,7 +27,10 @@ interface CallStatsReportSummaryCounter {
 export class SummaryStatsReportGatherer {
     public constructor(private emitter: StatsReportEmitter) {}
 
-    public build(allSummary: CallStatsReportSummary[]): void {
+    public build(
+        allSummary: CallStatsReportSummary[],
+        callParticipants: Map<RoomMember, Map<string, ParticipantState>>,
+    ): void {
         // Filter all stats which collect the first time webrtc stats.
         // Because stats based on time interval and the first collection of a summery stats has no previous
         // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
@@ -34,6 +39,16 @@ export class SummaryStatsReportGatherer {
         if (summaryTotalCount === 0) {
             return;
         }
+        // Calculate the actual number of devices based on the participants state event
+        // (this is used, to compare the expected participant count from the room state with the acutal peer connections)
+        // const devices = callParticipants.()
+        const devices: ({ id: String } & ParticipantState)[] = [];
+        for (const userEntry of callParticipants) {
+            for (const device of userEntry[1]) {
+                devices.push({ id: device[0], ...device[1] });
+            }
+        }
+
         const summaryCounter: CallStatsReportSummaryCounter = {
             receivedAudio: 0,
             receivedVideo: 0,
@@ -66,6 +81,9 @@ export class SummaryStatsReportGatherer {
                     : 0,
             ),
             peerConnections: summaryTotalCount,
+            roomStateExpectedPeerConnections: devices.length - 1,
+            missingPeerConnections: summaryTotalCount - (devices.length - 1),
+            percentageEstablishedPeerConnections: summaryTotalCount / (devices.length - 1),
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }

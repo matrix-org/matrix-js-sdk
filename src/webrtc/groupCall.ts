@@ -1595,6 +1595,9 @@ export class GroupCall extends TypedEventEmitter<
         });
 
         if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
+
+        // Update the participants stored in the stats object
+        this.stats?.setParticipants(this.participants);
     };
 
     private onStateChanged = (newState: GroupCallState, oldState: GroupCallState): void => {
@@ -1628,7 +1631,7 @@ export class GroupCall extends TypedEventEmitter<
     public getGroupCallStats(): GroupCallStats {
         if (this.stats === undefined) {
             const userID = this.client.getUserId() || "unknown";
-            this.stats = new GroupCallStats(this.groupCallId, userID, this.statsCollectIntervalTime);
+            this.stats = new GroupCallStats(this.groupCallId, userID, this.participants, this.statsCollectIntervalTime);
             this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
             this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
             this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
