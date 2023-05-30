@@ -350,3 +350,11 @@ export interface GeneratedSas {
  * English name.
  */
 export type EmojiMapping = [emoji: string, name: string];
+
+/**
+ * True if the request is in a state where it can be accepted (ie, that we're in phases {@link VerificationPhase.Unsent}
+ * or {@link VerificationPhase.Requested}, and that we're not in the process of sending a `ready` or `cancel`).
+ */
+export function canAcceptVerificationRequest(req: VerificationRequest): boolean {
+    return req.phase < VerificationPhase.Ready && !req.accepting && !req.declining;
+}

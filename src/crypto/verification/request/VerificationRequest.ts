@@ -25,6 +25,7 @@ import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
 import {
+    canAcceptVerificationRequest,
     VerificationPhase as Phase,
     VerificationRequest as IVerificationRequest,
     VerificationRequestEvent,
@@ -248,7 +249,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     }
 
     public get canAccept(): boolean {
-        return this.phase < PHASE_READY && !this._accepting && !this._declining;
+        return canAcceptVerificationRequest(this);
     }
 
     public get accepting(): boolean {
