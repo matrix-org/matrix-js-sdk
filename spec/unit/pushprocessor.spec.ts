@@ -97,51 +97,6 @@ describe("NotificationService", function () {
                         pattern: "foo*bar",
                         rule_id: "foobar",
                     },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "p[io]ng",
-                        rule_id: "pingpong",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "I ate [0-9] pies",
-                        rule_id: "pies",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "b[!ai]ke",
-                        rule_id: "bakebike",
-                    },
                 ],
                 override: [
                     {
