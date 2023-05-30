@@ -53,6 +53,19 @@ export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m
 }
 
 /**
+ * Normalizes homeserver domain or URL to a valid URL origin
+ * @param homeserver - homeserver domain or url
+ * @returns homeserver url with protocol
+ */
+const normalizeHomeserver = (homeserver: string): string => {
+    try {
+        return new URL(homeserver).origin;
+    } catch (err) {
+        return new URL(`https://${homeserver}`).origin;
+    }
+};
+
+/**
  * Utilities for automatically discovery resources, such as homeservers
  * for users to log in to.
  */
@@ -266,15 +279,15 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be discovered, and will be transparently included in the
      * response object unaltered.
-     * @param domain - The homeserver domain to perform discovery
-     * on. For example, "matrix.org".
+     * @param homeserver - The homeserver domain or url to perform discovery
+     * on. For example, "matrix.org", "https://matrix.org"
      * @returns Promise which resolves to the discovered
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
-    public static async findClientConfig(domain: string): Promise<ClientConfig> {
-        if (!domain || typeof domain !== "string" || domain.length === 0) {
-            throw new Error("'domain' must be a string of non-zero length");
+    public static async findClientConfig(homeserver: string): Promise<ClientConfig> {
+        if (!homeserver || typeof homeserver !== "string" || homeserver.length === 0) {
+            throw new Error("'homeserver' must be a string of non-zero length");
         }
 
         // We use a .well-known lookup for all cases. According to the spec, we
@@ -308,7 +321,8 @@ export class AutoDiscovery {
 
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
-        const wellknown = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
+        const homeserverUrl = normalizeHomeserver(homeserver);
+        const wellknown = await this.fetchWellKnownObject(`${homeserverUrl}/.well-known/matrix/client`);
         if (!wellknown || wellknown.action !== AutoDiscoveryAction.SUCCESS) {
             logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
@@ -334,16 +348,17 @@ export class AutoDiscovery {
      * Gets the raw discovery client configuration for the given domain name.
      * Should only be used if there's no validation to be done on the resulting
      * object, otherwise use findClientConfig().
-     * @param domain - The domain to get the client config for.
+     * @param homeserver- The homeserver domain or url to get client config for. For example, "matrix.org", "https://matrix.org"
      * @returns Promise which resolves to the domain's client config. Can
      * be an empty object.
      */
-    public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
-        if (!domain || typeof domain !== "string" || domain.length === 0) {
-            throw new Error("'domain' must be a string of non-zero length");
+    public static async getRawClientConfig(homeserver?: string): Promise<IClientWellKnown> {
+        if (!homeserver || typeof homeserver !== "string" || homeserver.length === 0) {
+            throw new Error("'homeserver' must be a string of non-zero length");
         }
 
-        const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
+        const homeserverUrl = normalizeHomeserver(homeserver);
+        const response = await this.fetchWellKnownObject(`${homeserverUrl}/.well-known/matrix/client`);
         if (!response) return {};
         return response.raw ?? {};
     }

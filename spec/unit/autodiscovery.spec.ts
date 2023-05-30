@@ -68,6 +68,26 @@ describe("AutoDiscovery", function () {
         ]);
     });
 
+    it("should handle a homeserver url that includes a protocol", async function () {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "http://example.org/.well-known/matrix/client").respond(200, {});
+        AutoDiscovery.findClientConfig("http://example.org");
+        await httpBackend.flushAllExpected();
+
+        // .well-known fetched using protocol from provided domain
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
+    it("should handle a homeserver domain that does not include a protocol", async function () {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "https://example.org/.well-known/matrix/client").respond(200, {});
+        AutoDiscovery.findClientConfig("example.org");
+        await httpBackend.flushAllExpected();
+
+        // https protocol added to domain for request
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
     it("should return PROMPT when .well-known 404s", function () {
         const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(404, {});
@@ -793,5 +813,37 @@ describe("AutoDiscovery", function () {
                 expect(conf).toEqual(expected);
             }),
         ]);
+    });
+
+    describe("getRawClientConfig()", () => {
+        it("should throw when homeserver is undefined", () => {
+            expect(AutoDiscovery.getRawClientConfig(undefined)).rejects.toThrow(
+                "'homeserver' must be a string of non-zero length",
+            );
+        });
+        it("should throw when homeserver is not a a string", () => {
+            expect(AutoDiscovery.getRawClientConfig({ url: "test.com" } as any)).rejects.toThrow(
+                "'homeserver' must be a string of non-zero length",
+            );
+        });
+        it("should fetch wellknown when homeserver includes protocol", async () => {
+            const httpBackend = getHttpBackend();
+            httpBackend.when("GET", "http://example.org/.well-known/matrix/client").respond(200, "<html>", true);
+
+            AutoDiscovery.getRawClientConfig("http://example.org");
+            await httpBackend.flushAllExpected();
+
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        it("should fetch wellknown with https when homeserver does not include protocol", async () => {
+            const httpBackend = getHttpBackend();
+            httpBackend.when("GET", "https://example.org/.well-known/matrix/client").respond(200, "<html>", true);
+
+            AutoDiscovery.getRawClientConfig("example.org");
+            await httpBackend.flushAllExpected();
+
+            httpBackend.verifyNoOutstandingRequests();
+        });
     });
 });
