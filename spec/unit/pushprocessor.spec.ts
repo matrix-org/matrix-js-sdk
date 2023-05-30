@@ -289,39 +289,6 @@ describe("NotificationService", function () {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    // TODO: This is not spec compliant behaviour.
-    //
-    // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1 which
-    // describes pattern should glob:
-    //
-    // 1. * matches 0 or more characters;
-    // 2. ? matches exactly one character
-    it("should bing on character group ([abc]) bing words.", function () {
-        testEvent.event.content!.body = "Ping!";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "Pong!";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    // TODO: This is not spec compliant behaviour. (See above.)
-    it("should bing on character range ([a-z]) bing words.", function () {
-        testEvent.event.content!.body = "I ate 6 pies";
-        const actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    // TODO: This is not spec compliant behaviour. (See above.)
-    it("should bing on character negation ([!a]) bing words.", function () {
-        testEvent.event.content!.body = "boke";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "bake";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(false);
-    });
-
     it("should not bing on room server ACL changes", function () {
         testEvent = utils.mkEvent({
             type: EventType.RoomServerAcl,
