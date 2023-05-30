@@ -357,7 +357,7 @@ export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended = false): string {
+export function globToRegexp(glob: string): string {
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
@@ -366,13 +366,7 @@ export function globToRegexp(glob: string, extended = false): string {
         [/\\\*/g, ".*"],
         [/\?/g, "."],
     ];
-    if (!extended) {
-        replacements.push([
-            /\\\[(!|)(.*)\\]/g,
-            (_match: string, neg: string, pat: string): string =>
-                ["[", neg ? "^" : "", pat.replace(/\\-/, "-"), "]"].join(""),
-        ]);
-    }
+
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
         (pat, args) => (args ? pat.replace(args[0], args[1] as any) : pat),
