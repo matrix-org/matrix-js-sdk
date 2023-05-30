@@ -26,6 +26,7 @@ import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
 import {
     VerificationPhase as Phase,
+    VerificationRequest as IVerificationRequest,
     VerificationRequestEvent,
     VerificationRequestEventHandlerMap,
 } from "../../../crypto-api/verification";
@@ -74,11 +75,13 @@ interface ITransition {
  * State machine for verification requests.
  * Things that differ based on what channel is used to
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
+ *
+ * @deprecated Avoid direct references: instead prefer {@link Crypto.VerificationRequest}.
  */
-export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends TypedEventEmitter<
-    VerificationRequestEvent,
-    VerificationRequestEventHandlerMap
-> {
+export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel>
+    extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
+    implements IVerificationRequest
+{
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
