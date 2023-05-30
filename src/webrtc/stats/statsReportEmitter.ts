@@ -19,7 +19,6 @@ import {
     ByteSentStatsReport,
     CallFeedReport,
     ConnectionStatsReport,
-    PeerConnectionReport,
     StatsReport,
     SummaryStatsReport,
 } from "./statsReport";

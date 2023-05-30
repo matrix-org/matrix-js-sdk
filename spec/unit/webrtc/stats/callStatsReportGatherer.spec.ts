@@ -173,16 +173,18 @@ describe("CallStatsReportGatherer", () => {
                 },
             };
             beforeEach(() => {
-                rtcSpy = new MockRTCPeerConnection() as RTCPeerConnection;
+                // @ts-ignore
+                rtcSpy = new MockRTCPeerConnection();
                 collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
                 const getStats = jest.spyOn(rtcSpy, "getStats");
+                // @ts-ignore
                 const previous = prevChromeReport as RTCStatsReport;
                 previous.get = (id: string) => {
                     return prevChromeReport.find((data) => data.id === id);
                 };
                 // @ts-ignore
                 collector.previousStatsReport = previous;
-
+                // @ts-ignore
                 const current = currentChromeReport as RTCStatsReport;
                 current.get = (id: string) => {
                     return currentChromeReport.find((data) => data.id === id);

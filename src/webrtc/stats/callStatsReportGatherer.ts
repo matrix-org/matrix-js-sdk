@@ -26,6 +26,7 @@ import { TrackStatsBuilder } from "./trackStatsBuilder";
 import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
 import { ValueFormatter } from "./valueFormatter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
+import { logger } from "../../logger";
 
 export class CallStatsReportGatherer {
     private isActive = true;
@@ -176,7 +177,7 @@ export class CallStatsReportGatherer {
 
     private handleError(error: any): void {
         this.isActive = false;
-        console.log("##### error", error);
+        logger.debug(`CallStatsReportGatherer ${this.callId} processStatsReport fails and set to inactive ${error}`);
     }
 
     private processAndEmitConnectionStatsReport(): void {

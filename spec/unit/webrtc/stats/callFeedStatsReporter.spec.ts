@@ -7,8 +7,8 @@ describe("CallFeedStatsReporter", () => {
     let rtcSpy: RTCPeerConnection;
     beforeEach(() => {});
 
-    describe("", () => {
-        it("should emit and receive ByteSendStatsReport", async () => {
+    describe("should", () => {
+        it("build CallFeedReport", async () => {
             expect(CallFeedStatsReporter.buildCallFeedReport(CALL_ID, USER_ID, rtcSpy)).toEqual({
                 callId: CALL_ID,
                 opponentMemberId: USER_ID,
