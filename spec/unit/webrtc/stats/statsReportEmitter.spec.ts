@@ -16,6 +16,7 @@ limitations under the License.
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 import {
     ByteSentStatsReport,
+    CallFeedReport,
     ConnectionStatsReport,
     StatsReport,
     SummaryStatsReport,
@@ -60,6 +61,18 @@ describe("StatsReportEmitter", () => {
                 return;
             });
             emitter.emitSummaryStatsReport(report);
+        });
+    });
+
+    it("should emit and receive CallFeedReports", async () => {
+        const report = {} as CallFeedReport;
+        return new Promise((resolve, _) => {
+            emitter.on(StatsReport.CALL_FEED_REPORT, (r) => {
+                expect(r).toBe(report);
+                resolve(null);
+                return;
+            });
+            emitter.emitCallFeedReport(report);
         });
     });
 });

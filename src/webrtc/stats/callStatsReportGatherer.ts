@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
+import { ByteSend, ByteSentStatsReport, CallFeedReport, TrackID } from "./statsReport";
 import { ConnectionStatsBuilder } from "./connectionStatsBuilder";
 import { TransportStatsBuilder } from "./transportStatsBuilder";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
@@ -62,10 +62,11 @@ export class CallStatsReportGatherer {
                     .then((report) => {
                         // @ts-ignore
                         this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
+
                         try {
                             this.processStatsReport(groupCallId, localUserId);
                         } catch (error) {
-                            this.isActive = false;
+                            this.handleError(error);
                             return summary;
                         }
 
@@ -161,6 +162,7 @@ export class CallStatsReportGatherer {
         });
 
         this.emitter.emitByteSendReport(byteSentStatsReport);
+        this.emitter.emitCallFeedReport({} as CallFeedReport);
         this.processAndEmitConnectionStatsReport();
     }
 
@@ -172,8 +174,9 @@ export class CallStatsReportGatherer {
         return this.isActive;
     }
 
-    private handleError(_: any): void {
+    private handleError(error: any): void {
         this.isActive = false;
+        console.log("##### error", error);
     }
 
     private processAndEmitConnectionStatsReport(): void {

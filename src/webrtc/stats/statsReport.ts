@@ -20,6 +20,7 @@ import { Resolution } from "./media/mediaTrackStats";
 
 export enum StatsReport {
     CONNECTION_STATS = "StatsReport.connection_stats",
+    CALL_FEED_REPORT = "StatsReport.call_feed_report",
     BYTE_SENT_STATS = "StatsReport.byte_sent_stats",
     SUMMARY_STATS = "StatsReport.summary_stats",
 }
@@ -46,6 +47,11 @@ export interface ConnectionStatsReport {
     codec: CodecMap;
     jitter: Map<TrackID, number>;
     transport: TransportStats[];
+}
+
+export interface CallFeedReport {
+    callId: string;
+    opponentMemberId: string;
 }
 
 export interface AudioConcealment {
