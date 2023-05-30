@@ -172,7 +172,7 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
  */
 export const MSC3912_RELATION_BASED_REDACTIONS_PROP = new UnstableValue(
-    "with_relations",
+    "with_rel_types",
     "org.matrix.msc3912.with_relations",
 );
 

@@ -181,9 +181,7 @@ describe("MatrixClient", function () {
         data: SYNC_DATA,
     };
 
-    const unstableFeatures: Record<string, boolean> = {
-        "org.matrix.msc3440.stable": true,
-    };
+    let unstableFeatures: Record<string, boolean> = {};
 
     // items are popped off when processed and block if no items left.
     let httpLookups: HttpLookup[] = [];
@@ -342,6 +340,11 @@ describe("MatrixClient", function () {
         store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
+
+        unstableFeatures = {
+            "org.matrix.msc3440.stable": true,
+        };
+
         makeClient();
 
         // set reasonable working defaults
@@ -1373,7 +1376,7 @@ describe("MatrixClient", function () {
             await client.redactEvent(roomId, eventId, txnId, { reason });
         });
 
-        describe("when calling with with_relations", () => {
+        describe.each(["with_rel_types", "with_relations"])("when calling with %s", (withRelTypesPropName) => {
             const eventId = "$event42:example.org";
 
             it("should raise an error if server has no support for relation based redactions", async () => {
@@ -1384,7 +1387,7 @@ describe("MatrixClient", function () {
 
                 expect(() => {
                     client.redactEvent(roomId, eventId, txnId, {
-                        with_relations: [RelationType.Reference],
+                        [withRelTypesPropName]: [RelationType.Reference],
                     });
                 }).toThrow(
                     new Error(
@@ -1394,36 +1397,40 @@ describe("MatrixClient", function () {
                 );
             });
 
-            describe("and the server supports relation based redactions (unstable)", () => {
-                beforeEach(async () => {
-                    unstableFeatures["org.matrix.msc3912"] = true;
-                    // load supported features
-                    await client.getVersions();
-                });
-
-                it("should send with_relations in the request body", async () => {
-                    const txnId = client.makeTxnId();
-
-                    httpLookups = [
-                        {
-                            method: "PUT",
-                            path:
-                                `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
-                                `/${encodeURIComponent(txnId)}`,
-                            expectBody: {
-                                reason: "redaction test",
-                                [MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: [RelationType.Reference],
-                            },
-                            data: { event_id: eventId },
-                        },
-                    ];
-
-                    await client.redactEvent(roomId, eventId, txnId, {
-                        reason: "redaction test",
-                        with_relations: [RelationType.Reference],
+            // expects both string[] and string to work
+            describe.each([[RelationType.Reference], RelationType.Reference])(
+                "and the server supports relation based redactions (%s, unstable)",
+                (relationType: RelationType | Array<RelationType>) => {
+                    beforeEach(async () => {
+                        unstableFeatures["org.matrix.msc3912"] = true;
+                        // load supported features
+                        await client.getVersions();
                     });
-                });
-            });
+
+                    it("should send with_rel_types in the request body", async () => {
+                        const txnId = client.makeTxnId();
+
+                        httpLookups = [
+                            {
+                                method: "PUT",
+                                path:
+                                    `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
+                                    `/${encodeURIComponent(txnId)}`,
+                                expectBody: {
+                                    reason: "redaction test",
+                                    [MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: [RelationType.Reference],
+                                },
+                                data: { event_id: eventId },
+                            },
+                        ];
+
+                        await client.redactEvent(roomId, eventId, txnId, {
+                            reason: "redaction test",
+                            [withRelTypesPropName]: relationType,
+                        });
+                    });
+                },
+            );
         });
     });
 
