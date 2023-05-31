@@ -322,8 +322,8 @@ describe("Room", function () {
         it("Make sure legacy overload passing options directly as parameters still works", async () => {
             await expect(room.addLiveEvents(events, DuplicateStrategy.Replace, false)).resolves.not.toThrow();
             await expect(room.addLiveEvents(events, DuplicateStrategy.Ignore, true)).resolves.not.toThrow();
-            // @ts-ignore
             await expect(
+                // @ts-ignore
                 room.addLiveEvents(events, "shouldfailbecauseinvalidduplicatestrategy", false),
             ).rejects.toThrow();
         });
