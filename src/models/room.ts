@@ -2797,13 +2797,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     public partitionThreadedEvents(
         events: MatrixEvent[],
-    ): [timelineEvents: MatrixEvent[], threadedEvents: MatrixEvent[]] {
+    ): [timelineEvents: MatrixEvent[], threadedEvents: MatrixEvent[], unknownRelations: MatrixEvent[]] {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
+        const UNKNOWN_RELATION = 2;
         if (this.client.supportsThreads()) {
             const threadRoots = this.findThreadRoots(events);
-            return events.reduce(
+            return events.reduce<[MatrixEvent[], MatrixEvent[], MatrixEvent[]]>(
                 (memo, event: MatrixEvent) => {
                     const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
                         event,
@@ -2820,13 +2821,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         memo[THREAD].push(event);
                     }
 
+                    if (!shouldLiveInThread && !shouldLiveInRoom) {
+                        memo[UNKNOWN_RELATION].push(event);
+                    }
+
                     return memo;
                 },
-                [[] as MatrixEvent[], [] as MatrixEvent[]],
+                [[], [], []],
             );
         } else {
             // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
-            return [events as MatrixEvent[], [] as MatrixEvent[]];
+            return [events as MatrixEvent[], [] as MatrixEvent[], [] as MatrixEvent[]];
         }
     }
 
