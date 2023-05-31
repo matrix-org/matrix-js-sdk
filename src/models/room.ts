@@ -2096,7 +2096,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client?.supportsThreads() || !event.isRelation()) {
+        if (!this.client?.supportsThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2130,6 +2130,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
         if (parentEvent && (event.isRelation() || event.isRedaction())) {
             return this.eventShouldLiveIn(parentEvent, events, roots);
+        }
+
+        if (!event.isRelation()) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
         }
 
         // Edge case where we know the event is a relation but don't have the parentEvent
