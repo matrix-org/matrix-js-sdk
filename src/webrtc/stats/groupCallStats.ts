@@ -70,9 +70,9 @@ export class GroupCallStats {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) =>
-            this.summaryStatsReportGatherer.build(s, this.participants),
-        );
+        Promise.all(summary)
+            .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s, this.participants))
+            .catch((err) => alert(err));
     }
 
     public setInterval(interval: number): void {

@@ -15,6 +15,7 @@ limitations under the License.
 */
 import { GroupCallStats } from "../../../../src/webrtc/stats/groupCallStats";
 import { CallStatsReportSummary } from "../../../../src/webrtc/stats/callStatsReportSummary";
+import { groupCallParticipantsOneOtherDevice } from "../../../test-utils/webrtc";
 
 const GROUP_CALL_ID = "GROUP_ID";
 const LOCAL_USER_ID = "LOCAL_USER_ID";
@@ -158,6 +159,13 @@ describe("GroupCallStats", () => {
             jest.spyOn(global, "clearInterval");
             stats.stop();
             expect(clearInterval).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("on setting participants", () => {
+        it("should return the same participants", async () => {
+            stats.setParticipants(groupCallParticipantsOneOtherDevice);
+            expect(stats.getParticipants()).toBe(groupCallParticipantsOneOtherDevice);
         });
     });
 });
