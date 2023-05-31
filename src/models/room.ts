@@ -2701,16 +2701,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param addLiveEventOptions - addLiveEvent options
      * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void>;
     /**
      * @deprecated In favor of the overload with `IAddLiveEventOptions`
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
-    public addLiveEvents(
+    public async addLiveEvents(
+        events: MatrixEvent[],
+        duplicateStrategy?: DuplicateStrategy,
+        fromCache?: boolean,
+    ): Promise<void>;
+    public async addLiveEvents(
         events: MatrixEvent[],
         duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
         fromCache = false,
-    ): void {
+    ): Promise<void> {
         let duplicateStrategy: DuplicateStrategy | undefined = duplicateStrategyOrOpts as DuplicateStrategy;
         let timelineWasEmpty: boolean | undefined = false;
         if (typeof duplicateStrategyOrOpts === "object") {
@@ -2761,6 +2765,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             timelineWasEmpty,
         };
 
+        // List of extra events to check for being parents of any relations encountered
+        const neighbouringEvents = [...events];
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
@@ -2774,11 +2781,26 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
 
-            const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+            let { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
                 event,
-                events,
+                neighbouringEvents,
                 threadRoots,
             );
+
+            if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
+                try {
+                    const parentEvent = await this.client.fetchRoomEvent(this.roomId, event.relationEventId!);
+                    neighbouringEvents.push(new MatrixEvent(parentEvent));
+
+                    ({ shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+                        event,
+                        neighbouringEvents,
+                        threadRoots,
+                    ));
+                } catch (e) {
+                    logger.error("Failed to load parent event of unhandled relation", e);
+                }
+            }
 
             if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
                 eventsByThread[threadId ?? ""] = [];
@@ -2787,6 +2809,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
+            } else if (!shouldLiveInThread && event.isRelation()) {
+                this.relations.aggregateChildEvent(event);
             }
         }
 

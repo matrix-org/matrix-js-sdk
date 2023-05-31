@@ -501,7 +501,7 @@ export class SyncApi {
                 },
             )
             .then(
-                (res) => {
+                async (res) => {
                     if (this._peekRoom !== peekRoom) {
                         debuglog("Stopped peeking in room %s", peekRoom.roomId);
                         return;
@@ -541,7 +541,7 @@ export class SyncApi {
                         })
                         .map(this.client.getEventMapper());
 
-                    peekRoom.addLiveEvents(events);
+                    await peekRoom.addLiveEvents(events);
                     this.peekPoll(peekRoom, res.end);
                 },
                 (err) => {
@@ -1773,7 +1773,7 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], {
+        await room.addLiveEvents(timelineEventList || [], {
             fromCache,
             timelineWasEmpty,
         });
