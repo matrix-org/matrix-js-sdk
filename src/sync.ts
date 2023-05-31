@@ -899,8 +899,6 @@ export class SyncApi {
             // Reset after a successful sync
             this.failedSyncCount = 0;
 
-            await this.client.store.setSyncData(data);
-
             const syncEventData = {
                 oldSyncToken: syncToken ?? undefined,
                 nextSyncToken: data.next_batch,
@@ -923,6 +921,9 @@ export class SyncApi {
                 // Emit the exception for client handling
                 this.client.emit(ClientEvent.SyncUnexpectedError, <Error>e);
             }
+
+            // Persist after processing as processing may mutate `unsigned`
+            await this.client.store.setSyncData(data);
 
             // update this as it may have changed
             syncEventData.catchingUp = this.catchingUp;
