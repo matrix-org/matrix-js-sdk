@@ -52,6 +52,8 @@ export interface ConnectionStatsReport {
 export interface CallFeedReport {
     callId: string;
     opponentMemberId: string;
+    transceiver: TransceiverStats[]
+    callFeeds: CallFeedStats[]
 }
 
 export interface AudioConcealment {
@@ -89,4 +91,29 @@ export interface SummaryStatsReport {
     maxPacketLoss: number;
     percentageConcealedAudio: number;
     peerConnections: number;
+}
+
+
+export interface TransceiverStats {
+    readonly mid: string;
+    readonly sender: TrackStats | null;
+    readonly receiver: TrackStats | null;
+    readonly direction: string;
+    readonly currenDirection: string;
+}
+export interface TrackStats {
+    readonly id: string;
+    readonly kind: "audio" | "video";
+    readonly stream: string;
+    readonly muted: boolean;
+    readonly enabled: boolean;
+    readonly readyState: "ended" | "live";
+}
+
+export interface CallFeedStats {
+    id: string;
+    type: "remote" | "local";
+    audio: TrackStats | null;
+    video: TrackStats | null;
+    purpose: string
 }
