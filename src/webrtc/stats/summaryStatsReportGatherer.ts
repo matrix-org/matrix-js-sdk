@@ -36,6 +36,8 @@ export class SummaryStatsReportGatherer {
         // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
         const summary = allSummary.filter((s) => !s.isFirstCollection);
         const summaryTotalCount = summary.length;
+        // For counting the peer connections we also want to consider the ignored summaries
+        const peerConnectionsCount= allSummary.length;
         if (summaryTotalCount === 0) {
             return;
         }
@@ -80,10 +82,10 @@ export class SummaryStatsReportGatherer {
                     ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
                     : 0,
             ),
-            peerConnections: summaryTotalCount,
+            peerConnections: peerConnectionsCount,
             roomStateExpectedPeerConnections: devices.length - 1,
-            missingPeerConnections: summaryTotalCount - (devices.length - 1),
-            percentageEstablishedPeerConnections: summaryTotalCount / (devices.length - 1),
+            missingPeerConnections: (devices.length - 1) - peerConnectionsCount,
+            percentageEstablishedPeerConnections: peerConnectionsCount / (devices.length - 1),
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
