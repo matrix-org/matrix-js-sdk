@@ -27,11 +27,7 @@ export class GroupCallStats {
     private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
     private participants: Map<RoomMember, Map<string, ParticipantState>> = new Map();
 
-    public constructor(
-        private groupCallId: string,
-        private userId: string,
-        private interval: number = 10000,
-    ) {}
+    public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
     public start(): void {
         if (this.timer === undefined && this.interval > 0) {
@@ -74,7 +70,9 @@ export class GroupCallStats {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s, this.participants));
+        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) =>
+            this.summaryStatsReportGatherer.build(s, this.participants),
+        );
     }
 
     public setInterval(interval: number): void {
