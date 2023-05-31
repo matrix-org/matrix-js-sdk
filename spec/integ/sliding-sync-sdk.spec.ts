@@ -42,7 +42,7 @@ import { SyncApiOptions, SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
-import { defer } from "../../lib/utils";
+import { defer } from "../../src/utils";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;
