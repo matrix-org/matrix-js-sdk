@@ -75,6 +75,8 @@ import { isPollEvent, Poll, PollEvent } from "./poll";
 export const KNOWN_SAFE_ROOM_VERSION = "9";
 const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
+const UNSIGNED_THREAD_ID_FIELD = "io.element.relation_thread_id";
+
 interface IOpts {
     /**
      * Controls where pending messages appear in a room's timeline.
@@ -2148,6 +2150,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
+        const unsigned = event.getUnsigned();
+        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD] === "string") {
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: unsigned[UNSIGNED_THREAD_ID_FIELD],
+            };
+        }
+
         // We've exhausted all scenarios,
         // we cannot assume that it lives in the main timeline as this may be a relation for an unknown thread
         return {
@@ -2796,8 +2807,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
                 try {
-                    const parentEvent = await this.client.fetchRoomEvent(this.roomId, event.relationEventId!);
-                    neighbouringEvents.push(new MatrixEvent(parentEvent));
+                    const parentEvent = new MatrixEvent(
+                        await this.client.fetchRoomEvent(this.roomId, event.relationEventId!),
+                    );
+                    neighbouringEvents.push(parentEvent);
+                    if (parentEvent.threadRootId) {
+                        threadRoots.add(parentEvent.threadRootId);
+                        const unsigned = event.getUnsigned();
+                        unsigned[UNSIGNED_THREAD_ID_FIELD] = parentEvent.threadRootId;
+                        event.setUnsigned(unsigned);
+                    }
 
                     ({ shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
                         event,
@@ -2874,6 +2893,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const event of events) {
             if (event.isRelation(THREAD_RELATION_TYPE.name)) {
                 threadRoots.add(event.relationEventId ?? "");
+            }
+            const unsigned = event.getUnsigned();
+            if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD] === "string") {
+                threadRoots.add(unsigned[UNSIGNED_THREAD_ID_FIELD]);
             }
         }
         return threadRoots;
