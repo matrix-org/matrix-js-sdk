@@ -63,7 +63,7 @@ export interface IUnsigned {
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
-    "io.element.relation_thread_id"?: string;
+    "org.matrix.msc4023.thread_id"?: string;
 }
 
 export interface IThreadBundledRelationship {

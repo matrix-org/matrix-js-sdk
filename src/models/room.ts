@@ -75,8 +75,6 @@ import { isPollEvent, Poll, PollEvent } from "./poll";
 export const KNOWN_SAFE_ROOM_VERSION = "9";
 const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-const UNSIGNED_THREAD_ID_FIELD = "io.element.relation_thread_id";
-
 interface IOpts {
     /**
      * Controls where pending messages appear in a room's timeline.
@@ -2151,11 +2149,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         const unsigned = event.getUnsigned();
-        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD] === "string") {
+        if (typeof unsigned["org.matrix.msc4023.thread_id"] === "string") {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: unsigned[UNSIGNED_THREAD_ID_FIELD],
+                threadId: unsigned["org.matrix.msc4023.thread_id"],
             };
         }
 
@@ -2814,7 +2812,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     if (parentEvent.threadRootId) {
                         threadRoots.add(parentEvent.threadRootId);
                         const unsigned = event.getUnsigned();
-                        unsigned[UNSIGNED_THREAD_ID_FIELD] = parentEvent.threadRootId;
+                        unsigned["org.matrix.msc4023.thread_id"] = parentEvent.threadRootId;
                         event.setUnsigned(unsigned);
                     }
 
@@ -2895,8 +2893,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 threadRoots.add(event.relationEventId ?? "");
             }
             const unsigned = event.getUnsigned();
-            if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD] === "string") {
-                threadRoots.add(unsigned[UNSIGNED_THREAD_ID_FIELD]);
+            if (typeof unsigned["org.matrix.msc4023.thread_id"] === "string") {
+                threadRoots.add(unsigned["org.matrix.msc4023.thread_id"]);
             }
         }
         return threadRoots;
