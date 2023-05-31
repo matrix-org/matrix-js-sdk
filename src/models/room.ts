@@ -2096,7 +2096,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client?.supportsThreads()) {
+        if (!this.client?.supportsThreads() || !event.isRelation()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2141,9 +2141,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // We've exhausted all scenarios, can safely assume that this event should live in the room timeline only
+        // We've exhausted all scenarios,
+        // we cannot assume that it lives in the main timeline as this may be a relation for an unknown thread
         return {
-            shouldLiveInRoom: true,
+            shouldLiveInRoom: false,
             shouldLiveInThread: false,
         };
     }
