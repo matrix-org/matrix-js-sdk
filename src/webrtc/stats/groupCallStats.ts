@@ -25,11 +25,11 @@ export class GroupCallStats {
     private readonly gatherers: Map<string, CallStatsReportGatherer> = new Map<string, CallStatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
     private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
+    private participants: Map<RoomMember, Map<string, ParticipantState>> = new Map();
 
     public constructor(
         private groupCallId: string,
         private userId: string,
-        private participants: Map<RoomMember, Map<string, ParticipantState>>,
         private interval: number = 10000,
     ) {}
 

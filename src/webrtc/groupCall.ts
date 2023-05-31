@@ -1631,7 +1631,8 @@ export class GroupCall extends TypedEventEmitter<
     public getGroupCallStats(): GroupCallStats {
         if (this.stats === undefined) {
             const userID = this.client.getUserId() || "unknown";
-            this.stats = new GroupCallStats(this.groupCallId, userID, this.participants, this.statsCollectIntervalTime);
+            this.stats = new GroupCallStats(this.groupCallId, userID, this.statsCollectIntervalTime);
+            this.stats.setParticipants(this.participants);
             this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
             this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
             this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
