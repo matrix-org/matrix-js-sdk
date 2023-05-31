@@ -9,7 +9,7 @@
 # Matrix JavaScript SDK
 
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
-browser or in Node.js or in Deno.
+browser or in Node.js.
 
 The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only
 guarantees that a feature will be supported for at least 4 spec releases. For example, if a feature the js-sdk supports
@@ -55,16 +55,7 @@ client.publicRooms(function (err, data) {
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
 
-## In Deno
-
-```javascript
-import * as sdk from "npm:matrix-js-sdk";
-const client = sdk.createClient({ baseUrl: "https://matrix.org" });
-await client.publicRooms(function (err, data) {
-    console.log("Public Rooms: %s", JSON.stringify(data));
-});
-```
-you can run with `deno run --allow-net myclient.ts`
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
 
 To start the client:
 
