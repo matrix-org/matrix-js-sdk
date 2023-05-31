@@ -357,27 +357,14 @@ export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended = false): string {
-    // From
-    // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
-    // Because micromatch is about 130KB with dependencies,
-    // and minimatch is not much better.
-    const replacements: [RegExp, string | ((substring: string, ...args: any[]) => string)][] = [
-        [/\\\*/g, ".*"],
-        [/\?/g, "."],
-    ];
-    if (!extended) {
-        replacements.push([
-            /\\\[(!|)(.*)\\]/g,
-            (_match: string, neg: string, pat: string): string =>
-                ["[", neg ? "^" : "", pat.replace(/\\-/, "-"), "]"].join(""),
-        ]);
-    }
-    return replacements.reduce(
-        // https://github.com/microsoft/TypeScript/issues/30134
-        (pat, args) => (args ? pat.replace(args[0], args[1] as any) : pat),
-        escapeRegExp(glob),
-    );
+/**
+ * Converts Matrix glob-style string to a regular expression
+ * https://spec.matrix.org/v1.7/appendices/#glob-style-matching
+ * @param glob - Matrix glob-style string
+ * @returns regular expression
+ */
+export function globToRegexp(glob: string): string {
+    return escapeRegExp(glob).replace(/\\\*/g, ".*").replace(/\?/g, ".");
 }
 
 export function ensureNoTrailingSlash(url: string): string;
