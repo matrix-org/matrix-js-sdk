@@ -110,6 +110,7 @@ export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
     [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
+    [GroupCallStatsReportEvent.CallFeedStats]: (report: GroupCallStatsReport<CallFeedReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -118,7 +119,9 @@ export enum GroupCallErrorCode {
     PlaceCallFailed = "place_call_failed",
 }
 
-export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport> {
+export interface GroupCallStatsReport<
+    T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport | CallFeedReport,
+> {
     report: T;
 }
 

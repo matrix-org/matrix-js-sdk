@@ -25,15 +25,17 @@ export enum StatsReport {
     SUMMARY_STATS = "StatsReport.summary_stats",
 }
 
+/// ByteSentStatsReport ################################################################################################
+export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
+    // is a map: `local trackID` => byte send
+    callId: string;
+    opponentMemberId: string;
+}
+
 export type TrackID = string;
 export type ByteSend = number;
 
-export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
-    callId: string;
-    opponentMemberId: string;
-    // is a map: `local trackID` => byte send
-}
-
+/// ConnectionStatsReport ##############################################################################################
 export interface ConnectionStatsReport {
     callId: string;
     opponentMemberId: string;
@@ -47,13 +49,6 @@ export interface ConnectionStatsReport {
     codec: CodecMap;
     jitter: Map<TrackID, number>;
     transport: TransportStats[];
-}
-
-export interface CallFeedReport {
-    callId: string;
-    opponentMemberId: string;
-    transceiver: TransceiverStats[];
-    callFeeds: CallFeedStats[];
 }
 
 export interface AudioConcealment {
@@ -76,6 +71,7 @@ export interface CodecMap {
     remote: Map<TrackID, string>;
 }
 
+/// SummaryStatsReport #################################################################################################
 export interface SummaryStatsReport {
     /**
      * Aggregated the information for percentage of received media
@@ -93,6 +89,24 @@ export interface SummaryStatsReport {
     peerConnections: number;
 }
 
+/// CallFeedReport #####################################################################################################
+export interface CallFeedReport {
+    callId: string;
+    opponentMemberId: string;
+    transceiver: TransceiverStats[];
+    callFeeds: CallFeedStats[];
+}
+
+export interface CallFeedStats {
+    type: "remote" | "local";
+    audio: TrackStats | null;
+    video: TrackStats | null;
+    purpose: string;
+    prefix: string;
+    isVideoMuted: boolean;
+    isAudioMuted: boolean;
+}
+
 export interface TransceiverStats {
     readonly mid: string;
     readonly sender: TrackStats | null;
@@ -108,14 +122,4 @@ export interface TrackStats {
     readonly muted: boolean;
     readonly enabled: boolean;
     readonly readyState: "ended" | "live";
-}
-
-export interface CallFeedStats {
-    type: "remote" | "local";
-    audio: TrackStats | null;
-    video: TrackStats | null;
-    purpose: string;
-    prefix: string;
-    isVideoMuted: boolean;
-    isAudioMuted: boolean;
 }

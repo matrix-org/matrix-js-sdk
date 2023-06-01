@@ -1,6 +1,5 @@
 import { CallFeedStatsReporter } from "../../../../src/webrtc/stats/callFeedStatsReporter";
 import { CallFeedReport } from "../../../../src/webrtc/stats/statsReport";
-import { MockRTCPeerConnection } from "../../../test-utils/webrtc";
 import { CallFeed } from "../../../../src/webrtc/callFeed";
 
 const CALL_ID = "CALL_ID";
@@ -23,7 +22,7 @@ describe("CallFeedStatsReporter", () => {
                     {
                         currenDirection: "sendonly",
                         direction: "sendrecv",
-                        mid: 0,
+                        mid: "0",
                         receiver: {
                             enabled: true,
                             id: "receiver_audio_0",
@@ -44,7 +43,7 @@ describe("CallFeedStatsReporter", () => {
                     {
                         currenDirection: "sendrecv",
                         direction: "recvonly",
-                        mid: 1,
+                        mid: "1",
                         receiver: {
                             enabled: true,
                             id: "receiver_video_1",
@@ -65,7 +64,7 @@ describe("CallFeedStatsReporter", () => {
                     {
                         currenDirection: "recvonly",
                         direction: "recvonly",
-                        mid: 2,
+                        mid: "2",
                         receiver: {
                             enabled: true,
                             id: "receiver_video_2",
@@ -82,11 +81,15 @@ describe("CallFeedStatsReporter", () => {
 
         it("extend CallFeedReport with call feeds", async () => {
             const feed = buildCallFeedMock("1");
-            const callFeeds: CallFeed[] = [feed];
+            const callFeedList: CallFeed[] = [feed];
+            const report = {
+                callId: "callId",
+                opponentMemberId: "opponentMemberId",
+                transceiver: [],
+                callFeeds: [],
+            } as CallFeedReport;
 
-            expect(
-                CallFeedStatsReporter.expandCallFeedReport({ callFeeds: [] } as CallFeedReport, callFeeds).callFeeds,
-            ).toEqual([
+            expect(CallFeedStatsReporter.expandCallFeedReport(report, callFeedList).callFeeds).toEqual([
                 {
                     audio: {
                         enabled: true,
@@ -115,21 +118,21 @@ describe("CallFeedStatsReporter", () => {
 
     const buildTransceiverMocks = (): RTCRtpTransceiver[] => {
         const trans1 = {
-            mid: 0,
+            mid: "0",
             direction: "sendrecv",
             currentDirection: "sendonly",
             sender: buildSenderMock("sender_audio_0", "audio"),
             receiver: buildReceiverMock("receiver_audio_0", "audio"),
         } as RTCRtpTransceiver;
         const trans2 = {
-            mid: 1,
+            mid: "1",
             direction: "recvonly",
             currentDirection: "sendrecv",
             sender: buildSenderMock("sender_video_1", "video"),
             receiver: buildReceiverMock("receiver_video_1", "video"),
         } as RTCRtpTransceiver;
         const trans3 = {
-            mid: 2,
+            mid: "2",
             direction: "recvonly",
             currentDirection: "recvonly",
             sender: { track: null } as RTCRtpSender,

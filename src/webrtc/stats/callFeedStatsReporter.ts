@@ -11,9 +11,9 @@ export class CallFeedStatsReporter {
             const sender = t.sender?.track ? CallFeedStatsReporter.buildTrackStats(t.sender.track, "") : null;
             const receiver = CallFeedStatsReporter.buildTrackStats(t.receiver.track, "");
             transceiver.push({
-                mid: t.mid,
+                mid: t.mid == null ? "null" : t.mid,
                 direction: t.direction,
-                currenDirection: t.currentDirection,
+                currenDirection: t.currentDirection == null ? "null" : t.currentDirection,
                 sender,
                 receiver,
             });
@@ -41,7 +41,7 @@ export class CallFeedStatsReporter {
     public static expandCallFeedReport(
         report: CallFeedReport,
         callFeeds: CallFeed[],
-        prefix: string = "unknown",
+        prefix = "unknown",
     ): CallFeedReport {
         callFeeds.forEach((feed) => {
             const audioTracks = feed.stream.getAudioTracks();
