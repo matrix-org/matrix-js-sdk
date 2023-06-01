@@ -1938,11 +1938,6 @@ describe("MatrixClient event timelines", function () {
                     return THREAD_ROOT;
                 });
             httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
                 .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function () {
                     return {
