@@ -23,5 +23,5 @@ try {
     global.Olm = require("@matrix-org/olm");
     logger.log("loaded libolm");
 } catch (e) {
-    logger.warn("unable to run crypto tests: libolm not available");
+    logger.warn("unable to run crypto tests: libolm not available", e);
 }

@@ -186,10 +186,7 @@ describe("Group Call", function () {
         it("sets state to local call feed uninitialized when getUserMedia() fails", async () => {
             jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockRejectedValue("Error");
 
-            try {
-                await groupCall.initLocalCallFeed();
-            } catch (e) {}
-
+            await expect(groupCall.initLocalCallFeed()).rejects.toBeTruthy();
             expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
         });
 

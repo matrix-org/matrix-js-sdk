@@ -13,16 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { StatsValueFormatter } from "../../../../src/webrtc/stats/statsValueFormatter";
+import { ValueFormatter } from "../../../../src/webrtc/stats/valueFormatter";
 
-describe("StatsValueFormatter", () => {
+describe("ValueFormatter", () => {
     describe("on get non negative values", () => {
         it("formatter shod return number", async () => {
-            expect(StatsValueFormatter.getNonNegativeValue("2")).toEqual(2);
-            expect(StatsValueFormatter.getNonNegativeValue(0)).toEqual(0);
-            expect(StatsValueFormatter.getNonNegativeValue("-2")).toEqual(0);
-            expect(StatsValueFormatter.getNonNegativeValue("")).toEqual(0);
-            expect(StatsValueFormatter.getNonNegativeValue(NaN)).toEqual(0);
+            expect(ValueFormatter.getNonNegativeValue("2")).toEqual(2);
+            expect(ValueFormatter.getNonNegativeValue(0)).toEqual(0);
+            expect(ValueFormatter.getNonNegativeValue("-2")).toEqual(0);
+            expect(ValueFormatter.getNonNegativeValue("")).toEqual(0);
+            expect(ValueFormatter.getNonNegativeValue(NaN)).toEqual(0);
         });
     });
 });

@@ -6,7 +6,7 @@ import "../olm-loader";
 
 import { logger } from "../../src/logger";
 import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, IPusher, MatrixClient, MsgType } from "../../src";
+import { ClientEvent, EventType, IPusher, MatrixClient, MsgType, RelationType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -258,6 +258,9 @@ export interface IMessageOpts {
  * @param opts.user - The user ID for the event.
  * @param opts.msg - Optional. The content.body for the event.
  * @param opts.event - True to make a MatrixEvent.
+ * @param opts.relatesTo - An IEventRelation relating this to another event.
+ * @param opts.ts - The timestamp of the event.
+ * @param opts.event - True to make a MatrixEvent.
  * @param client - If passed along with opts.event=true will be used to set up re-emitters.
  * @returns The event
  */
@@ -297,6 +300,7 @@ interface IReplyMessageOpts extends IMessageOpts {
  * @param opts.room - The room ID for the event.
  * @param opts.user - The user ID for the event.
  * @param opts.msg - Optional. The content.body for the event.
+ * @param opts.ts - The timestamp of the event.
  * @param opts.replyToMessage - The replied message
  * @param opts.event - True to make a MatrixEvent.
  * @param client - If passed along with opts.event=true will be used to set up re-emitters.
@@ -328,6 +332,73 @@ export function mkReplyMessage(
         eventOpts.content.body = "Random->" + Math.random();
     }
     return mkEvent(eventOpts, client);
+}
+
+/**
+ * Create a reaction event.
+ *
+ * @param target - the event we are reacting to.
+ * @param client - the MatrixClient
+ * @param userId - the userId of the sender
+ * @param roomId - the id of the room we are in
+ * @param ts - The timestamp of the event.
+ * @returns The event
+ */
+export function mkReaction(
+    target: MatrixEvent,
+    client: MatrixClient,
+    userId: string,
+    roomId: string,
+    ts?: number,
+): MatrixEvent {
+    return mkEvent(
+        {
+            event: true,
+            type: EventType.Reaction,
+            user: userId,
+            room: roomId,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: target.getId()!,
+                    key: Math.random().toString(),
+                },
+            },
+            ts,
+        },
+        client,
+    );
+}
+
+export function mkEdit(
+    target: MatrixEvent,
+    client: MatrixClient,
+    userId: string,
+    roomId: string,
+    msg?: string,
+    ts?: number,
+) {
+    msg = msg ?? `Edit of ${target.getId()}`;
+    return mkEvent(
+        {
+            event: true,
+            type: EventType.RoomMessage,
+            user: userId,
+            room: roomId,
+            content: {
+                "body": `* ${msg}`,
+                "m.new_content": {
+                    body: msg,
+                },
+                "m.relates_to": {
+                    rel_type: RelationType.Replace,
+                    event_id: target.getId()!,
+                },
+            },
+            ts,
+        },
+        client,
+    );
 }
 
 /**

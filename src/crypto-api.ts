@@ -114,7 +114,7 @@ export interface CryptoApi {
     /**
      * Return whether we trust other user's signatures of their devices.
      *
-     * @see {@link CryptoApi#setTrustCrossSignedDevices}
+     * @see {@link Crypto.CryptoApi#setTrustCrossSignedDevices}
      *
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
@@ -126,7 +126,8 @@ export interface CryptoApi {
      * @param userId - The ID of the user whose device is to be checked.
      * @param deviceId - The ID of the device to check
      *
-     * @returns Verification status of the device, or `null` if the device is not known
+     * @returns `null` if the device is unknown, or has not published any encryption keys (implying it does not support
+     *     encryption); otherwise the verification status of the device.
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
 
@@ -147,7 +148,7 @@ export interface CryptoApi {
     /**
      * Get the ID of one of the user's cross-signing keys.
      *
-     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigngingKey.SelfSigning`,
+     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
      *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
      *
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
@@ -252,7 +253,7 @@ export class DeviceVerificationStatus {
      * A device is "verified" if either:
      *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
-     *    cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+     *    cross-signed devices via {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
      *
      * @returns true if this device is verified via any means.
      */
@@ -260,3 +261,5 @@ export class DeviceVerificationStatus {
         return this.localVerified || (this.trustCrossSignedDevices && this.crossSigningVerified);
     }
 }
+
+export * from "./crypto-api/verification";

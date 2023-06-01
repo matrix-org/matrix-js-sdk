@@ -501,7 +501,7 @@ export class SyncApi {
                 },
             )
             .then(
-                (res) => {
+                async (res) => {
                     if (this._peekRoom !== peekRoom) {
                         debuglog("Stopped peeking in room %s", peekRoom.roomId);
                         return;
@@ -541,7 +541,7 @@ export class SyncApi {
                         })
                         .map(this.client.getEventMapper());
 
-                    peekRoom.addLiveEvents(events);
+                    await peekRoom.addLiveEvents(events);
                     this.peekPoll(peekRoom, res.end);
                 },
                 (err) => {
@@ -899,8 +899,6 @@ export class SyncApi {
             // Reset after a successful sync
             this.failedSyncCount = 0;
 
-            await this.client.store.setSyncData(data);
-
             const syncEventData = {
                 oldSyncToken: syncToken ?? undefined,
                 nextSyncToken: data.next_batch,
@@ -923,6 +921,10 @@ export class SyncApi {
                 // Emit the exception for client handling
                 this.client.emit(ClientEvent.SyncUnexpectedError, <Error>e);
             }
+
+            // Persist after processing as `unsigned` may get mutated
+            // with an `org.matrix.msc4023.thread_id`
+            await this.client.store.setSyncData(data);
 
             // update this as it may have changed
             syncEventData.catchingUp = this.catchingUp;
@@ -1627,16 +1629,17 @@ export class SyncApi {
         return Object.keys(obj)
             .filter((k) => !unsafeProp(k))
             .map((roomId) => {
-                const arrObj = obj[roomId] as T & { room: Room; isBrandNewRoom: boolean };
                 let room = client.store.getRoom(roomId);
                 let isBrandNewRoom = false;
                 if (!room) {
                     room = this.createRoom(roomId);
                     isBrandNewRoom = true;
                 }
-                arrObj.room = room;
-                arrObj.isBrandNewRoom = isBrandNewRoom;
-                return arrObj;
+                return {
+                    ...obj[roomId],
+                    room,
+                    isBrandNewRoom,
+                };
             });
     }
 
@@ -1773,7 +1776,7 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], {
+        await room.addLiveEvents(timelineEventList || [], {
             fromCache,
             timelineWasEmpty,
         });

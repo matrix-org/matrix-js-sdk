@@ -36,7 +36,11 @@ import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
-import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
+import {
+    GroupCallEventHandler,
+    GroupCallEventHandlerEvent,
+    GroupCallEventHandlerEventHandlerMap,
+} from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
 import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
@@ -180,7 +184,6 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
@@ -2577,7 +2580,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
-     * @deprecated prefer {@link CryptoApi#getCrossSigningKeyId}
+     * @deprecated prefer {@link Crypto.CryptoApi#getCrossSigningKeyId}
      */
     public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {
@@ -2624,7 +2627,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - The ID of the user whose devices is to be checked.
      * @param deviceId - The ID of the device to check
      *
-     * @deprecated Use {@link CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         if (!this.crypto) {
@@ -4087,27 +4090,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             queryString["server_name"] = opts.viaServers;
         }
 
-        try {
-            const data: IJoinRequestBody = {};
-            const signedInviteObj = await signPromise;
-            if (signedInviteObj) {
-                data.third_party_signed = signedInviteObj;
-            }
-
-            const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
-            const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
-
-            const roomId = res.room_id;
-            const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-            const room = syncApi.createRoom(roomId);
-            if (opts.syncRoom) {
-                // v2 will do this for us
-                // return syncApi.syncRoom(room);
-            }
-            return room;
-        } catch (e) {
-            throw e; // rethrow for reject
+        const data: IJoinRequestBody = {};
+        const signedInviteObj = await signPromise;
+        if (signedInviteObj) {
+            data.third_party_signed = signedInviteObj;
         }
+
+        const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
+        const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
+
+        const roomId = res.room_id;
+        const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
+        const syncRoom = syncApi.createRoom(roomId);
+        if (opts.syncRoom) {
+            // v2 will do this for us
+            // return syncApi.syncRoom(room);
+        }
+        return syncRoom;
     }
 
     /**
@@ -5005,7 +5004,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rpEvent?: MatrixEvent,
     ): Promise<{}> {
         const room = this.getRoom(roomId);
-        if (room && room.hasPendingEvent(rmEventId)) {
+        if (room?.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
         }
 
@@ -5058,9 +5057,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const key = ts + "_" + url;
 
         // If there's already a request in flight (or we've handled it), return that instead.
-        const cachedPreview = this.urlPreviewCache[key];
-        if (cachedPreview) {
-            return cachedPreview;
+        if (key in this.urlPreviewCache) {
+            return this.urlPreviewCache[key];
         }
 
         const resp = this.http.authedRequest<IPreviewUrlResponse>(
@@ -5575,11 +5573,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.currentState.setUnknownStateEvents(stateEvents);
                     }
 
-                    const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, threadedEvents, unknownRelations] =
+                        room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     room.oldState.paginationToken = res.end ?? null;
                     if (res.chunk.length === 0) {
@@ -5688,11 +5688,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
+        unknownRelations.forEach((event) => timelineSet.relations.aggregateChildEvent(event));
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -6232,7 +6233,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
@@ -6240,6 +6241,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     const atEnd = res.end === undefined || res.end === res.start;
 

@@ -25,14 +25,13 @@ import {
     ISendEventFromWidgetResponseData,
 } from "matrix-widget-api";
 
-import { IEvent, IContent, EventStatus } from "./models/event";
+import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
 import { ISendEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
 import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts, SendToDeviceContentMap } from "./client";
 import { SyncApi, SyncState } from "./sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
-import { MatrixEvent } from "./models/event";
 import { User } from "./models/user";
 import { Room } from "./models/room";
 import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage";

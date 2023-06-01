@@ -200,4 +200,11 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.warn("Unrecognised message from worker: ", msg);
         }
     };
+
+    /*
+     * Destroy the web worker
+     */
+    public async destroy(): Promise<void> {
+        this.worker?.terminate();
+    }
 }

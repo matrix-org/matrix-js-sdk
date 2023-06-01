@@ -1111,7 +1111,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
             expect([...(e as any).devices.keys()]).toEqual([aliceClient.getUserId()!]);
-            expect((e as any).devices.get(aliceClient.getUserId()!).has("DEVICE_ID"));
+            expect((e as any).devices.get(aliceClient.getUserId()!).has("DEVICE_ID")).toBeTruthy();
         }
 
         // mark the device as known, and resend.

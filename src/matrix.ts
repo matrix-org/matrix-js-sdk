@@ -37,6 +37,7 @@ export * from "./models/event-timeline-set";
 export * from "./models/poll";
 export * from "./models/room-member";
 export * from "./models/room-state";
+export * from "./models/typed-event-emitter";
 export * from "./models/user";
 export * from "./models/device";
 export * from "./scheduler";
@@ -63,9 +64,29 @@ export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
 export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
-export type { CryptoApi } from "./crypto-api";
-export { DeviceVerificationStatus } from "./crypto-api";
 export { CryptoEvent } from "./crypto";
+
+/**
+ * Types supporting cryptography.
+ *
+ * The most important is {@link Crypto.CryptoApi}, an instance of which can be retrieved via
+ * {@link MatrixClient.getCrypto}.
+ */
+export * as Crypto from "./crypto-api";
+
+/**
+ * Backwards compatibility re-export
+ * @internal
+ * @deprecated use {@link Crypto.CryptoApi}
+ */
+export type { CryptoApi } from "./crypto-api";
+
+/**
+ * Backwards compatibility re-export
+ * @internal
+ * @deprecated use {@link Crypto.DeviceVerificationStatus}
+ */
+export { DeviceVerificationStatus } from "./crypto-api";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
