@@ -4627,10 +4627,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+        const content: IContent = { reason };
 
-        let withRelTypesContent = {};
-
-        if (opts?.with_rel_types) {
+        if (opts?.with_rel_types !== undefined) {
             if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
                 throw new Error(
                     "Server does not support relation based redactions " +
@@ -4643,9 +4642,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
                     : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!;
 
-            withRelTypesContent = {
-                [withRelTypesPropName]: opts.with_rel_types,
-            };
+            content[withRelTypesPropName] = opts.with_rel_types;
         }
 
         return this.sendCompleteEvent(
@@ -4653,10 +4650,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: {
-                    ...withRelTypesContent,
-                    reason,
-                },
+                content,
                 redacts: eventId,
             },
             txnId as string,
