@@ -27,10 +27,7 @@ interface CallStatsReportSummaryCounter {
 export class SummaryStatsReportGatherer {
     public constructor(private emitter: StatsReportEmitter) {}
 
-    public build(
-        allSummary: CallStatsReportSummary[],
-        callParticipants: Map<RoomMember, Map<string, ParticipantState>>,
-    ): void {
+    public build(allSummary: CallStatsReportSummary[]): void {
         // Filter all stats which collect the first time webrtc stats.
         // Because stats based on time interval and the first collection of a summery stats has no previous
         // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
@@ -40,15 +37,6 @@ export class SummaryStatsReportGatherer {
         const peerConnectionsCount = allSummary.length;
         if (summaryTotalCount === 0) {
             return;
-        }
-        // Calculate the actual number of devices based on the participants state event
-        // (this is used, to compare the expected participant count from the room state with the acutal peer connections)
-        // const devices = callParticipants.()
-        const devices: ({ id: String } & ParticipantState)[] = [];
-        for (const userEntry of callParticipants) {
-            for (const device of userEntry[1]) {
-                devices.push({ id: device[0], ...device[1] });
-            }
         }
 
         const summaryCounter: CallStatsReportSummaryCounter = {
@@ -83,11 +71,30 @@ export class SummaryStatsReportGatherer {
                     : 0,
             ),
             peerConnections: peerConnectionsCount,
-            roomStateExpectedPeerConnections: devices.length - 1,
-            missingPeerConnections: devices.length - peerConnectionsCount - 1,
-            percentageEstablishedPeerConnections: peerConnectionsCount / (devices.length - 1),
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
+    }
+
+    public static extendSummaryReport(
+        report: SummaryStatsReport,
+        callParticipants: Map<RoomMember, Map<string, ParticipantState>>,
+    ): void {
+        // Calculate the actual number of devices based on the participants state event
+        // (this is used, to compare the expected participant count from the room state with the acutal peer connections)
+        // const devices = callParticipants.()
+        const devices: [string, ParticipantState][] = [];
+        const users: [RoomMember, Map<string, ParticipantState>][] = [];
+        for (const userEntry of callParticipants) {
+            users.push(userEntry);
+            for (const device of userEntry[1]) {
+                devices.push(device);
+            }
+        }
+        report.oppDevicesInCall = Math.max(0, devices.length - 1);
+        report.oppUsersInCall = Math.max(0, users.length - 1);
+        report.diffDevicesToPeerConnections = Math.max(0, devices.length - 1) - report.peerConnections;
+        report.ratioPeerConnectionToDevices =
+            Math.max(0, devices.length - 1) == 0 ? 0 : report.peerConnections / (devices.length - 1);
     }
 
     private countTrackListReceivedMedia(counter: CallStatsReportSummaryCounter, stats: CallStatsReportSummary): void {

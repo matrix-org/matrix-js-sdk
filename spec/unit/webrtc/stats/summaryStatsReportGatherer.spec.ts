@@ -15,7 +15,8 @@ limitations under the License.
 */
 import { SummaryStatsReportGatherer } from "../../../../src/webrtc/stats/summaryStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
-import { groupCallParticipantsOneOtherDevice, groupCallParticipantsFourOtherDevices } from "../../../test-utils/webrtc";
+import { groupCallParticipantsFourOtherDevices } from "../../../test-utils/webrtc";
+
 describe("SummaryStatsReportGatherer", () => {
     let reporter: SummaryStatsReportGatherer;
     let emitter: StatsReportEmitter;
@@ -27,37 +28,34 @@ describe("SummaryStatsReportGatherer", () => {
 
     describe("build Summary Stats Report", () => {
         it("should do nothing if  summary list empty", async () => {
-            reporter.build([], new Map());
+            reporter.build([]);
             expect(emitter.emitSummaryStatsReport).not.toHaveBeenCalled();
         });
         it("should do nothing if a summary stats element collection the is first time", async () => {
-            reporter.build(
-                [
-                    {
-                        isFirstCollection: true,
-                        receivedMedia: 10,
-                        receivedAudioMedia: 4,
-                        receivedVideoMedia: 6,
-                        audioTrackSummary: {
-                            count: 1,
-                            muted: 0,
-                            maxJitter: 0,
-                            maxPacketLoss: 0,
-                            concealedAudio: 0,
-                            totalAudio: 100,
-                        },
-                        videoTrackSummary: {
-                            count: 1,
-                            muted: 0,
-                            maxJitter: 0,
-                            maxPacketLoss: 0,
-                            concealedAudio: 0,
-                            totalAudio: 0,
-                        },
+            reporter.build([
+                {
+                    isFirstCollection: true,
+                    receivedMedia: 10,
+                    receivedAudioMedia: 4,
+                    receivedVideoMedia: 6,
+                    audioTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 0,
+                        maxPacketLoss: 0,
+                        concealedAudio: 0,
+                        totalAudio: 100,
                     },
-                ],
-                groupCallParticipantsOneOtherDevice,
-            );
+                    videoTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 0,
+                        maxPacketLoss: 0,
+                        concealedAudio: 0,
+                        totalAudio: 0,
+                    },
+                },
+            ]);
             expect(emitter.emitSummaryStatsReport).not.toHaveBeenCalled();
         });
 
@@ -152,7 +150,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsFourOtherDevices);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 0.5,
                 percentageReceivedAudioMedia: 0.5,
@@ -161,9 +159,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 4,
                 percentageConcealedAudio: 0.0375,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 4,
             });
         });
 
@@ -192,7 +187,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -201,9 +196,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -232,7 +224,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 0,
                 percentageReceivedAudioMedia: 1,
@@ -241,9 +233,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -272,7 +261,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 0,
                 percentageReceivedAudioMedia: 0,
@@ -281,9 +270,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -378,7 +364,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsFourOtherDevices);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -387,9 +373,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 40,
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 4,
             });
         });
 
@@ -418,7 +401,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -427,9 +410,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -458,7 +438,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -467,9 +447,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -498,7 +475,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsOneOtherDevice);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -507,9 +484,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 0,
                 peerConnections: 1,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 1,
             });
         });
 
@@ -604,7 +578,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsFourOtherDevices);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -613,9 +587,6 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 40,
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 0,
-                percentageEstablishedPeerConnections: 1,
-                roomStateExpectedPeerConnections: 4,
             });
         });
         it("should report missing peer connections", async () => {
@@ -665,7 +636,7 @@ describe("SummaryStatsReportGatherer", () => {
                     },
                 },
             ];
-            reporter.build(summary, groupCallParticipantsFourOtherDevices);
+            reporter.build(summary);
             expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -674,9 +645,58 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 40,
                 peerConnections: 2,
                 percentageConcealedAudio: 0,
-                missingPeerConnections: 2,
-                percentageEstablishedPeerConnections: 0.5,
-                roomStateExpectedPeerConnections: 4,
+            });
+        });
+    });
+    describe("extend Summary Stats Report", () => {
+        it("should extend the report with the appropriate data based on a user map", async () => {
+            const summary = {
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+            };
+            SummaryStatsReportGatherer.extendSummaryReport(summary, groupCallParticipantsFourOtherDevices);
+            expect(summary).toStrictEqual({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+                oppUsersInCall: 1,
+                oppDevicesInCall: 4,
+                diffDevicesToPeerConnections: 0,
+                ratioPeerConnectionToDevices: 1,
+            });
+        });
+        it("should extend the report data based on a user map", async () => {
+            const summary = {
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+            };
+            SummaryStatsReportGatherer.extendSummaryReport(summary, new Map());
+            expect(summary).toStrictEqual({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+                oppUsersInCall: 0,
+                oppDevicesInCall: 0,
+                diffDevicesToPeerConnections: -4,
+                ratioPeerConnectionToDevices: 0,
             });
         });
     });

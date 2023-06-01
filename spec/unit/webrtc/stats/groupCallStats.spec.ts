@@ -161,13 +161,6 @@ describe("GroupCallStats", () => {
             expect(clearInterval).not.toHaveBeenCalled();
         });
     });
-
-    describe("on setting participants", () => {
-        it("should return the same participants", async () => {
-            stats.setParticipants(groupCallParticipantsOneOtherDevice);
-            expect(stats.getParticipants()).toBe(groupCallParticipantsOneOtherDevice);
-        });
-    });
 });
 
 const mockRTCPeerConnection = (): RTCPeerConnection => {

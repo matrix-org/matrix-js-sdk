@@ -71,17 +71,11 @@ export class GroupCallStats {
         });
 
         Promise.all(summary)
-            .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s, this.participants))
+            .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s))
             .catch((err) => alert(err));
     }
 
     public setInterval(interval: number): void {
         this.interval = interval;
-    }
-    public setParticipants(participants: Map<RoomMember, Map<string, ParticipantState>>): void {
-        this.participants = participants;
-    }
-    public getParticipants(): Map<RoomMember, Map<string, ParticipantState>> {
-        return this.participants;
     }
 }
