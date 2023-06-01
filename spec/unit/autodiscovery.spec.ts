@@ -450,6 +450,50 @@ describe("AutoDiscovery", function () {
         ]);
     });
 
+    it("should return SUCCESS with authentication error when authentication config is invalid", function () {
+        const httpBackend = getHttpBackend();
+        httpBackend
+            .when("GET", "/_matrix/client/versions")
+            .check((req) => {
+                expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
+            })
+            .respond(200, {
+                versions: ["r0.0.1"],
+            });
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                // Note: we also expect this test to trim the trailing slash
+                base_url: "https://chat.example.org/",
+            },
+            "m.authentication": {
+                invalid: true,
+            },
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "SUCCESS",
+                        error: null,
+                        base_url: "https://chat.example.org",
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                    "m.authentication": {
+                        state: "FAIL_ERROR",
+                        error: OidcDiscoveryError.Misconfigured,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
     it(
         "should return SUCCESS / FAIL_PROMPT when the identity server configuration " + "is wrong (missing base_url)",
         function () {
