@@ -2151,6 +2151,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // We've exhausted all scenarios,
         // we cannot assume that it lives in the main timeline as this may be a relation for an unknown thread
+        // adding the event in the wrong timeline causes stuck notifications and can break ability to send read receipts
         return {
             shouldLiveInRoom: false,
             shouldLiveInThread: false,
