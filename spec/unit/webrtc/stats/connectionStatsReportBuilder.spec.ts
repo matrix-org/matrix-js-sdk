@@ -39,9 +39,7 @@ describe("StatsReportBuilder", () => {
 
     describe("should build stats", () => {
         it("by media track stats.", async () => {
-            expect(ConnectionStatsReportBuilder.build("callId", "oMemberId", stats)).toEqual({
-                callId: "callId",
-                opponentMemberId: "oMemberId",
+            expect(ConnectionStatsReportBuilder.build(stats)).toEqual({
                 bitrate: {
                     audio: {
                         download: 4000,

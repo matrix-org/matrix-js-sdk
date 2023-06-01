@@ -17,12 +17,8 @@ import { AudioConcealment, CodecMap, ConnectionStatsReport, FramerateMap, Resolu
 import { MediaTrackStats, Resolution } from "./media/mediaTrackStats";
 
 export class ConnectionStatsReportBuilder {
-    public static build(
-        callId: string,
-        opponentMemberId: string,
-        stats: Map<TrackID, MediaTrackStats>,
-    ): ConnectionStatsReport {
-        const report = { callId, opponentMemberId } as ConnectionStatsReport;
+    public static build(stats: Map<TrackID, MediaTrackStats>): ConnectionStatsReport {
+        const report = {} as ConnectionStatsReport;
 
         // process stats
         const totalPackets = {
