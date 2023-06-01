@@ -2113,11 +2113,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         // A thread relation is always only shown in a thread
-        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+        const threadRootId = event.threadRootId;
+        if (threadRootId != undefined) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: event.threadRootId,
+                threadId: threadRootId,
             };
         }
 
@@ -2145,15 +2146,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
                 threadId: event.relationEventId,
-            };
-        }
-
-        const unsigned = event.getUnsigned();
-        if (typeof unsigned["org.matrix.msc4023.thread_id"] === "string") {
-            return {
-                shouldLiveInRoom: false,
-                shouldLiveInThread: true,
-                threadId: unsigned["org.matrix.msc4023.thread_id"],
             };
         }
 
@@ -2888,12 +2880,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
-            if (event.isRelation(THREAD_RELATION_TYPE.name)) {
-                threadRoots.add(event.relationEventId ?? "");
-            }
-            const unsigned = event.getUnsigned();
-            if (typeof unsigned["org.matrix.msc4023.thread_id"] === "string") {
-                threadRoots.add(unsigned["org.matrix.msc4023.thread_id"]);
+            const threadRootId = event.threadRootId;
+            if (threadRootId != undefined) {
+                threadRoots.add(threadRootId);
             }
         }
         return threadRoots;
