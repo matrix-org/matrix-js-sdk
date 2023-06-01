@@ -48,19 +48,18 @@ enum AutoDiscoveryError {
     InvalidJson = "Invalid JSON",
 }
 
-interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
+interface AutoDiscoveryState {
     state: AutoDiscoveryAction;
     error?: IWellKnownConfig["error"] | null;
 }
-interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
-    state: AutoDiscoveryAction;
-    error?: IWellKnownConfig["error"] | null;
-}
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error">, AutoDiscoveryState {}
+
+interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig, AutoDiscoveryState {}
 
 export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
-    "m.authentication"?: DelegatedAuthConfig;
+    "m.authentication"?: DelegatedAuthConfig | AutoDiscoveryState;
 }
 
 /**
@@ -276,7 +275,7 @@ export class AutoDiscovery {
 
     public static async validateDiscoveryAuthenticationConfig(
         wellKnown: IClientWellKnown,
-    ): Promise<DelegatedAuthConfig> {
+    ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {
         try {
             const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
 
@@ -310,11 +309,10 @@ export class AutoDiscovery {
                     ? AutoDiscoveryAction.IGNORE
                     : AutoDiscoveryAction.FAIL_ERROR;
 
-            // @TODO(kerrya) better way to handle this fail type
             return {
                 state,
                 error: errorType,
-            } as unknown as DelegatedAuthConfig;
+            };
         }
     }
 
