@@ -81,10 +81,35 @@ describe("CallFeedStatsReporter", () => {
         });
 
         it("extend CallFeedReport with call feeds", async () => {
-            const callFeeds: CallFeed[] = [];
+            const feed = buildCallFeedMock("1");
+            const callFeeds: CallFeed[] = [feed];
+
             expect(
                 CallFeedStatsReporter.expandCallFeedReport({ callFeeds: [] } as CallFeedReport, callFeeds).callFeeds,
-            ).toEqual([]);
+            ).toEqual([
+                {
+                    audio: {
+                        enabled: true,
+                        id: "video-1",
+                        kind: "video",
+                        muted: false,
+                        readyState: "live",
+                        stream: "stream-1",
+                    },
+                    prefix: "unknown",
+                    type: "local",
+                    isAudioMuted: true,
+                    isVideoMuted: false,
+                    video: {
+                        enabled: true,
+                        id: "audio-1",
+                        kind: "audio",
+                        muted: false,
+                        readyState: "live",
+                        stream: "stream-1",
+                    },
+                },
+            ]);
         });
     });
 
@@ -136,5 +161,23 @@ describe("CallFeedStatsReporter", () => {
             muted: false,
             readyState: "live",
         } as MediaStreamTrack;
+    };
+
+    const buildCallFeedMock = (id: string, isLocal = true): CallFeed => {
+        const stream = {
+            id: `stream-${id}`,
+            getAudioTracks(): MediaStreamTrack[] {
+                return [buildTrackMock(`video-${id}`, "video")];
+            },
+            getVideoTracks(): MediaStreamTrack[] {
+                return [buildTrackMock(`audio-${id}`, "audio")];
+            },
+        } as MediaStream;
+        return {
+            stream,
+            isLocal: () => isLocal,
+            isVideoMuted: () => false,
+            isAudioMuted: () => true,
+        } as CallFeed;
     };
 });

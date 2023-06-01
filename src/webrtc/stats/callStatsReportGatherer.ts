@@ -177,7 +177,7 @@ export class CallStatsReportGatherer {
 
     private handleError(error: any): void {
         this.isActive = false;
-        logger.debug(`CallStatsReportGatherer ${this.callId} processStatsReport fails and set to inactive ${error}`);
+        logger.warn(`CallStatsReportGatherer ${this.callId} processStatsReport fails and set to inactive ${error}`);
     }
 
     private processAndEmitConnectionStatsReport(): void {

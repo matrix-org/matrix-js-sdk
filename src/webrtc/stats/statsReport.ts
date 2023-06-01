@@ -52,8 +52,8 @@ export interface ConnectionStatsReport {
 export interface CallFeedReport {
     callId: string;
     opponentMemberId: string;
-    transceiver: TransceiverStats[]
-    callFeeds: CallFeedStats[]
+    transceiver: TransceiverStats[];
+    callFeeds: CallFeedStats[];
 }
 
 export interface AudioConcealment {
@@ -93,7 +93,6 @@ export interface SummaryStatsReport {
     peerConnections: number;
 }
 
-
 export interface TransceiverStats {
     readonly mid: string;
     readonly sender: TrackStats | null;
@@ -101,6 +100,7 @@ export interface TransceiverStats {
     readonly direction: string;
     readonly currenDirection: string;
 }
+
 export interface TrackStats {
     readonly id: string;
     readonly kind: "audio" | "video";
@@ -111,9 +111,11 @@ export interface TrackStats {
 }
 
 export interface CallFeedStats {
-    id: string;
     type: "remote" | "local";
     audio: TrackStats | null;
     video: TrackStats | null;
-    purpose: string
+    purpose: string;
+    prefix: string;
+    isVideoMuted: boolean;
+    isAudioMuted: boolean;
 }

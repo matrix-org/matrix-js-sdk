@@ -38,7 +38,33 @@ export class CallFeedStatsReporter {
         } as TrackStats;
     }
 
-    public static expandCallFeedReport(report: CallFeedReport, callFeeds: CallFeed[]): CallFeedReport {
+    public static expandCallFeedReport(
+        report: CallFeedReport,
+        callFeeds: CallFeed[],
+        prefix: string = "unknown",
+    ): CallFeedReport {
+        callFeeds.forEach((feed) => {
+            const audioTracks = feed.stream.getAudioTracks();
+            const videoTracks = feed.stream.getVideoTracks();
+            const audio =
+                audioTracks.length > 0
+                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getAudioTracks()[0], feed.stream.id)
+                    : null;
+            const video =
+                videoTracks.length > 0
+                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getVideoTracks()[0], feed.stream.id)
+                    : null;
+            const feedStats = {
+                type: feed.isLocal() ? "local" : "remote",
+                audio,
+                video,
+                purpose: feed.purpose,
+                prefix,
+                isVideoMuted: feed.isVideoMuted(),
+                isAudioMuted: feed.isAudioMuted(),
+            } as CallFeedStats;
+            report.callFeeds.push(feedStats);
+        });
         return report;
     }
 }
