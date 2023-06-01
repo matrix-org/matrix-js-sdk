@@ -39,6 +39,7 @@ import {
     UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
+    UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
@@ -2113,12 +2114,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         // A thread relation is always only shown in a thread
-        const threadRootId = event.threadRootId;
-        if (threadRootId != undefined) {
+        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: threadRootId,
+                threadId: event.threadRootId,
             };
         }
 
@@ -2146,6 +2146,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
                 threadId: event.relationEventId,
+            };
+        }
+
+        const unsigned = event.getUnsigned();
+        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: unsigned[UNSIGNED_THREAD_ID_FIELD.name],
             };
         }
 
@@ -2804,7 +2813,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     if (parentEvent.threadRootId) {
                         threadRoots.add(parentEvent.threadRootId);
                         const unsigned = event.getUnsigned();
-                        unsigned["org.matrix.msc4023.thread_id"] = parentEvent.threadRootId;
+                        unsigned[UNSIGNED_THREAD_ID_FIELD.name] = parentEvent.threadRootId;
                         event.setUnsigned(unsigned);
                     }
 
@@ -2881,9 +2890,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
-            const threadRootId = event.threadRootId;
-            if (threadRootId != undefined) {
-                threadRoots.add(threadRootId);
+            if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+                threadRoots.add(event.relationEventId ?? "");
+            }
+            const unsigned = event.getUnsigned();
+            if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+                threadRoots.add(unsigned[UNSIGNED_THREAD_ID_FIELD.name]!);
             }
         }
         return threadRoots;

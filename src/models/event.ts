@@ -579,16 +579,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
-        }
-        if (this.thread) {
-            return this.thread.id;
-        }
-        if (this.threadId) {
-            return this.threadId;
-        }
-        const unsigned = this.getUnsigned();
-        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
-            return unsigned[UNSIGNED_THREAD_ID_FIELD.name];
+        } else {
+            return this.getThread()?.id || this.threadId;
         }
     }
 
