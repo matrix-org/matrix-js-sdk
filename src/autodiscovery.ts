@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions } from "./client";
+import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions, M_AUTHENTICATION } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
 import {
@@ -268,7 +268,7 @@ export class AutoDiscovery {
         });
 
         const authConfig = await this.validateDiscoveryAuthenticationConfig(wellknown);
-        clientConfig.m_authentication = authConfig;
+        clientConfig[M_AUTHENTICATION.stable!] = authConfig;
 
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
@@ -300,16 +300,19 @@ export class AutoDiscovery {
             };
             return delegatedAuthConfig;
         } catch (error) {
-            console.log("hhh", error);
-
             const errorMessage = (error as Error).message as unknown as OidcDiscoveryError;
             const errorType = Object.values(OidcDiscoveryError).includes(errorMessage)
                 ? errorMessage
                 : OidcDiscoveryError.General;
 
+            const state =
+                errorType === OidcDiscoveryError.NotSupported
+                    ? AutoDiscoveryAction.IGNORE
+                    : AutoDiscoveryAction.FAIL_ERROR;
+
             // @TODO(kerrya) better way to handle this fail type
             return {
-                state: AutoDiscoveryAction.FAIL_ERROR,
+                state,
                 error: errorType,
             } as unknown as DelegatedAuthConfig;
         }

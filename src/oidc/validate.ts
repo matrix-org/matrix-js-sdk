@@ -1,3 +1,19 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
 import { logger } from "../logger";
 
@@ -29,8 +45,8 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
     }
 
     if (
-        (typeof authentication.issuer === "string" && !authentication.account) ||
-        typeof authentication.account === "string"
+        typeof authentication.issuer === "string" &&
+        (!authentication.account || typeof authentication.account === "string")
     ) {
         return {
             issuer: authentication.issuer,
@@ -42,7 +58,8 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
 };
 
 // force into a record to make accessing properties easier
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === "object" && !Array.isArray(value);
 const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!wellKnown[key] || typeof wellKnown[key] !== "string") {
         logger.error(`OIDC issuer configuration: ${key} is invalid`);
@@ -52,7 +69,7 @@ const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string)
 };
 const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, value: any): boolean => {
     const array = wellKnown[key];
-    if (!array || !Array.isArray(array) || !array.find(value)) {
+    if (!array || !Array.isArray(array) || !array.includes(value)) {
         logger.error(`OIDC issuer configuration: ${key} is invalid. ${value} is required.`);
         return false;
     }
@@ -69,7 +86,7 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
  */
 export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuerConfig => {
     if (!isRecord(wellKnown)) {
-        logger.error("Issuer configuration not found");
+        logger.error("Issuer configuration not found or malformed");
         throw new Error(OidcDiscoveryError.OpSupport);
     }
 
