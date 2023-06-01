@@ -340,7 +340,7 @@ describe("MatrixClient", function () {
         store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
 
-        // set unstableFeatures to a defined state before reach test
+        // set unstableFeatures to a defined state before each test
         unstableFeatures = {
             "org.matrix.msc3440.stable": true,
         };
