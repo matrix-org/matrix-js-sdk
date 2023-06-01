@@ -2173,14 +2173,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private addThreadedEvents(threadId: string, events: MatrixEvent[], toStartOfTimeline = false): void {
-        let thread = this.getThread(threadId);
-
-        if (!thread) {
+        const thread = this.getThread(threadId);
+        if (thread) {
+            thread.addEvents(events, toStartOfTimeline);
+        } else {
             const rootEvent = this.findEventById(threadId) ?? events.find((e) => e.getId() === threadId);
-            thread = this.createThread(threadId, rootEvent, events, toStartOfTimeline);
+            this.createThread(threadId, rootEvent, events, toStartOfTimeline);
         }
-
-        thread.addEvents(events, toStartOfTimeline);
     }
 
     /**
