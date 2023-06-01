@@ -4627,26 +4627,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
-        let withRelTypes = opts?.with_rel_types ?? opts?.with_relations;
 
-        if (typeof withRelTypes === "string") {
-            withRelTypes = [withRelTypes];
+        let withRelTypesContent = {};
+
+        if (opts?.with_rel_types) {
+            if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
+                throw new Error(
+                    "Server does not support relation based redactions " +
+                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+                );
+            }
+
+            const withRelTypesPropName =
+                this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                    ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                    : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!;
+
+            withRelTypesContent = {
+                [withRelTypesPropName]: opts.with_rel_types,
+            };
         }
-
-        if (withRelTypes && this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
-            throw new Error(
-                "Server does not support relation based redactions " +
-                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
-            );
-        }
-
-        const withRelTypesContent = withRelTypes
-            ? {
-                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
-                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
-                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: withRelTypes,
-              }
-            : {};
 
         return this.sendCompleteEvent(
             roomId,

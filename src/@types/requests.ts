@@ -48,11 +48,6 @@ export interface IJoinRoomOpts {
 export interface IRedactOpts {
     reason?: string;
     /**
-     * @deprecated Use with_rel_types instead.
-     *             Will be removed at the latest when MSC3912 becomes stable.
-     */
-    with_relations?: Array<RelationType | string>;
-    /**
      * If specified, then any events which relate to the event being redacted with
      * any of the relationship types listed will also be redacted.
      * Provide a "*" list item to tell the server to redact relations of any type.
