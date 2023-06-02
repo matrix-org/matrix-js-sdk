@@ -1479,7 +1479,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread2 reply",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1499,7 +1499,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread reply2",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
