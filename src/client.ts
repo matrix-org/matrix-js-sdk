@@ -5569,11 +5569,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.currentState.setUnknownStateEvents(stateEvents);
                     }
 
-                    const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, threadedEvents, unknownRelations] =
+                        room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     room.oldState.paginationToken = res.end ?? null;
                     if (res.chunk.length === 0) {
@@ -5682,11 +5684,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
+        unknownRelations.forEach((event) => timelineSet.relations.aggregateChildEvent(event));
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -6226,7 +6229,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
@@ -6234,6 +6237,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     const atEnd = res.end === undefined || res.end === res.start;
 

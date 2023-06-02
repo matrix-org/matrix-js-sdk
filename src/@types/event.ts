@@ -235,6 +235,13 @@ export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
     "org.matrix.msc3890.local_notification_settings",
 );
 
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/4023
+ *
+ * @experimental
+ */
+export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matrix.msc4023.thread_id");
+
 export interface IEncryptedFile {
     url: string;
     mimetype?: string;

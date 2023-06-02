@@ -36,11 +36,15 @@ import {
     NotificationCountType,
     IEphemeral,
     Room,
+    IndexedDBStore,
+    RelationType,
 } from "../../src";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
+import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
+import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 describe("MatrixClient syncing", () => {
     const selfUserId = "@alice:localhost";
@@ -1866,5 +1870,125 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.verifyNoOutstandingExpectation();
         idbClient.stopClient();
         idbHttpBackend.stop();
+    });
+
+    it("should query server for which thread a 2nd order relation belongs to and stash in sync accumulator", async () => {
+        const roomId = "!room:example.org";
+
+        async function startClient(client: MatrixClient): Promise<void> {
+            await Promise.all([
+                idbClient.startClient({
+                    // Without this all events just go into the main timeline
+                    threadSupport: true,
+                }),
+                idbHttpBackend.flushAllExpected(),
+                emitPromise(idbClient, ClientEvent.Room),
+            ]);
+        }
+
+        function assertEventsExpected(client: MatrixClient): void {
+            const room = client.getRoom(roomId);
+            const mainTimelineEvents = room!.getLiveTimeline().getEvents();
+            expect(mainTimelineEvents).toHaveLength(1);
+            expect(mainTimelineEvents[0].getContent().body).toEqual("Test");
+
+            const thread = room!.getThread("$someThreadId")!;
+            expect(thread.replayEvents).toHaveLength(1);
+            expect(thread.replayEvents![0].getRelation()!.key).toEqual("🪿");
+        }
+
+        let idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
+            store: new IndexedDBStore({
+                indexedDB: global.indexedDB,
+                dbName: "test",
+            }),
+        });
+        let idbHttpBackend = idbTestClient.httpBackend;
+        let idbClient = idbTestClient.client;
+        await idbClient.store.startup();
+
+        idbHttpBackend.when("GET", "/versions").respond(200, { versions: ["v1.4"] });
+        idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
+        idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+        const syncRoomSection = {
+            join: {
+                [roomId]: {
+                    timeline: {
+                        prev_batch: "foo",
+                        events: [
+                            mkMessage({
+                                room: roomId,
+                                user: selfUserId,
+                                msg: "Test",
+                            }),
+                            mkEvent({
+                                room: roomId,
+                                user: selfUserId,
+                                content: {
+                                    "m.relates_to": {
+                                        rel_type: RelationType.Annotation,
+                                        event_id: "$someUnknownEvent",
+                                        key: "🪿",
+                                    },
+                                },
+                                type: "m.reaction",
+                            }),
+                        ],
+                    },
+                },
+            },
+        };
+        idbHttpBackend.when("GET", "/sync").respond(200, {
+            ...syncData,
+            rooms: syncRoomSection,
+        });
+        idbHttpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/event/%24someUnknownEvent`).respond(
+            200,
+            mkEvent({
+                room: roomId,
+                user: selfUserId,
+                content: {
+                    "body": "Thread response",
+                    "m.relates_to": {
+                        rel_type: THREAD_RELATION_TYPE.name,
+                        event_id: "$someThreadId",
+                    },
+                },
+                type: "m.room.message",
+            }),
+        );
+
+        await startClient(idbClient);
+        assertEventsExpected(idbClient);
+
+        idbHttpBackend.verifyNoOutstandingExpectation();
+        // Force sync accumulator to persist, reset client, assert it doesn't re-fetch event on next start-up
+        await idbClient.store.save(true);
+        await idbClient.stopClient();
+        await idbClient.store.destroy();
+        await idbHttpBackend.stop();
+
+        idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
+            store: new IndexedDBStore({
+                indexedDB: global.indexedDB,
+                dbName: "test",
+            }),
+        });
+        idbHttpBackend = idbTestClient.httpBackend;
+        idbClient = idbTestClient.client;
+        await idbClient.store.startup();
+
+        idbHttpBackend.when("GET", "/versions").respond(200, { versions: ["v1.4"] });
+        idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
+        idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        idbHttpBackend.when("GET", "/sync").respond(200, syncData);
+
+        await startClient(idbClient);
+        assertEventsExpected(idbClient);
+
+        idbHttpBackend.verifyNoOutstandingExpectation();
+        await idbClient.stopClient();
+        await idbHttpBackend.stop();
     });
 });
