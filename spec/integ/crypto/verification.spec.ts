@@ -170,6 +170,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         // there should now be a verifier
         const verifier: VerificationBase = request.verifier!;
         expect(verifier).toBeDefined();
+        expect(verifier.getShowSasCallbacks()).toBeNull();
 
         // start off the verification process: alice will send an `accept`
         const verificationPromise = verifier.verify();
@@ -207,6 +208,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
         // `getShowSasCallbacks` is an alternative way to get the callbacks
         expect(verifier.getShowSasCallbacks()).toBe(showSas);
+        expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
         // user confirms that the emoji match, and alice sends a 'mac'
         [requestBody] = await Promise.all([expectSendToDeviceMessage("m.key.verification.mac"), showSas.confirm()]);
@@ -326,6 +328,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // there should now be a verifier
             const verifier: VerificationBase = request.verifier!;
             expect(verifier).toBeDefined();
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
             // ... which we call .verify on, which emits a ShowReciprocateQr event
             const verificationPromise = verifier.verify();
@@ -335,6 +338,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // getReciprocateQrCodeCallbacks() is an alternative way to get the callbacks
             expect(verifier.getReciprocateQrCodeCallbacks()).toBe(reciprocateQRCodeCallbacks);
+            expect(verifier.getShowSasCallbacks()).toBeNull();
 
             // Alice confirms she is happy
             reciprocateQRCodeCallbacks.confirm();
