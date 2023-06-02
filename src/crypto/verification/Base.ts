@@ -390,12 +390,12 @@ export class VerificationBase<
     }
 
     /**
-     * Get the details for a QR code verification, if one is in progress
+     * Get the details for reciprocating QR code verification, if one is in progress
      *
-     * Returns `null`, unless this verifier is for a QR-code-based verification and we are waiting for the user to
-     * confirm a match.
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
      */
-    public getShowQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
         return null;
     }
 }

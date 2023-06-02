@@ -120,7 +120,7 @@ export class ReciprocateQRCode extends Base {
         });
     };
 
-    public getShowQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
         return this.reciprocateQREvent ?? null;
     }
 }
