@@ -28,10 +28,14 @@ export type TrackID = string;
 export type ByteSend = number;
 
 export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
+    callId?: string;
+    opponentMemberId?: string;
     // is a map: `local trackID` => byte send
 }
 
 export interface ConnectionStatsReport {
+    callId?: string;
+    opponentMemberId?: string;
     bandwidth: ConnectionStatsBandwidth;
     bitrate: ConnectionStatsBitrate;
     packetLoss: PacketLoss;
