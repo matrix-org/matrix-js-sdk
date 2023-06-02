@@ -188,6 +188,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             verifier.once(VerifierEvent.ShowSas, resolve);
         });
 
+        // `getShowSasCallbacks` is an alternative way to get the callbacks
+        expect(verifier.getShowSasCallbacks()).toBe(showSas);
+
         // user confirms that the emoji match, and alice sends a 'mac'
         [requestBody] = await Promise.all([expectSendToDeviceMessage("m.key.verification.mac"), showSas.confirm()]);
         toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
@@ -312,6 +315,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const reciprocateQRCodeCallbacks = await new Promise<ShowQrCodeCallbacks>((resolve) => {
                 verifier.once(VerifierEvent.ShowReciprocateQr, resolve);
             });
+
+            // getReciprocateQrCodeCallbacks() is an alternative way to get the callbacks
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBe(reciprocateQRCodeCallbacks);
 
             // Alice confirms she is happy
             reciprocateQRCodeCallbacks.confirm();
