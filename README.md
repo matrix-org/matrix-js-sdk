@@ -55,6 +55,8 @@ client.publicRooms(function (err, data) {
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
 
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
+
 To start the client:
 
 ```javascript
