@@ -18,8 +18,8 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
-import { createClient, MatrixClient, UIAuthCallback } from "../../src";
+import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
+import { createClient, MatrixClient, UIAuthCallback } from "../../../src";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections

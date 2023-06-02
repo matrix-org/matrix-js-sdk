@@ -21,11 +21,11 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { MockResponse, MockResponseFunction } from "fetch-mock";
 
-import type { IDeviceKeys } from "../../src/@types/crypto";
-import * as testUtils from "../test-utils/test-utils";
-import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../test-utils/test-utils";
-import { TestClient } from "../TestClient";
-import { logger } from "../../src/logger";
+import type { IDeviceKeys } from "../../../src/@types/crypto";
+import * as testUtils from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { TestClient } from "../../TestClient";
+import { logger } from "../../../src/logger";
 import {
     createClient,
     IClaimOTKsResult,
@@ -43,13 +43,13 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
-} from "../../src/matrix";
-import { DeviceInfo } from "../../src/crypto/deviceinfo";
-import { E2EKeyReceiver, IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
-import { ISyncResponder, SyncResponder } from "../test-utils/SyncResponder";
-import { escapeRegExp } from "../../src/utils";
-import { downloadDeviceToJsDevice } from "../../src/rust-crypto/device-converter";
-import { flushPromises } from "../test-utils/flushPromises";
+} from "../../../src/matrix";
+import { DeviceInfo } from "../../../src/crypto/deviceinfo";
+import { E2EKeyReceiver, IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { escapeRegExp } from "../../../src/utils";
+import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
+import { flushPromises } from "../../test-utils/flushPromises";
 
 const ROOM_ID = "!room:id";
 
