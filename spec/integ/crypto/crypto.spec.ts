@@ -50,6 +50,7 @@ import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
+import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 
 const ROOM_ID = "!room:id";
 
@@ -419,12 +420,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
         logger.log(aliceClient.getUserId() + ": starting");
 
-        const homeserverUrl = aliceClient.getHomeserverUrl();
-        fetchMock.get(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["r0.5.0"] });
-        fetchMock.get(new URL("/_matrix/client/r0/pushrules/", homeserverUrl).toString(), {});
-        fetchMock.post(new URL("/_matrix/client/r0/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
-            filter_id: "fid",
-        });
+        mockInitialApiRequests(aliceClient.getHomeserverUrl());
 
         // we let the client do a very basic initial sync, which it needs before
         // it will upload one-time keys.
