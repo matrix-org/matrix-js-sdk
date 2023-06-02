@@ -590,6 +590,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
             return unsigned[UNSIGNED_THREAD_ID_FIELD.name];
         }
+        return undefined;
     }
 
     /**
