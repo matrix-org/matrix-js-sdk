@@ -17,15 +17,12 @@ import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
-import { ParticipantState } from "../groupCall";
-import { RoomMember } from "../../matrix";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
     private readonly gatherers: Map<string, CallStatsReportGatherer> = new Map<string, CallStatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
     private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
-    private participants: Map<RoomMember, Map<string, ParticipantState>> = new Map();
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
