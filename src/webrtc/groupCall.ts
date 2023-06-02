@@ -26,7 +26,7 @@ import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
 import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
-import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
+import { SummaryStatsReporter } from "./stats/summaryStatsReporter";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -283,7 +283,7 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     private onSummaryStats = (report: SummaryStatsReport): void => {
-        SummaryStatsReportGatherer.extendSummaryReport(report, this.participants);
+        SummaryStatsReporter.extendSummaryReport(report, this.participants);
         // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
     };

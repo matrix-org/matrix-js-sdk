@@ -16,13 +16,13 @@ limitations under the License.
 import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
+import { SummaryStatsReporter } from "./summaryStatsReporter";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
     private readonly gatherers: Map<string, CallStatsReportGatherer> = new Map<string, CallStatsReportGatherer>();
     public readonly reports = new StatsReportEmitter();
-    private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
+    private readonly summaryStatsReportGatherer = new SummaryStatsReporter(this.reports);
 
     public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
 
