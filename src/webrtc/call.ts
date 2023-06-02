@@ -255,7 +255,7 @@ export enum CallErrorCode {
 const VOIP_PROTO_VERSION = "1";
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
-const FALLBACK_ICE_SERVER = "stun:turn.matrix.org";
+export const FALLBACK_ICE_SERVER = "stun:turn.matrix.org";
 
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60 * 1000; // ms
