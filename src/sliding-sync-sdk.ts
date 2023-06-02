@@ -628,7 +628,7 @@ export class SlidingSyncSdk {
 
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
-            await this.injectRoomEvents(room, inviteStateEvents);
+            this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
                 this.client.store.storeRoom(room);
@@ -700,7 +700,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
+        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -747,12 +747,12 @@ export class SlidingSyncSdk {
      * @param numLive - the number of events in timelineEventList which just happened,
      * supplied from the server.
      */
-    public async injectRoomEvents(
+    public injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         numLive?: number,
-    ): Promise<void> {
+    ): void {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
         numLive = numLive || 0;
@@ -811,11 +811,11 @@ export class SlidingSyncSdk {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        await room.addLiveEvents(timelineEventList, {
+        room.addLiveEvents(timelineEventList, {
             fromCache: true,
         });
         if (liveTimelineEvents.length > 0) {
-            await room.addLiveEvents(liveTimelineEvents, {
+            room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
             });
         }

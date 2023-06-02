@@ -697,7 +697,7 @@ async function createThread(client: MatrixClient, user: string, roomId: string):
 
     // Ensure the root is in the room timeline
     root.setThreadId(root.getId());
-    await room.addLiveEvents([root]);
+    room.addLiveEvents([root]);
 
     // Create the thread and wait for it to be initialised
     const thread = room.createThread(root.getId()!, root, [], false);
