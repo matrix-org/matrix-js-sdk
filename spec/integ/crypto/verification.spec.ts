@@ -50,7 +50,6 @@ beforeAll(() => {
 
     Object.defineProperty(global, "crypto", {
         value: {
-            // @ts-ignore this doesn't match the type in typescript, but that doesn't really matter
             getRandomValues: function <T extends Uint8Array>(array: T): T {
                 array.fill(0x12);
                 return array;
@@ -62,6 +61,7 @@ beforeAll(() => {
 // restore the original global.crypto
 afterAll(() => {
     if (previousCrypto === undefined) {
+        // @ts-ignore deleting a non-optional property. It *is* optional really.
         delete global.crypto;
     } else {
         Object.defineProperty(global, "crypto", {
