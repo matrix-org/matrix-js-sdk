@@ -241,10 +241,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     oldBackendOnly(
         "Outgoing verification: can verify another device via QR code with an untrusted cross-signing key",
         async () => {
-            // we need to have bootstrapped cross-signing for this
-            //await bootstrapCrossSigning(aliceClient);
-            // console.warn("Bootstrapped");
-
             // expect requests to download our own keys
             fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
                 device_keys: {
