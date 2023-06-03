@@ -25,13 +25,13 @@ import { logger } from "../logger";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
 import { DeviceInfo } from "./deviceinfo";
-import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ISecretStorageKeyInfo } from "./api";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
+import { DeviceVerificationStatus } from "../crypto-api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -164,12 +164,12 @@ export class CrossSigningInfo {
      *     key
      */
     public async isStoredInSecretStorage(
-        secretStorage: SecretStorage<MatrixClient | undefined>,
+        secretStorage: ServerSideSecretStorage,
     ): Promise<Record<string, object> | null> {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = (await secretStorage.isStored("m.cross_signing.master")) || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s: Record<string, ISecretStorageKeyInfo>): void {
+        function intersect(s: Record<string, SecretStorageKeyDescription>): void {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
                     delete stored[k];
@@ -192,7 +192,7 @@ export class CrossSigningInfo {
      */
     public static async storeInSecretStorage(
         keys: Map<string, Uint8Array>,
-        secretStorage: SecretStorage<undefined>,
+        secretStorage: ServerSideSecretStorage,
     ): Promise<void> {
         for (const [type, privateKey] of keys) {
             const encodedKey = encodeBase64(privateKey);
@@ -209,7 +209,10 @@ export class CrossSigningInfo {
      * @param secretStorage - The secret store using account data
      * @returns The private key
      */
-    public static async getFromSecretStorage(type: string, secretStorage: SecretStorage): Promise<Uint8Array | null> {
+    public static async getFromSecretStorage(
+        type: string,
+        secretStorage: ServerSideSecretStorage,
+    ): Promise<Uint8Array | null> {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
         if (!encodedKey) {
             return null;
@@ -626,15 +629,20 @@ export class UserTrustLevel {
 }
 
 /**
- * Represents the ways in which we trust a device
+ * Represents the ways in which we trust a device.
+ *
+ * @deprecated Use {@link DeviceVerificationStatus}.
  */
-export class DeviceTrustLevel {
+export class DeviceTrustLevel extends DeviceVerificationStatus {
     public constructor(
-        public readonly crossSigningVerified: boolean,
-        public readonly tofu: boolean,
-        private readonly localVerified: boolean,
-        private readonly trustCrossSignedDevices: boolean,
-    ) {}
+        crossSigningVerified: boolean,
+        tofu: boolean,
+        localVerified: boolean,
+        trustCrossSignedDevices: boolean,
+        signedByOwner = false,
+    ) {
+        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices, signedByOwner });
+    }
 
     public static fromUserTrustLevel(
         userTrustLevel: UserTrustLevel,
@@ -646,14 +654,8 @@ export class DeviceTrustLevel {
             userTrustLevel.isTofu(),
             localVerified,
             trustCrossSignedDevices,
+            true,
         );
-    }
-
-    /**
-     * @returns true if this device is verified via any means
-     */
-    public isVerified(): boolean {
-        return Boolean(this.isLocallyVerified() || (this.trustCrossSignedDevices && this.isCrossSigningVerified()));
     }
 
     /**
@@ -686,7 +688,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
             _expectedPublicKey: string,
         ): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
-                return store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                     store.getSecretStorePrivateKey(txn, resolve, type);
                 });
             });
@@ -788,7 +790,7 @@ export async function requestKeysDuringVerification(
         })();
 
         // We call getCrossSigningKey() for its side-effects
-        return Promise.race<KeysDuringVerification | void>([
+        Promise.race<KeysDuringVerification | void>([
             Promise.all([
                 crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),

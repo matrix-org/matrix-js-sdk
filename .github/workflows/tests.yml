@@ -8,6 +8,8 @@ on:
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
+env:
+    ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 jobs:
     jest:
         name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})"
@@ -38,24 +40,22 @@ jobs:
               id: cpu-cores
               uses: SimenB/github-actions-cpu-cores@410541432439795d30db6501fb1d8178eb41e502 # v1
 
-            - name: Load metrics reporter
-              id: metrics
-              if: github.ref == 'refs/heads/develop'
-              run: |
-                  echo "extra-reporter='--reporters=<rootDir>/spec/slowReporter.js'" >> $GITHUB_OUTPUT
-
             - name: Run tests
               run: |
-                  yarn coverage \
+                  yarn test \
+                      --coverage=${{ env.ENABLE_COVERAGE }} \
                       --ci \
-                      --reporters github-actions ${{ steps.metrics.outputs.extra-reporter }} \
                       --max-workers ${{ steps.cpu-cores.outputs.count }} \
                       ./spec/${{ matrix.specs }}
-                  mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
               env:
                   JEST_SONAR_UNIQUE_OUTPUT_NAME: true
 
+            - name: Move coverage files into place
+              if: env.ENABLE_COVERAGE == 'true'
+              run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+
             - name: Upload Artifact
+              if: env.ENABLE_COVERAGE == 'true'
               uses: actions/upload-artifact@v3
               with:
                   name: coverage
@@ -71,7 +71,8 @@ jobs:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
 
-    # Hook for branch protection to work outside merge queues
+    # Hook for branch protection to skip downstream testing outside of merge queues
+    # and skip sonarcloud coverage within merge queues
     downstream:
         name: Downstream tests
         runs-on: ubuntu-latest
@@ -79,5 +80,16 @@ jobs:
         needs:
             - matrix-react-sdk
         steps:
+            - name: Skip SonarCloud on merge queues
+              if: env.ENABLE_COVERAGE == 'false'
+              uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
+              with:
+                  authToken: ${{ secrets.GITHUB_TOKEN }}
+                  state: success
+                  description: SonarCloud skipped
+                  context: SonarCloud Code Analysis
+                  sha: ${{ github.sha }}
+                  target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
             - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
               run: exit 1

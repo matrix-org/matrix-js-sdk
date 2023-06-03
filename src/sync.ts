@@ -28,8 +28,8 @@ import { Optional } from "matrix-events-sdk";
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import * as utils from "./utils";
-import { IDeferred } from "./utils";
+import { promiseMapSeries, defer, deepCopy } from "./utils";
+import { IDeferred, noUnsafeEventProps, unsafeProp } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { logger } from "./logger";
@@ -414,7 +414,7 @@ export class SyncApi {
 
             // FIXME: Mostly duplicated from injectRoomEvents but not entirely
             // because "state" in this API is at the BEGINNING of the chunk
-            const oldStateEvents = utils.deepCopy(response.state).map(client.getEventMapper());
+            const oldStateEvents = deepCopy(response.state).map(client.getEventMapper());
             const stateEvents = response.state.map(client.getEventMapper());
             const messages = response.messages.chunk.map(client.getEventMapper());
 
@@ -501,7 +501,7 @@ export class SyncApi {
                 },
             )
             .then(
-                (res) => {
+                async (res) => {
                     if (this._peekRoom !== peekRoom) {
                         debuglog("Stopped peeking in room %s", peekRoom.roomId);
                         return;
@@ -541,7 +541,7 @@ export class SyncApi {
                         })
                         .map(this.client.getEventMapper());
 
-                    peekRoom.addLiveEvents(events);
+                    await peekRoom.addLiveEvents(events);
                     this.peekPoll(peekRoom, res.end);
                 },
                 (err) => {
@@ -899,8 +899,6 @@ export class SyncApi {
             // Reset after a successful sync
             this.failedSyncCount = 0;
 
-            await this.client.store.setSyncData(data);
-
             const syncEventData = {
                 oldSyncToken: syncToken ?? undefined,
                 nextSyncToken: data.next_batch,
@@ -923,6 +921,10 @@ export class SyncApi {
                 // Emit the exception for client handling
                 this.client.emit(ClientEvent.SyncUnexpectedError, <Error>e);
             }
+
+            // Persist after processing as `unsigned` may get mutated
+            // with an `org.matrix.msc4023.thread_id`
+            await this.client.store.setSyncData(data);
 
             // update this as it may have changed
             syncEventData.catchingUp = this.catchingUp;
@@ -953,7 +955,7 @@ export class SyncApi {
                 }
 
                 // tell databases that everything is now in a consistent state and can be saved.
-                this.client.store.save();
+                await this.client.store.save();
             }
         }
 
@@ -1133,22 +1135,24 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (Array.isArray(data.presence?.events)) {
-            data.presence!.events.map(client.getEventMapper()).forEach(function (presenceEvent) {
-                let user = client.store.getUser(presenceEvent.getSender()!);
-                if (user) {
-                    user.setPresenceEvent(presenceEvent);
-                } else {
-                    user = createNewUser(client, presenceEvent.getSender()!);
-                    user.setPresenceEvent(presenceEvent);
-                    client.store.storeUser(user);
-                }
-                client.emit(ClientEvent.Event, presenceEvent);
-            });
+            data.presence!.events.filter(noUnsafeEventProps)
+                .map(client.getEventMapper())
+                .forEach(function (presenceEvent) {
+                    let user = client.store.getUser(presenceEvent.getSender()!);
+                    if (user) {
+                        user.setPresenceEvent(presenceEvent);
+                    } else {
+                        user = createNewUser(client, presenceEvent.getSender()!);
+                        user.setPresenceEvent(presenceEvent);
+                        client.store.storeUser(user);
+                    }
+                    client.emit(ClientEvent.Event, presenceEvent);
+                });
         }
 
         // handle non-room account_data
         if (Array.isArray(data.account_data?.events)) {
-            const events = data.account_data.events.map(client.getEventMapper());
+            const events = data.account_data.events.filter(noUnsafeEventProps).map(client.getEventMapper());
             const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
@@ -1171,7 +1175,7 @@ export class SyncApi {
 
         // handle to-device events
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
-            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events;
+            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
 
             if (this.syncOpts.cryptoCallbacks) {
                 toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
@@ -1245,7 +1249,7 @@ export class SyncApi {
         this.notifEvents = [];
 
         // Handle invites
-        await utils.promiseMapSeries(inviteRooms, async (inviteObj) => {
+        await promiseMapSeries(inviteRooms, async (inviteObj) => {
             const room = inviteObj.room;
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
@@ -1286,7 +1290,7 @@ export class SyncApi {
         });
 
         // Handle joins
-        await utils.promiseMapSeries(joinRooms, async (joinObj) => {
+        await promiseMapSeries(joinRooms, async (joinObj) => {
             const room = joinObj.room;
             const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
             // Prevent events from being decrypted ahead of time
@@ -1469,7 +1473,7 @@ export class SyncApi {
         });
 
         // Handle leaves (e.g. kicked rooms)
-        await utils.promiseMapSeries(leaveRooms, async (leaveObj) => {
+        await promiseMapSeries(leaveRooms, async (leaveObj) => {
             const room = leaveObj.room;
             const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
@@ -1513,8 +1517,8 @@ export class SyncApi {
 
         // Handle device list updates
         if (data.device_lists) {
-            if (this.syncOpts.crypto) {
-                await this.syncOpts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
+            if (this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.processDeviceLists(data.device_lists);
             } else {
                 // FIXME if we *don't* have a crypto module, we still need to
                 // invalidate the device lists. But that would require a
@@ -1522,24 +1526,11 @@ export class SyncApi {
             }
         }
 
-        // Handle one_time_keys_count
-        if (this.syncOpts.crypto && data.device_one_time_keys_count) {
-            const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
-            this.syncOpts.crypto.updateOneTimeKeyCount(currentCount);
-        }
-        if (
-            this.syncOpts.crypto &&
-            (data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"])
-        ) {
-            // The presence of device_unused_fallback_key_types indicates that the
-            // server supports fallback keys. If there's no unused
-            // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys =
-                data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.syncOpts.crypto.setNeedsNewFallback(
-                Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
-            );
-        }
+        // Handle one_time_keys_count and unused fallback keys
+        await this.syncOpts.cryptoCallbacks?.processKeyCounts(
+            data.device_one_time_keys_count,
+            data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
+        );
     }
 
     /**
@@ -1563,7 +1554,7 @@ export class SyncApi {
             this.pokeKeepAlive();
         }
         if (!this.connectionReturnedDefer) {
-            this.connectionReturnedDefer = utils.defer();
+            this.connectionReturnedDefer = defer();
         }
         return this.connectionReturnedDefer.promise;
     }
@@ -1635,18 +1626,21 @@ export class SyncApi {
         // to
         // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
         const client = this.client;
-        return Object.keys(obj).map((roomId) => {
-            const arrObj = obj[roomId] as T & { room: Room; isBrandNewRoom: boolean };
-            let room = client.store.getRoom(roomId);
-            let isBrandNewRoom = false;
-            if (!room) {
-                room = this.createRoom(roomId);
-                isBrandNewRoom = true;
-            }
-            arrObj.room = room;
-            arrObj.isBrandNewRoom = isBrandNewRoom;
-            return arrObj;
-        });
+        return Object.keys(obj)
+            .filter((k) => !unsafeProp(k))
+            .map((roomId) => {
+                let room = client.store.getRoom(roomId);
+                let isBrandNewRoom = false;
+                if (!room) {
+                    room = this.createRoom(roomId);
+                    isBrandNewRoom = true;
+                }
+                return {
+                    ...obj[roomId],
+                    room,
+                    isBrandNewRoom,
+                };
+            });
     }
 
     private mapSyncEventsFormat(
@@ -1659,7 +1653,7 @@ export class SyncApi {
         }
         const mapper = this.client.getEventMapper({ decrypt });
         type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) & { room_id?: string };
-        return (obj.events as TaggedEvent[]).map(function (e) {
+        return (obj.events as TaggedEvent[]).filter(noUnsafeEventProps).map(function (e) {
             if (room) {
                 e.room_id = room.roomId;
             }
@@ -1782,7 +1776,7 @@ export class SyncApi {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList || [], {
+        await room.addLiveEvents(timelineEventList || [], {
             fromCache,
             timelineWasEmpty,
         });

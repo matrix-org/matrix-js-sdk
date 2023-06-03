@@ -17,7 +17,7 @@ limitations under the License.
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
-import * as utils from "./utils";
+import { promiseMapSeries } from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
 import {
@@ -85,30 +85,16 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
 
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
         // Handle device list updates
-        if (data["device_lists"]) {
-            await this.crypto.handleDeviceListChanges(
-                {
-                    oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
-                },
-                data["device_lists"],
-            );
+        if (data.device_lists) {
+            await this.crypto.processDeviceLists(data.device_lists);
         }
 
-        // Handle one_time_keys_count
-        if (data["device_one_time_keys_count"]) {
-            const currentCount = data["device_one_time_keys_count"].signed_curve25519 || 0;
-            this.crypto.updateOneTimeKeyCount(currentCount);
-        }
-        if (data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
-            // The presence of device_unused_fallback_key_types indicates that the
-            // server supports fallback keys. If there's no unused
-            // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys =
-                data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.crypto.setNeedsNewFallback(
-                Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
-            );
-        }
+        // Handle one_time_keys_count and unused_fallback_key_types
+        await this.crypto.processKeyCounts(
+            data.device_one_time_keys_count,
+            data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"],
+        );
+
         this.crypto.onSyncCompleted({});
     }
 }
@@ -642,7 +628,7 @@ export class SlidingSyncSdk {
 
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
-            this.injectRoomEvents(room, inviteStateEvents);
+            await this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
                 this.client.store.storeRoom(room);
@@ -714,7 +700,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
+        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -740,8 +726,8 @@ export class SlidingSyncSdk {
             }
         };
 
-        await utils.promiseMapSeries(stateEvents, processRoomEvent);
-        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
+        await promiseMapSeries(stateEvents, processRoomEvent);
+        await promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function (e) {
             client.emit(ClientEvent.Event, e);
         });
@@ -761,12 +747,12 @@ export class SlidingSyncSdk {
      * @param numLive - the number of events in timelineEventList which just happened,
      * supplied from the server.
      */
-    public injectRoomEvents(
+    public async injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         numLive?: number,
-    ): void {
+    ): Promise<void> {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
         numLive = numLive || 0;
@@ -825,11 +811,11 @@ export class SlidingSyncSdk {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList, {
+        await room.addLiveEvents(timelineEventList, {
             fromCache: true,
         });
         if (liveTimelineEvents.length > 0) {
-            room.addLiveEvents(liveTimelineEvents, {
+            await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
             });
         }

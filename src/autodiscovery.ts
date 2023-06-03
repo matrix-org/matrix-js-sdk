@@ -142,7 +142,7 @@ export class AutoDiscovery {
             },
         };
 
-        if (!wellknown || !wellknown["m.homeserver"]) {
+        if (!wellknown?.["m.homeserver"]) {
             logger.error("No m.homeserver key in config");
 
             clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
@@ -171,7 +171,7 @@ export class AutoDiscovery {
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
         const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
-        if (!hsVersions || !hsVersions.raw?.["versions"]) {
+        if (!hsVersions?.raw?.["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
 
@@ -345,7 +345,7 @@ export class AutoDiscovery {
 
         const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!response) return {};
-        return response.raw || {};
+        return response.raw ?? {};
     }
 
     /**

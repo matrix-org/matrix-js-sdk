@@ -28,6 +28,7 @@ import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
+import { Feature, ServerSupport } from "../feature";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -202,10 +203,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     ): void => {
         // Add a synthesized receipt when paginating forward in the timeline
         if (!toStartOfTimeline) {
-            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+            const sender = event.getSender();
+            if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
+                room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+            }
         }
         this.onEcho(event, toStartOfTimeline ?? false);
     };
+
+    private shouldSendLocalEchoReceipt(sender: string, event: MatrixEvent): boolean {
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+        if (recursionSupport === ServerSupport.Unsupported) {
+            // Normally we add a local receipt, but if we don't have
+            // recursion support, then events may arrive out of order, so we
+            // only create a receipt if it's after our existing receipt.
+            const oldReceiptEventId = this.getReadReceiptForUserId(sender)?.eventId;
+            if (oldReceiptEventId) {
+                const receiptEvent = this.findEventById(oldReceiptEventId);
+                if (receiptEvent && receiptEvent.getTs() > event.getTs()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private onLocalEcho = (event: MatrixEvent): void => {
         this.onEcho(event, false);
@@ -233,6 +256,34 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             });
             this.timeline = this.events;
         }
+    }
+
+    /**
+     * TEMPORARY. Only call this when MSC3981 is not available, and we have some
+     * late-arriving events to insert, because we recursively found them as part
+     * of populating a thread. When we have MSC3981 we won't need it, because
+     * they will all be supplied by the homeserver in one request, and they will
+     * already be in the right order in that response.
+     * This is a copy of addEventToTimeline above, modified to call
+     * insertEventIntoTimeline so this event is inserted into our best guess of
+     * the right place based on timestamp. (We should be using Sync Order but we
+     * don't have it.)
+     *
+     * @internal
+     */
+    public insertEventIntoTimeline(event: MatrixEvent): void {
+        const eventId = event.getId();
+        if (!eventId) {
+            return;
+        }
+        // If the event is already in this thread, bail out
+        if (this.findEventById(eventId)) {
+            return;
+        }
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
+
+        // As far as we know, timeline should always be the same as events
+        this.timeline = this.events;
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -280,7 +331,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                  */
                 this.replayEvents?.push(event);
             } else {
-                this.addEventToTimeline(event, toStartOfTimeline);
+                const recursionSupport =
+                    this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+                if (recursionSupport === ServerSupport.Unsupported) {
+                    this.insertEventIntoTimeline(event);
+                } else {
+                    this.addEventToTimeline(event, toStartOfTimeline);
+                }
             }
             // Apply annotations and replace relations to the relations of the timeline only
             this.timelineSet.relations?.aggregateParentEvent(event);
@@ -458,25 +516,31 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
-        return Promise.all(
-            events
-                .filter((e) => e.isEncrypted())
-                .map((event: MatrixEvent) => {
-                    if (event.isRelation()) return; // skip - relations don't get edits
-                    return this.client
-                        .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
-                            limit: 1,
-                        })
-                        .then((relations) => {
-                            if (relations.events.length) {
-                                event.makeReplaced(relations.events[0]);
-                            }
-                        })
-                        .catch((e) => {
-                            logger.error("Failed to load edits for encrypted thread event", e);
-                        });
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+        if (recursionSupport === ServerSupport.Unsupported) {
+            return Promise.all(
+                events.filter(isAnEncryptedThreadMessage).map(async (event: MatrixEvent) => {
+                    try {
+                        const relations = await this.client.relations(
+                            this.roomId,
+                            event.getId()!,
+                            RelationType.Replace,
+                            event.getType(),
+                            {
+                                limit: 1,
+                            },
+                        );
+                        if (relations.events.length) {
+                            const editEvent = relations.events[0];
+                            event.makeReplaced(editEvent);
+                            this.insertEventIntoTimeline(editEvent);
+                        }
+                    } catch (e) {
+                        logger.error("Failed to load edits for encrypted thread event", e);
+                    }
                 }),
-        );
+            );
+        }
     }
 
     public setEventMetadata(event: Optional<MatrixEvent>): void {
@@ -642,6 +706,16 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public setUnread(type: NotificationCountType, count: number): void {
         return this.room.setThreadUnreadNotificationCount(this.id, type, count);
     }
+}
+
+/**
+ * Decide whether an event deserves to have its potential edits fetched.
+ *
+ * @returns true if this event is encrypted and is a message that is part of a
+ * thread - either inside it, or a root.
+ */
+function isAnEncryptedThreadMessage(event: MatrixEvent): boolean {
+    return event.isEncrypted() && (event.isRelation(THREAD_RELATION_TYPE.name) || event.isThreadRoot);
 }
 
 export const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(

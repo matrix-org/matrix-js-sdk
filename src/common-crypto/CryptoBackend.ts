@@ -14,31 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
-import type { IToDeviceEvent } from "../sync-accumulator";
-import type { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
+import { CryptoApi } from "../crypto-api";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
+import { IEventDecryptionResult } from "../@types/crypto";
+import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 
 /**
  * Common interface for the crypto implementations
  */
-export interface CryptoBackend extends SyncCryptoCallbacks {
-    /**
-     * Global override for whether the client should ever send encrypted
-     * messages to unverified devices. This provides the default for rooms which
-     * do not specify a value.
-     *
-     * If true, all unverified devices will be blacklisted by default
-     */
-    globalBlacklistUnverifiedDevices: boolean;
-
+export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
      * Whether sendMessage in a room with unknown and unverified devices
      * should throw an error and not send the message. This has 'Global' for
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
+     *
+     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
+     * going to support it in the rust crypto implementation.
      */
     globalErrorOnUnknownDevices: boolean;
 
@@ -48,16 +44,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
     stop(): void;
 
     /**
-     * Checks if the user has previously published cross-signing keys
-     *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
-
-     * @returns true if the user has previously published cross-signing keys
-     */
-    userHasCrossSigningKeys(): Promise<boolean>;
-
-    /**
      * Get the verification level for a given user
      *
      * TODO: define this better
@@ -65,24 +51,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
      * @param userId - user to be checked
      */
     checkUserTrust(userId: string): UserTrustLevel;
-
-    /**
-     * Get the verification level for a given device
-     *
-     * TODO: define this better
-     *
-     * @param userId - user to be checked
-     * @param deviceId - device to be checked
-     */
-    checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
-
-    /**
-     * Perform any background tasks that can be done before a message is ready to
-     * send, in order to speed up sending of the message.
-     *
-     * @param room - the room the event is in
-     */
-    prepareToEncrypt(room: Room): void;
 
     /**
      * Encrypt an event according to the configuration of the room.
@@ -112,14 +80,24 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
     /**
-     * Get a list containing all of the room keys
+     * Finds a DM verification request that is already in progress for the given room id
      *
-     * This should be encrypted before returning it to the user.
+     * @param roomId - the room to use for verification
      *
-     * @returns a promise which resolves to a list of
-     *    session export objects
+     * @returns the VerificationRequest that is in progress, if any
      */
-    exportRoomKeys(): Promise<IMegolmSessionData[]>;
+    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 }
 
 /** The methods which crypto implementations should expose to the Sync api */
@@ -137,6 +115,22 @@ export interface SyncCryptoCallbacks {
      * @returns A list of preprocessed to-device messages.
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop when one time key counts and unused fallback key details are received.
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     */
+    processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
+
+    /**
+     * Handle the notification from /sync that device lists have
+     * been changed.
+     *
+     * @param deviceLists - device_lists field from /sync
+     */
+    processDeviceLists(deviceLists: IDeviceLists): Promise<void>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.

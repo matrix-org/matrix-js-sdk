@@ -21,13 +21,13 @@ import { decodeBase64, encodeBase64 } from "./olmlib";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
 import { logger } from "../logger";
-import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
 import { Method } from "../http-api";
+import { SecretStorageKeyDescription } from "../secret-storage";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
-    device_data: ISecretStorageKeyInfo & {
+    device_data: SecretStorageKeyDescription & {
         // eslint-disable-line camelcase
         algorithm: string;
         account: string; // pickle

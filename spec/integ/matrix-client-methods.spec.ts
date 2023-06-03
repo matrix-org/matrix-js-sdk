@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import HttpBackend from "matrix-mock-request";
+import { Mocked } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
@@ -24,6 +25,7 @@ import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -603,14 +605,14 @@ describe("MatrixClient", function () {
                 });
 
             const prom = client!.downloadKeys(["boris", "chaz"]).then(function (res) {
-                assertObjectContains(res.boris.dev1, {
+                assertObjectContains(res.get("boris")!.get("dev1")!, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
                     algorithms: ["1"],
                     unsigned: { abc: "def" },
                 });
 
-                assertObjectContains(res.chaz.dev2, {
+                assertObjectContains(res.get("chaz")!.get("dev2")!, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev2": ed25519key },
                     algorithms: ["2"],
@@ -1127,22 +1129,51 @@ describe("MatrixClient", function () {
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
+            httpBackend!
+                .when("GET", "/capabilities")
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client!.requestLoginToken(uiaData);
             httpBackend!
-                .when("POST", "/unstable/org.matrix.msc3882/login/token", { auth: uiaData })
+                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
                 .respond(200, response);
             await httpBackend!.flush("");
             expect(await prom).toStrictEqual(response);
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
-            const response = {};
+            httpBackend!
+                .when("GET", "/capabilities")
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
+            const response = { login_token: "xyz", expires_in_ms: 5000 };
+            const prom = client!.requestLoginToken();
+            httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            await httpBackend!.flush("");
+            // check that expires_in has been populated for compatibility with r0
+            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
+        });
+
+        it("should hit the r1 endpoint when capability is disabled", async () => {
+            httpBackend!
+                .when("GET", "/capabilities")
+                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
+            const response = { login_token: "xyz", expires_in_ms: 5000 };
+            const prom = client!.requestLoginToken();
+            httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            await httpBackend!.flush("");
+            // check that expires_in has been populated for compatibility with r0
+            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
+        });
+
+        it("should hit the r0 endpoint for fallback", async () => {
+            httpBackend!.when("GET", "/capabilities").respond(200, {});
+            const response = { login_token: "xyz", expires_in: 5 };
             const prom = client!.requestLoginToken();
             httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
             await httpBackend!.flush("");
-            expect(await prom).toStrictEqual(response);
+            // check that expires_in has been populated for compatibility with r1
+            expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
         });
     });
 
@@ -1381,6 +1412,42 @@ describe("MatrixClient", function () {
         // uploadKeys() is a no-op nowadays, so there's not much to test here.
         it("should complete successfully", async () => {
             await client!.uploadKeys();
+        });
+    });
+
+    describe("getCryptoTrustCrossSignedDevices", () => {
+        it("should throw if e2e is disabled", () => {
+            expect(() => client!.getCryptoTrustCrossSignedDevices()).toThrow("End-to-end encryption disabled");
+        });
+
+        it("should proxy to the crypto backend", async () => {
+            const mockBackend = {
+                getTrustCrossSignedDevices: jest.fn().mockReturnValue(true),
+            } as unknown as Mocked<CryptoBackend>;
+            client!["cryptoBackend"] = mockBackend;
+
+            expect(client!.getCryptoTrustCrossSignedDevices()).toBe(true);
+            mockBackend.getTrustCrossSignedDevices.mockReturnValue(false);
+            expect(client!.getCryptoTrustCrossSignedDevices()).toBe(false);
+        });
+    });
+
+    describe("setCryptoTrustCrossSignedDevices", () => {
+        it("should throw if e2e is disabled", () => {
+            expect(() => client!.setCryptoTrustCrossSignedDevices(false)).toThrow("End-to-end encryption disabled");
+        });
+
+        it("should proxy to the crypto backend", async () => {
+            const mockBackend = {
+                setTrustCrossSignedDevices: jest.fn(),
+            } as unknown as Mocked<CryptoBackend>;
+            client!["cryptoBackend"] = mockBackend;
+
+            client!.setCryptoTrustCrossSignedDevices(true);
+            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(true);
+
+            client!.setCryptoTrustCrossSignedDevices(false);
+            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
         });
     });
 });

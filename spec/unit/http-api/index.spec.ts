@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import DOMException from "domexception";
 import { mocked } from "jest-mock";
 
 import { ClientPrefix, MatrixHttpApi, Method, UploadResponse } from "../../../src";
@@ -32,8 +31,6 @@ describe("MatrixHttpApi", () => {
     let upload: Promise<UploadResponse>;
 
     const DONE = 0;
-
-    global.DOMException = DOMException;
 
     beforeEach(() => {
         xhr = {

@@ -49,6 +49,12 @@ export class IndexedDBStoreWorker {
      */
     public constructor(private readonly postMessage: InstanceType<typeof Worker>["postMessage"]) {}
 
+    private onClose = (): void => {
+        this.postMessage.call(null, {
+            command: "closed",
+        });
+    };
+
     /**
      * Passes a message event from the main script into the class. This method
      * can be directly assigned to the web worker `onmessage` variable.
@@ -57,7 +63,7 @@ export class IndexedDBStoreWorker {
      */
     public onMessage = (ev: MessageEvent): void => {
         const msg: ICmd = ev.data;
-        let prom;
+        let prom: Promise<any> | undefined;
 
         switch (msg.command) {
             case "setupWorker":
@@ -67,7 +73,7 @@ export class IndexedDBStoreWorker {
                 prom = Promise.resolve();
                 break;
             case "connect":
-                prom = this.backend?.connect();
+                prom = this.backend?.connect(this.onClose);
                 break;
             case "isNewlyCreated":
                 prom = this.backend?.isNewlyCreated();

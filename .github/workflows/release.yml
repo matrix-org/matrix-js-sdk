@@ -11,46 +11,39 @@ jobs:
             - name: 🧮 Checkout code
               uses: actions/checkout@v3
 
+            - name: 🧮 Checkout gh-pages
+              uses: actions/checkout@v3
+              with:
+                  ref: gh-pages
+                  path: _docs
+
             - name: 🔧 Yarn cache
               uses: actions/setup-node@v3
               with:
                   cache: "yarn"
 
             - name: 🔨 Install dependencies
-              run: "yarn install --pure-lockfile"
+              run: "yarn install --frozen-lockfile"
 
-            - name: 📖 Generate JSDoc
-              run: "yarn gendoc"
-
-            - name: 📋 Copy to temp
+            - name: 🔨 Install symlinks
               run: |
-                  cp -a "./_docs" "$RUNNER_TEMP/"
+                  sudo apt-get update
+                  sudo apt-get install -y symlinks
 
-            - name: 🧮 Checkout gh-pages
-              uses: actions/checkout@v3
-              with:
-                  ref: gh-pages
-
-            - name: 🔪 Prepare
-              env:
-                  GITHUB_REF_NAME: ${{ github.ref_name }}
+            - name: 📖 Generate docs
               run: |
-                  VERSION="${GITHUB_REF_NAME#v}"
-                  [ ! -e "$VERSION" ] || rm -r $VERSION
-                  cp -r $RUNNER_TEMP/_docs/ $VERSION
-
-                  # Add the new directory to the index if it isn't there already
-                  if ! grep -q ">Version $VERSION</a>" index.html; then
-                    perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
-                      "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$VERSION" index.html
-                  fi
+                  yarn tpv --yes --out _docs --stale --major 10
+                  yarn gendoc
+                  symlinks -rc _docs
 
             - name: 🚀 Deploy
-              uses: peaceiris/actions-gh-pages@bd8c6b06eba6b3d25d72b7a1767993c0aeee42e7 # v3
-              with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  keep_files: true
-                  publish_dir: .
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  git add . --all
+                  git commit -m "Update docs"
+                  git push
+              working-directory: _docs
 
     npm:
         name: Publish

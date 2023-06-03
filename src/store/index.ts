@@ -36,11 +36,12 @@ export interface ISavedSync {
  * A store for most of the data js-sdk needs to store, apart from crypto data
  */
 export interface IStore {
-    readonly accountData: Record<string, MatrixEvent>; // type : content
+    readonly accountData: Map<string, MatrixEvent>; // type : content
 
-    // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
-    // for when it falls back to being a memory store due to errors.
-    on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
+    // XXX: The indexeddb store exposes a non-standard emitter for:
+    // "degraded" event for when it falls back to being a memory store due to errors.
+    // "closed" event for when the database closes unexpectedly
+    on?: (event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void) => void;
 
     /** @returns whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
@@ -175,7 +176,7 @@ export interface IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    save(force?: boolean): void;
+    save(force?: boolean): Promise<void>;
 
     /**
      * Startup does nothing.
@@ -244,4 +245,9 @@ export interface IStore {
      * Removes a specific batch of to-device messages from the queue
      */
     removeToDeviceBatch(id: number): Promise<void>;
+
+    /**
+     * Stop the store and perform any appropriate cleanup
+     */
+    destroy(): Promise<void>;
 }

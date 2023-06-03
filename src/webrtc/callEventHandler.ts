@@ -277,6 +277,11 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
+            const stats = groupCall?.getGroupCallStats();
+            if (stats) {
+                call.initStats(stats);
+            }
+
             try {
                 await call.initWithInvite(event);
             } catch (e) {

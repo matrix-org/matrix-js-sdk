@@ -16,12 +16,12 @@ limitations under the License.
 
 import { Account } from "@matrix-org/olm";
 
-import { logger } from "../../src/logger";
-import { decodeRecoveryKey } from "../../src/crypto/recoverykey";
-import { IKeyBackupInfo, IKeyBackupSession } from "../../src/crypto/keybackup";
-import { TestClient } from "../TestClient";
-import { IEvent } from "../../src";
-import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { logger } from "../../../src/logger";
+import { decodeRecoveryKey } from "../../../src/crypto/recoverykey";
+import { IKeyBackupInfo, IKeyBackupSession } from "../../../src/crypto/keybackup";
+import { TestClient } from "../../TestClient";
+import { IEvent } from "../../../src";
+import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 
 const ROOM_ID = "!ROOM:ID";
 

@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import { logger } from "../logger";
-import { IContent, MatrixEvent } from "../models/event";
+import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { Method, ClientPrefix } from "../http-api";
-import { Crypto, ICryptoCallbacks, IBootstrapCrossSigningOpts } from "./index";
+import { Crypto, ICryptoCallbacks } from "./index";
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -28,13 +28,13 @@ import {
     ISignedKey,
     KeySignatures,
 } from "../client";
-import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IAccountDataClient } from "./SecretStorage";
+import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
+import { BootstrapCrossSigningOpts } from "../crypto-api";
 
 interface ICrossSigningKeys {
-    authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
+    authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
     keys: Record<"master" | "self_signing" | "user_signing", ICrossSigningKey>;
 }
 
@@ -61,7 +61,7 @@ export class EncryptionSetupBuilder {
      * @param accountData - pre-existing account data, will only be read, not written.
      * @param delegateCryptoCallbacks - crypto callbacks to delegate to if the key isn't in cache yet
      */
-    public constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
+    public constructor(accountData: Map<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
@@ -238,7 +238,7 @@ export class EncryptionSetupOperation {
  */
 class AccountDataClientAdapter
     extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
-    implements IAccountDataClient
+    implements AccountDataClient
 {
     //
     public readonly values = new Map<string, MatrixEvent>();
@@ -246,28 +246,28 @@ class AccountDataClientAdapter
     /**
      * @param existingValues - existing account data
      */
-    public constructor(private readonly existingValues: Record<string, MatrixEvent>) {
+    public constructor(private readonly existingValues: Map<string, MatrixEvent>) {
         super();
     }
 
     /**
      * @returns the content of the account data
      */
-    public getAccountDataFromServer<T extends { [k: string]: any }>(type: string): Promise<T> {
-        return Promise.resolve(this.getAccountData(type) as T);
+    public getAccountDataFromServer<T extends { [k: string]: any }>(type: string): Promise<T | null> {
+        return Promise.resolve(this.getAccountData(type));
     }
 
     /**
      * @returns the content of the account data
      */
-    public getAccountData(type: string): IContent | null {
+    public getAccountData<T extends { [k: string]: any }>(type: string): T | null {
         const modifiedValue = this.values.get(type);
         if (modifiedValue) {
-            return modifiedValue;
+            return modifiedValue as unknown as T;
         }
-        const existingValue = this.existingValues[type];
+        const existingValue = this.existingValues.get(type);
         if (existingValue) {
-            return existingValue.getContent();
+            return existingValue.getContent<T>();
         }
         return null;
     }
@@ -326,7 +326,7 @@ class SSSSCryptoCallbacks {
     public constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
-        { keys }: { keys: Record<string, ISecretStorageKeyInfo> },
+        { keys }: { keys: Record<string, SecretStorageKeyDescription> },
         name: string,
     ): Promise<[string, Uint8Array] | null> {
         for (const keyId of Object.keys(keys)) {
@@ -348,7 +348,7 @@ class SSSSCryptoCallbacks {
         return null;
     }
 
-    public addPrivateKey(keyId: string, keyInfo: ISecretStorageKeyInfo, privKey: Uint8Array): void {
+    public addPrivateKey(keyId: string, keyInfo: SecretStorageKeyDescription, privKey: Uint8Array): void {
         this.privateKeys.set(keyId, privKey);
         // Also pass along to application to cache if it wishes
         this.delegateCryptoCallbacks?.cacheSecretStorageKey?.(keyId, keyInfo, privKey);

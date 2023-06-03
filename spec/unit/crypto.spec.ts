@@ -381,12 +381,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -405,7 +400,7 @@ describe("Crypto", function () {
             // the first message can't be decrypted yet, but the second one
             // can
             let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
-            bobClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            bobClient.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
             bobClient.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             await decryptEventsPromise;
@@ -617,12 +612,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await secondAliceClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(secondAliceClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -725,12 +715,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -805,12 +790,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -897,12 +877,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -1011,7 +986,6 @@ describe("Crypto", function () {
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
-            client.crypto!.getSecretStorageKey = jest.fn().mockResolvedValue(null);
             client.crypto!.isCrossSigningReady = async () => false;
             client.crypto!.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto!.baseApis.setAccountData = jest.fn().mockResolvedValue(null);
@@ -1039,7 +1013,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
-            ensureOlmSessionsForDevices.mockResolvedValue({});
+            ensureOlmSessionsForDevices.mockResolvedValue(new Map());
             encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
                 result.plaintext = { type: 0, body: JSON.stringify(payload) };

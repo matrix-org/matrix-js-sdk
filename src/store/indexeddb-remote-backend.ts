@@ -30,6 +30,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     // Once we start connecting, we keep the promise and re-use it
     // if we try to connect again
     private startPromise?: Promise<void>;
+    // Callback for when the IndexedDB gets closed unexpectedly
+    private onClose?(): void;
 
     /**
      * An IndexedDB store backend where the actual backend sits in a web
@@ -48,7 +50,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * grant permission.
      * @returns Promise which resolves if successfully connected.
      */
-    public connect(): Promise<void> {
+    public connect(onClose?: () => void): Promise<void> {
+        this.onClose = onClose;
         return this.ensureStarted().then(() => this.doCmd("connect"));
     }
 
@@ -171,7 +174,9 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private onWorkerMessage = (ev: MessageEvent): void => {
         const msg = ev.data;
 
-        if (msg.command == "cmd_success" || msg.command == "cmd_fail") {
+        if (msg.command == "closed") {
+            this.onClose?.();
+        } else if (msg.command == "cmd_success" || msg.command == "cmd_fail") {
             if (msg.seq === undefined) {
                 logger.error("Got reply from worker with no seq");
                 return;
@@ -195,4 +200,11 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.warn("Unrecognised message from worker: ", msg);
         }
     };
+
+    /*
+     * Destroy the web worker
+     */
+    public async destroy(): Promise<void> {
+        this.worker?.terminate();
+    }
 }

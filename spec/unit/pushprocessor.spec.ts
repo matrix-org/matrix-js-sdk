@@ -1,6 +1,7 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName } from "../../src";
+import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName, RuleId } from "../../src";
+import { mockClientMethodsUser } from "../test-utils/client";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -45,9 +46,8 @@ describe("NotificationService", function () {
                 },
             };
         },
-        credentials: {
-            userId: testUserId,
-        },
+        ...mockClientMethodsUser(testUserId),
+        supportsIntentionalMentions: () => true,
         pushRules: {
             device: {},
             global: {
@@ -96,51 +96,6 @@ describe("NotificationService", function () {
                         enabled: true,
                         pattern: "foo*bar",
                         rule_id: "foobar",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "p[io]ng",
-                        rule_id: "pingpong",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "I ate [0-9] pies",
-                        rule_id: "pies",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "b[!ai]ke",
-                        rule_id: "bakebike",
                     },
                 ],
                 override: [
@@ -287,39 +242,6 @@ describe("NotificationService", function () {
         testEvent.event.content!.body = "It was foomahbar I think.";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    // TODO: This is not spec compliant behaviour.
-    //
-    // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1 which
-    // describes pattern should glob:
-    //
-    // 1. * matches 0 or more characters;
-    // 2. ? matches exactly one character
-    it("should bing on character group ([abc]) bing words.", function () {
-        testEvent.event.content!.body = "Ping!";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "Pong!";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    // TODO: This is not spec compliant behaviour. (See above.)
-    it("should bing on character range ([a-z]) bing words.", function () {
-        testEvent.event.content!.body = "I ate 6 pies";
-        const actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    // TODO: This is not spec compliant behaviour. (See above.)
-    it("should bing on character negation ([!a]) bing words.", function () {
-        testEvent.event.content!.body = "boke";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "bake";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(false);
     });
 
     it("should not bing on room server ACL changes", function () {
@@ -711,6 +633,37 @@ describe("NotificationService", function () {
                 rule: msc3914RoomCallRule,
             });
         });
+    });
+
+    describe("test intentional mentions behaviour", () => {
+        it.each([RuleId.ContainsUserName, RuleId.ContainsDisplayName, RuleId.AtRoomNotification])(
+            "Rule %s matches unless intentional mentions are enabled",
+            (ruleId) => {
+                const rule = {
+                    rule_id: ruleId,
+                    actions: [],
+                    conditions: [],
+                    default: false,
+                    enabled: true,
+                };
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(true);
+
+                // Add the mentions property to the event and the rule is now disabled.
+                testEvent = utils.mkEvent({
+                    type: "m.room.message",
+                    room: testRoomId,
+                    user: "@alfred:localhost",
+                    event: true,
+                    content: {
+                        "body": "",
+                        "msgtype": "m.text",
+                        "org.matrix.msc3952.mentions": {},
+                    },
+                });
+
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(false);
+            },
+        );
     });
 });
 

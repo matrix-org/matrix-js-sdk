@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,11 +22,12 @@ import { Mocked } from "jest-mock";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { ServerSideSecretStorage } from "../../../src/secret-storage";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -35,16 +36,15 @@ afterEach(() => {
     indexedDB = new IDBFactory();
 });
 
-describe("RustCrypto", () => {
-    const TEST_USER = "@alice:example.com";
-    const TEST_DEVICE_ID = "TEST_DEVICE";
+const TEST_USER = "@alice:example.com";
+const TEST_DEVICE_ID = "TEST_DEVICE";
 
+describe("RustCrypto", () => {
     describe(".exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should return a list", async () => {
@@ -53,12 +53,11 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("to-device messages", () => {
+    describe("call preprocess methods", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should pass through unencrypted to-device messages", async () => {
@@ -92,6 +91,32 @@ describe("RustCrypto", () => {
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
         });
+    });
+
+    it("isCrossSigningReady", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.isCrossSigningReady()).resolves.toBe(false);
+    });
+
+    it("getCrossSigningKeyId", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
+    });
+
+    it("bootstrapCrossSigning delegates to CrossSigningIdentity", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        const mockCrossSigningIdentity = {
+            bootstrapCrossSigning: jest.fn().mockResolvedValue(undefined),
+        };
+        // @ts-ignore private property
+        rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
+        await rustCrypto.bootstrapCrossSigning({});
+        expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
+    });
+
+    it("isSecretStorageReady", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
     });
 
     describe("outgoing requests", () => {
@@ -141,7 +166,13 @@ describe("RustCrypto", () => {
                 makeOutgoingRequest: jest.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
-            rustCrypto = new RustCrypto(olmMachine, {} as MatrixHttpApi<any>, TEST_USER, TEST_DEVICE_ID);
+            rustCrypto = new RustCrypto(
+                olmMachine,
+                {} as MatrixHttpApi<any>,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+            );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
 
@@ -206,8 +237,7 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixClient["http"];
-            rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+            rustCrypto = await makeTestRustCrypto();
         });
 
         it("should handle unencrypted events", () => {
@@ -230,4 +260,74 @@ describe("RustCrypto", () => {
             expect(res.encrypted).toBeTruthy();
         });
     });
+
+    describe("get|setTrustCrossSignedDevices", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto();
+        });
+
+        it("should be true by default", () => {
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+
+        it("should be easily turn-off-and-on-able", () => {
+            rustCrypto.setTrustCrossSignedDevices(false);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(false);
+            rustCrypto.setTrustCrossSignedDevices(true);
+            expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+    });
+
+    describe("getDeviceVerificationStatus", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getDevice: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+            );
+        });
+
+        it("should call getDevice", async () => {
+            olmMachine.getDevice.mockResolvedValue({
+                isCrossSigningTrusted: jest.fn().mockReturnValue(false),
+                isLocallyTrusted: jest.fn().mockReturnValue(false),
+                isCrossSignedByOwner: jest.fn().mockReturnValue(false),
+            } as unknown as RustSdkCryptoJs.Device);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(olmMachine.getDevice.mock.calls[0][0].toString()).toEqual("@user:domain");
+            expect(olmMachine.getDevice.mock.calls[0][1].toString()).toEqual("device");
+            expect(res?.crossSigningVerified).toBe(false);
+            expect(res?.localVerified).toBe(false);
+            expect(res?.signedByOwner).toBe(false);
+        });
+
+        it("should return null for unknown device", async () => {
+            olmMachine.getDevice.mockResolvedValue(undefined);
+            const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
+            expect(res).toBe(null);
+        });
+    });
 });
+
+/** build a basic RustCrypto instance for testing
+ *
+ * just provides default arguments for initRustCrypto()
+ */
+async function makeTestRustCrypto(
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }> = {} as MatrixClient["http"],
+    userId: string = TEST_USER,
+    deviceId: string = TEST_DEVICE_ID,
+    secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+): Promise<RustCrypto> {
+    return await initRustCrypto(http, userId, deviceId, secretStorage);
+}

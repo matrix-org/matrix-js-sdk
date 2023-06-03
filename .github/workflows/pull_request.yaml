@@ -8,7 +8,7 @@ on:
         secrets:
             ELEMENT_BOT_TOKEN:
                 required: true
-concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
+concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
 jobs:
     changelog:
         name: Preview Changelog

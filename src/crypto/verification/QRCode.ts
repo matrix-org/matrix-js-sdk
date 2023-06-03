@@ -18,7 +18,7 @@ limitations under the License.
  * QR code key verification.
  */
 
-import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
+import { VerificationBase as Base } from "./Base";
 import { newKeyMismatchError, newUserCancelledError } from "./Error";
 import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
 import { logger } from "../../logger";
@@ -26,25 +26,18 @@ import { VerificationRequest } from "./request/VerificationRequest";
 import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixEvent } from "../../models/event";
+import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
 
-interface IReciprocateQr {
-    confirm(): void;
-    cancel(): void;
-}
+/** @deprecated use VerifierEvent */
+export type QrCodeEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const QrCodeEvent = VerifierEvent;
 
-export enum QrCodeEvent {
-    ShowReciprocateQr = "show_reciprocate_qr",
-}
-
-type EventHandlerMap = {
-    [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
-} & VerificationEventHandlerMap;
-
-export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
-    public reciprocateQREvent?: IReciprocateQr;
+export class ReciprocateQRCode extends Base {
+    public reciprocateQREvent?: ShowQrCodeCallbacks;
 
     public static factory(
         channel: IVerificationChannel,

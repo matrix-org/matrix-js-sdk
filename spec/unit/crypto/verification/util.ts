@@ -20,7 +20,7 @@ import { IContent, MatrixEvent } from "../../../../src/models/event";
 import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
 import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from "../../../../src/logger";
-import { MatrixClient, ClientEvent, ICreateClientOpts } from "../../../../src/client";
+import { MatrixClient, ClientEvent, ICreateClientOpts, SendToDeviceContentMap } from "../../../../src/client";
 
 interface UserInfo {
     userId: string;
@@ -36,16 +36,16 @@ export async function makeTestClients(
     const clientMap: Record<string, Record<string, MatrixClient>> = {};
     const makeSendToDevice =
         (matrixClient: MatrixClient): MatrixClient["sendToDevice"] =>
-        async (type, map) => {
+        async (type: string, contentMap: SendToDeviceContentMap) => {
             // logger.log(this.getUserId(), "sends", type, map);
-            for (const [userId, devMap] of Object.entries(map)) {
+            for (const [userId, deviceMessages] of contentMap) {
                 if (userId in clientMap) {
-                    for (const [deviceId, msg] of Object.entries(devMap)) {
+                    for (const [deviceId, message] of deviceMessages) {
                         if (deviceId in clientMap[userId]) {
                             const event = new MatrixEvent({
                                 sender: matrixClient.getUserId()!,
                                 type: type,
-                                content: msg,
+                                content: message,
                             });
                             const client = clientMap[userId][deviceId];
                             const decryptionPromise = event.isEncrypted()

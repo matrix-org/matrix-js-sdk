@@ -14,13 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IEvent, MatrixEvent, PollEvent, Room } from "../../../src";
+import { M_POLL_START } from "matrix-events-sdk";
+
+import { EventType, IEvent, MatrixEvent, PollEvent, Room } from "../../../src";
 import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
 import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src/@types/polls";
 import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";
-import { Poll } from "../../../src/models/poll";
+import { isPollEvent, Poll } from "../../../src/models/poll";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { flushPromises } from "../../test-utils/flushPromises";
+import { mkEvent } from "../../test-utils/test-utils";
 
 jest.useFakeTimers();
 
@@ -452,5 +455,32 @@ describe("Poll", () => {
             expect(poll.emit).toHaveBeenCalledWith(PollEvent.Responses, responses);
             expect(responses.getRelations()).toEqual([responseEvent]);
         });
+    });
+
+    describe("isPollEvent", () => {
+        it("should return »false« for a non-poll event", () => {
+            const messageEvent = mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                content: {},
+                user: mockClient.getSafeUserId(),
+                room: room.roomId,
+            });
+            expect(isPollEvent(messageEvent)).toBe(false);
+        });
+
+        it.each([[M_POLL_START.name], [M_POLL_RESPONSE.name], [M_POLL_END.name]])(
+            "should return »true« for a »%s« event",
+            (type: string) => {
+                const pollEvent = mkEvent({
+                    event: true,
+                    type,
+                    content: {},
+                    user: mockClient.getSafeUserId(),
+                    room: room.roomId,
+                });
+                expect(isPollEvent(pollEvent)).toBe(true);
+            },
+        );
     });
 });

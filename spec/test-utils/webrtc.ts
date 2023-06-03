@@ -30,6 +30,7 @@ import {
     RoomState,
     RoomStateEvent,
     RoomStateEventHandlerMap,
+    SendToDeviceContentMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -122,6 +123,7 @@ export class MockRTCPeerConnection {
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     public iceConnectionStateChangeListener?: () => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
+    public onDataChannelListener?: (ev: RTCDataChannelEvent) => void;
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate?: () => void;
@@ -167,6 +169,8 @@ export class MockRTCPeerConnection {
             this.iceConnectionStateChangeListener = listener;
         } else if (type == "track") {
             this.onTrackListener = listener;
+        } else if (type == "datachannel") {
+            this.onDataChannelListener = listener;
         }
     }
     public createDataChannel(label: string, opts: RTCDataChannelInit) {
@@ -231,6 +235,12 @@ export class MockRTCPeerConnection {
             this.negotiationNeededListener();
         }
     }
+
+    public triggerIncomingDataChannel(): void {
+        this.onDataChannelListener?.({ channel: {} } as RTCDataChannelEvent);
+    }
+
+    public restartIce(): void {}
 }
 
 export class MockRTCRtpSender {
@@ -443,11 +453,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     >();
     public sendToDevice = jest.fn<
         Promise<{}>,
-        [
-            eventType: string,
-            contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-            txnId?: string,
-        ]
+        [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
 
     public isInitialSyncComplete(): boolean {
@@ -502,18 +508,22 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public state = CallState.Ringing;
     public opponentUserId = FAKE_USER_ID_1;
     public opponentDeviceId = FAKE_DEVICE_ID_1;
+    public opponentSessionId = FAKE_SESSION_ID_1;
     public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
+        isAudioMuted: jest.fn().mockReturnValue(false),
+        isVideoMuted: jest.fn().mockReturnValue(false),
         stream: new MockMediaStream("stream"),
-    };
+    } as unknown as CallFeed;
     public remoteUsermediaFeed?: CallFeed;
     public remoteScreensharingFeed?: CallFeed;
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
     public hangup = jest.fn<void, []>();
+    public initStats = jest.fn<void, []>();
 
     public sendMetadataUpdate = jest.fn<void, []>();
 
@@ -523,6 +533,14 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 
     public getOpponentDeviceId(): string | undefined {
         return this.opponentDeviceId;
+    }
+
+    public getOpponentSessionId(): string | undefined {
+        return this.opponentSessionId;
+    }
+
+    public getLocalFeeds(): CallFeed[] {
+        return [this.localUsermediaFeed];
     }
 
     public typed(): MatrixCall {
@@ -585,6 +603,7 @@ export function makeMockGroupCallStateEvent(
         "m.type": GroupCallType.Video,
         "m.intent": GroupCallIntent.Prompt,
     },
+    redacted?: boolean,
 ): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
@@ -592,6 +611,7 @@ export function makeMockGroupCallStateEvent(
         getTs: jest.fn().mockReturnValue(0),
         getContent: jest.fn().mockReturnValue(content),
         getStateKey: jest.fn().mockReturnValue(groupCallId),
+        isRedacted: jest.fn().mockReturnValue(redacted ?? false),
     } as unknown as MatrixEvent;
 }
 
@@ -604,3 +624,124 @@ export function makeMockGroupCallMemberStateEvent(roomId: string, groupCallId: s
         getStateKey: jest.fn().mockReturnValue(groupCallId),
     } as unknown as MatrixEvent;
 }
+
+export const REMOTE_SFU_DESCRIPTION =
+    "v=0\n" +
+    "o=- 3242942315779688438 1678878001 IN IP4 0.0.0.0\n" +
+    "s=-\n" +
+    "t=0 0\n" +
+    "a=fingerprint:sha-256 EA:30:B2:7F:49:B5:46:D6:40:72:BF:79:95:C1:65:08:6E:35:09:FB:90:89:DA:EF:6B:82:D1:38:8C:25:39:B2\n" +
+    "a=group:BUNDLE 0 1 2\n" +
+    "m=audio 9 UDP/TLS/RTP/SAVPF 111 9 0 8\n" +
+    "c=IN IP4 0.0.0.0\n" +
+    "a=setup:actpass\n" +
+    "a=mid:0\n" +
+    "a=ice-ufrag:obZwzAcRtxwuozPZ\n" +
+    "a=ice-pwd:TWXNaPeyKTTvRLyIQhWHfHlZHJjtcoKs\n" +
+    "a=rtcp-mux\n" +
+    "a=rtcp-rsize\n" +
+    "a=rtpmap:111 opus/48000/2\n" +
+    "a=fmtp:111 minptime=10;usedtx=1;useinbandfec=1\n" +
+    "a=rtcp-fb:111 transport-cc \n" +
+    "a=rtpmap:9 G722/8000\n" +
+    "a=rtpmap:0 PCMU/8000\n" +
+    "a=rtpmap:8 PCMA/8000\n" +
+    "a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\n" +
+    "a=ssrc:2963372119 cname:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90\n" +
+    "a=ssrc:2963372119 msid:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90 4b811ab6-6926-473d-8ca5-ac45f268c507\n" +
+    "a=ssrc:2963372119 mslabel:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90\n" +
+    "a=ssrc:2963372119 label:4b811ab6-6926-473d-8ca5-ac45f268c507\n" +
+    "a=msid:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90 4b811ab6-6926-473d-8ca5-ac45f268c507\n" +
+    "a=sendrecv\n" +
+    "a=candidate:1155505470 1 udp 2130706431 13.41.173.213 41385 typ host\n" +
+    "a=candidate:1155505470 2 udp 2130706431 13.41.173.213 41385 typ host\n" +
+    "a=candidate:1155505470 1 udp 2130706431 13.41.173.213 40026 typ host\n" +
+    "a=candidate:1155505470 2 udp 2130706431 13.41.173.213 40026 typ host\n" +
+    "a=end-of-candidates\n" +
+    "m=video 9 UDP/TLS/RTP/SAVPF 96 97 102 103 104 106 108 109 98 99 112 116\n" +
+    "c=IN IP4 0.0.0.0\n" +
+    "a=setup:actpass\n" +
+    "a=mid:1\n" +
+    "a=ice-ufrag:obZwzAcRtxwuozPZ\n" +
+    "a=ice-pwd:TWXNaPeyKTTvRLyIQhWHfHlZHJjtcoKs\n" +
+    "a=rtcp-mux\n" +
+    "a=rtcp-rsize\n" +
+    "a=rtpmap:96 VP8/90000\n" +
+    "a=rtcp-fb:96 goog-remb \n" +
+    "a=rtcp-fb:96 transport-cc \n" +
+    "a=rtcp-fb:96 ccm fir\n" +
+    "a=rtcp-fb:96 nack \n" +
+    "a=rtcp-fb:96 nack pli\n" +
+    "a=rtpmap:97 rtx/90000\n" +
+    "a=fmtp:97 apt=96\n" +
+    "a=rtpmap:102 H264/90000\n" +
+    "a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f\n" +
+    "a=rtcp-fb:102 goog-remb \n" +
+    "a=rtcp-fb:102 transport-cc \n" +
+    "a=rtcp-fb:102 ccm fir\n" +
+    "a=rtcp-fb:102 nack \n" +
+    "a=rtcp-fb:102 nack pli\n" +
+    "a=rtpmap:103 rtx/90000\n" +
+    "a=fmtp:103 apt=102\n" +
+    "a=rtpmap:104 H264/90000\n" +
+    "a=fmtp:104 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f\n" +
+    "a=rtcp-fb:104 goog-remb \n" +
+    "a=rtcp-fb:104 transport-cc \n" +
+    "a=rtcp-fb:104 ccm fir\n" +
+    "a=rtcp-fb:104 nack \n" +
+    "a=rtcp-fb:104 nack pli\n" +
+    "a=rtpmap:106 H264/90000\n" +
+    "a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\n" +
+    "a=rtcp-fb:106 goog-remb \n" +
+    "a=rtcp-fb:106 transport-cc \n" +
+    "a=rtcp-fb:106 ccm fir\n" +
+    "a=rtcp-fb:106 nack \n" +
+    "a=rtcp-fb:106 nack pli\n" +
+    "a=rtpmap:108 H264/90000\n" +
+    "a=fmtp:108 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f\n" +
+    "a=rtcp-fb:108 goog-remb \n" +
+    "a=rtcp-fb:108 transport-cc \n" +
+    "a=rtcp-fb:108 ccm fir\n" +
+    "a=rtcp-fb:108 nack \n" +
+    "a=rtcp-fb:108 nack pli\n" +
+    "a=rtpmap:109 rtx/90000\n" +
+    "a=fmtp:109 apt=108\n" +
+    "a=rtpmap:98 VP9/90000\n" +
+    "a=fmtp:98 profile-id=0\n" +
+    "a=rtcp-fb:98 goog-remb \n" +
+    "a=rtcp-fb:98 transport-cc \n" +
+    "a=rtcp-fb:98 ccm fir\n" +
+    "a=rtcp-fb:98 nack \n" +
+    "a=rtcp-fb:98 nack pli\n" +
+    "a=rtpmap:99 rtx/90000\n" +
+    "a=fmtp:99 apt=98\n" +
+    "a=rtpmap:112 H264/90000\n" +
+    "a=fmtp:112 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f\n" +
+    "a=rtcp-fb:112 goog-remb \n" +
+    "a=rtcp-fb:112 transport-cc \n" +
+    "a=rtcp-fb:112 ccm fir\n" +
+    "a=rtcp-fb:112 nack \n" +
+    "a=rtcp-fb:112 nack pli\n" +
+    "a=rtpmap:116 ulpfec/90000\n" +
+    "a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\n" +
+    "a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\n" +
+    "a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\n" +
+    "a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\n" +
+    "a=rid:f recv\n" +
+    "a=rid:h recv\n" +
+    "a=rid:q recv\n" +
+    "a=simulcast:recv f;h;q\n" +
+    "a=ssrc:1212931603 cname:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90\n" +
+    "a=ssrc:1212931603 msid:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90 12905f48-75b9-499f-ba50-fc00f56a86c6\n" +
+    "a=ssrc:1212931603 mslabel:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90\n" +
+    "a=ssrc:1212931603 label:12905f48-75b9-499f-ba50-fc00f56a86c6\n" +
+    "a=msid:dcc3a6d5-37a1-42e7-94a9-d520f20d0c90 12905f48-75b9-499f-ba50-fc00f56a86c6\n" +
+    "a=sendrecv\n" +
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel\n" +
+    "c=IN IP4 0.0.0.0\n" +
+    "a=setup:actpass\n" +
+    "a=mid:2\n" +
+    "a=sendrecv\n" +
+    "a=sctp-port:5000\n" +
+    "a=ice-ufrag:obZwzAcRtxwuozPZ\n" +
+    "a=ice-pwd:TWXNaPeyKTTvRLyIQhWHfHlZHJjtcoKs";

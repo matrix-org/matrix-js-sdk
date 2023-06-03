@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import * as utils from "../utils";
+import { checkObjectHasKeys, encodeParams } from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { ConnectionError, MatrixError } from "./errors";
@@ -45,7 +45,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
         public readonly opts: O,
     ) {
-        utils.checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
+        checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
     }
@@ -66,7 +66,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * Sets the base URL for the identity server
      * @param url - The new base url
      */
-    public setIdBaseUrl(url: string): void {
+    public setIdBaseUrl(url?: string): void {
         this.opts.idBaseUrl = url;
     }
 
@@ -304,7 +304,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
         const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
-            utils.encodeParams(queryParams, url.searchParams);
+            encodeParams(queryParams, url.searchParams);
         }
         return url;
     }

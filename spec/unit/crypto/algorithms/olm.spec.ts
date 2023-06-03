@@ -146,18 +146,21 @@ describe("OlmDevice", function () {
                     });
                 },
             } as unknown as MockedObject<MatrixClient>;
-            const devicesByUser = {
-                "@bob:example.com": [
-                    DeviceInfo.fromStorage(
-                        {
-                            keys: {
-                                "curve25519:ABCDEFG": "akey",
+            const devicesByUser = new Map([
+                [
+                    "@bob:example.com",
+                    [
+                        DeviceInfo.fromStorage(
+                            {
+                                keys: {
+                                    "curve25519:ABCDEFG": "akey",
+                                },
                             },
-                        },
-                        "ABCDEFG",
-                    ),
+                            "ABCDEFG",
+                        ),
+                    ],
                 ],
-            };
+            ]);
 
             // start two tasks that try to ensure that there's an olm session
             const promises = Promise.all([
@@ -218,12 +221,8 @@ describe("OlmDevice", function () {
             // There's no required ordering of devices per user, so here we
             // create two different orderings so that each task reserves a
             // device the other task needs before continuing.
-            const devicesByUserAB = {
-                "@bob:example.com": [deviceBobA, deviceBobB],
-            };
-            const devicesByUserBA = {
-                "@bob:example.com": [deviceBobB, deviceBobA],
-            };
+            const devicesByUserAB = new Map([["@bob:example.com", [deviceBobA, deviceBobB]]]);
+            const devicesByUserBA = new Map([["@bob:example.com", [deviceBobB, deviceBobA]]]);
 
             const task1 = alwaysSucceed(olmlib.ensureOlmSessionsForDevices(aliceOlmDevice, baseApis, devicesByUserAB));
 

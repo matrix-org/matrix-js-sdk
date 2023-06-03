@@ -28,7 +28,8 @@ import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossS
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { VerificationRequest } from "./request/VerificationRequest";
-import { ListenerMap, TypedEventEmitter } from "../../models/typed-event-emitter";
+import { TypedEventEmitter } from "../../models/typed-event-emitter";
+import { VerifierEvent, VerifierEventHandlerMap } from "../../crypto-api/verification";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -40,18 +41,24 @@ export class SwitchStartEventError extends Error {
 
 export type KeyVerifier = (keyId: string, device: DeviceInfo, keyInfo: string) => void;
 
-export enum VerificationEvent {
-    Cancel = "cancel",
-}
+/** @deprecated use VerifierEvent */
+export type VerificationEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const VerificationEvent = VerifierEvent;
 
+/** @deprecated use VerifierEventHandlerMap */
 export type VerificationEventHandlerMap = {
     [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
+// The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
+// backwards compatibility with applications that reference the class.
 export class VerificationBase<
-    Events extends string,
-    Arguments extends ListenerMap<Events | VerificationEvent>,
-> extends TypedEventEmitter<Events | VerificationEvent, Arguments, VerificationEventHandlerMap> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Events extends string = VerifierEvent,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Arguments = VerifierEventHandlerMap,
+> extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> {
     private cancelled = false;
     private _done = false;
     private promise: Promise<void> | null = null;

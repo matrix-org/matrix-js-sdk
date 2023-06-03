@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../../logger";
-import * as utils from "../../utils";
+import { safeSet, deepCompare, promiseTry } from "../../utils";
 import {
     CryptoStore,
     IDeviceData,
@@ -89,7 +89,7 @@ export class MemoryCryptoStore implements CryptoStore {
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
         const requestBody = request.requestBody;
 
-        return utils.promiseTry(() => {
+        return promiseTry(() => {
             // first see if we already have an entry for this request.
             const existing = this._getOutgoingRoomKeyRequest(requestBody);
 
@@ -137,7 +137,7 @@ export class MemoryCryptoStore implements CryptoStore {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     private _getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): OutgoingRoomKeyRequest | null {
         for (const existing of this.outgoingRoomKeyRequests) {
-            if (utils.deepCompare(existing.requestBody, requestBody)) {
+            if (deepCompare(existing.requestBody, requestBody)) {
                 return existing;
             }
         }
@@ -337,7 +337,7 @@ export class MemoryCryptoStore implements CryptoStore {
             deviceSessions = {};
             this.sessions[deviceKey] = deviceSessions;
         }
-        deviceSessions[sessionId] = sessionInfo;
+        safeSet(deviceSessions, sessionId, sessionInfo);
     }
 
     public async storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
@@ -375,11 +375,11 @@ export class MemoryCryptoStore implements CryptoStore {
             if (userId in notifiedErrorDevices) {
                 if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
                     ret.push(device);
-                    notifiedErrorDevices[userId][deviceInfo.deviceId] = true;
+                    safeSet(notifiedErrorDevices[userId], deviceInfo.deviceId, true);
                 }
             } else {
                 ret.push(device);
-                notifiedErrorDevices[userId] = { [deviceInfo.deviceId]: true };
+                safeSet(notifiedErrorDevices, userId, { [deviceInfo.deviceId]: true });
             }
         }
 
