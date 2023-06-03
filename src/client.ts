@@ -7689,16 +7689,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects with an error response.
      */
     public refreshToken(refreshToken: string): Promise<IRefreshTokenResponse> {
-        return this.http.authedRequest(
-            Method.Post,
-            "/refresh",
-            undefined,
-            { refresh_token: refreshToken },
-            {
-                prefix: ClientPrefix.V1,
-                inhibitLogoutEmit: true, // we don't want to cause logout loops
-            },
-        );
+        const performRefreshRequestWithPrefix = (prefix: ClientPrefix): Promise<IRefreshTokenResponse> =>
+            this.http.authedRequest(
+                Method.Post,
+                "/refresh",
+                undefined,
+                { refresh_token: refreshToken },
+                {
+                    prefix,
+                    inhibitLogoutEmit: true, // we don't want to cause logout loops
+                },
+            );
+
+        // First try with the (specced) /v3/ prefix.
+        // However, before Synapse 1.72.0, Synapse incorrectly required a /v1/ prefix, so we fall
+        // back to that if the request fails, for backwards compatibility.
+        return performRefreshRequestWithPrefix(ClientPrefix.V3).catch((e) => {
+            if (e.errcode === "M_UNRECOGNIZED") {
+                return performRefreshRequestWithPrefix(ClientPrefix.V1);
+            }
+            throw e;
+        });
     }
 
     /**
