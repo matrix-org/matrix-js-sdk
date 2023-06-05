@@ -79,7 +79,7 @@ export class GroupCallStats {
         Promise.all(summary)
             .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s))
             .catch((err) => {
-                logger.error("Cloud not build syummary stats report", err);
+                logger.error("Could not build summary stats report", err);
             });
     }
 
