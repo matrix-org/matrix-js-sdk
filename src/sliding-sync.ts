@@ -326,7 +326,7 @@ export enum SlidingSyncEvent {
 }
 
 export type SlidingSyncEventHandlerMap = {
-    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => Promise<void> | void;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
@@ -574,7 +574,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         if (!roomData.timeline) {
             roomData.timeline = [];
         }
-        this.emitPromised(SlidingSyncEvent.RoomData, roomId, roomData);
+        await this.emitPromised(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
     /**
