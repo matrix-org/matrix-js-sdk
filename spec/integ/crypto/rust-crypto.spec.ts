@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { createClient } from "../../src";
+import { createClient } from "../../../src";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections

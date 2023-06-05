@@ -184,11 +184,9 @@ export class CallStatsReportGatherer {
     }
 
     private processAndEmitConnectionStatsReport(): void {
-        const report = ConnectionStatsReportBuilder.build(
-            this.callId,
-            this.opponentMemberId,
-            this.trackStats.getTrack2stats(),
-        );
+        const report = ConnectionStatsReportBuilder.build(this.trackStats.getTrack2stats());
+        report.callId = this.callId;
+        report.opponentMemberId = this.opponentMemberId;
 
         this.connectionStats.bandwidth = report.bandwidth;
         this.connectionStats.bitrate = report.bitrate;

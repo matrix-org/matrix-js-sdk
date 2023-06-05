@@ -27,9 +27,9 @@ export enum StatsReport {
 
 /// ByteSentStatsReport ################################################################################################
 export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
+    callId?: string;
+    opponentMemberId?: string;
     // is a map: `local trackID` => byte send
-    callId: string;
-    opponentMemberId: string;
 }
 
 export type TrackID = string;
@@ -37,8 +37,8 @@ export type ByteSend = number;
 
 /// ConnectionStatsReport ##############################################################################################
 export interface ConnectionStatsReport {
-    callId: string;
-    opponentMemberId: string;
+    callId?: string;
+    opponentMemberId?: string;
     bandwidth: ConnectionStatsBandwidth;
     bitrate: ConnectionStatsBitrate;
     packetLoss: PacketLoss;
