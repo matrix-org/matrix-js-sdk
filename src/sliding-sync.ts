@@ -326,8 +326,7 @@ export enum SlidingSyncEvent {
 }
 
 export type SlidingSyncEventHandlerMap = {
-    // The deferred must be resolved for the next sync request to be made
-    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData, deferred: IDeferred<void>) => void;
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
@@ -575,9 +574,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         if (!roomData.timeline) {
             roomData.timeline = [];
         }
-        const deferred = defer<void>();
-        this.emit(SlidingSyncEvent.RoomData, roomId, roomData, deferred);
-        await deferred.promise;
+        this.emitPromised(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
     /**
@@ -770,7 +767,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             return;
         }
         // find the matching index
-        const txnIndex = this.txnIdDefers.findIndex((txnIdDefer) => txnIdDefer.txnId === txnId);
+        let txnIndex = -1;
+        for (let i = 0; i < this.txnIdDefers.length; i++) {
+            if (this.txnIdDefers[i].txnId === txnId) {
+                txnIndex = i;
+                break;
+            }
+        }
         if (txnIndex === -1) {
             // this shouldn't happen; we shouldn't be seeing txn_ids for things we don't know about,
             // whine about it.
