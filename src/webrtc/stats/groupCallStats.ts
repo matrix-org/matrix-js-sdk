@@ -17,6 +17,7 @@ import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReporter } from "./summaryStatsReporter";
+import { logger } from "../../logger";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
@@ -77,7 +78,9 @@ export class GroupCallStats {
 
         Promise.all(summary)
             .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s))
-            .catch((err) => alert(err));
+            .catch((err) => {
+                logger.error("Cloud not build syummary stats report", err);
+            });
     }
 
     public setInterval(interval: number): void {

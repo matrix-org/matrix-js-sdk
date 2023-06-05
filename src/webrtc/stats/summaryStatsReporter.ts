@@ -90,8 +90,8 @@ export class SummaryStatsReporter {
                 devices.push(device);
             }
         }
-        report.oppDevicesInCall = Math.max(0, devices.length - 1);
-        report.oppUsersInCall = Math.max(0, users.length - 1);
+        report.opponentDevicesInCall = Math.max(0, devices.length - 1);
+        report.opponentUsersInCall = Math.max(0, users.length - 1);
         report.diffDevicesToPeerConnections = Math.max(0, devices.length - 1) - report.peerConnections;
         report.ratioPeerConnectionToDevices =
             Math.max(0, devices.length - 1) == 0 ? 0 : report.peerConnections / (devices.length - 1);

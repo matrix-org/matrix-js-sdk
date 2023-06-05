@@ -668,8 +668,8 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 40,
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
-                oppUsersInCall: 1,
-                oppDevicesInCall: 4,
+                opponentUsersInCall: 1,
+                opponentDevicesInCall: 4,
                 diffDevicesToPeerConnections: 0,
                 ratioPeerConnectionToDevices: 1,
             });
@@ -693,8 +693,8 @@ describe("SummaryStatsReportGatherer", () => {
                 maxPacketLoss: 40,
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
-                oppUsersInCall: 0,
-                oppDevicesInCall: 0,
+                opponentUsersInCall: 0,
+                opponentDevicesInCall: 0,
                 diffDevicesToPeerConnections: -4,
                 ratioPeerConnectionToDevices: 0,
             });
