@@ -20,7 +20,7 @@ import { fail } from "assert";
 
 import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
+import { IRoomEvent, IStateEvent } from "../../src";
 import {
     MatrixClient,
     MatrixEvent,
@@ -303,7 +303,7 @@ describe("SlidingSyncSdk", () => {
             };
 
             it("can be created with required_state and timeline", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, data[roomA]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, data[roomA], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomA);
                 expect(gotRoom).toBeTruthy();
@@ -313,7 +313,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with timeline only", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomB, data[roomB]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomB, data[roomB], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomB);
                 expect(gotRoom).toBeTruthy();
@@ -323,7 +323,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with a highlight_count", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomC, data[roomC]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomC, data[roomC], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomC);
                 expect(gotRoom).toBeTruthy();
@@ -333,7 +333,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with a notification_count", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, data[roomD], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomD);
                 expect(gotRoom).toBeTruthy();
@@ -343,7 +343,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with an invited/joined_count", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomG, data[roomG]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomG, data[roomG], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomG);
                 expect(gotRoom).toBeTruthy();
@@ -366,7 +366,7 @@ describe("SlidingSyncSdk", () => {
                     }
                 };
                 client!.on(RoomEvent.Timeline, listener);
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomH, data[roomH]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomH, data[roomH], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 client!.off(RoomEvent.Timeline, listener);
                 const gotRoom = client!.getRoom(roomH);
@@ -379,7 +379,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with invite_state", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomE, data[roomE]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomE, data[roomE], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomE);
                 expect(gotRoom).toBeTruthy();
@@ -388,7 +388,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("uses the 'name' field to caluclate the room name", async () => {
-                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomF, data[roomF]);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomF, data[roomF], defer());
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomF);
                 expect(gotRoom).toBeTruthy();
@@ -398,11 +398,16 @@ describe("SlidingSyncSdk", () => {
             describe("updating", () => {
                 it("can update with a new timeline event", async () => {
                     const newEvent = mkOwnEvent(EventType.RoomMessage, { body: "new event A" });
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, {
-                        timeline: [newEvent],
-                        required_state: [],
-                        name: data[roomA].name,
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomA,
+                        {
+                            timeline: [newEvent],
+                            required_state: [],
+                            name: data[roomA].name,
+                        },
+                        defer(),
+                    );
                     const gotRoom = client!.getRoom(roomA);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -420,11 +425,16 @@ describe("SlidingSyncSdk", () => {
                         return;
                     }
                     expect(gotRoom!.getJoinRule()).toEqual(JoinRule.Invite); // default
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomB, {
-                        required_state: [mkOwnStateEvent("m.room.join_rules", { join_rule: "restricted" }, "")],
-                        timeline: [],
-                        name: data[roomB].name,
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomB,
+                        {
+                            required_state: [mkOwnStateEvent("m.room.join_rules", { join_rule: "restricted" }, "")],
+                            timeline: [],
+                            name: data[roomB].name,
+                        },
+                        defer(),
+                    );
                     gotRoom = client!.getRoom(roomB);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -434,12 +444,17 @@ describe("SlidingSyncSdk", () => {
                 });
 
                 it("can update with a new highlight_count", async () => {
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomC, {
-                        name: data[roomC].name,
-                        required_state: [],
-                        timeline: [],
-                        highlight_count: 1,
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomC,
+                        {
+                            name: data[roomC].name,
+                            required_state: [],
+                            timeline: [],
+                            highlight_count: 1,
+                        },
+                        defer(),
+                    );
                     const gotRoom = client!.getRoom(roomC);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -449,12 +464,17 @@ describe("SlidingSyncSdk", () => {
                 });
 
                 it("can update with a new notification_count", async () => {
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, {
-                        name: data[roomD].name,
-                        required_state: [],
-                        timeline: [],
-                        notification_count: 1,
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomD,
+                        {
+                            name: data[roomD].name,
+                            required_state: [],
+                            timeline: [],
+                            notification_count: 1,
+                        },
+                        defer(),
+                    );
                     const gotRoom = client!.getRoom(roomD);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -464,12 +484,17 @@ describe("SlidingSyncSdk", () => {
                 });
 
                 it("can update with a new joined_count", () => {
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomG, {
-                        name: data[roomD].name,
-                        required_state: [],
-                        timeline: [],
-                        joined_count: 1,
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomG,
+                        {
+                            name: data[roomD].name,
+                            required_state: [],
+                            timeline: [],
+                            joined_count: 1,
+                        },
+                        defer(),
+                    );
                     const gotRoom = client!.getRoom(roomG);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -490,12 +515,17 @@ describe("SlidingSyncSdk", () => {
                         mkOwnEvent(EventType.RoomMessage, { body: "old event C" }),
                         ...timeline,
                     ];
-                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, {
-                        timeline: oldTimeline,
-                        required_state: [],
-                        name: data[roomA].name,
-                        initial: true, // e.g requested via room subscription
-                    });
+                    mockSlidingSync!.emit(
+                        SlidingSyncEvent.RoomData,
+                        roomA,
+                        {
+                            timeline: oldTimeline,
+                            required_state: [],
+                            name: data[roomA].name,
+                            initial: true, // e.g requested via room subscription
+                        },
+                        defer(),
+                    );
                     const gotRoom = client!.getRoom(roomA);
                     expect(gotRoom).toBeTruthy();
                     if (gotRoom == null) {
@@ -597,17 +627,22 @@ describe("SlidingSyncSdk", () => {
                 displayname: "The Invitee",
             };
             httpBackend!.when("GET", "/profile").respond(200, inviteeProfile);
-            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
-                initial: true,
-                name: "Room with Invite",
-                required_state: [],
-                timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
-                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
-                ],
-            });
+            mockSlidingSync!.emit(
+                SlidingSyncEvent.RoomData,
+                roomId,
+                {
+                    initial: true,
+                    name: "Room with Invite",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
+                    ],
+                },
+                defer(),
+            );
             await httpBackend!.flush("/profile", 1, 1000);
             await emitPromise(client!, RoomMemberEvent.Name);
             const room = client!.getRoom(roomId)!;
@@ -714,17 +749,22 @@ describe("SlidingSyncSdk", () => {
 
         it("processes rooms account data", async () => {
             const roomId = "!room:id";
-            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
-                name: "Room with account data",
-                required_state: [],
-                timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
-                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
-                ],
-                initial: true,
-            });
+            mockSlidingSync!.emit(
+                SlidingSyncEvent.RoomData,
+                roomId,
+                {
+                    name: "Room with account data",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                    ],
+                    initial: true,
+                },
+                defer(),
+            );
             const roomContent = {
                 foo: "bar",
             };
@@ -918,17 +958,22 @@ describe("SlidingSyncSdk", () => {
 
         it("processes typing notifications", async () => {
             const roomId = "!room:id";
-            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
-                name: "Room with typing",
-                required_state: [],
-                timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
-                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
-                ],
-                initial: true,
-            });
+            mockSlidingSync!.emit(
+                SlidingSyncEvent.RoomData,
+                roomId,
+                {
+                    name: "Room with typing",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                    ],
+                    initial: true,
+                },
+                defer(),
+            );
             await emitPromise(client!, ClientEvent.Room);
             const room = client!.getRoom(roomId)!;
             expect(room).toBeTruthy();
@@ -959,17 +1004,22 @@ describe("SlidingSyncSdk", () => {
 
         it("gracefully handles missing rooms and members when typing", async () => {
             const roomId = "!room:id";
-            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
-                name: "Room with typing",
-                required_state: [],
-                timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
-                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
-                ],
-                initial: true,
-            });
+            mockSlidingSync!.emit(
+                SlidingSyncEvent.RoomData,
+                roomId,
+                {
+                    name: "Room with typing",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                    ],
+                    initial: true,
+                },
+                defer(),
+            );
             const room = client!.getRoom(roomId)!;
             expect(room).toBeTruthy();
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
@@ -1045,25 +1095,30 @@ describe("SlidingSyncSdk", () => {
             const roomId = "!room:id";
             const alice = "@alice:alice";
             const lastEvent = mkOwnEvent(EventType.RoomMessage, { body: "hello" });
-            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
-                name: "Room with receipts",
-                required_state: [],
-                timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
-                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    {
-                        type: EventType.RoomMember,
-                        state_key: alice,
-                        content: { membership: "join" },
-                        sender: alice,
-                        origin_server_ts: Date.now(),
-                        event_id: "$alice",
-                    },
-                    lastEvent,
-                ],
-                initial: true,
-            });
+            mockSlidingSync!.emit(
+                SlidingSyncEvent.RoomData,
+                roomId,
+                {
+                    name: "Room with receipts",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        {
+                            type: EventType.RoomMember,
+                            state_key: alice,
+                            content: { membership: "join" },
+                            sender: alice,
+                            origin_server_ts: Date.now(),
+                            event_id: "$alice",
+                        },
+                        lastEvent,
+                    ],
+                    initial: true,
+                },
+                defer(),
+            );
             await emitPromise(client!, ClientEvent.Room);
             const room = client!.getRoom(roomId)!;
             expect(room).toBeTruthy();
