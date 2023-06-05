@@ -327,11 +327,7 @@ export enum SlidingSyncEvent {
 
 export type SlidingSyncEventHandlerMap = {
     // The deferred must be resolved for the next sync request to be made
-    [SlidingSyncEvent.RoomData]: (
-        roomId: string,
-        roomData: MSC3575RoomData,
-        deferred: IDeferred<void>,
-    ) => Promise<void>;
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData, deferred: IDeferred<void>) => void;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
