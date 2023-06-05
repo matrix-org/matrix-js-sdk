@@ -583,7 +583,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this.thread) {
             return this.thread.id;
         }
-        if (this.threadId != undefined) {
+        if (this.threadId !== undefined) {
             return this.threadId;
         }
         const unsigned = this.getUnsigned();
