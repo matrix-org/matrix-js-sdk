@@ -326,7 +326,12 @@ export enum SlidingSyncEvent {
 }
 
 export type SlidingSyncEventHandlerMap = {
-    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
+    // The deferred must be resolved for the next sync request to be made
+    [SlidingSyncEvent.RoomData]: (
+        roomId: string,
+        roomData: MSC3575RoomData,
+        deferred: IDeferred<void>,
+    ) => Promise<void>;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
@@ -567,14 +572,16 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param roomId - The room which received some data.
      * @param roomData - The raw sliding sync response JSON.
      */
-    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
+    private async invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): Promise<void> {
         if (!roomData.required_state) {
             roomData.required_state = [];
         }
         if (!roomData.timeline) {
             roomData.timeline = [];
         }
-        this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
+        const deferred = defer<void>();
+        this.emit(SlidingSyncEvent.RoomData, roomId, roomData, deferred);
+        await deferred.promise;
     }
 
     /**
@@ -767,13 +774,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             return;
         }
         // find the matching index
-        let txnIndex = -1;
-        for (let i = 0; i < this.txnIdDefers.length; i++) {
-            if (this.txnIdDefers[i].txnId === txnId) {
-                txnIndex = i;
-                break;
-            }
-        }
+        const txnIndex = this.txnIdDefers.findIndex((txnIdDefer) => txnIdDefer.txnId === txnId);
         if (txnIndex === -1) {
             // this shouldn't happen; we shouldn't be seeing txn_ids for things we don't know about,
             // whine about it.
@@ -923,9 +924,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             }
             this.onPreExtensionsResponse(resp.extensions);
 
-            Object.keys(resp.rooms).forEach((roomId) => {
-                this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
-            });
+            for (const roomId in resp.rooms) {
+                await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
+            }
 
             const listKeysWithUpdates: Set<string> = new Set();
             if (!doNotUpdateList) {

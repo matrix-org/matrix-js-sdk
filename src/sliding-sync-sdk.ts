@@ -17,7 +17,7 @@ limitations under the License.
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
-import { promiseMapSeries } from "./utils";
+import { IDeferred, promiseMapSeries } from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
 import {
@@ -376,7 +376,7 @@ export class SlidingSyncSdk {
         });
     }
 
-    private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
+    private async onRoomData(roomId: string, roomData: MSC3575RoomData, deferred: IDeferred<void>): Promise<void> {
         let room = this.client.store.getRoom(roomId);
         if (!room) {
             if (!roomData.initial) {
@@ -385,7 +385,8 @@ export class SlidingSyncSdk {
             }
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
-        this.processRoomData(this.client, room, roomData);
+        await this.processRoomData(this.client, room!, roomData);
+        deferred.resolve();
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
