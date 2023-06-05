@@ -8,8 +8,8 @@ export class CallFeedStatsReporter {
         const callFeeds: CallFeedStats[] = [];
 
         rtpTransceivers.forEach((t) => {
-            const sender = t.sender?.track ? CallFeedStatsReporter.buildTrackStats(t.sender.track, "") : null;
-            const receiver = CallFeedStatsReporter.buildTrackStats(t.receiver.track, "");
+            const sender = t.sender?.track ? CallFeedStatsReporter.buildTrackStats(t.sender.track, "sender") : null;
+            const receiver = CallFeedStatsReporter.buildTrackStats(t.receiver.track, "receiver");
             transceiver.push({
                 mid: t.mid == null ? "null" : t.mid,
                 direction: t.direction,
@@ -27,14 +27,19 @@ export class CallFeedStatsReporter {
         };
     }
 
-    private static buildTrackStats(track: MediaStreamTrack, stream: string): TrackStats {
+    private static buildTrackStats(track: MediaStreamTrack, label = "--"): TrackStats {
+        const settingDeviceId = track.getSettings()?.deviceId;
+        const constrainDeviceId = track.getConstraints()?.deviceId;
+
         return {
             id: track.id,
             kind: track.kind,
-            stream,
+            settingDeviceId: settingDeviceId ? settingDeviceId : "unknown",
+            constrainDeviceId: constrainDeviceId ? constrainDeviceId : "unknown",
             muted: track.muted,
             enabled: track.enabled,
             readyState: track.readyState,
+            label,
         } as TrackStats;
     }
 
@@ -43,18 +48,22 @@ export class CallFeedStatsReporter {
         callFeeds: CallFeed[],
         prefix = "unknown",
     ): CallFeedReport {
+        if (!report.callFeeds) {
+            report.callFeeds = [];
+        }
         callFeeds.forEach((feed) => {
             const audioTracks = feed.stream.getAudioTracks();
             const videoTracks = feed.stream.getVideoTracks();
             const audio =
                 audioTracks.length > 0
-                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getAudioTracks()[0], feed.stream.id)
+                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getAudioTracks()[0], feed.purpose)
                     : null;
             const video =
                 videoTracks.length > 0
-                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getVideoTracks()[0], feed.stream.id)
+                    ? CallFeedStatsReporter.buildTrackStats(feed.stream.getVideoTracks()[0], feed.purpose)
                     : null;
             const feedStats = {
+                stream: feed.stream.id,
                 type: feed.isLocal() ? "local" : "remote",
                 audio,
                 video,

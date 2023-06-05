@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSentStatsReport, CallFeedReport, TrackID } from "./statsReport";
+import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
 import { ConnectionStatsBuilder } from "./connectionStatsBuilder";
 import { TransportStatsBuilder } from "./transportStatsBuilder";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
@@ -27,6 +27,7 @@ import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
 import { ValueFormatter } from "./valueFormatter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { logger } from "../../logger";
+import { CallFeedStatsReporter } from "./callFeedStatsReporter";
 
 export class CallStatsReportGatherer {
     private isActive = true;
@@ -163,7 +164,9 @@ export class CallStatsReportGatherer {
         });
 
         this.emitter.emitByteSendReport(byteSentStatsReport);
-        this.emitter.emitCallFeedReport({} as CallFeedReport);
+        this.emitter.emitCallFeedReport(
+            CallFeedStatsReporter.buildCallFeedReport(this.callId, this.opponentMemberId, this.pc),
+        );
         this.processAndEmitConnectionStatsReport();
     }
 

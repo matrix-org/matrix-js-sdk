@@ -98,6 +98,7 @@ export interface CallFeedReport {
 }
 
 export interface CallFeedStats {
+    stream: string;
     type: "remote" | "local";
     audio: TrackStats | null;
     video: TrackStats | null;
@@ -118,8 +119,10 @@ export interface TransceiverStats {
 export interface TrackStats {
     readonly id: string;
     readonly kind: "audio" | "video";
-    readonly stream: string;
+    readonly settingDeviceId: string;
+    readonly constrainDeviceId: string;
     readonly muted: boolean;
     readonly enabled: boolean;
     readonly readyState: "ended" | "live";
+    readonly label: string;
 }

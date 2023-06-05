@@ -293,7 +293,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private onCallFeedReport = (report: CallFeedReport): void => {
         if (this.localCallFeed) {
-            report = CallFeedStatsReporter.expandCallFeedReport(report, [this.localCallFeed], "local");
+            report = CallFeedStatsReporter.expandCallFeedReport(report, [this.localCallFeed], "from-local-feed");
         }
 
         const callFeeds: CallFeed[] = [];
@@ -303,7 +303,7 @@ export class GroupCall extends TypedEventEmitter<
             }
         });
 
-        report = CallFeedStatsReporter.expandCallFeedReport(report, callFeeds, "remote");
+        report = CallFeedStatsReporter.expandCallFeedReport(report, callFeeds, "from-call-feed");
         this.emit(GroupCallStatsReportEvent.CallFeedStats, { report });
     };
 

@@ -30,8 +30,8 @@ describe("CallStatsReportGatherer", () => {
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
         rtcSpy.addEventListener = jest.fn();
+        rtcSpy.getTransceivers = jest.fn().mockReturnValue([]);
         emitter = new StatsReportEmitter();
-        MockRTCPeerConnection;
         collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
     });
 
