@@ -1046,16 +1046,20 @@ describe("MatrixClient event timelines", function () {
                 return request;
             }
 
-            function respondToThread(root: Partial<IEvent>, replies: Partial<IEvent>[], limit?: number): ExpectedHttpRequest {
+            function respondToThread(
+                root: Partial<IEvent>,
+                replies: Partial<IEvent>[],
+                limit?: number,
+            ): ExpectedHttpRequest {
                 const request = httpBackend.when(
                     "GET",
                     "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                    encodeURIComponent(root.event_id!) +
-                    buildRelationPaginationQuery(client, {
-                        dir: Direction.Backward,
-                        limit: limit,
-                        recurse: true,
-                    }),
+                        encodeURIComponent(root.event_id!) +
+                        buildRelationPaginationQuery(client, {
+                            dir: Direction.Backward,
+                            limit: limit,
+                            recurse: true,
+                        }),
                 );
                 request.respond(200, function () {
                     return {
