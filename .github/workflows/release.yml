@@ -32,7 +32,7 @@ jobs:
 
             - name: 📖 Generate docs
               run: |
-                  yarn tpv --yes --out _docs --stale --major 10
+                  yarn tpv purge --yes --out _docs --stale --major 10
                   yarn gendoc
                   symlinks -rc _docs
 
