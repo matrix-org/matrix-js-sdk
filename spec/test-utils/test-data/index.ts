@@ -4,6 +4,7 @@
  */
 
 import { IDeviceKeys } from "../../../src/@types/crypto";
+import { IDownloadKeyResult } from "../../../src";
 
 /* eslint-disable comma-dangle */
 
@@ -28,6 +29,56 @@ export const SIGNED_TEST_DEVICE_DATA: IDeviceKeys = {
     "signatures": {
         "@alice:localhost": {
             "ed25519:test_device": "LmQC/yAUZJmkxZ+3L0nEwvtVWOzjqQqADWBhk+C47SPaFYHeV+E291mgXaSCJVeGltX+HC49Aw7nb6ga7sw0Aw"
+        }
+    }
+};
+
+/** base64-encoded public master cross-signing key */
+export const MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY";
+
+/** Signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
+export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
+    "master_keys": {
+        "@alice:localhost": {
+            "keys": {
+                "ed25519:J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY": "J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY"
+            },
+            "user_id": "@alice:localhost",
+            "usage": [
+                "master"
+            ]
+        }
+    },
+    "self_signing_keys": {
+        "@alice:localhost": {
+            "keys": {
+                "ed25519:aU2+2CyXQTCuDcmWW0EL2bhJ6PdjFW2LbAsbHqf02AY": "aU2+2CyXQTCuDcmWW0EL2bhJ6PdjFW2LbAsbHqf02AY"
+            },
+            "user_id": "@alice:localhost",
+            "usage": [
+                "self_signing"
+            ],
+            "signatures": {
+                "@alice:localhost": {
+                    "ed25519:J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY": "XfhYEhZmOs8BJdb3viatILBZ/bElsHXEW28V4tIaY5CxrBR0YOym3yZHWmRmypXessHZAKOhZn3yBMXzdajyCw"
+                }
+            }
+        }
+    },
+    "user_signing_keys": {
+        "@alice:localhost": {
+            "keys": {
+                "ed25519:g5TC/zjQXyZYuDLZv7a41z5fFVrXpYPypG//AFQj8hY": "g5TC/zjQXyZYuDLZv7a41z5fFVrXpYPypG//AFQj8hY"
+            },
+            "user_id": "@alice:localhost",
+            "usage": [
+                "user_signing"
+            ],
+            "signatures": {
+                "@alice:localhost": {
+                    "ed25519:J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY": "6AkD1XM2H0/ebgP9oBdMKNeft7uxsrb0XN1CsjjHgeZCvCTMmv3BHlLiT/Hzy4fe8H+S1tr484dcXN/PIdnfDA"
+                }
+            }
         }
     }
 };
