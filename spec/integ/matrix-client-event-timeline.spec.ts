@@ -1101,6 +1101,12 @@ describe("MatrixClient event timelines", function () {
             respondToEvent();
             respondToThread(THREAD_ROOT, [THREAD_REPLY], 1);
             await flushHttp(room.fetchRoomThreads());
+            const thread = room.getThread(THREAD_ROOT.event_id!)!;
+            expect(thread).not.toBeNull();
+            respondToThread(THREAD_ROOT, [THREAD_REPLY], 1);
+            expect(thread.timelineSet.thread).toBe(thread);
+            expect(Thread.hasServerSideSupport).toBe(FeatureSupport.Stable);
+            await flushHttp(client.getLatestTimeline(thread.timelineSet));
         });
 
         it("should create threads for thread roots discovered", function () {
