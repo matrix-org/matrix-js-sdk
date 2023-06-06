@@ -29,6 +29,7 @@ import {
     PendingEventOrdering,
     RelationType,
     Room,
+    UNSIGNED_THREAD_ID_FIELD,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
 import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
@@ -178,6 +179,9 @@ const THREAD_REPLY = utils.mkEvent({
             rel_type: "io.element.thread",
             event_id: THREAD_ROOT.event_id,
         },
+    },
+    unsigned: {
+        [UNSIGNED_THREAD_ID_FIELD.name]: THREAD_ROOT.event_id,
     },
     event: false,
 });
@@ -1091,6 +1095,9 @@ describe("MatrixClient event timelines", function () {
                     event_id: THREAD_ROOT.event_id,
                 },
             },
+            unsigned: {
+                [UNSIGNED_THREAD_ID_FIELD.name]: THREAD_ROOT.event_id,
+            },
             event: true,
         });
         THREAD_REPLY2.localTimestamp += 1000;
@@ -1108,6 +1115,9 @@ describe("MatrixClient event timelines", function () {
                     rel_type: "io.element.thread",
                     event_id: THREAD_ROOT.event_id,
                 },
+            },
+            unsigned: {
+                [UNSIGNED_THREAD_ID_FIELD.name]: THREAD_ROOT.event_id,
             },
             event: true,
         });
@@ -1182,6 +1192,9 @@ describe("MatrixClient event timelines", function () {
                     event_id: THREAD_ROOT.event_id,
                 },
             },
+            unsigned: {
+                [UNSIGNED_THREAD_ID_FIELD.name]: THREAD_ROOT.event_id,
+            },
             event: true,
         });
         THREAD_REPLY2.localTimestamp += 1000;
@@ -1213,6 +1226,9 @@ describe("MatrixClient event timelines", function () {
                     rel_type: "io.element.thread",
                     event_id: THREAD_ROOT.event_id,
                 },
+            },
+            unsigned: {
+                [UNSIGNED_THREAD_ID_FIELD.name]: THREAD_ROOT.event_id,
             },
             event: true,
         });
@@ -1254,8 +1270,6 @@ describe("MatrixClient event timelines", function () {
                 "GET",
                 "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                     encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
                     buildRelationPaginationQuery({
                         dir: Direction.Backward,
                         limit: 3,

@@ -42,6 +42,7 @@ import {
     RelationType,
     RoomEvent,
     RoomMember,
+    UNSIGNED_THREAD_ID_FIELD,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { NotificationCountType, Room } from "../../src/models/room";
@@ -132,6 +133,9 @@ describe("Room", function () {
                         },
                         "rel_type": "m.thread",
                     },
+                },
+                unsigned: {
+                    [UNSIGNED_THREAD_ID_FIELD.name]: root.getId(),
                 },
             },
             room.client,
