@@ -9630,7 +9630,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * A helper to determine intentional mentions support
-     * @returns a boolean to determine if intentional mentions are enabled
+     * @returns a boolean to determine if intentional mentions are enabled on the server
      * @experimental
      */
     public supportsIntentionalMentions(): boolean {
