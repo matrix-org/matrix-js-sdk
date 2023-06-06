@@ -246,10 +246,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     oldBackendOnly(
         "Outgoing verification: can verify another device via QR code with an untrusted cross-signing key",
         async () => {
-            // we need to have bootstrapped cross-signing for this
-            //await bootstrapCrossSigning(aliceClient);
-            // console.warn("Bootstrapped");
-
             // expect requests to download our own keys
             fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
                 device_keys: {
@@ -305,6 +301,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(qrCodeBuffer.readUint8(7)).toEqual(0x02); // mode
             const txnIdLen = qrCodeBuffer.readUint16BE(8);
             expect(qrCodeBuffer.subarray(10, 10 + txnIdLen).toString("utf-8")).toEqual(transactionId);
+            // Alice's device's public key comes next, but we have nothing to do with it here.
             // const aliceDevicePubKey = qrCodeBuffer.subarray(10 + txnIdLen, 32 + 10 + txnIdLen);
             expect(qrCodeBuffer.subarray(42 + txnIdLen, 32 + 42 + txnIdLen)).toEqual(
                 Buffer.from(MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64, "base64"),
@@ -328,17 +325,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // there should now be a verifier
             const verifier: VerificationBase = request.verifier!;
             expect(verifier).toBeDefined();
-            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
             // ... which we call .verify on, which emits a ShowReciprocateQr event
             const verificationPromise = verifier.verify();
             const reciprocateQRCodeCallbacks = await new Promise<ShowQrCodeCallbacks>((resolve) => {
                 verifier.once(VerifierEvent.ShowReciprocateQr, resolve);
             });
-
-            // getReciprocateQrCodeCallbacks() is an alternative way to get the callbacks
-            expect(verifier.getReciprocateQrCodeCallbacks()).toBe(reciprocateQRCodeCallbacks);
-            expect(verifier.getShowSasCallbacks()).toBeNull();
 
             // Alice confirms she is happy
             reciprocateQRCodeCallbacks.confirm();

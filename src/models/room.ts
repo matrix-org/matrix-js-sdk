@@ -49,7 +49,7 @@ import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import {
     Thread,
     ThreadEvent,
-    EventHandlerMap as ThreadHandlerMap,
+    ThreadEventHandlerMap as ThreadHandlerMap,
     FILTER_RELATED_BY_REL_TYPES,
     THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
@@ -1957,7 +1957,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+        this.on(ThreadEvent.Update, this.onThreadUpdate);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
     }
@@ -2055,7 +2055,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    private onThreadNewReply(thread: Thread): void {
+    private onThreadUpdate(thread: Thread): void {
         this.updateThreadRootEvents(thread, false, true);
     }
 
@@ -2113,12 +2113,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // A thread relation is always only shown in a thread
-        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+        // A thread relation (1st and 2nd order) is always only shown in a thread
+        const threadRootId = event.threadRootId;
+        if (threadRootId != undefined) {
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
-                threadId: event.threadRootId,
+                threadId: threadRootId,
             };
         }
 
@@ -2146,15 +2147,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
                 threadId: event.relationEventId,
-            };
-        }
-
-        const unsigned = event.getUnsigned();
-        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
-            return {
-                shouldLiveInRoom: false,
-                shouldLiveInThread: true,
-                threadId: unsigned[UNSIGNED_THREAD_ID_FIELD.name],
             };
         }
 
@@ -2890,12 +2882,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private findThreadRoots(events: MatrixEvent[]): Set<string> {
         const threadRoots = new Set<string>();
         for (const event of events) {
-            if (event.isRelation(THREAD_RELATION_TYPE.name)) {
-                threadRoots.add(event.relationEventId ?? "");
-            }
-            const unsigned = event.getUnsigned();
-            if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
-                threadRoots.add(unsigned[UNSIGNED_THREAD_ID_FIELD.name]!);
+            const threadRootId = event.threadRootId;
+            if (threadRootId != undefined) {
+                threadRoots.add(threadRootId);
             }
         }
         return threadRoots;

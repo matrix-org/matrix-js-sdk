@@ -20,7 +20,7 @@ import { fail } from "assert";
 
 import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
+import { IRoomEvent, IStateEvent } from "../../src";
 import {
     MatrixClient,
     MatrixEvent,
@@ -39,7 +39,7 @@ import {
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncApiOptions, SyncState } from "../../src/sync";
-import { IStoredClientOpts } from "../../src/client";
+import { IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
