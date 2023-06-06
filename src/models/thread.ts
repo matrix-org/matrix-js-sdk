@@ -38,14 +38,19 @@ export enum ThreadEvent {
     Delete = "Thread.delete",
 }
 
-type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New> | RoomEvent.Timeline | RoomEvent.TimelineReset;
+export type ThreadEmittedEvents = Exclude<ThreadEvent, ThreadEvent.New> | RoomEvent.Timeline | RoomEvent.TimelineReset;
 
-export type EventHandlerMap = {
+export type ThreadEventHandlerMap = {
     [ThreadEvent.Update]: (thread: Thread) => void;
     [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
     [ThreadEvent.ViewThread]: () => void;
     [ThreadEvent.Delete]: (thread: Thread) => void;
 } & EventTimelineSetHandlerMap;
+
+/**
+ * @deprecated please use ThreadEventHandlerMap instead
+ */
+export type EventHandlerMap = ThreadEventHandlerMap;
 
 interface IThreadOpts {
     room: Room;
@@ -70,7 +75,7 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
     }
 }
 
-export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
+export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;
     public static hasServerSideFwdPaginationSupport = FeatureSupport.None;
@@ -83,7 +88,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private _currentUserParticipated = false;
 
-    private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
+    private reEmitter: TypedReEmitter<ThreadEmittedEvents, ThreadEventHandlerMap>;
 
     private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
