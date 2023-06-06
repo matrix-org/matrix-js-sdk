@@ -5751,18 +5751,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     throw new Error("could not get thread timeline: not a thread timeline");
                 }
 
+                const relType = recurse ? null : THREAD_RELATION_TYPE.name;
                 const thread = timelineSet.thread;
                 const resOlder: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    relType,
                     null,
                     { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    relType,
                     null,
                     { dir: Direction.Forward, from: res.end, recurse: recurse || undefined },
                 );
@@ -5810,11 +5811,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
 
                 const thread = timelineSet.thread;
+                const relType = recurse ? null : THREAD_RELATION_TYPE.name;
 
                 const resOlder = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    relType,
                     null,
                     { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
@@ -5824,7 +5826,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const resNewer: IRelationsResponse = await this.fetchRelations(
                         timelineSet.room.roomId,
                         thread.id,
-                        THREAD_RELATION_TYPE.name,
+                        relType,
                         null,
                         { dir: Direction.Forward, from: nextBatch, recurse: recurse || undefined },
                     );
@@ -5892,10 +5894,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let event;
+        const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
+        const relType = recurse ? null : THREAD_RELATION_TYPE.name;
         if (timelineSet.threadListType !== null) {
             const res = await this.createThreadListMessagesRequest(
                 timelineSet.room.roomId,
-                null,
+                relType,
                 1,
                 Direction.Backward,
                 timelineSet.threadListType,
@@ -5907,7 +5911,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const res = await this.fetchRelations(
                 timelineSet.room.roomId,
                 timelineSet.thread.id,
-                THREAD_RELATION_TYPE.name,
+                relType,
                 null,
                 { dir: Direction.Backward, limit: 1, recurse: recurse || undefined },
             );
@@ -6191,7 +6195,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
-            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, THREAD_RELATION_TYPE.name, null, {
+            const relType = recurse ? null : THREAD_RELATION_TYPE.name;
+            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, relType, null, {
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
