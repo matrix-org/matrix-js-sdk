@@ -53,11 +53,15 @@ const withoutRoomId = (e: Partial<IEvent>): Partial<IEvent> => {
 /**
  * Our httpBackend only allows matching calls if we have the exact same query, in the exact same order
  * This method allows building queries with the exact same parameter order as the fetchRelations method in client
+ * @param client Matrix client to mock the request for
  * @param params query parameters
  */
-const buildRelationPaginationQuery = (params: QueryDict): string => {
+const buildRelationPaginationQuery = (client: MatrixClient, params: QueryDict): string => {
     if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
         params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+    }
+    if (client.canSupport.get(Feature.RelationsRecursion) === ServerSupport.Unstable) {
+        params = replaceParam("recurse", "org.matrix.msc3981.recurse", params);
     }
     return "?" + encodeParams(params).toString();
 };
@@ -626,7 +630,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery(client, { dir: Direction.Backward, limit: 1 }),
                 )
                 .respond(200, function () {
                     return {
@@ -1024,6 +1028,77 @@ describe("MatrixClient event timelines", function () {
             ]);
         });
 
+        it("should use recursive relations to paginate thread timelines", async function () {
+            function respondToThreads(
+                response = {
+                    chunk: [THREAD_ROOT],
+                    state: [],
+                    next_batch: null,
+                },
+            ): ExpectedHttpRequest {
+                const request = httpBackend.when(
+                    "GET",
+                    encodeUri("/_matrix/client/v1/rooms/$roomId/threads", {
+                        $roomId: roomId,
+                    }),
+                );
+                request.respond(200, response);
+                return request;
+            }
+
+            function respondToThread(root: Partial<IEvent>, replies: Partial<IEvent>[], limit?: number): ExpectedHttpRequest {
+                const request = httpBackend.when(
+                    "GET",
+                    "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                    encodeURIComponent(root.event_id!) +
+                    buildRelationPaginationQuery(client, {
+                        dir: Direction.Backward,
+                        limit: limit,
+                        recurse: true,
+                    }),
+                );
+                request.respond(200, function () {
+                    return {
+                        original_event: root,
+                        chunk: replies,
+                        // no next batch as this is the oldest end of the timeline
+                    };
+                });
+                return request;
+            }
+
+            function respondToEvent(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
+                const request = httpBackend.when(
+                    "GET",
+                    encodeUri("/_matrix/client/r0/rooms/$roomId/event/$eventId", {
+                        $roomId: roomId,
+                        $eventId: event.event_id!,
+                    }),
+                );
+                request.respond(200, event);
+                return request;
+            }
+
+            // Setup
+            // @ts-ignore
+            client.clientOpts.threadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+            Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+            client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Unstable);
+            const room = client.getRoom(roomId)!;
+            await room!.createThreadsTimelineSets();
+            respondToThreads();
+            respondToThreads();
+            respondToEvent();
+            respondToEvent();
+            respondToEvent();
+            respondToEvent();
+            respondToEvent();
+            respondToThread(THREAD_ROOT, [THREAD_REPLY], 1);
+            await flushHttp(room.fetchRoomThreads());
+        });
+
         it("should create threads for thread roots discovered", function () {
             const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
@@ -1270,7 +1345,7 @@ describe("MatrixClient event timelines", function () {
                 "GET",
                 "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                     encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    buildRelationPaginationQuery({
+                    buildRelationPaginationQuery(client, {
                         dir: Direction.Backward,
                         limit: 3,
                         recurse: true,
@@ -1918,7 +1993,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery(client, { dir: Direction.Backward, limit: 1 }),
                 )
                 .respond(200, function () {
                     return {
@@ -1971,7 +2046,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({
+                        buildRelationPaginationQuery(client, {
                             dir: Direction.Backward,
                             from: "start_token",
                         }),
@@ -1988,7 +2063,7 @@ describe("MatrixClient event timelines", function () {
                         encodeURIComponent(THREAD_ROOT.event_id!) +
                         "/" +
                         encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Forward, from: "end_token" }),
+                        buildRelationPaginationQuery(client, { dir: Direction.Forward, from: "end_token" }),
                 )
                 .respond(200, function () {
                     return {
