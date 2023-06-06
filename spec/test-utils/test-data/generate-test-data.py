@@ -37,6 +37,10 @@ TEST_DEVICE_ID = "test_device"
 # any 32-byte string can be an ed25519 private key.
 TEST_DEVICE_PRIVATE_KEY_BYTES = b"deadbeefdeadbeefdeadbeefdeadbeef"
 
+MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"doyouspeakwhaaaaaaaaaaaaaaaaaale"
+USER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"useruseruseruseruseruseruseruser"
+SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"selfselfselfselfselfselfselfself"
+
 
 def main() -> None:
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
@@ -57,8 +61,15 @@ def main() -> None:
         "user_id": TEST_USER_ID,
     }
 
-    device_data["signatures"][TEST_USER_ID][ f"ed25519:{TEST_DEVICE_ID}"] = sign_json(
+    device_data["signatures"][TEST_USER_ID][f"ed25519:{TEST_DEVICE_ID}"] = sign_json(
         device_data, private_key
+    )
+
+    master_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+    b64_master_public_key = encode_base64(
+        master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
 
     print(
@@ -69,6 +80,7 @@ def main() -> None:
  */
 
 import {{ IDeviceKeys }} from "../../../src/@types/crypto";
+import {{ IDownloadKeyResult }} from "../../../src";
 
 /* eslint-disable comma-dangle */
 
@@ -80,8 +92,82 @@ export const TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64 = "{b64_public_key}";
 
 /** Signed device data, suitable for returning from a `/keys/query` call */
 export const SIGNED_TEST_DEVICE_DATA: IDeviceKeys = {json.dumps(device_data, indent=4)};
-""", end='',
+
+/** base64-encoded public master cross-signing key */
+export const MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "{b64_master_public_key}";
+
+/** Signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
+export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
+        json.dumps(build_cross_signing_keys_data(), indent=4)
+};
+""",
+        end="",
     )
+
+
+def build_cross_signing_keys_data() -> dict:
+    """Build the signed cross-signing-keys data for return from /keys/query"""
+    master_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+    b64_master_public_key = encode_base64(
+        master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    self_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+    b64_self_signing_public_key = encode_base64(
+        self_signing_private_key.public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw
+        )
+    )
+    user_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+    b64_user_signing_public_key = encode_base64(
+        user_signing_private_key.public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw
+        )
+    )
+    # create without signatures initially
+    cross_signing_keys_data = {
+        "master_keys": {
+            TEST_USER_ID: {
+                "keys": {
+                    f"ed25519:{b64_master_public_key}": b64_master_public_key,
+                },
+                "user_id": TEST_USER_ID,
+                "usage": ["master"],
+            }
+        },
+        "self_signing_keys": {
+            TEST_USER_ID: {
+                "keys": {
+                    f"ed25519:{b64_self_signing_public_key}": b64_self_signing_public_key,
+                },
+                "user_id": TEST_USER_ID,
+                "usage": ["self_signing"],
+            },
+        },
+        "user_signing_keys": {
+            TEST_USER_ID: {
+                "keys": {
+                    f"ed25519:{b64_user_signing_public_key}": b64_user_signing_public_key,
+                },
+                "user_id": TEST_USER_ID,
+                "usage": ["user_signing"],
+            },
+        },
+    }
+    # sign the sub-keys with the master
+    for k in ["self_signing_keys", "user_signing_keys"]:
+        to_sign = cross_signing_keys_data[k][TEST_USER_ID]
+        sig = sign_json(to_sign, master_private_key)
+        to_sign["signatures"] = {
+            TEST_USER_ID: {f"ed25519:{b64_master_public_key}": sig}
+        }
+
+    return cross_signing_keys_data
 
 
 def encode_base64(input_bytes: bytes) -> str:

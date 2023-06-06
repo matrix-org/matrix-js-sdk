@@ -18,12 +18,14 @@ import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
 
 import { createClient, MatrixClient } from "../../../src";
-import { ShowSasCallbacks, VerifierEvent } from "../../../src/crypto-api/verification";
+import { ShowQrCodeCallbacks, ShowSasCallbacks, VerifierEvent } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
 import { VerificationBase } from "../../../src/crypto/verification/Base";
 import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
+    MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
     TEST_DEVICE_ID,
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
@@ -39,6 +41,34 @@ import {
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
 jest.useFakeTimers();
+
+let previousCrypto: Crypto | undefined;
+
+beforeAll(() => {
+    // Stub out global.crypto
+    previousCrypto = global["crypto"];
+
+    Object.defineProperty(global, "crypto", {
+        value: {
+            getRandomValues: function <T extends Uint8Array>(array: T): T {
+                array.fill(0x12);
+                return array;
+            },
+        },
+    });
+});
+
+// restore the original global.crypto
+afterAll(() => {
+    if (previousCrypto === undefined) {
+        // @ts-ignore deleting a non-optional property. It *is* optional really.
+        delete global.crypto;
+    } else {
+        Object.defineProperty(global, "crypto", {
+            value: previousCrypto,
+        });
+    }
+});
 
 /**
  * Integration tests for verification functionality.
@@ -208,6 +238,107 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         olmSAS.free();
     });
 
+    oldBackendOnly(
+        "Outgoing verification: can verify another device via QR code with an untrusted cross-signing key",
+        async () => {
+            // expect requests to download our own keys
+            fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
+                device_keys: {
+                    [TEST_USER_ID]: {
+                        [TEST_DEVICE_ID]: SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+                ...SIGNED_CROSS_SIGNING_KEYS_DATA,
+            });
+
+            // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
+            //
+            // Completing the initial sync will make the device list download outdated device lists (of which our own
+            // user will be one).
+            syncResponder.sendOrQueueSyncResponse({});
+            // DeviceList has a sleep(5) which we need to make happen
+            await jest.advanceTimersByTimeAsync(10);
+            expect(aliceClient.getStoredCrossSigningForUser(TEST_USER_ID)).toBeTruthy();
+
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [requestBody, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
+            ]);
+            const transactionId = request.channel.transactionId;
+
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.methods).toContain("m.qr_code.show.v1");
+            expect(toDeviceMessage.methods).toContain("m.qr_code.scan.v1");
+            expect(toDeviceMessage.methods).toContain("m.reciprocate.v1");
+            expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+
+            // The dummy device replies with an m.key.verification.ready, with an indication we can scan the QR code
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.ready",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    methods: ["m.qr_code.scan.v1"],
+                    transaction_id: transactionId,
+                },
+            });
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(Phase.Ready);
+
+            // we should now have QR data we can display
+            const qrCodeData = request.qrCodeData!;
+            expect(qrCodeData).toBeTruthy();
+            const qrCodeBuffer = qrCodeData.getBuffer();
+            // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
+            expect(qrCodeBuffer.subarray(0, 6).toString("latin1")).toEqual("MATRIX");
+            expect(qrCodeBuffer.readUint8(6)).toEqual(0x02); // version
+            expect(qrCodeBuffer.readUint8(7)).toEqual(0x02); // mode
+            const txnIdLen = qrCodeBuffer.readUint16BE(8);
+            expect(qrCodeBuffer.subarray(10, 10 + txnIdLen).toString("utf-8")).toEqual(transactionId);
+            // Alice's device's public key comes next, but we have nothing to do with it here.
+            // const aliceDevicePubKey = qrCodeBuffer.subarray(10 + txnIdLen, 32 + 10 + txnIdLen);
+            expect(qrCodeBuffer.subarray(42 + txnIdLen, 32 + 42 + txnIdLen)).toEqual(
+                Buffer.from(MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64, "base64"),
+            );
+            const sharedSecret = qrCodeBuffer.subarray(74 + txnIdLen);
+
+            // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.start",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    method: "m.reciprocate.v1",
+                    transaction_id: transactionId,
+                    secret: encodeUnpaddedBase64(sharedSecret),
+                },
+            });
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(Phase.Started);
+            expect(request.chosenMethod).toEqual("m.reciprocate.v1");
+
+            // there should now be a verifier
+            const verifier: VerificationBase = request.verifier!;
+            expect(verifier).toBeDefined();
+
+            // ... which we call .verify on, which emits a ShowReciprocateQr event
+            const verificationPromise = verifier.verify();
+            const reciprocateQRCodeCallbacks = await new Promise<ShowQrCodeCallbacks>((resolve) => {
+                verifier.once(VerifierEvent.ShowReciprocateQr, resolve);
+            });
+
+            // Alice confirms she is happy
+            reciprocateQRCodeCallbacks.confirm();
+
+            // that should satisfy Alice, who should reply with a 'done'
+            await expectSendToDeviceMessage("m.key.verification.done");
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
+            expect(request.phase).toEqual(Phase.Done);
+        },
+    );
+
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
         syncResponder.sendOrQueueSyncResponse({ to_device: { events: [ev] } });
@@ -252,4 +383,8 @@ function calculateMAC(olmSAS: Olm.SAS, input: string, info: string): string {
     const mac = olmSAS.calculate_mac_fixed_base64(input, info);
     //console.info(`Test MAC: input:'${input}, info: '${info}' -> '${mac}`);
     return mac;
+}
+
+function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
+    return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
 }
