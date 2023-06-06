@@ -609,11 +609,6 @@ describe("MatrixClient event timelines", function () {
                 .respond(200, function () {
                     return THREAD_ROOT;
                 });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
 
             httpBackend
                 .when(
@@ -1571,7 +1566,6 @@ describe("MatrixClient event timelines", function () {
                 const prom = emitPromise(room, ThreadEvent.Update);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
@@ -1918,11 +1912,6 @@ describe("MatrixClient event timelines", function () {
             expect(thread.initialEventsFetched).toBeTruthy();
             const timelineSet = thread.timelineSet;
 
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
             httpBackend
                 .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function () {

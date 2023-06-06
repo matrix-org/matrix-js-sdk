@@ -144,7 +144,21 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.setEventMetadata(this.rootEvent);
     }
 
+    // We wrap fetchRootEvent with this function to avoid spawning another request if one is still in flight
+    private fetchRootEventPromise: Promise<void> | null = null;
     private async fetchRootEvent(): Promise<void> {
+        if (this.fetchRootEventPromise != null) {
+            return this.fetchRootEventPromise;
+        }
+        const promise = this.actualFetchRootEvent()
+            .finally(() => {
+                this.fetchRootEventPromise = null;
+            });
+        this.fetchRootEventPromise = promise;
+        return promise;
+    }
+
+    private async actualFetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
         // If the rootEvent does not exist in the local stores, then fetch it from the server.
         try {
@@ -154,7 +168,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         } catch (e) {
             logger.error("Failed to fetch thread root to construct thread with", e);
         }
-        await this.processEvent(this.rootEvent);
     }
 
     public static setServerSideSupport(status: FeatureSupport): void {
