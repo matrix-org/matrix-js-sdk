@@ -5778,7 +5778,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 for (const event of events) {
                     event.setUnsigned({
                         ...event.getUnsigned(),
-                         [UNSIGNED_THREAD_ID_FIELD.name]: timelineSet.thread.id,
+                        [UNSIGNED_THREAD_ID_FIELD.name]: timelineSet.thread.id,
                     });
                     await timelineSet.thread?.processEvent(event);
                 }
@@ -5813,13 +5813,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const thread = timelineSet.thread;
                 const relType = recurse ? null : THREAD_RELATION_TYPE.name;
 
-                const resOlder = await this.fetchRelations(
-                    timelineSet.room.roomId,
-                    thread.id,
-                    relType,
-                    null,
-                    { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
-                );
+                const resOlder = await this.fetchRelations(timelineSet.room.roomId, thread.id, relType, null, {
+                    dir: Direction.Backward,
+                    from: res.start,
+                    recurse: recurse || undefined,
+                });
                 const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
                 while (nextBatch) {
@@ -5908,13 +5906,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             event = res.chunk?.[0];
         } else if (timelineSet.thread && Thread.hasServerSideSupport) {
             const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
-            const res = await this.fetchRelations(
-                timelineSet.room.roomId,
-                timelineSet.thread.id,
-                relType,
-                null,
-                { dir: Direction.Backward, limit: 1, recurse: recurse || undefined },
-            );
+            const res = await this.fetchRelations(timelineSet.room.roomId, timelineSet.thread.id, relType, null, {
+                dir: Direction.Backward,
+                limit: 1,
+                recurse: recurse || undefined,
+            });
             event = res.chunk?.[0];
             // Fallback to set unsigned thread id if the server doesn't support it
             // We know the thread id because we just requested this event via /relations
