@@ -1,5 +1,5 @@
-Changes in [26.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.0.0-rc.1) (2023-06-01)
-============================================================================================================
+Changes in [26.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.0.0) (2023-06-06)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Ensure we do not add relations to the wrong timeline ([\#3427](https://github.com/matrix-org/matrix-js-sdk/pull/3427)). Fixes vector-im/element-web#25450 and vector-im/element-web#25494.
