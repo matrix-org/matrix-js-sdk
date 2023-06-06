@@ -629,6 +629,7 @@ export function lexicographicCompare(a: string, b: string): number {
 }
 
 const collator = new Intl.Collator();
+
 /**
  * Performant language-sensitive string comparison
  * @param a - the first string to compare
@@ -754,4 +755,31 @@ export class MapWithDefault<K, V> extends Map<K, V> {
 
         return this.get(key)!;
     }
+}
+
+const EVENT_FETCH_DEBOUNCE_INTERVAL = 100;
+/**
+ * Debounces a function that returns a promise.
+ *
+ * If the wrapper is called, it'll remember the last promise it has returned. Until that promise completes, all
+ * additional calls to the wrapper will return the exact same promise.
+ *
+ * This can be used to avoid unnecessary duplicate requests to the backend.
+ *
+ * @param fun - function to be wrapped
+ */
+export function debounceFetch<A extends any[], R>(fun: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+    let currentPromise: Promise<R> | null = null;
+
+    return (...args: A): Promise<R> => {
+        if (currentPromise !== null) {
+            return currentPromise;
+        }
+        const promise: Promise<R> = sleep(EVENT_FETCH_DEBOUNCE_INTERVAL).then(() => {
+            currentPromise = null;
+            return fun(...args);
+        });
+        currentPromise = promise;
+        return promise;
+    };
 }

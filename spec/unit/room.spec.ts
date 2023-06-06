@@ -2585,6 +2585,7 @@ describe("Room", function () {
             prom = emitPromise(room, ThreadEvent.Update);
             await room.addLiveEvents([threadResponseEdit]);
             await prom;
+            await emitPromise(room, ThreadEvent.Update);
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
 
@@ -2812,6 +2813,7 @@ describe("Room", function () {
             const threadResponse2Redaction = mkRedaction(threadResponse2);
             await room.addLiveEvents([threadResponse2Redaction]);
             await prom;
+            await emitPromise(room, ThreadEvent.Update);
             await emitPromise(room, ThreadEvent.Update);
             expect(thread).toHaveLength(1);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());

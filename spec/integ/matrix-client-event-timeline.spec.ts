@@ -605,12 +605,6 @@ describe("MatrixClient event timelines", function () {
                 });
 
             httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-
-            httpBackend
                 .when(
                     "GET",
                     "/rooms/!foo%3Abar/relations/" +
@@ -1887,11 +1881,6 @@ describe("MatrixClient event timelines", function () {
                     return THREAD_ROOT;
                 });
             httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
                 .when(
                     "GET",
                     "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
@@ -1912,11 +1901,6 @@ describe("MatrixClient event timelines", function () {
             expect(thread.initialEventsFetched).toBeTruthy();
             const timelineSet = thread.timelineSet;
 
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
             httpBackend
                 .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function () {

@@ -1957,7 +1957,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.on(ThreadEvent.Update, this.onThreadUpdate);
+        this.on(ThreadEvent.NewReply, this.onThreadUpdate);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
     }

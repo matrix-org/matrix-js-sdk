@@ -29,6 +29,7 @@ import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
+import { debounceFetch } from "../utils";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -106,6 +107,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public replayEvents: MatrixEvent[] | null = [];
 
+    private readonly updateRootEvent: () => Promise<void>;
+
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
 
@@ -136,38 +139,14 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
+        this.updateRootEvent = debounceFetch(() => this.internalUpdateRootEvent());
+
         this.processReceipts(opts.receipts);
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
         this.updateThreadMetadata();
         this.setEventMetadata(this.rootEvent);
-    }
-
-    // We wrap fetchRootEvent with this function to avoid spawning another request if one is still in flight
-    private fetchRootEventPromise: Promise<void> | null = null;
-    private async fetchRootEvent(): Promise<void> {
-        if (this.fetchRootEventPromise != null) {
-            return this.fetchRootEventPromise;
-        }
-        const promise = this.actualFetchRootEvent()
-            .finally(() => {
-                this.fetchRootEventPromise = null;
-            });
-        this.fetchRootEventPromise = promise;
-        return promise;
-    }
-
-    private async actualFetchRootEvent(): Promise<void> {
-        this.rootEvent = this.room.findEventById(this.id);
-        // If the rootEvent does not exist in the local stores, then fetch it from the server.
-        try {
-            const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
-            const mapper = this.client.getEventMapper();
-            this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
-        } catch (e) {
-            logger.error("Failed to fetch thread root to construct thread with", e);
-        }
     }
 
     public static setServerSideSupport(status: FeatureSupport): void {
@@ -488,18 +467,30 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    private async updateThreadMetadata(): Promise<void> {
-        this.updatePendingReplyCount();
-
+    private async internalUpdateRootEvent(): Promise<void> {
         if (Thread.hasServerSideSupport) {
             // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
             // don't want the thread preview to be empty if we can avoid it
             if (!this.initialEventsFetched) {
                 await this.processRootEvent();
             }
-            await this.fetchRootEvent();
+
+            this.rootEvent = this.room.findEventById(this.id);
+            // If the rootEvent does not exist in the local stores, then fetch it from the server.
+            try {
+                const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
+                const mapper = this.client.getEventMapper();
+                this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
+            } catch (e) {
+                logger.error("Failed to fetch thread root to construct thread with", e);
+            }
         }
         await this.processRootEvent();
+    }
+
+    private async updateThreadMetadata(): Promise<void> {
+        this.updatePendingReplyCount();
+        await this.updateRootEvent();
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
