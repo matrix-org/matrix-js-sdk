@@ -15,4 +15,4 @@ for line in sys.stdin:
             break
         found_first_header = True
     elif not re.match(r"^=+$", line) and len(line) > 0:
-        print line
+        print(line)

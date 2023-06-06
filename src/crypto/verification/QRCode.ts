@@ -119,6 +119,10 @@ export class ReciprocateQRCode extends Base {
             }
         });
     };
+
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return this.reciprocateQREvent ?? null;
+    }
 }
 
 const CODE_VERSION = 0x02; // the version of binary QR codes we support

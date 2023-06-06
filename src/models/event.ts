@@ -34,7 +34,7 @@ import {
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
+import { Thread, ThreadEvent, ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
 import { IActionsObject } from "../pushprocessor";
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
