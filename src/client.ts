@@ -151,6 +151,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
+    UNSIGNED_THREAD_ID_FIELD,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -5774,6 +5775,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     ...resOlder.chunk.map(mapper),
                 ];
                 for (const event of events) {
+                    event.setUnsigned({
+                        ...event.getUnsigned(),
+                         [UNSIGNED_THREAD_ID_FIELD.name]: timelineSet.thread.id,
+                    });
                     await timelineSet.thread?.processEvent(event);
                 }
 
@@ -5835,6 +5840,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     ...resOlder.chunk.map(mapper),
                 ];
                 for (const event of events) {
+                    // Fallback to set unsigned thread id if the server doesn't support it
+                    // We know the thread id because we just requested this event via /relations
+                    event.setUnsigned({
+                        [UNSIGNED_THREAD_ID_FIELD.name]: timelineSet.thread.id,
+                        ...event.getUnsigned(),
+                    });
                     await timelineSet.thread?.processEvent(event);
                 }
 
@@ -5901,6 +5912,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 { dir: Direction.Backward, limit: 1, recurse: recurse || undefined },
             );
             event = res.chunk?.[0];
+            // Fallback to set unsigned thread id if the server doesn't support it
+            // We know the thread id because we just requested this event via /relations
+            event.unsigned = {
+                [UNSIGNED_THREAD_ID_FIELD.name]: timelineSet.thread.id,
+                ...event.unsigned,
+            };
         } else {
             const messagesPath = utils.encodeUri("/rooms/$roomId/messages", {
                 $roomId: timelineSet.room.roomId,
@@ -6186,6 +6203,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
+                        // Fallback to set unsigned thread id if the server doesn't support it
+                        // We know the thread id because we just requested this event via /relations
+                        event.setUnsigned({
+                            [UNSIGNED_THREAD_ID_FIELD.name]: thread.id,
+                            ...event.getUnsigned(),
+                        });
                         await thread?.processEvent(event);
                         const sender = event.getSender()!;
                         if (!backwards || thread?.getEventReadUpTo(sender) === null) {
