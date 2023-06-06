@@ -1274,6 +1274,7 @@ describe("MatrixClient event timelines", function () {
             THREAD_ROOT.event_id,
             THREAD_REPLY.event_id,
             THREAD_REPLY2.getId(),
+            THREAD_ROOT_REACTION.getId(),
             THREAD_REPLY3.getId(),
         ]);
     });
@@ -1322,7 +1323,7 @@ describe("MatrixClient event timelines", function () {
             request.respond(200, function () {
                 return {
                     original_event: root,
-                    chunk: [replies],
+                    chunk: replies,
                     // no next batch as this is the oldest end of the timeline
                 };
             });
@@ -1479,7 +1480,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread2 reply",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1499,7 +1500,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread reply2",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1567,7 +1568,7 @@ describe("MatrixClient event timelines", function () {
                 // Test adding a second event to the first thread
                 const thread = room.getThread(THREAD_ROOT.event_id!)!;
                 thread.initialEventsFetched = true;
-                const prom = emitPromise(room, ThreadEvent.NewReply);
+                const prom = emitPromise(room, ThreadEvent.Update);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
