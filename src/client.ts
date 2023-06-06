@@ -9634,7 +9634,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @experimental
      */
     public supportsIntentionalMentions(): boolean {
-        return this.canSupport.get(Feature.IntentionalMentions) !== ServerSupport.Unsupported || false;
+        return this.canSupport.get(Feature.IntentionalMentions) !== ServerSupport.Unsupported;
     }
 
     /**
