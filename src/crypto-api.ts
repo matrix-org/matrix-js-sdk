@@ -18,6 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
+import { ICrossSigningStatus } from "./@types/crypto";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -185,6 +186,17 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Check the cross signing status of this device
+     *
+     * - if there is a public key on this device
+     * - if the private master, userSigning and selfSigning keys are store in the SecretStorage
+     * - if the private master, userSigning and selfSigning keys are cached locally
+
+     * @returns the current cross signing status of this device
+     */
+    getCrossSigningStatus(): Promise<ICrossSigningStatus>;
 }
 
 /**

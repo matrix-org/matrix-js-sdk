@@ -19,7 +19,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
-import { createClient, MatrixClient, UIAuthCallback } from "../../../src";
+import { createClient, MatrixClient, IAuthDict, UIAuthCallback } from "../../../src";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -61,34 +61,46 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         fetchMock.mockReset();
     });
 
+    /**
+     * Create cross-signing keys, publish the keys
+     * Mock and bootstrap all the required steps
+     *
+     * @return the IAuthDict
+     */
+    async function setupCrossSigning(): Promise<IAuthDict> {
+        // have account_data requests return an empty object
+        fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
+
+        // we expect a request to upload signatures for our device ...
+        fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
+
+        // ... and one to upload the cross-signing keys (with UIA)
+        fetchMock.post(
+            // legacy crypto uses /unstable/; /v3/ is correct
+            {
+                url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                name: "upload-keys",
+            },
+            {},
+        );
+
+        // provide a UIA callback, so that the cross-signing keys are uploaded
+        const authDict = { type: "test" };
+        const uiaCallback: UIAuthCallback<void> = async (makeRequest) => {
+            await makeRequest(authDict);
+        };
+
+        // now bootstrap cross signing, and check it resolves successfully
+        await aliceClient.getCrypto()?.bootstrapCrossSigning({
+            authUploadDeviceSigningKeys: uiaCallback,
+        });
+
+        return authDict;
+    }
+
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
         it("publishes keys if none were yet published", async () => {
-            // have account_data requests return an empty object
-            fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
-
-            // we expect a request to upload signatures for our device ...
-            fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
-
-            // ... and one to upload the cross-signing keys (with UIA)
-            fetchMock.post(
-                // legacy crypto uses /unstable/; /v3/ is correct
-                {
-                    url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
-                    name: "upload-keys",
-                },
-                {},
-            );
-
-            // provide a UIA callback, so that the cross-signing keys are uploaded
-            const authDict = { type: "test" };
-            const uiaCallback: UIAuthCallback<void> = async (makeRequest) => {
-                await makeRequest(authDict);
-            };
-
-            // now bootstrap cross signing, and check it resolves successfully
-            await aliceClient.bootstrapCrossSigning({
-                authUploadDeviceSigningKeys: uiaCallback,
-            });
+            const authDict = await setupCrossSigning();
 
             // check the cross-signing keys upload
             expect(fetchMock.called("upload-keys")).toBeTruthy();
@@ -112,6 +124,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(body).toHaveProperty(
                 `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[${sskId}]`,
             );
+        });
+    });
+
+    it("Get cross signing status for Alice", async () => {
+        await setupCrossSigning();
+
+        const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
+
+        // Expect the cross signing keys to be available
+        expect(crossSigningStatus).toStrictEqual({
+            publicKeyOnDevice: true,
+            privateKeysInSecretStorage: false,
+            privateKeysCachedLocally: { masterKey: true, userSigningKey: true, selfSigningKey: true },
         });
     });
 });

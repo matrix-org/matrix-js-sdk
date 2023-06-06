@@ -97,3 +97,16 @@ export interface IOneTimeKey {
     fallback?: boolean;
     signatures?: ISignatures;
 }
+
+/**
+ * The result of a call to {@link Crypto.getCrossSigningStatus}
+ */
+export interface ICrossSigningStatus {
+    publicKeyOnDevice: boolean;
+    privateKeysInSecretStorage: boolean;
+    privateKeysCachedLocally: {
+        masterKey: boolean;
+        selfSigningKey: boolean;
+        userSigningKey: boolean;
+    };
+}

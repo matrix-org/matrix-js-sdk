@@ -20,7 +20,13 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
+import type {
+    ICrossSigningStatus,
+    IDeviceKeys,
+    IEventDecryptionResult,
+    IMegolmSessionData,
+    IOneTimeKey,
+} from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -742,6 +748,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             !this.backupManager.getKeyBackupEnabled() || (await this.baseApis.isKeyBackupKeyStored());
 
         return !!(secretStorageKeyInAccount && privateKeysInStorage && sessionBackupInStorage);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<ICrossSigningStatus> {
+        const publicKeyOnDevice = Boolean(this.crossSigningInfo.getId());
+        const privateKeysInSecretStorage = Boolean(
+            await this.crossSigningInfo.isStoredInSecretStorage(this.secretStorage),
+        );
+        const cacheCallbacks = this.crossSigningInfo.getCacheCallbacks();
+        const masterKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("master"));
+        const selfSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("self_signing"));
+        const userSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("user_signing"));
+
+        return {
+            publicKeyOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey,
+                selfSigningKey,
+                userSigningKey,
+            },
+        };
     }
 
     /**
