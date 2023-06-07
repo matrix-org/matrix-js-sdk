@@ -1752,7 +1752,7 @@ describe("Group Call", function () {
             reportEmitter = groupCall.getGroupCallStats().reports;
         });
 
-        it("should not extend with feed stats if no call exists", async () => {
+        it("should not extends with feed stats if no call exists", async () => {
             const testPromise = new Promise<void>((done) => {
                 groupCall.on(GroupCallStatsReportEvent.CallFeedStats, () => {
                     expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith({}, [], "from-call-feed");
@@ -1764,7 +1764,7 @@ describe("Group Call", function () {
             await testPromise;
         });
 
-        it("and a CallFeedReport was triggered then it should extend with local feed", async () => {
+        it("and a CallFeedReport was triggered then it should extends with local feed", async () => {
             const localCallFeed = {} as CallFeed;
             groupCall.localCallFeed = localCallFeed;
 
@@ -1788,10 +1788,10 @@ describe("Group Call", function () {
             await testPromise;
         });
 
-        it("and a CallFeedReport was triggered then it should extend with remote feed", async () => {
+        it("and a CallFeedReport was triggered then it should extends with remote feed", async () => {
             const localCallFeed = {} as CallFeed;
             groupCall.localCallFeed = localCallFeed;
-            // @ts-ignore
+            // @ts-ignore Suppress error because access to private property
             const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
             report.callId = call.callId;
             const feeds = call.getFeeds();

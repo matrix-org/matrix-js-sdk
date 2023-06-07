@@ -1,3 +1,18 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 import { CallFeedStatsReporter } from "../../../../src/webrtc/stats/callFeedStatsReporter";
 import { CallFeedReport } from "../../../../src/webrtc/stats/statsReport";
 import { CallFeed } from "../../../../src/webrtc/callFeed";
@@ -12,14 +27,14 @@ describe("CallFeedStatsReporter", () => {
     });
 
     describe("should", () => {
-        it("build CallFeedReport", async () => {
+        it("builds CallFeedReport", async () => {
             expect(CallFeedStatsReporter.buildCallFeedReport(CALL_ID, USER_ID, rtcSpy)).toEqual({
                 callId: CALL_ID,
                 opponentMemberId: USER_ID,
                 callFeeds: [],
                 transceiver: [
                     {
-                        currenDirection: "sendonly",
+                        currentDirection: "sendonly",
                         direction: "sendrecv",
                         mid: "0",
                         receiver: {
@@ -44,7 +59,7 @@ describe("CallFeedStatsReporter", () => {
                         },
                     },
                     {
-                        currenDirection: "sendrecv",
+                        currentDirection: "sendrecv",
                         direction: "recvonly",
                         mid: "1",
                         receiver: {
@@ -69,7 +84,7 @@ describe("CallFeedStatsReporter", () => {
                         },
                     },
                     {
-                        currenDirection: "recvonly",
+                        currentDirection: "recvonly",
                         direction: "recvonly",
                         mid: "2",
                         receiver: {
@@ -88,7 +103,7 @@ describe("CallFeedStatsReporter", () => {
             } as CallFeedReport);
         });
 
-        it("extend CallFeedReport with call feeds", async () => {
+        it("extends CallFeedReport with call feeds", async () => {
             const feed = buildCallFeedMock("1");
             const callFeedList: CallFeed[] = [feed];
             const report = {

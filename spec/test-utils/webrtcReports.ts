@@ -1,3 +1,28 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+/**
+ * Here you can find two example Webrtc reports and use them for testing.
+ * The reports were generated with Chrome/Mac and `RTCPeerConnection: getStats()` method.
+ * Webrtc stats change over time and people are often interested in time-dependent statements.
+ * That's why there are two reports (`prevChromeReport`, `currentChromeReport`) here that were recorded 10 seconds apart.
+ *
+ * Notice:
+ * Because RTCStatsReport is more than just a data object, I left out the cast of the reports to RTCStatsReport.
+ * With other words, I didn't want cover the behavior of RTCStatsReport here.
+ */
 export const prevChromeReport = [
     {
         id: "AP",

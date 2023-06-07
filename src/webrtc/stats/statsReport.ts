@@ -113,7 +113,7 @@ export interface TransceiverStats {
     readonly sender: TrackStats | null;
     readonly receiver: TrackStats | null;
     readonly direction: string;
-    readonly currenDirection: string;
+    readonly currentDirection: string;
 }
 
 export interface TrackStats {
