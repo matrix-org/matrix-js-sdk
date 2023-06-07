@@ -252,6 +252,27 @@ export interface CryptoApi {
      * @returns the VerificationRequest that is in progress, if any
      */
     findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestOwnUserVerification(): Promise<VerificationRequest>;
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
 }
 
 /**
