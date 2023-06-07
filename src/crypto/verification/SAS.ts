@@ -480,4 +480,8 @@ export class SAS extends Base {
             }
         });
     }
+
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return this.sasEvent ?? null;
+    }
 }

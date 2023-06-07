@@ -49,7 +49,7 @@ import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import {
     Thread,
     ThreadEvent,
-    EventHandlerMap as ThreadHandlerMap,
+    ThreadEventHandlerMap as ThreadHandlerMap,
     FILTER_RELATED_BY_REL_TYPES,
     THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
