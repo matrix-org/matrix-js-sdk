@@ -163,6 +163,22 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return true;
     }
 
+    /**
+     * Unique ID for this verification request.
+     *
+     * An ID isn't assigned until the first message is sent, so this may be `undefined` in the early phases.
+     */
+    public get transactionId(): string | undefined {
+        return this.channel.transactionId;
+    }
+
+    /**
+     * For an in-room verification, the ID of the room.
+     */
+    public get roomId(): string | undefined {
+        return this.channel.roomId;
+    }
+
     public get invalid(): boolean {
         return this.phase === PHASE_UNSENT;
     }
@@ -257,9 +273,21 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return !this.observeOnly && this._phase !== PHASE_DONE && this._phase !== PHASE_CANCELLED;
     }
 
-    /** Only set after a .ready if the other party can scan a QR code */
+    /** Only set after a .ready if the other party can scan a QR code
+     *
+     * @deprecated Prefer `getQRCodeBytes`.
+     */
     public get qrCodeData(): QRCodeData | null {
         return this._qrCodeData;
+    }
+
+    /**
+     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     */
+    public getQRCodeBytes(): Buffer | undefined {
+        return this._qrCodeData?.getBuffer();
     }
 
     /** Checks whether the other party supports a given verification method.
@@ -345,6 +373,11 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     /** The user id of the other party in this request */
     public get otherUserId(): string {
         return this.channel.userId!;
+    }
+
+    /** The device id of the other party in this request, for requests happening over to-device messages only. */
+    public get otherDeviceId(): string | undefined {
+        return this.channel.deviceId;
     }
 
     public get isSelfVerification(): boolean {
