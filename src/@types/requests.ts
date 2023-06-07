@@ -48,17 +48,16 @@ export interface IJoinRoomOpts {
 export interface IRedactOpts {
     reason?: string;
     /**
-     * Whether events related to the redacted event should be redacted.
-     *
      * If specified, then any events which relate to the event being redacted with
      * any of the relationship types listed will also be redacted.
+     * Provide a "*" list item to tell the server to redact relations of any type.
      *
      * <b>Raises an Error if the server does not support it.</b>
      * Check for server-side support before using this param with
      * <code>client.canSupport.get(Feature.RelationBasedRedactions)</code>.
      * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
      */
-    with_relations?: Array<RelationType | string>;
+    with_rel_types?: Array<RelationType | "*">;
 }
 
 export interface ISendEventResponse {

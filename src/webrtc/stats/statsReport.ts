@@ -87,6 +87,11 @@ export interface SummaryStatsReport {
     maxPacketLoss: number;
     percentageConcealedAudio: number;
     peerConnections: number;
+    opponentUsersInCall?: number;
+    opponentDevicesInCall?: number;
+    diffDevicesToPeerConnections?: number;
+    ratioPeerConnectionToDevices?: number;
+    // Todo: Decide if we want an index (or a timestamp) of this report in relation to the group call, to help differenciate when issues occur and ignore/track initial connection delays.
 }
 
 /// CallFeedReport #####################################################################################################

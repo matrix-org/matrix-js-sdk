@@ -469,11 +469,6 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
-
-    /**
-     * @experimental
-     */
-    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -4598,10 +4593,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
+     * @param opts - Redact options
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
-     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     * @throws Error if called with `with_rel_types` (MSC3912) but the server does not support it.
      *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
@@ -4631,34 +4626,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+        const content: IContent = { reason };
 
-        if (
-            opts?.with_relations &&
-            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
-        ) {
-            throw new Error(
-                "Server does not support relation based redactions " +
-                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
-            );
+        if (opts?.with_rel_types !== undefined) {
+            if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
+                throw new Error(
+                    "Server does not support relation based redactions " +
+                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+                );
+            }
+
+            const withRelTypesPropName =
+                this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                    ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                    : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!;
+
+            content[withRelTypesPropName] = opts.with_rel_types;
         }
-
-        const withRelations = opts?.with_relations
-            ? {
-                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
-                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
-                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
-              }
-            : {};
 
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: {
-                    ...withRelations,
-                    reason,
-                },
+                content,
                 redacts: eventId,
             },
             txnId as string,
@@ -9635,11 +9626,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * A helper to determine intentional mentions support
-     * @returns a boolean to determine if intentional mentions are enabled
+     * @returns a boolean to determine if intentional mentions are enabled on the server
      * @experimental
      */
     public supportsIntentionalMentions(): boolean {
-        return this.clientOpts?.intentionalMentions || false;
+        return this.canSupport.get(Feature.IntentionalMentions) !== ServerSupport.Unsupported;
     }
 
     /**

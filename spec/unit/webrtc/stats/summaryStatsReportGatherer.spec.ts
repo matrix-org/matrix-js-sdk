@@ -15,6 +15,7 @@ limitations under the License.
 */
 import { SummaryStatsReportGatherer } from "../../../../src/webrtc/stats/summaryStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
+import { groupCallParticipantsFourOtherDevices } from "../../../test-utils/webrtc";
 
 describe("SummaryStatsReportGatherer", () => {
     let reporter: SummaryStatsReportGatherer;
@@ -584,8 +585,118 @@ describe("SummaryStatsReportGatherer", () => {
                 percentageReceivedVideoMedia: 1,
                 maxJitter: 2,
                 maxPacketLoss: 40,
-                peerConnections: 3,
+                peerConnections: 4,
                 percentageConcealedAudio: 0,
+            });
+        });
+        it("should report missing peer connections", async () => {
+            const summary = [
+                {
+                    isFirstCollection: true,
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 20,
+                        maxPacketLoss: 5,
+                        concealedAudio: 0,
+                        totalAudio: 0,
+                    },
+                    videoTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 0,
+                        maxPacketLoss: 0,
+                        concealedAudio: 0,
+                        totalAudio: 0,
+                    },
+                },
+                {
+                    isFirstCollection: false,
+                    receivedMedia: 1,
+                    receivedAudioMedia: 1,
+                    receivedVideoMedia: 1,
+                    audioTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 2,
+                        maxPacketLoss: 5,
+                        concealedAudio: 0,
+                        totalAudio: 0,
+                    },
+                    videoTrackSummary: {
+                        count: 1,
+                        muted: 0,
+                        maxJitter: 0,
+                        maxPacketLoss: 40,
+                        concealedAudio: 0,
+                        totalAudio: 0,
+                    },
+                },
+            ];
+            reporter.build(summary);
+            expect(emitter.emitSummaryStatsReport).toHaveBeenCalledWith({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 2,
+                percentageConcealedAudio: 0,
+            });
+        });
+    });
+    describe("extend Summary Stats Report", () => {
+        it("should extend the report with the appropriate data based on a user map", async () => {
+            const summary = {
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+            };
+            SummaryStatsReportGatherer.extendSummaryReport(summary, groupCallParticipantsFourOtherDevices);
+            expect(summary).toStrictEqual({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+                opponentUsersInCall: 1,
+                opponentDevicesInCall: 4,
+                diffDevicesToPeerConnections: 0,
+                ratioPeerConnectionToDevices: 1,
+            });
+        });
+        it("should extend the report data based on a user map", async () => {
+            const summary = {
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+            };
+            SummaryStatsReportGatherer.extendSummaryReport(summary, new Map());
+            expect(summary).toStrictEqual({
+                percentageReceivedMedia: 1,
+                percentageReceivedAudioMedia: 1,
+                percentageReceivedVideoMedia: 1,
+                maxJitter: 2,
+                maxPacketLoss: 40,
+                peerConnections: 4,
+                percentageConcealedAudio: 0,
+                opponentUsersInCall: 0,
+                opponentDevicesInCall: 0,
+                diffDevicesToPeerConnections: -4,
+                ratioPeerConnectionToDevices: 0,
             });
         });
     });
