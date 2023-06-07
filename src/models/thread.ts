@@ -281,6 +281,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (!eventId) {
             return;
         }
+        // If the event is already in this thread, bail out
         if (this.findEventById(eventId)) {
             return;
         }
@@ -532,17 +533,17 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                             event.getType(),
                             {
                                 limit: 1,
-                            })
-                            .then((relations) => {
-                                if (relations.events.length) {
-                                    event.makeReplaced(relations.events[0]);
-                                    this.insertEventIntoTimeline(event);
-                                }
-                            })
-                            .catch((e) => {
-                                logger.error("Failed to load edits for encrypted thread event", e);
-                            });
-                    }),
+                            },
+                        );
+                        if (relations.events.length) {
+                            const editEvent = relations.events[0];
+                            event.makeReplaced(editEvent);
+                            this.insertEventIntoTimeline(editEvent);
+                        }
+                    } catch (e) {
+                        logger.error("Failed to load edits for encrypted thread event", e);
+                    }
+                }),
             );
         }
     }
