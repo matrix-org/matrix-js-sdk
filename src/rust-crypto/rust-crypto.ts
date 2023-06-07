@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { ICrossSigningStatus, IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
@@ -34,7 +34,7 @@ import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-a
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { ServerSideSecretStorage } from "../secret-storage";
+import { SecretStorageKeyDescription, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningKey } from "../crypto/api";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 
@@ -71,13 +71,13 @@ export class RustCrypto implements CryptoBackend {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
 
         /** The local user's User ID. */
-        _userId: string,
+        private readonly userId: string,
 
         /** The local user's Device ID. */
         _deviceId: string,
 
         /** Interface to server-side secret storage */
-        _secretStorage: ServerSideSecretStorage,
+        private readonly secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
@@ -354,12 +354,15 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<ICrossSigningStatus> {
-        const userIdentity: OwnUserIdentity = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
-        const publicKeyOnDevice = userIdentity.masterKey && userIdentity.selfSigningKey && userIdentity.userSigningKey;
+        const publicKeyOnDevice =
+            Boolean(userIdentity.masterKey) &&
+            Boolean(userIdentity.selfSigningKey) &&
+            Boolean(userIdentity.userSigningKey);
         const privateKeysInSecretStorage = Boolean(await this.isStoredInSecretStorage(this.secretStorage));
-        const crossSigningStatus: CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
 
         return {
             publicKeyOnDevice,
