@@ -25,8 +25,15 @@ import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
+import {
+    ByteSentStatsReport,
+    CallFeedReport,
+    ConnectionStatsReport,
+    StatsReport,
+    SummaryStatsReport,
+} from "./stats/statsReport";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -97,6 +104,7 @@ export enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
     SummaryStats = "GroupCall.summary_stats",
+    CallFeedStats = "GroupCall.call_feed_stats",
 }
 
 /**
@@ -106,6 +114,7 @@ export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
     [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
+    [GroupCallStatsReportEvent.CallFeedStats]: (report: GroupCallStatsReport<CallFeedReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -114,7 +123,9 @@ export enum GroupCallErrorCode {
     PlaceCallFailed = "place_call_failed",
 }
 
-export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport> {
+export interface GroupCallStatsReport<
+    T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport | CallFeedReport,
+> {
     report: T;
 }
 
@@ -286,6 +297,22 @@ export class GroupCall extends TypedEventEmitter<
         SummaryStatsReportGatherer.extendSummaryReport(report, this.participants);
         // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
+    };
+
+    private onCallFeedReport = (report: CallFeedReport): void => {
+        if (this.localCallFeed) {
+            report = CallFeedStatsReporter.expandCallFeedReport(report, [this.localCallFeed], "from-local-feed");
+        }
+
+        const callFeeds: CallFeed[] = [];
+        this.forEachCall((call) => {
+            if (call.callId === report.callId) {
+                call.getFeeds().forEach((f) => callFeeds.push(f));
+            }
+        });
+
+        report = CallFeedStatsReporter.expandCallFeedReport(report, callFeeds, "from-call-feed");
+        this.emit(GroupCallStatsReportEvent.CallFeedStats, { report });
     };
 
     public async create(): Promise<GroupCall> {
@@ -1642,6 +1669,7 @@ export class GroupCall extends TypedEventEmitter<
             this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
             this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
             this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
+            this.stats.reports.on(StatsReport.CALL_FEED_REPORT, this.onCallFeedReport);
         }
         return this.stats;
     }
