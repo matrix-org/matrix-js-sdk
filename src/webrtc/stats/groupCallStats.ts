@@ -16,7 +16,7 @@ limitations under the License.
 import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { SummaryStatsReportGatherer } from "./SummaryStatsReportGatherer";
+import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
 import { logger } from "../../logger";
 
 export class GroupCallStats {

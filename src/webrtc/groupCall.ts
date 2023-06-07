@@ -26,7 +26,7 @@ import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
 import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
-import { SummaryStatsReportGatherer } from "./stats/SummaryStatsReportGatherer";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
