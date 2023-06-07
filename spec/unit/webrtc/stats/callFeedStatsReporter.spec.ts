@@ -28,79 +28,7 @@ describe("CallFeedStatsReporter", () => {
 
     describe("should", () => {
         it("builds CallFeedReport", async () => {
-            expect(CallFeedStatsReporter.buildCallFeedReport(CALL_ID, USER_ID, rtcSpy)).toEqual({
-                callId: CALL_ID,
-                opponentMemberId: USER_ID,
-                callFeeds: [],
-                transceiver: [
-                    {
-                        currentDirection: "sendonly",
-                        direction: "sendrecv",
-                        mid: "0",
-                        receiver: {
-                            constrainDeviceId: "constrainDeviceId-receiver_audio_0",
-                            enabled: true,
-                            id: "receiver_audio_0",
-                            kind: "audio",
-                            label: "receiver",
-                            muted: false,
-                            readyState: "live",
-                            settingDeviceId: "settingDeviceId-receiver_audio_0",
-                        },
-                        sender: {
-                            constrainDeviceId: "constrainDeviceId-sender_audio_0",
-                            enabled: true,
-                            id: "sender_audio_0",
-                            kind: "audio",
-                            label: "sender",
-                            muted: false,
-                            readyState: "live",
-                            settingDeviceId: "settingDeviceId-sender_audio_0",
-                        },
-                    },
-                    {
-                        currentDirection: "sendrecv",
-                        direction: "recvonly",
-                        mid: "1",
-                        receiver: {
-                            constrainDeviceId: "constrainDeviceId-receiver_video_1",
-                            enabled: true,
-                            id: "receiver_video_1",
-                            kind: "video",
-                            label: "receiver",
-                            muted: false,
-                            readyState: "live",
-                            settingDeviceId: "settingDeviceId-receiver_video_1",
-                        },
-                        sender: {
-                            constrainDeviceId: "constrainDeviceId-sender_video_1",
-                            enabled: true,
-                            id: "sender_video_1",
-                            kind: "video",
-                            label: "sender",
-                            muted: false,
-                            readyState: "live",
-                            settingDeviceId: "settingDeviceId-sender_video_1",
-                        },
-                    },
-                    {
-                        currentDirection: "recvonly",
-                        direction: "recvonly",
-                        mid: "2",
-                        receiver: {
-                            constrainDeviceId: "constrainDeviceId-receiver_video_2",
-                            enabled: true,
-                            id: "receiver_video_2",
-                            kind: "video",
-                            label: "receiver",
-                            muted: false,
-                            readyState: "live",
-                            settingDeviceId: "settingDeviceId-receiver_video_2",
-                        },
-                        sender: null,
-                    },
-                ],
-            } as CallFeedReport);
+            expect(CallFeedStatsReporter.buildCallFeedReport(CALL_ID, USER_ID, rtcSpy)).toMatchSnapshot();
         });
 
         it("extends CallFeedReport with call feeds", async () => {
@@ -113,35 +41,7 @@ describe("CallFeedStatsReporter", () => {
                 callFeeds: [],
             } as CallFeedReport;
 
-            expect(CallFeedStatsReporter.expandCallFeedReport(report, callFeedList).callFeeds).toEqual([
-                {
-                    audio: {
-                        constrainDeviceId: "constrainDeviceId-video-1",
-                        enabled: true,
-                        id: "video-1",
-                        kind: "video",
-                        label: "--",
-                        muted: false,
-                        readyState: "live",
-                        settingDeviceId: "settingDeviceId-video-1",
-                    },
-                    isAudioMuted: true,
-                    isVideoMuted: false,
-                    prefix: "unknown",
-                    stream: "stream-1",
-                    type: "local",
-                    video: {
-                        constrainDeviceId: "constrainDeviceId-audio-1",
-                        enabled: true,
-                        id: "audio-1",
-                        kind: "audio",
-                        label: "--",
-                        muted: false,
-                        readyState: "live",
-                        settingDeviceId: "settingDeviceId-audio-1",
-                    },
-                },
-            ]);
+            expect(CallFeedStatsReporter.expandCallFeedReport(report, callFeedList).callFeeds).toMatchSnapshot();
         });
     });
 
