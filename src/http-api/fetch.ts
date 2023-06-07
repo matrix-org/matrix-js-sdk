@@ -302,7 +302,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns URL
      */
     public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
-        const baseUrlWithoutTrailingSlash = (baseUrl ?? this.opts.baseUrl).replace(/\/+$/, "");
+        const baseUrlWithFallback = baseUrl ?? this.opts.baseUrl;
+        const baseUrlWithoutTrailingSlash = baseUrlWithFallback.endsWith("/")
+            ? baseUrlWithFallback.slice(0, -1)
+            : baseUrlWithFallback;
         const url = new URL(baseUrlWithoutTrailingSlash + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
             encodeParams(queryParams, url.searchParams);
