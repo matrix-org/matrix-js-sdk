@@ -24,7 +24,7 @@ interface CallStatsReportSummaryCounter {
     totalAudio: number;
 }
 
-export class SummaryStatsReporter {
+export class SummaryStatsReportGatherer {
     public constructor(private emitter: StatsReportEmitter) {}
 
     public build(allSummary: CallStatsReportSummary[]): void {

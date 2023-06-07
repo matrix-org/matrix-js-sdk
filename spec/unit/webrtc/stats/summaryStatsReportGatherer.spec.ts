@@ -13,17 +13,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { SummaryStatsReporter } from "../../../../src/webrtc/stats/summaryStatsReporter";
+import { SummaryStatsReportGatherer } from "../../../../src/webrtc/stats/SummaryStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 import { groupCallParticipantsFourOtherDevices } from "../../../test-utils/webrtc";
 
 describe("SummaryStatsReportGatherer", () => {
-    let reporter: SummaryStatsReporter;
+    let reporter: SummaryStatsReportGatherer;
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         emitter = new StatsReportEmitter();
         emitter.emitSummaryStatsReport = jest.fn();
-        reporter = new SummaryStatsReporter(emitter);
+        reporter = new SummaryStatsReportGatherer(emitter);
     });
 
     describe("build Summary Stats Report", () => {
@@ -659,7 +659,7 @@ describe("SummaryStatsReportGatherer", () => {
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
             };
-            SummaryStatsReporter.extendSummaryReport(summary, groupCallParticipantsFourOtherDevices);
+            SummaryStatsReportGatherer.extendSummaryReport(summary, groupCallParticipantsFourOtherDevices);
             expect(summary).toStrictEqual({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
@@ -684,7 +684,7 @@ describe("SummaryStatsReportGatherer", () => {
                 peerConnections: 4,
                 percentageConcealedAudio: 0,
             };
-            SummaryStatsReporter.extendSummaryReport(summary, new Map());
+            SummaryStatsReportGatherer.extendSummaryReport(summary, new Map());
             expect(summary).toStrictEqual({
                 percentageReceivedMedia: 1,
                 percentageReceivedAudioMedia: 1,
