@@ -90,6 +90,24 @@ export class TypedEventEmitter<
     }
 
     /**
+     * Similar to `emit` but calls all listeners within a `Promise.all` and returns the promise chain
+     * @param event - The name of the event to emit
+     * @param args - Arguments to pass to the listener
+     * @returns `true` if the event had listeners, `false` otherwise.
+     */
+    public async emitPromised<T extends Events>(
+        event: T,
+        ...args: Parameters<SuperclassArguments[T]>
+    ): Promise<boolean>;
+    public async emitPromised<T extends Events>(event: T, ...args: Parameters<Arguments[T]>): Promise<boolean>;
+    public async emitPromised<T extends Events>(event: T, ...args: any[]): Promise<boolean> {
+        const listeners = this.listeners(event);
+        return Promise.allSettled(listeners.map((l) => l(...args))).then(() => {
+            return listeners.length > 0;
+        });
+    }
+
+    /**
      * Returns the number of listeners listening to the event named `event`.
      *
      * @param event - The name of the event being listened for

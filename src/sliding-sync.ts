@@ -326,7 +326,7 @@ export enum SlidingSyncEvent {
 }
 
 export type SlidingSyncEventHandlerMap = {
-    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => Promise<void> | void;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
@@ -567,14 +567,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param roomId - The room which received some data.
      * @param roomData - The raw sliding sync response JSON.
      */
-    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
+    private async invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): Promise<void> {
         if (!roomData.required_state) {
             roomData.required_state = [];
         }
         if (!roomData.timeline) {
             roomData.timeline = [];
         }
-        this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
+        await this.emitPromised(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
     /**
@@ -923,9 +923,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             }
             this.onPreExtensionsResponse(resp.extensions);
 
-            Object.keys(resp.rooms).forEach((roomId) => {
-                this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
-            });
+            for (const roomId in resp.rooms) {
+                await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
+            }
 
             const listKeysWithUpdates: Set<string> = new Set();
             if (!doNotUpdateList) {

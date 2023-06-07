@@ -168,11 +168,11 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
 
 /**
- * Name of the "with_relations" request property for relation based redactions.
+ * Name of the request property for relation based redactions.
  * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
  */
 export const MSC3912_RELATION_BASED_REDACTIONS_PROP = new UnstableValue(
-    "with_relations",
+    "with_rel_types",
     "org.matrix.msc3912.with_relations",
 );
 
