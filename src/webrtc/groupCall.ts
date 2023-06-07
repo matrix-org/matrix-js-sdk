@@ -26,6 +26,7 @@ import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
 import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -98,6 +99,9 @@ export enum GroupCallStatsReportEvent {
     SummaryStats = "GroupCall.summary_stats",
 }
 
+/**
+ * The final report-events that get consumed by client.
+ */
 export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
@@ -269,14 +273,18 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
     };
 
     private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
     private onSummaryStats = (report: SummaryStatsReport): void => {
+        SummaryStatsReportGatherer.extendSummaryReport(report, this.participants);
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
     };
 
@@ -1595,6 +1603,8 @@ export class GroupCall extends TypedEventEmitter<
         });
 
         if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
+
+        // Update the participants stored in the stats object
     };
 
     private onStateChanged = (newState: GroupCallState, oldState: GroupCallState): void => {
