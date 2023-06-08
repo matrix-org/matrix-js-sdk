@@ -1453,7 +1453,7 @@ describe("MatrixClient event timelines", function () {
                 expect(room.getPendingEvents()).toHaveLength(1);
             });
 
-            it("should handle thread updates by reordering the thread list", async () => {
+            it("should handle new thread replies by reordering the thread list", async () => {
                 // Test data for a second thread
                 const THREAD2_ROOT = utils.mkEvent({
                     room: roomId,
@@ -1568,7 +1568,8 @@ describe("MatrixClient event timelines", function () {
                 // Test adding a second event to the first thread
                 const thread = room.getThread(THREAD_ROOT.event_id!)!;
                 thread.initialEventsFetched = true;
-                const prom = emitPromise(room, ThreadEvent.Update);
+                const prom = emitPromise(room, ThreadEvent.NewReply);
+                respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
