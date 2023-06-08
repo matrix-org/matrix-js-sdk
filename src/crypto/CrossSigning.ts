@@ -30,7 +30,7 @@ import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { SecretStorageKeyDescription, ServerSideSecretStorage } from "../secret-storage";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 import { DeviceVerificationStatus } from "../crypto-api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
