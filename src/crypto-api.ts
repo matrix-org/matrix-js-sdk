@@ -273,6 +273,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
+ * Used when calling {@link CryptoApi#importRoomKeys} as the parameter of
+ * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
     stage: string; // TODO: Enum
@@ -293,4 +295,3 @@ export interface ImportRoomKeysOpts {
 }
 
 export * from "./crypto-api/verification";
-
