@@ -745,3 +745,78 @@ export const REMOTE_SFU_DESCRIPTION =
     "a=sctp-port:5000\n" +
     "a=ice-ufrag:obZwzAcRtxwuozPZ\n" +
     "a=ice-pwd:TWXNaPeyKTTvRLyIQhWHfHlZHJjtcoKs";
+
+export const groupCallParticipantsFourOtherDevices = new Map([
+    [
+        new RoomMember("roomId0", "user1"),
+        new Map([
+            [
+                "deviceId0",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId1",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId2",
+                {
+                    sessionId: "2",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+    [
+        new RoomMember("roomId0", "user2"),
+        new Map([
+            [
+                "deviceId3",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId4",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+]);
+
+export const groupCallParticipantsOneOtherDevice = new Map([
+    [
+        new RoomMember("roomId1", "thisMember"),
+        new Map([
+            [
+                "deviceId0",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+    [
+        new RoomMember("roomId1", "opponentMember"),
+        new Map([
+            [
+                "deviceId1",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+]);

@@ -17,6 +17,8 @@ limitations under the License.
 import { CallStatsReportGatherer } from "../../../../src/webrtc/stats/callStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 import { MediaSsrcHandler } from "../../../../src/webrtc/stats/media/mediaSsrcHandler";
+import { currentChromeReport, prevChromeReport } from "../../../test-utils/webrtcReports";
+import { MockRTCPeerConnection } from "../../../test-utils/webrtc";
 
 const CALL_ID = "CALL_ID";
 const USER_ID = "USER_ID";
@@ -28,6 +30,7 @@ describe("CallStatsReportGatherer", () => {
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
         rtcSpy.addEventListener = jest.fn();
+        rtcSpy.getTransceivers = jest.fn().mockReturnValue([]);
         emitter = new StatsReportEmitter();
         collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
     });
@@ -144,6 +147,70 @@ describe("CallStatsReportGatherer", () => {
                 },
             });
             expect(collector.getActive()).toBeTruthy();
+        });
+
+        describe("should not only produce a call summary stat but also", () => {
+            const wantedSummaryReport = {
+                isFirstCollection: false,
+                audioTrackSummary: {
+                    concealedAudio: 0,
+                    count: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    muted: 0,
+                    totalAudio: 0,
+                },
+                receivedAudioMedia: 0,
+                receivedMedia: 0,
+                receivedVideoMedia: 0,
+                videoTrackSummary: {
+                    concealedAudio: 0,
+                    count: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    muted: 0,
+                    totalAudio: 0,
+                },
+            };
+            beforeEach(() => {
+                rtcSpy = new MockRTCPeerConnection() as unknown as RTCPeerConnection;
+                collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
+                const getStats = jest.spyOn(rtcSpy, "getStats");
+
+                const previous = prevChromeReport as unknown as RTCStatsReport;
+                previous.get = (id: string) => {
+                    return prevChromeReport.find((data) => data.id === id);
+                };
+                // @ts-ignore
+                collector.previousStatsReport = previous;
+
+                const current = currentChromeReport as unknown as RTCStatsReport;
+                current.get = (id: string) => {
+                    return currentChromeReport.find((data) => data.id === id);
+                };
+
+                // @ts-ignore
+                getStats.mockResolvedValue(current);
+            });
+
+            it("emit byteSentStatsReport", async () => {
+                const emitByteSendReport = jest.spyOn(emitter, "emitByteSendReport");
+                const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+                expect(actual).toEqual(wantedSummaryReport);
+                expect(emitByteSendReport).toHaveBeenCalled();
+            });
+            it("emit emitConnectionStatsReport", async () => {
+                const emitConnectionStatsReport = jest.spyOn(emitter, "emitConnectionStatsReport");
+                const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+                expect(actual).toEqual(wantedSummaryReport);
+                expect(emitConnectionStatsReport).toHaveBeenCalled();
+            });
+            it("emit callFeedStatsReport", async () => {
+                const emitCallFeedReport = jest.spyOn(emitter, "emitCallFeedReport");
+                const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
+                expect(actual).toEqual(wantedSummaryReport);
+                expect(emitCallFeedReport).toHaveBeenCalled();
+            });
         });
     });
 

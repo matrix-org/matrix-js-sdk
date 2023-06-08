@@ -129,9 +129,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expectSendToDeviceMessage("m.key.verification.request"),
             aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
         ]);
-        const transactionId = request.channel.transactionId;
+        const transactionId = request.transactionId;
         expect(transactionId).toBeDefined();
         expect(request.phase).toEqual(Phase.Requested);
+        expect(request.roomId).toBeUndefined();
 
         let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
         expect(toDeviceMessage.methods).toContain("m.sas.v1");
@@ -149,6 +150,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
         await waitForVerificationRequestChanged(request);
         expect(request.phase).toEqual(Phase.Ready);
+        expect(request.otherDeviceId).toEqual(TEST_DEVICE_ID);
 
         // ... and picks a method with m.key.verification.start
         returnToDeviceMessageFromSync({
@@ -270,7 +272,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
             ]);
-            const transactionId = request.channel.transactionId;
+            const transactionId = request.transactionId;
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.methods).toContain("m.qr_code.show.v1");
@@ -292,9 +294,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(Phase.Ready);
 
             // we should now have QR data we can display
-            const qrCodeData = request.qrCodeData!;
-            expect(qrCodeData).toBeTruthy();
-            const qrCodeBuffer = qrCodeData.getBuffer();
+            const qrCodeBuffer = request.getQRCodeBytes()!;
+            expect(qrCodeBuffer).toBeTruthy();
+
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
             expect(qrCodeBuffer.subarray(0, 6).toString("latin1")).toEqual("MATRIX");
             expect(qrCodeBuffer.readUint8(6)).toEqual(0x02); // version

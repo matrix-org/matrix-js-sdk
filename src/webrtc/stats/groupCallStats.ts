@@ -17,6 +17,7 @@ import { CallStatsReportGatherer } from "./callStatsReportGatherer";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
+import { logger } from "../../logger";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;
@@ -75,7 +76,11 @@ export class GroupCallStats {
             summary.push(c.processStats(this.groupCallId, this.userId));
         });
 
-        Promise.all(summary).then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s));
+        Promise.all(summary)
+            .then((s: Awaited<CallStatsReportSummary>[]) => this.summaryStatsReportGatherer.build(s))
+            .catch((err) => {
+                logger.error("Could not build summary stats report", err);
+            });
     }
 
     public setInterval(interval: number): void {
