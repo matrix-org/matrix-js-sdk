@@ -216,7 +216,7 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
-        // TODO when backup support will be added we would need to expose from backup in bindings
+        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
         const jsonKeys = JSON.stringify(keys);
         await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
             const importOpt: ImportRoomKeyProgressData = {
