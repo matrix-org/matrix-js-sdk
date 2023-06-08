@@ -362,15 +362,16 @@ export class RustCrypto implements CryptoBackend {
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
         const privateKeysInSecretStorage = Boolean(await isStoredInSecretStorage(this.secretStorage));
-        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
+            await this.olmMachine.crossSigningStatus();
 
         return {
             publicKeysOnDevice,
             privateKeysInSecretStorage,
             privateKeysCachedLocally: {
-                masterKey: crossSigningStatus.hasMaster,
-                userSigningKey: crossSigningStatus.hasUserSigning,
-                selfSigningKey: crossSigningStatus.hasSelfSigning,
+                masterKey: Boolean(crossSigningStatus?.hasMaster),
+                userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
+                selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
             },
         };
     }
