@@ -41,7 +41,7 @@ const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
 
 describe("RustCrypto", () => {
-    describe(".importThenExportRoomKeys", () => {
+    describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
