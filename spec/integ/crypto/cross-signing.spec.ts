@@ -65,7 +65,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
      * Create cross-signing keys, publish the keys
      * Mock and bootstrap all the required steps
      *
-     * @return the IAuthDict
+     * @return the IAuthDict - The parameters which are submitted as the `auth` dict in a UIA request
+     * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
      */
     async function setupCrossSigning(): Promise<IAuthDict> {
         // have account_data requests return an empty object
@@ -127,16 +128,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         });
     });
 
-    it("Get cross signing status for Alice", async () => {
-        await setupCrossSigning();
+    describe("getCrossSigningStatus()", () => {
+        it("should return correct values after bootstrapping cross-signing", async () => {
+            await setupCrossSigning();
 
-        const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
+            const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
 
-        // Expect the cross signing keys to be available
-        expect(crossSigningStatus).toStrictEqual({
-            publicKeyOnDevice: true,
-            privateKeysInSecretStorage: false,
-            privateKeysCachedLocally: { masterKey: true, userSigningKey: true, selfSigningKey: true },
+            // Expect the cross signing keys to be available
+            expect(crossSigningStatus).toStrictEqual({
+                publicKeysOnDevice: true,
+                privateKeysInSecretStorage: false,
+                privateKeysCachedLocally: { masterKey: true, userSigningKey: true, selfSigningKey: true },
+            });
         });
     });
 });
