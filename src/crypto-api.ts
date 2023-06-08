@@ -135,7 +135,8 @@ export interface CryptoApi {
      * @param userId - The ID of the user whose device is to be checked.
      * @param deviceId - The ID of the device to check
      *
-     * @returns Verification status of the device, or `null` if the device is not known
+     * @returns `null` if the device is unknown, or has not published any encryption keys (implying it does not support
+     *     encryption); otherwise the verification status of the device.
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
 
@@ -156,7 +157,7 @@ export interface CryptoApi {
     /**
      * Get the ID of one of the user's cross-signing keys.
      *
-     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigngingKey.SelfSigning`,
+     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
      *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
      *
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
@@ -270,6 +271,7 @@ export class DeviceVerificationStatus {
     }
 }
 
+<<<<<<< HEAD
 /**
  * Room key import progress report.
  */
@@ -290,3 +292,6 @@ export interface ImportRoomKeysOpts {
     untrusted?: boolean;
     source?: String; // TODO: Enum (backup, file, ??)
 }
+=======
+export * from "./crypto-api/verification";
+>>>>>>> develop

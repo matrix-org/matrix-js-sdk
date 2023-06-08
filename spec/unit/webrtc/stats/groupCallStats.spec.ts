@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { GroupCallStats } from "../../../../src/webrtc/stats/groupCallStats";
-import { SummaryStats } from "../../../../src/webrtc/stats/summaryStats";
+import { CallStatsReportSummary } from "../../../../src/webrtc/stats/callStatsReportSummary";
 
 const GROUP_CALL_ID = "GROUP_ID";
 const LOCAL_USER_ID = "LOCAL_USER_ID";
@@ -112,7 +112,7 @@ describe("GroupCallStats", () => {
                     concealedAudio: 0,
                     totalAudio: 0,
                 },
-            } as SummaryStats;
+            } as CallStatsReportSummary;
             let processStatsSpy;
             if (collector) {
                 processStatsSpy = jest.spyOn(collector, "processStats").mockResolvedValue(summaryStats);

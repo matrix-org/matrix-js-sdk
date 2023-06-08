@@ -376,7 +376,7 @@ export class SlidingSyncSdk {
         });
     }
 
-    private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
+    private async onRoomData(roomId: string, roomData: MSC3575RoomData): Promise<void> {
         let room = this.client.store.getRoom(roomId);
         if (!room) {
             if (!roomData.initial) {
@@ -385,7 +385,7 @@ export class SlidingSyncSdk {
             }
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
-        this.processRoomData(this.client, room, roomData);
+        await this.processRoomData(this.client, room!, roomData);
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
@@ -628,7 +628,7 @@ export class SlidingSyncSdk {
 
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
-            this.injectRoomEvents(room, inviteStateEvents);
+            await this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
                 this.client.store.storeRoom(room);
@@ -700,7 +700,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
+        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -747,12 +747,12 @@ export class SlidingSyncSdk {
      * @param numLive - the number of events in timelineEventList which just happened,
      * supplied from the server.
      */
-    public injectRoomEvents(
+    public async injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         numLive?: number,
-    ): void {
+    ): Promise<void> {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
         numLive = numLive || 0;
@@ -811,11 +811,11 @@ export class SlidingSyncSdk {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList, {
+        await room.addLiveEvents(timelineEventList, {
             fromCache: true,
         });
         if (liveTimelineEvents.length > 0) {
-            room.addLiveEvents(liveTimelineEvents, {
+            await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
             });
         }

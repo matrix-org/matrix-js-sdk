@@ -38,14 +38,19 @@ export enum ThreadEvent {
     Delete = "Thread.delete",
 }
 
-type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New> | RoomEvent.Timeline | RoomEvent.TimelineReset;
+export type ThreadEmittedEvents = Exclude<ThreadEvent, ThreadEvent.New> | RoomEvent.Timeline | RoomEvent.TimelineReset;
 
-export type EventHandlerMap = {
+export type ThreadEventHandlerMap = {
     [ThreadEvent.Update]: (thread: Thread) => void;
     [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
     [ThreadEvent.ViewThread]: () => void;
     [ThreadEvent.Delete]: (thread: Thread) => void;
 } & EventTimelineSetHandlerMap;
+
+/**
+ * @deprecated please use ThreadEventHandlerMap instead
+ */
+export type EventHandlerMap = ThreadEventHandlerMap;
 
 interface IThreadOpts {
     room: Room;
@@ -70,7 +75,7 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
     }
 }
 
-export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
+export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;
     public static hasServerSideFwdPaginationSupport = FeatureSupport.None;
@@ -83,7 +88,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private _currentUserParticipated = false;
 
-    private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
+    private reEmitter: TypedReEmitter<ThreadEmittedEvents, ThreadEventHandlerMap>;
 
     private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
@@ -203,10 +208,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     ): void => {
         // Add a synthesized receipt when paginating forward in the timeline
         if (!toStartOfTimeline) {
-            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+            const sender = event.getSender();
+            if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
+                room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+            }
         }
         this.onEcho(event, toStartOfTimeline ?? false);
     };
+
+    private shouldSendLocalEchoReceipt(sender: string, event: MatrixEvent): boolean {
+        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+        if (recursionSupport === ServerSupport.Unsupported) {
+            // Normally we add a local receipt, but if we don't have
+            // recursion support, then events may arrive out of order, so we
+            // only create a receipt if it's after our existing receipt.
+            const oldReceiptEventId = this.getReadReceiptForUserId(sender)?.eventId;
+            if (oldReceiptEventId) {
+                const receiptEvent = this.findEventById(oldReceiptEventId);
+                if (receiptEvent && receiptEvent.getTs() > event.getTs()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private onLocalEcho = (event: MatrixEvent): void => {
         this.onEcho(event, false);
@@ -254,6 +281,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (!eventId) {
             return;
         }
+        // If the event is already in this thread, bail out
         if (this.findEventById(eventId)) {
             return;
         }
@@ -496,24 +524,26 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
         if (recursionSupport === ServerSupport.Unsupported) {
             return Promise.all(
-                events
-                    .filter((e) => e.isEncrypted())
-                    .map((event: MatrixEvent) => {
-                        if (event.isRelation()) return; // skip - relations don't get edits
-                        return this.client
-                            .relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
+                events.filter(isAnEncryptedThreadMessage).map(async (event: MatrixEvent) => {
+                    try {
+                        const relations = await this.client.relations(
+                            this.roomId,
+                            event.getId()!,
+                            RelationType.Replace,
+                            event.getType(),
+                            {
                                 limit: 1,
-                            })
-                            .then((relations) => {
-                                if (relations.events.length) {
-                                    event.makeReplaced(relations.events[0]);
-                                    this.insertEventIntoTimeline(event);
-                                }
-                            })
-                            .catch((e) => {
-                                logger.error("Failed to load edits for encrypted thread event", e);
-                            });
-                    }),
+                            },
+                        );
+                        if (relations.events.length) {
+                            const editEvent = relations.events[0];
+                            event.makeReplaced(editEvent);
+                            this.insertEventIntoTimeline(editEvent);
+                        }
+                    } catch (e) {
+                        logger.error("Failed to load edits for encrypted thread event", e);
+                    }
+                }),
             );
         }
     }
@@ -681,6 +711,16 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public setUnread(type: NotificationCountType, count: number): void {
         return this.room.setThreadUnreadNotificationCount(this.id, type, count);
     }
+}
+
+/**
+ * Decide whether an event deserves to have its potential edits fetched.
+ *
+ * @returns true if this event is encrypted and is a message that is part of a
+ * thread - either inside it, or a root.
+ */
+function isAnEncryptedThreadMessage(event: MatrixEvent): boolean {
+    return event.isEncrypted() && (event.isRelation(THREAD_RELATION_TYPE.name) || event.isThreadRoot);
 }
 
 export const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(

@@ -16,7 +16,7 @@ limitations under the License.
 import { AudioConcealment, CodecMap, ConnectionStatsReport, FramerateMap, ResolutionMap, TrackID } from "./statsReport";
 import { MediaTrackStats, Resolution } from "./media/mediaTrackStats";
 
-export class StatsReportBuilder {
+export class ConnectionStatsReportBuilder {
     public static build(stats: Map<TrackID, MediaTrackStats>): ConnectionStatsReport {
         const report = {} as ConnectionStatsReport;
 
@@ -103,12 +103,12 @@ export class StatsReportBuilder {
         };
 
         report.packetLoss = {
-            total: StatsReportBuilder.calculatePacketLoss(
+            total: ConnectionStatsReportBuilder.calculatePacketLoss(
                 lostPackets.download + lostPackets.upload,
                 totalPackets.download + totalPackets.upload,
             ),
-            download: StatsReportBuilder.calculatePacketLoss(lostPackets.download, totalPackets.download),
-            upload: StatsReportBuilder.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
+            download: ConnectionStatsReportBuilder.calculatePacketLoss(lostPackets.download, totalPackets.download),
+            upload: ConnectionStatsReportBuilder.calculatePacketLoss(lostPackets.upload, totalPackets.upload),
         };
         report.audioConcealment = audioConcealment;
         report.totalAudioConcealment = {

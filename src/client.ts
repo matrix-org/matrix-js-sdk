@@ -463,11 +463,6 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
-
-    /**
-     * @experimental
-     */
-    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -493,6 +488,10 @@ export interface IThreadsCapability extends ICapability {}
 export interface IMSC3882GetLoginTokenCapability extends ICapability {}
 
 export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
+
+export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
+export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
+export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
 
 /**
  * A representation of the capabilities advertised by a homeserver as defined by
@@ -4594,10 +4593,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
+     * @param opts - Redact options
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
-     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     * @throws Error if called with `with_rel_types` (MSC3912) but the server does not support it.
      *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
@@ -4627,34 +4626,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+        const content: IContent = { reason };
 
-        if (
-            opts?.with_relations &&
-            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
-        ) {
-            throw new Error(
-                "Server does not support relation based redactions " +
-                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
-            );
+        if (opts?.with_rel_types !== undefined) {
+            if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
+                throw new Error(
+                    "Server does not support relation based redactions " +
+                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+                );
+            }
+
+            const withRelTypesPropName =
+                this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                    ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                    : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!;
+
+            content[withRelTypesPropName] = opts.with_rel_types;
         }
-
-        const withRelations = opts?.with_relations
-            ? {
-                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
-                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
-                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
-              }
-            : {};
 
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: {
-                    ...withRelations,
-                    reason,
-                },
+                content,
                 redacts: eventId,
             },
             txnId as string,
@@ -5573,11 +5568,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.currentState.setUnknownStateEvents(stateEvents);
                     }
 
-                    const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, threadedEvents, unknownRelations] =
+                        room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     room.oldState.paginationToken = res.end ?? null;
                     if (res.chunk.length === 0) {
@@ -5686,11 +5683,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
+        unknownRelations.forEach((event) => timelineSet.relations.aggregateChildEvent(event));
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -6230,7 +6228,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
@@ -6238,6 +6236,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     const atEnd = res.end === undefined || res.end === res.start;
 
@@ -7144,29 +7143,75 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user
+     * Gets a set of room IDs in common with another user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
+     *
      * @param userId - The userId to check.
-     * @returns Promise which resolves to a set of rooms
+     * @returns Promise which resolves to an array of rooms
      * @returns Rejects: with an error response.
      */
+    // TODO: on spec release, rename this to getMutualRooms
     // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
-        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
+        // Initial variant of the MSC
+        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport) {
-            throw Error("Server does not support mutual_rooms API");
-        }
+        // Newer variant that renamed shared rooms to mutual rooms
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        const path = utils.encodeUri(
-            `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
-            { $userId: userId },
+        // Latest variant that changed from path elements to query elements
+        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
+            UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
-        const res = await this.http.authedRequest<{ joined: string[] }>(Method.Get, path, undefined, undefined, {
-            prefix: ClientPrefix.Unstable,
-        });
-        return res.joined;
+        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
+            throw Error("Server does not support the Mutual Rooms API");
+        }
+
+        let path;
+        let query;
+
+        // Cascading unstable support switching.
+        if (queryMutualRoomsSupport) {
+            path = "/uk.half-shot.msc2666/user/mutual_rooms";
+            query = { user_id: userId };
+        } else {
+            path = utils.encodeUri(
+                `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
+                { $userId: userId },
+            );
+            query = {};
+        }
+
+        // Accumulated rooms
+        const rooms: string[] = [];
+        let token = null;
+
+        do {
+            const tokenQuery: Record<string, string> = {};
+            if (token != null && queryMutualRoomsSupport) {
+                tokenQuery["batch_token"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch_token?: string;
+            }>(Method.Get, path, { ...query, ...tokenQuery }, undefined, {
+                prefix: ClientPrefix.Unstable,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch_token !== undefined) {
+                token = res.next_batch_token;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
     }
 
     /**
@@ -7685,16 +7730,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects with an error response.
      */
     public refreshToken(refreshToken: string): Promise<IRefreshTokenResponse> {
-        return this.http.authedRequest(
-            Method.Post,
-            "/refresh",
-            undefined,
-            { refresh_token: refreshToken },
-            {
-                prefix: ClientPrefix.V1,
-                inhibitLogoutEmit: true, // we don't want to cause logout loops
-            },
-        );
+        const performRefreshRequestWithPrefix = (prefix: ClientPrefix): Promise<IRefreshTokenResponse> =>
+            this.http.authedRequest(
+                Method.Post,
+                "/refresh",
+                undefined,
+                { refresh_token: refreshToken },
+                {
+                    prefix,
+                    inhibitLogoutEmit: true, // we don't want to cause logout loops
+                },
+            );
+
+        // First try with the (specced) /v3/ prefix.
+        // However, before Synapse 1.72.0, Synapse incorrectly required a /v1/ prefix, so we fall
+        // back to that if the request fails, for backwards compatibility.
+        return performRefreshRequestWithPrefix(ClientPrefix.V3).catch((e) => {
+            if (e.errcode === "M_UNRECOGNIZED") {
+                return performRefreshRequestWithPrefix(ClientPrefix.V1);
+            }
+            throw e;
+        });
     }
 
     /**
@@ -9570,11 +9626,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * A helper to determine intentional mentions support
-     * @returns a boolean to determine if intentional mentions are enabled
+     * @returns a boolean to determine if intentional mentions are enabled on the server
      * @experimental
      */
     public supportsIntentionalMentions(): boolean {
-        return this.clientOpts?.intentionalMentions || false;
+        return this.canSupport.get(Feature.IntentionalMentions) !== ServerSupport.Unsupported;
     }
 
     /**

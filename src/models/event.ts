@@ -24,11 +24,17 @@ import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 import type { IEventDecryptionResult } from "../@types/crypto";
 import { logger } from "../logger";
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
+import {
+    EVENT_VISIBILITY_CHANGE_TYPE,
+    EventType,
+    MsgType,
+    RelationType,
+    UNSIGNED_THREAD_ID_FIELD,
+} from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
+import { Thread, ThreadEvent, ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
 import { IActionsObject } from "../pushprocessor";
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
@@ -63,6 +69,7 @@ export interface IUnsigned {
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
+    [UNSIGNED_THREAD_ID_FIELD.name]?: string;
 }
 
 export interface IThreadBundledRelationship {
@@ -572,9 +579,18 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
-        } else {
-            return this.getThread()?.id || this.threadId;
         }
+        if (this.thread) {
+            return this.thread.id;
+        }
+        if (this.threadId !== undefined) {
+            return this.threadId;
+        }
+        const unsigned = this.getUnsigned();
+        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+            return unsigned[UNSIGNED_THREAD_ID_FIELD.name];
+        }
+        return undefined;
     }
 
     /**
@@ -586,7 +602,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // Bundled relationships only returned when the sync response is limited
         // hence us having to check both bundled relation and inspect the thread
         // model
-        return !!threadDetails || this.getThread()?.id === this.getId();
+        return !!threadDetails || this.threadRootId === this.getId();
     }
 
     public get replyEventId(): string | undefined {

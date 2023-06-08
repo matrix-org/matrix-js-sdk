@@ -517,4 +517,47 @@ describe("InteractiveAuth", () => {
             expect(ia.getEmailSid()).toEqual(sid);
         });
     });
+
+    it("should prioritise shorter flows", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: [AuthType.Recaptcha, AuthType.Password] }, { stages: [AuthType.Password] }],
+                params: {},
+            },
+        });
+
+        // @ts-ignore
+        ia.chooseStage();
+        expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
+    });
+
+    it("should prioritise flows with entirely supported stages", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: ["com.devture.shared_secret_auth"] }, { stages: [AuthType.Password] }],
+                params: {},
+            },
+            supportedStages: [AuthType.Password],
+        });
+
+        // @ts-ignore
+        ia.chooseStage();
+        expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
+    });
 });
