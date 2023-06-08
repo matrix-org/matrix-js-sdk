@@ -63,8 +63,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
     /**
      * Mock the requests needed to set up cross signing
+     *
+     * Return `{}` for `GET _matrix/client/r0/user/:userId/account_data/:type` request
+     * Return `{}` for `POST _matrix/client/v3/keys/signatures/upload` request
+     * Return `{}` for `POST /_matrix/client/(unstable|v3)/keys/device_signing/upload` request
      */
-    function mockCrossSigningRequest() {
+    function mockSetupCrossSigningRequests(): void {
         // have account_data requests return an empty object
         fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
 
@@ -86,14 +90,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
      * Create cross-signing keys, publish the keys
      * Mock and bootstrap all the required steps
      *
-     * @return the IAuthDict - The parameters which are submitted as the `auth` dict in a UIA request
+     * @param authDict - The parameters which are submitted as the `auth` dict in a UIA request
      * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
      */
-    async function setupCrossSigning(): Promise<IAuthDict> {
-        mockCrossSigningRequest();
-
-        // provide a UIA callback, so that the cross-signing keys are uploaded
-        const authDict = { type: "test" };
+    async function mockCrossSigningRequests(authDict: IAuthDict): Promise<void> {
         const uiaCallback: UIAuthCallback<void> = async (makeRequest) => {
             await makeRequest(authDict);
         };
@@ -102,13 +102,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         await aliceClient.getCrypto()?.bootstrapCrossSigning({
             authUploadDeviceSigningKeys: uiaCallback,
         });
-
-        return authDict;
     }
 
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
         it("publishes keys if none were yet published", async () => {
-            const authDict = await setupCrossSigning();
+            mockSetupCrossSigningRequests();
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await mockCrossSigningRequests(authDict);
 
             // check the cross-signing keys upload
             expect(fetchMock.called("upload-keys")).toBeTruthy();
@@ -137,7 +139,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
     describe("getCrossSigningStatus()", () => {
         it("should return correct values without bootstrapping cross-signing", async () => {
-            mockCrossSigningRequest();
+            mockSetupCrossSigningRequests();
 
             const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
 
@@ -150,7 +152,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         });
 
         it("should return correct values after bootstrapping cross-signing", async () => {
-            await setupCrossSigning();
+            mockSetupCrossSigningRequests();
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await mockCrossSigningRequests(authDict);
 
             const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
 
