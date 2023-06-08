@@ -46,7 +46,7 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
 
     if (
         typeof authentication.issuer === "string" &&
-        (!authentication.account || typeof authentication.account === "string")
+        (!authentication.hasOwnProperty('account') || typeof authentication.account === "string")
     ) {
         return {
             issuer: authentication.issuer,
