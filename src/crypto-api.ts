@@ -271,7 +271,6 @@ export class DeviceVerificationStatus {
     }
 }
 
-<<<<<<< HEAD
 /**
  * Room key import progress report.
  */
@@ -292,6 +291,6 @@ export interface ImportRoomKeysOpts {
     untrusted?: boolean;
     source?: String; // TODO: Enum (backup, file, ??)
 }
-=======
+
 export * from "./crypto-api/verification";
->>>>>>> develop
+
