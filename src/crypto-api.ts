@@ -276,15 +276,15 @@ export * from "./crypto-api/verification";
  */
 export interface CrossSigningStatus {
     /**
-     * True if the public master, self signing and user signing keys are avaible on this device
+     * True if the public master, self signing and user signing keys are available on this device.
      */
     publicKeysOnDevice: boolean;
     /**
-     * True if the private keys are stored in the secret storage
+     * True if the private keys are stored in the secret storage.
      */
     privateKeysInSecretStorage: boolean;
     /**
-     * True if the private keys are stored locally
+     * True if the private keys are stored locally.
      */
     privateKeysCachedLocally: {
         masterKey: boolean;
