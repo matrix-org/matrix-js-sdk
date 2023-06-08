@@ -273,6 +273,17 @@ export class AutoDiscovery {
         return Promise.resolve(clientConfig);
     }
 
+    /**
+     * Validate delegated auth configuration
+     * - m.authentication config is present and valid
+     * - delegated auth issuer openid-configuration is reachable
+     * - delegated auth issuer openid-configuration is configured correctly for us
+     * When successful, DelegatedAuthConfig will be returned with endpoints used for delegated auth
+     * Any errors are caught, and AutoDiscoveryState returned with error
+     * @param wellKnown - configuration object as returned
+     * by the .well-known auto-discovery endpoint
+     * @returns Config or failure result
+     */
     public static async validateDiscoveryAuthenticationConfig(
         wellKnown: IClientWellKnown,
     ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {

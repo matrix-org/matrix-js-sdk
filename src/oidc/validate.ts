@@ -46,7 +46,7 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
 
     if (
         typeof authentication.issuer === "string" &&
-        (!authentication.hasOwnProperty('account') || typeof authentication.account === "string")
+        (!authentication.hasOwnProperty("account") || typeof authentication.account === "string")
     ) {
         return {
             issuer: authentication.issuer,
@@ -57,7 +57,6 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
     throw new Error(OidcDiscoveryError.Misconfigured);
 };
 
-// force into a record to make accessing properties easier
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
 const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {

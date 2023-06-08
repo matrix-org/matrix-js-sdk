@@ -52,7 +52,7 @@ describe("validateWellKnownAuthentication()", () => {
         };
         expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
     });
-    
+
     it("should throw misconfigured error when authentication account is false", () => {
         const wk = {
             ...baseWk,
