@@ -34,7 +34,7 @@ import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-a
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { SecretStorageKeyDescription, ServerSideSecretStorage } from "../secret-storage";
+import { isStoredInSecretStorage, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningKey } from "../crypto/api";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 
@@ -361,7 +361,7 @@ export class RustCrypto implements CryptoBackend {
             Boolean(userIdentity.masterKey) &&
             Boolean(userIdentity.selfSigningKey) &&
             Boolean(userIdentity.userSigningKey);
-        const privateKeysInSecretStorage = Boolean(await this.isStoredInSecretStorage(this.secretStorage));
+        const privateKeysInSecretStorage = Boolean(await isStoredInSecretStorage(this.secretStorage));
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
 
         return {
@@ -373,35 +373,6 @@ export class RustCrypto implements CryptoBackend {
                 selfSigningKey: crossSigningStatus.hasSelfSigning,
             },
         };
-    }
-
-    /**
-     * Check whether the private keys exist in secret storage.
-     * XXX: This could be static, be we often seem to have an instance when we
-     * want to know this anyway...
-     *
-     * @param secretStorage - The secret store using account data
-     * @returns map of key name to key info the secret is encrypted
-     *     with, or null if it is not present or not encrypted with a trusted
-     *     key
-     */
-    private async isStoredInSecretStorage(
-        secretStorage: ServerSideSecretStorage,
-    ): Promise<Record<string, object> | null> {
-        // check what SSSS keys have encrypted the master key (if any)
-        const stored = (await secretStorage.isStored("m.cross_signing.master")) || {};
-        // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s: Record<string, SecretStorageKeyDescription>): void {
-            for (const k of Object.keys(stored)) {
-                if (!s[k]) {
-                    delete stored[k];
-                }
-            }
-        }
-        for (const type of ["self_signing", "user_signing"]) {
-            intersect((await secretStorage.isStored(`m.cross_signing.${type}`)) || {});
-        }
-        return Object.keys(stored).length ? stored : null;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

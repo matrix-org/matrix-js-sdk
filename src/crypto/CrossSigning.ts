@@ -30,7 +30,7 @@ import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
+import { ServerSideSecretStorage, isStoredInSecretStorage } from "../secret-storage";
 import { DeviceVerificationStatus } from "../crypto-api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
@@ -166,20 +166,7 @@ export class CrossSigningInfo {
     public async isStoredInSecretStorage(
         secretStorage: ServerSideSecretStorage,
     ): Promise<Record<string, object> | null> {
-        // check what SSSS keys have encrypted the master key (if any)
-        const stored = (await secretStorage.isStored("m.cross_signing.master")) || {};
-        // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s: Record<string, SecretStorageKeyDescription>): void {
-            for (const k of Object.keys(stored)) {
-                if (!s[k]) {
-                    delete stored[k];
-                }
-            }
-        }
-        for (const type of ["self_signing", "user_signing"]) {
-            intersect((await secretStorage.isStored(`m.cross_signing.${type}`)) || {});
-        }
-        return Object.keys(stored).length ? stored : null;
+        return isStoredInSecretStorage(secretStorage);
     }
 
     /**
