@@ -287,7 +287,7 @@ export interface ImportRoomKeyProgressData {
  * Options object for {@link CryptoApi#importRoomKeys}.
  */
 export interface ImportRoomKeysOpts {
-    /** Reports ongoing progress of the import process, can be used for feedback. */
+    /** Reports ongoing progress of the import process. Can be used for feedback. */
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
     // TODO, the rust SDK will always such imported keys as untrusted
     untrusted?: boolean;
