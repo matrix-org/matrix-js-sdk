@@ -62,13 +62,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     });
 
     /**
-     * Create cross-signing keys, publish the keys
-     * Mock and bootstrap all the required steps
-     *
-     * @return the IAuthDict - The parameters which are submitted as the `auth` dict in a UIA request
-     * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
+     * Mock the requests needed to set up cross signing
      */
-    async function setupCrossSigning(): Promise<IAuthDict> {
+    function mockCrossSigningRequest() {
         // have account_data requests return an empty object
         fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
 
@@ -84,6 +80,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             },
             {},
         );
+    }
+
+    /**
+     * Create cross-signing keys, publish the keys
+     * Mock and bootstrap all the required steps
+     *
+     * @return the IAuthDict - The parameters which are submitted as the `auth` dict in a UIA request
+     * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
+     */
+    async function setupCrossSigning(): Promise<IAuthDict> {
+        mockCrossSigningRequest();
 
         // provide a UIA callback, so that the cross-signing keys are uploaded
         const authDict = { type: "test" };
@@ -129,6 +136,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     });
 
     describe("getCrossSigningStatus()", () => {
+        it("should return correct values without bootstrapping cross-signing", async () => {
+            mockCrossSigningRequest();
+
+            const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
+
+            // Expect the cross signing keys to be unavailable
+            expect(crossSigningStatus).toStrictEqual({
+                publicKeysOnDevice: false,
+                privateKeysInSecretStorage: false,
+                privateKeysCachedLocally: { masterKey: false, userSigningKey: false, selfSigningKey: false },
+            });
+        });
+
         it("should return correct values after bootstrapping cross-signing", async () => {
             await setupCrossSigning();
 
