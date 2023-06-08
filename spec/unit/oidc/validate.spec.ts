@@ -52,6 +52,17 @@ describe("validateWellKnownAuthentication()", () => {
         };
         expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
     });
+    
+    it("should throw misconfigured error when authentication account is false", () => {
+        const wk = {
+            ...baseWk,
+            [M_AUTHENTICATION.stable!]: {
+                issuer: "test.com",
+                account: false,
+            },
+        };
+        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
+    });
 
     it("should return valid config when wk uses stable m.authentication", () => {
         const wk = {
@@ -67,7 +78,7 @@ describe("validateWellKnownAuthentication()", () => {
         });
     });
 
-    it("should return valid config when m.authentication account is falsy", () => {
+    it("should return valid config when m.authentication account is missing", () => {
         const wk = {
             ...baseWk,
             [M_AUTHENTICATION.stable!]: {
