@@ -34,9 +34,10 @@ import { BootstrapCrossSigningOpts, CrossSigningStatus, DeviceVerificationStatus
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { isStoredInSecretStorage, ServerSideSecretStorage } from "../secret-storage";
+import { ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningKey } from "../crypto/api";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
+import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -361,7 +362,7 @@ export class RustCrypto implements CryptoBackend {
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
-        const privateKeysInSecretStorage = Boolean(await isStoredInSecretStorage(this.secretStorage));
+        const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
             await this.olmMachine.crossSigningStatus();
 
