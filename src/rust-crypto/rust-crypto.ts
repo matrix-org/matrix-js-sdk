@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import type { ICrossSigningStatus, IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
@@ -30,7 +30,7 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningStatus, DeviceVerificationStatus } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
@@ -353,11 +353,11 @@ export class RustCrypto implements CryptoBackend {
     /**
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
-    public async getCrossSigningStatus(): Promise<ICrossSigningStatus> {
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
         const userIdentity: RustSdkCryptoJs.OwnUserIdentity = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
-        const publicKeyOnDevice =
+        const publicKeysOnDevice =
             Boolean(userIdentity.masterKey) &&
             Boolean(userIdentity.selfSigningKey) &&
             Boolean(userIdentity.userSigningKey);
@@ -365,7 +365,7 @@ export class RustCrypto implements CryptoBackend {
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
 
         return {
-            publicKeyOnDevice,
+            publicKeysOnDevice,
             privateKeysInSecretStorage,
             privateKeysCachedLocally: {
                 masterKey: crossSigningStatus.hasMaster,
