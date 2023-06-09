@@ -119,7 +119,7 @@ describe("validateWellKnownAuthentication()", () => {
 });
 
 describe("validateOIDCIssuerWellKnown", () => {
-    const validWk = {
+    const validWk: any = {
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
         registration_endpoint: "https://authorize.org/regsiter",
@@ -163,13 +163,22 @@ describe("validateOIDCIssuerWellKnown", () => {
         });
     });
 
+    it("should return validated issuer config without registrationendpoint", () => {
+        const wk = { ...validWk };
+        delete wk.registration_endpoint;
+        expect(validateOIDCIssuerWellKnown(wk)).toEqual({
+            authorizationEndpoint: validWk.authorization_endpoint,
+            tokenEndpoint: validWk.token_endpoint,
+            registrationEndpoint: undefined,
+        });
+    });
+
     type TestCase = [string, any];
     it.each<TestCase>([
         ["authorization_endpoint", undefined],
         ["authorization_endpoint", { not: "a string" }],
         ["token_endpoint", undefined],
         ["token_endpoint", { not: "a string" }],
-        ["registration_endpoint", undefined],
         ["registration_endpoint", { not: "a string" }],
         ["response_types_supported", undefined],
         ["response_types_supported", "not an array"],

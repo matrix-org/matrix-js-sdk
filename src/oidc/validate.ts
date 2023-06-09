@@ -27,7 +27,7 @@ export enum OidcDiscoveryError {
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;
-    registrationEndpoint: string;
+    registrationEndpoint?: string;
 };
 
 /**
@@ -60,7 +60,14 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
 const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
-    if (!wellKnown[key] || typeof wellKnown[key] !== "string") {
+    if (!wellKnown[key] || !optionalStringProperty(wellKnown, key)) {
+        logger.error(`OIDC issuer configuration: ${key} is invalid`);
+        return false;
+    }
+    return true;
+};
+const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
+    if (!!wellKnown[key] && typeof wellKnown[key] !== "string") {
         logger.error(`OIDC issuer configuration: ${key} is invalid`);
         return false;
     }
@@ -92,7 +99,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     const isInvalid = [
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
-        requiredStringProperty(wellKnown, "registration_endpoint"),
+        optionalStringProperty(wellKnown, "registration_endpoint"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
         requiredArrayValue(wellKnown, "code_challenge_methods_supported", "S256"),
