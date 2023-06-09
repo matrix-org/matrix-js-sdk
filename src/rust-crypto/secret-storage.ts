@@ -17,16 +17,16 @@ limitations under the License.
 import { ServerSideSecretStorage } from "../secret-storage";
 
 /**
- * Check that the private cross signing keys (master, self signing, user signing) are stored into the secret storage and encrypted with the secret storage key.
+ * Check that the private cross signing keys (master, self signing, user signing) are stored in the secret storage and encrypted with the same secret storage key.
  *
  * @param secretStorage - The secret store using account data
- * @returns True if one of the secret storage master keys is shared with the secret storage user signing and self signing keys.
+ * @returns True if the cross-signing keys are all stored and encrypted with the same secret storage key.
  */
 export async function secretStorageContainsCrossSigningKeys(secretStorage: ServerSideSecretStorage): Promise<boolean> {
-    // Get the secret storage keys stored into the secret storage
+    // Check if the master cross-signing key is stored in secret storage
     const secretStorageMasterKeys = await secretStorage.isStored("m.cross_signing.master");
 
-    // Not stored keys
+    // Master key not stored
     if (!secretStorageMasterKeys) return false;
 
     // Get the user signing keys stored into the secret storage
@@ -34,7 +34,7 @@ export async function secretStorageContainsCrossSigningKeys(secretStorage: Serve
     // Get the self signing keys stored into the secret storage
     const secretStorageSelfSigningKeys = (await secretStorage.isStored(`m.cross_signing.self_signing`)) || {};
 
-    // Check that one of the secret storage master keys is shared with the secret storage user signing and self signing keys
+    // Check that one of the secret storage keys used to encrypt the master key was also used to encrypt the user-signing and self-signing keys
     return Object.keys(secretStorageMasterKeys).some(
         (secretStorageKey) =>
             secretStorageUserSigningKeys[secretStorageKey] && secretStorageSelfSigningKeys[secretStorageKey],

@@ -19,7 +19,7 @@ import { ServerSideSecretStorage } from "../../../src/secret-storage";
 
 describe("secret-storage", () => {
     describe("secretStorageContainsCrossSigningKeys", () => {
-        it("should return false when there is no secret storage master key", async () => {
+        it("should return false when the master cross-signing key is not stored in secret storage", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockReturnValue(false),
             } as unknown as ServerSideSecretStorage;
@@ -41,7 +41,7 @@ describe("secret-storage", () => {
             expect(result).toBeFalsy();
         });
 
-        it("should return false when the secret storage master key is only shared by user signing the secret storage", async () => {
+        it("should return false when the secret storage key for the master key is only shared by the user-signing key", async () => {
             const secretStorage = {
                 isStored: (type: string) => {
                     // Return different storage keys
