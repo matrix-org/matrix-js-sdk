@@ -1641,7 +1641,7 @@ describe("MatrixClient event timelines", function () {
                 });
                 THREAD_REPLY_REACTION.localTimestamp += 1000;
 
-                // Test data for the first thread, with the second reply
+                // Modified thread root event containing latest thread reply in its unsigned
                 const THREAD_ROOT_UPDATED = {
                     ...THREAD_ROOT,
                     unsigned: {
@@ -1673,7 +1673,7 @@ describe("MatrixClient event timelines", function () {
                 await client.stopClient(); // we don't need the client to be syncing at this time
                 const room = client.getRoom(roomId)!;
 
-                // Setup room threads
+                // Set up room threads
                 const timelineSets = await room!.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads(threadsResponse);
