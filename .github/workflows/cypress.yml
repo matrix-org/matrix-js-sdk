@@ -22,8 +22,10 @@ jobs:
             statuses: write
             pull-requests: read
         secrets:
-            # secrets are not automatically shared with called workflows, so share the cypress dashboard key
+            # secrets are not automatically shared with called workflows, so share the cypress dashboard key, and the Kiwi login details
             CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+            TCMS_USERNAME: ${{ secrets.TCMS_USERNAME }}
+            TCMS_PASSWORD: ${{ secrets.TCMS_PASSWORD }}
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
             rust-crypto: true
