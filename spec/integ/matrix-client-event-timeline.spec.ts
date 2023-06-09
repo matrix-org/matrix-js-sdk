@@ -1585,7 +1585,7 @@ describe("MatrixClient event timelines", function () {
                 ]);
             });
 
-            it("should handle not reorder the thread list on other thread updates", async () => {
+            it("should not reorder the thread list on other thread updates", async () => {
                 // Test data for a second thread
                 const THREAD2_ROOT = utils.mkEvent({
                     room: roomId,
