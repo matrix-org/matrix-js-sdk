@@ -298,11 +298,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
      * @param queryParams - A dict of query params (these will NOT be urlencoded).
      * @param prefix - The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
-     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
+     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org", defaulting to this.opts.baseUrl.
      * @returns URL
      */
     public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
-        const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
+        const baseUrlWithFallback = baseUrl ?? this.opts.baseUrl;
+        const baseUrlWithoutTrailingSlash = baseUrlWithFallback.endsWith("/")
+            ? baseUrlWithFallback.slice(0, -1)
+            : baseUrlWithFallback;
+        const url = new URL(baseUrlWithoutTrailingSlash + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
             encodeParams(queryParams, url.searchParams);
         }
