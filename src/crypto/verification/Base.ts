@@ -32,6 +32,7 @@ import { TypedEventEmitter } from "../../models/typed-event-emitter";
 import {
     ShowQrCodeCallbacks,
     ShowSasCallbacks,
+    Verifier,
     VerifierEvent,
     VerifierEventHandlerMap,
 } from "../../crypto-api/verification";
@@ -56,14 +57,18 @@ export type VerificationEventHandlerMap = {
     [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
 // The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
 // backwards compatibility with applications that reference the class.
 export class VerificationBase<
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Events extends string = VerifierEvent,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Arguments = VerifierEventHandlerMap,
-> extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        Events extends string = VerifierEvent,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        Arguments = VerifierEventHandlerMap,
+    >
+    extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap>
+    implements Verifier
+{
     private cancelled = false;
     private _done = false;
     private promise: Promise<void> | null = null;

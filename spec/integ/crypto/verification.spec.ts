@@ -18,9 +18,8 @@ import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
 
 import { createClient, MatrixClient } from "../../../src";
-import { ShowQrCodeCallbacks, ShowSasCallbacks, VerifierEvent } from "../../../src/crypto-api/verification";
+import { ShowQrCodeCallbacks, ShowSasCallbacks, Verifier, VerifierEvent } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { VerificationBase } from "../../../src/crypto/verification/Base";
 import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
@@ -170,7 +169,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         expect(request.chosenMethod).toEqual("m.sas.v1");
 
         // there should now be a verifier
-        const verifier: VerificationBase = request.verifier!;
+        const verifier: Verifier = request.verifier!;
         expect(verifier).toBeDefined();
         expect(verifier.getShowSasCallbacks()).toBeNull();
 
@@ -325,7 +324,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.chosenMethod).toEqual("m.reciprocate.v1");
 
             // there should now be a verifier
-            const verifier: VerificationBase = request.verifier!;
+            const verifier: Verifier = request.verifier!;
             expect(verifier).toBeDefined();
             expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
