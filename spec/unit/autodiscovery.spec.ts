@@ -18,6 +18,7 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import { AutoDiscovery } from "../../src/autodiscovery";
+import { OidcDiscoveryError } from "../../src/oidc/validate";
 
 describe("AutoDiscovery", function () {
     const getHttpBackend = (): MockHttpBackend => {
@@ -368,7 +369,7 @@ describe("AutoDiscovery", function () {
         },
     );
 
-    it("should return SUCCESS when .well-known has a verifiably accurate base_url for " + "m.homeserver", function () {
+    it("should return SUCCESS when .well-known has a verifiably accurate base_url for m.homeserver", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -396,6 +397,10 @@ describe("AutoDiscovery", function () {
                         state: "PROMPT",
                         error: null,
                         base_url: null,
+                    },
+                    "m.authentication": {
+                        state: "IGNORE",
+                        error: OidcDiscoveryError.NotSupported,
                     },
                 };
 
@@ -433,6 +438,54 @@ describe("AutoDiscovery", function () {
                         state: "PROMPT",
                         error: null,
                         base_url: null,
+                    },
+                    "m.authentication": {
+                        state: "IGNORE",
+                        error: OidcDiscoveryError.NotSupported,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return SUCCESS with authentication error when authentication config is invalid", function () {
+        const httpBackend = getHttpBackend();
+        httpBackend
+            .when("GET", "/_matrix/client/versions")
+            .check((req) => {
+                expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
+            })
+            .respond(200, {
+                versions: ["r0.0.1"],
+            });
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                // Note: we also expect this test to trim the trailing slash
+                base_url: "https://chat.example.org/",
+            },
+            "m.authentication": {
+                invalid: true,
+            },
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "SUCCESS",
+                        error: null,
+                        base_url: "https://chat.example.org",
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                    "m.authentication": {
+                        state: "FAIL_ERROR",
+                        error: OidcDiscoveryError.Misconfigured,
                     },
                 };
 
@@ -625,7 +678,7 @@ describe("AutoDiscovery", function () {
         },
     );
 
-    it("should return SUCCESS when the identity server configuration is " + "verifiably accurate", function () {
+    it("should return SUCCESS when the identity server configuration is verifiably accurate", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -664,6 +717,10 @@ describe("AutoDiscovery", function () {
                         error: null,
                         base_url: "https://identity.example.org",
                     },
+                    "m.authentication": {
+                        state: "IGNORE",
+                        error: OidcDiscoveryError.NotSupported,
+                    },
                 };
 
                 expect(conf).toEqual(expected);
@@ -671,7 +728,7 @@ describe("AutoDiscovery", function () {
         ]);
     });
 
-    it("should return SUCCESS and preserve non-standard keys from the " + ".well-known response", function () {
+    it("should return SUCCESS and preserve non-standard keys from the .well-known response", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -715,6 +772,10 @@ describe("AutoDiscovery", function () {
                     },
                     "org.example.custom.property": {
                         cupcakes: "yes",
+                    },
+                    "m.authentication": {
+                        state: "IGNORE",
+                        error: OidcDiscoveryError.NotSupported,
                     },
                 };
 
