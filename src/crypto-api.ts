@@ -19,6 +19,13 @@ import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 
+/** Types of cross-signing key */
+export enum CrossSigningKey {
+    Master = "master",
+    SelfSigning = "self_signing",
+    UserSigning = "user_signing",
+}
+
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
@@ -107,7 +114,7 @@ export interface CryptoApi {
     /**
      * Return whether we trust other user's signatures of their devices.
      *
-     * @see {@link CryptoApi#setTrustCrossSignedDevices}
+     * @see {@link Crypto.CryptoApi#setTrustCrossSignedDevices}
      *
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
@@ -119,7 +126,8 @@ export interface CryptoApi {
      * @param userId - The ID of the user whose device is to be checked.
      * @param deviceId - The ID of the device to check
      *
-     * @returns Verification status of the device, or `null` if the device is not known
+     * @returns `null` if the device is unknown, or has not published any encryption keys (implying it does not support
+     *     encryption); otherwise the verification status of the device.
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
 
@@ -136,6 +144,16 @@ export interface CryptoApi {
      * @returns True if cross-signing is ready to be used on this device
      */
     isCrossSigningReady(): Promise<boolean>;
+
+    /**
+     * Get the ID of one of the user's cross-signing keys.
+     *
+     * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
+     *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
+     *
+     * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
+     */
+    getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.
@@ -167,6 +185,13 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Get the status of our cross-signing keys.
+     *
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     */
+    getCrossSigningStatus(): Promise<CrossSigningStatus>;
 }
 
 /**
@@ -235,11 +260,35 @@ export class DeviceVerificationStatus {
      * A device is "verified" if either:
      *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
-     *    cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
+     *    cross-signed devices via {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
      *
      * @returns true if this device is verified via any means.
      */
     public isVerified(): boolean {
         return this.localVerified || (this.trustCrossSignedDevices && this.crossSigningVerified);
     }
+}
+
+export * from "./crypto-api/verification";
+
+/**
+ * The result of a call to {@link CryptoApi.getCrossSigningStatus}.
+ */
+export interface CrossSigningStatus {
+    /**
+     * True if the public master, self signing and user signing keys are available on this device.
+     */
+    publicKeysOnDevice: boolean;
+    /**
+     * True if the private keys are stored in the secret storage.
+     */
+    privateKeysInSecretStorage: boolean;
+    /**
+     * True if the private keys are stored locally.
+     */
+    privateKeysCachedLocally: {
+        masterKey: boolean;
+        selfSigningKey: boolean;
+        userSigningKey: boolean;
+    };
 }

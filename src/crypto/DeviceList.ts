@@ -116,7 +116,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     public async load(): Promise<void> {
         await this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
             this.cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
-                this.hasFetched = Boolean(deviceData && deviceData.devices);
+                this.hasFetched = Boolean(deviceData?.devices);
                 this.devices = deviceData ? deviceData.devices : {};
                 this.crossSigningInfo = deviceData ? deviceData.crossSigningInfo || {} : {};
                 this.deviceTrackingStatus = deviceData ? deviceData.trackingStatus : {};

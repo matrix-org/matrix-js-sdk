@@ -688,7 +688,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
             _expectedPublicKey: string,
         ): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
-                return store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                     store.getSecretStorePrivateKey(txn, resolve, type);
                 });
             });
@@ -790,7 +790,7 @@ export async function requestKeysDuringVerification(
         })();
 
         // We call getCrossSigningKey() for its side-effects
-        return Promise.race<KeysDuringVerification | void>([
+        Promise.race<KeysDuringVerification | void>([
             Promise.all([
                 crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),

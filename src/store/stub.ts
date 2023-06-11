@@ -266,4 +266,8 @@ export class StubStore implements IStore {
     public async removeToDeviceBatch(id: number): Promise<void> {
         return Promise.resolve();
     }
+
+    public async destroy(): Promise<void> {
+        // Nothing to do
+    }
 }

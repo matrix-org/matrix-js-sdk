@@ -399,9 +399,9 @@ export class SyncAccumulator {
 
             const acc = currentData._summary;
             const sum = data.summary;
-            acc[HEROES_KEY] = sum[HEROES_KEY] || acc[HEROES_KEY];
-            acc[JOINED_COUNT_KEY] = sum[JOINED_COUNT_KEY] || acc[JOINED_COUNT_KEY];
-            acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] || acc[INVITED_COUNT_KEY];
+            acc[HEROES_KEY] = sum[HEROES_KEY] ?? acc[HEROES_KEY];
+            acc[JOINED_COUNT_KEY] = sum[JOINED_COUNT_KEY] ?? acc[JOINED_COUNT_KEY];
+            acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] ?? acc[INVITED_COUNT_KEY];
         }
 
         // We purposefully do not persist m.typing events.

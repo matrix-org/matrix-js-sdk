@@ -30,11 +30,14 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningStatus, DeviceVerificationStatus } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { ServerSideSecretStorage } from "../secret-storage";
+import { CrossSigningKey } from "../crypto/api";
+import { CrossSigningIdentity } from "./CrossSigningIdentity";
+import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -55,6 +58,7 @@ export class RustCrypto implements CryptoBackend {
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
+    private crossSigningIdentity: CrossSigningIdentity;
 
     public constructor(
         /** The `OlmMachine` from the underlying rust crypto sdk. */
@@ -68,17 +72,18 @@ export class RustCrypto implements CryptoBackend {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
 
         /** The local user's User ID. */
-        _userId: string,
+        private readonly userId: string,
 
         /** The local user's Device ID. */
         _deviceId: string,
 
         /** Interface to server-side secret storage */
-        _secretStorage: ServerSideSecretStorage,
+        private readonly secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -325,10 +330,18 @@ export class RustCrypto implements CryptoBackend {
     }
 
     /**
+     * Implementation of {@link CryptoApi#getCrossSigningKeyId}
+     */
+    public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
+        // TODO
+        return null;
+    }
+
+    /**
      * Implementation of {@link CryptoApi#boostrapCrossSigning}
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
-        logger.log("Cross-signing ready");
+        await this.crossSigningIdentity.bootstrapCrossSigning(opts);
     }
 
     /**
@@ -336,6 +349,32 @@ export class RustCrypto implements CryptoBackend {
      */
     public async isSecretStorageReady(): Promise<boolean> {
         return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        const publicKeysOnDevice =
+            Boolean(userIdentity?.masterKey) &&
+            Boolean(userIdentity?.selfSigningKey) &&
+            Boolean(userIdentity?.userSigningKey);
+        const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
+            await this.olmMachine.crossSigningStatus();
+
+        return {
+            publicKeysOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey: Boolean(crossSigningStatus?.hasMaster),
+                userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
+                selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
+            },
+        };
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

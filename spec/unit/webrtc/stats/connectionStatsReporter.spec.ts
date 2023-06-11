@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { ConnectionStatsReporter } from "../../../../src/webrtc/stats/connectionStatsReporter";
+import { ConnectionStatsBuilder } from "../../../../src/webrtc/stats/connectionStatsBuilder";
 
 describe("ConnectionStatsReporter", () => {
     describe("should on bandwidth stats", () => {
@@ -22,11 +22,11 @@ describe("ConnectionStatsReporter", () => {
                 availableIncomingBitrate: 1000,
                 availableOutgoingBitrate: 2000,
             } as RTCIceCandidatePairStats;
-            expect(ConnectionStatsReporter.buildBandwidthReport(stats)).toEqual({ download: 1, upload: 2 });
+            expect(ConnectionStatsBuilder.buildBandwidthReport(stats)).toEqual({ download: 1, upload: 2 });
         });
         it("build empty bandwidth report if chromium starts attributes not available", () => {
             const stats = {} as RTCIceCandidatePairStats;
-            expect(ConnectionStatsReporter.buildBandwidthReport(stats)).toEqual({ download: 0, upload: 0 });
+            expect(ConnectionStatsBuilder.buildBandwidthReport(stats)).toEqual({ download: 0, upload: 0 });
         });
     });
 
@@ -36,11 +36,11 @@ describe("ConnectionStatsReporter", () => {
                 availableIncomingBitrate: 1000,
                 availableOutgoingBitrate: 2000,
             } as RTCIceCandidatePairStats;
-            expect(ConnectionStatsReporter.buildBandwidthReport(stats)).toEqual({ download: 1, upload: 2 });
+            expect(ConnectionStatsBuilder.buildBandwidthReport(stats)).toEqual({ download: 1, upload: 2 });
         });
         it("build empty bandwidth report if chromium starts attributes not available", () => {
             const stats = {} as RTCIceCandidatePairStats;
-            expect(ConnectionStatsReporter.buildBandwidthReport(stats)).toEqual({ download: 0, upload: 0 });
+            expect(ConnectionStatsBuilder.buildBandwidthReport(stats)).toEqual({ download: 0, upload: 0 });
         });
     });
 });

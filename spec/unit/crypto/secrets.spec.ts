@@ -148,22 +148,14 @@ describe("Secrets", function () {
     it("should throw if given a key that doesn't exist", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar", ["this secret does not exist"]);
-            // should be able to use expect(...).toThrow() but mocha still fails
-            // the test even when it throws for reasons I have no inclination to debug
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar", ["this secret does not exist"])).rejects.toBeTruthy();
         alice.stopClient();
     });
 
     it("should refuse to encrypt with zero keys", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar", []);
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar", [])).rejects.toBeTruthy();
         alice.stopClient();
     });
 
@@ -214,10 +206,7 @@ describe("Secrets", function () {
     it("should refuse to encrypt if no keys given and no default key", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar");
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar")).rejects.toBeTruthy();
         alice.stopClient();
     });
 

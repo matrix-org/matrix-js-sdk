@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import * as utils from "../utils";
+import { checkObjectHasKeys, encodeParams } from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { ConnectionError, MatrixError } from "./errors";
@@ -45,7 +45,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
         public readonly opts: O,
     ) {
-        utils.checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
+        checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
     }
@@ -298,13 +298,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
      * @param queryParams - A dict of query params (these will NOT be urlencoded).
      * @param prefix - The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
-     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
+     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org", defaulting to this.opts.baseUrl.
      * @returns URL
      */
     public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
-        const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
+        const baseUrlWithFallback = baseUrl ?? this.opts.baseUrl;
+        const baseUrlWithoutTrailingSlash = baseUrlWithFallback.endsWith("/")
+            ? baseUrlWithFallback.slice(0, -1)
+            : baseUrlWithFallback;
+        const url = new URL(baseUrlWithoutTrailingSlash + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
-            utils.encodeParams(queryParams, url.searchParams);
+            encodeParams(queryParams, url.searchParams);
         }
         return url;
     }

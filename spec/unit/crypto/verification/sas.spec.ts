@@ -144,7 +144,7 @@ describe("SAS verification", function () {
                                 expect(e.sas).toEqual(aliceSasEvent.sas);
                                 e.confirm();
                                 aliceSasEvent.confirm();
-                            } catch (error) {
+                            } catch {
                                 e.mismatch();
                                 aliceSasEvent.mismatch();
                             }
@@ -169,7 +169,7 @@ describe("SAS verification", function () {
                         expect(e.sas).toEqual(bobSasEvent.sas);
                         e.confirm();
                         bobSasEvent.confirm();
-                    } catch (error) {
+                    } catch {
                         e.mismatch();
                         bobSasEvent.mismatch();
                     }
@@ -519,7 +519,7 @@ describe("SAS verification", function () {
                                 expect(e.sas).toEqual(aliceSasEvent.sas);
                                 e.confirm();
                                 aliceSasEvent.confirm();
-                            } catch (error) {
+                            } catch {
                                 e.mismatch();
                                 aliceSasEvent.mismatch();
                             }
@@ -543,7 +543,7 @@ describe("SAS verification", function () {
                         expect(e.sas).toEqual(bobSasEvent.sas);
                         e.confirm();
                         bobSasEvent.confirm();
-                    } catch (error) {
+                    } catch {
                         e.mismatch();
                         bobSasEvent.mismatch();
                     }

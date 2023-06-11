@@ -23,11 +23,19 @@ const config: Config = {
     collectCoverageFrom: ["<rootDir>/src/**/*.{js,ts}"],
     coverageReporters: ["text-summary", "lcov"],
     testResultsProcessor: "@casualbot/jest-sonar-reporter",
+
+    // Always print out a summary if there are any failing tests. Normally
+    // a summary is only printed if there are more than 20 test *suites*.
+    reporters: [["default", { summaryThreshold: 0 }]],
 };
 
 // if we're running under GHA, enable the GHA reporter
 if (env["GITHUB_ACTIONS"] !== undefined) {
-    const reporters: Config["reporters"] = [["github-actions", { silent: false }], "summary"];
+    const reporters: Config["reporters"] = [
+        ["github-actions", { silent: false }],
+        // as above: always show a summary if there were any failing tests.
+        ["summary", { summaryThreshold: 0 }],
+    ];
 
     // if we're running against the develop branch, also enable the slow test reporter
     if (env["GITHUB_REF"] == "refs/heads/develop") {

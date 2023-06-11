@@ -19,6 +19,7 @@ import { IKeyBackupInfo } from "./keybackup";
 import type { AddSecretStorageKeyOpts } from "../secret-storage";
 
 /* re-exports for backwards compatibility. */
+export { CrossSigningKey } from "../crypto-api";
 export type {
     AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
@@ -26,12 +27,6 @@ export type {
 } from "../secret-storage";
 
 // TODO: Merge this with crypto.js once converted
-
-export enum CrossSigningKey {
-    Master = "master",
-    SelfSigning = "self_signing",
-    UserSigning = "user_signing",
-}
 
 export interface IEncryptedEventInfo {
     /**
