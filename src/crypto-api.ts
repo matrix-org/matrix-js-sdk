@@ -185,6 +185,13 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Get the status of our cross-signing keys.
+     *
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     */
+    getCrossSigningStatus(): Promise<CrossSigningStatus>;
 }
 
 /**
@@ -263,3 +270,25 @@ export class DeviceVerificationStatus {
 }
 
 export * from "./crypto-api/verification";
+
+/**
+ * The result of a call to {@link CryptoApi.getCrossSigningStatus}.
+ */
+export interface CrossSigningStatus {
+    /**
+     * True if the public master, self signing and user signing keys are available on this device.
+     */
+    publicKeysOnDevice: boolean;
+    /**
+     * True if the private keys are stored in the secret storage.
+     */
+    privateKeysInSecretStorage: boolean;
+    /**
+     * True if the private keys are stored locally.
+     */
+    privateKeysCachedLocally: {
+        masterKey: boolean;
+        selfSigningKey: boolean;
+        userSigningKey: boolean;
+    };
+}

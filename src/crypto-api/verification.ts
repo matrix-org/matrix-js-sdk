@@ -15,8 +15,67 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../models/event";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
-/** Events emitted by `Verifier`. */
+/**
+ * A `Verifier` is responsible for performing the verification using a particular method, such as via QR code or SAS
+ * (emojis).
+ *
+ * A verifier object can be created by calling `VerificationRequest.beginVerification`; one is also created
+ * automatically when a `m.key.verification.start` event is received for an existing VerificationRequest.
+ *
+ * Once a verifier object is created, the verification can be started by calling the {@link Verifier#verify} method.
+ */
+export interface Verifier extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> {
+    /**
+     * Returns true if the verification has been cancelled, either by us or the other side.
+     */
+    get hasBeenCancelled(): boolean;
+
+    /**
+     * The ID of the other user in the verification process.
+     */
+    get userId(): string;
+
+    /**
+     * Start the key verification, if it has not already been started.
+     *
+     * This means sending a `m.key.verification.start` if we are the first responder, or a `m.key.verification.accept`
+     * if the other side has already sent a start event.
+     *
+     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
+     *    or times out.
+     */
+    verify(): Promise<void>;
+
+    /**
+     * Cancel a verification.
+     *
+     * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
+     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
+     *
+     * @param e - the reason for the cancellation.
+     */
+    cancel(e: Error): void;
+
+    /**
+     * Get the details for an SAS verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
+     * the SAS matches.
+     */
+    getShowSasCallbacks(): ShowSasCallbacks | null;
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null;
+}
+
+/** Events emitted by {@link Verifier} */
 export enum VerifierEvent {
     /**
      * The verification has been cancelled, by us or the other side.
@@ -29,7 +88,7 @@ export enum VerifierEvent {
     /**
      * SAS data has been exchanged and should be displayed to the user.
      *
-     * The payload is the {@link ShowQrCodeCallbacks} object.
+     * The payload is the {@link ShowSasCallbacks} object.
      */
     ShowSas = "show_sas",
 
