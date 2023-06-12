@@ -168,4 +168,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             });
         });
     });
+
+    describe("isCrossSigningReady()", () => {
+        it("should return false if cross-signing is not bootstrapped", async () => {
+            mockSetupCrossSigningRequests();
+
+            const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
+
+            expect(isCrossSigningReady).toBeFalsy();
+        });
+
+        it("should return true after bootstrapping cross-signing", async () => {
+            mockSetupCrossSigningRequests();
+            await bootstrapCrossSigning({ type: "test" });
+
+            const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
+
+            expect(isCrossSigningReady).toBeTruthy();
+        });
+    });
 });

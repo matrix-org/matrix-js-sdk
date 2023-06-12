@@ -326,7 +326,15 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
-        return false;
+        const { publicKeysOnDevice, privateKeysInSecretStorage, privateKeysCachedLocally } =
+            await this.getCrossSigningStatus();
+        const hasKeysInCache =
+            Boolean(privateKeysCachedLocally.masterKey) &&
+            Boolean(privateKeysCachedLocally.selfSigningKey) &&
+            Boolean(privateKeysCachedLocally.userSigningKey);
+
+        // The cross signing is ready if the public and private keys are available
+        return publicKeysOnDevice && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
