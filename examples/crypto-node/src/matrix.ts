@@ -132,13 +132,18 @@ export const verifyRoom = async (client: MatrixClient, room: Room): Promise<void
 	const members = await room.getEncryptionTargetMembers();
 	const verificationPromises: Promise<void>[] = [];
 
-	for (const member of members) {
-		const devices = client.getStoredDevicesForUser(member.userId);
+	const crypto = client.getCrypto();
 
-		for (const device of devices) {
+	if (crypto == null) {
+		return;
+	}
 
-			if (device.isUnverified()) {
-				verificationPromises.push( verifyDevice(client, member.userId, device.deviceId) );
+	const deviceMap = await crypto.getUserDeviceInfo(members.map(m => m.userId));
+
+	for (const [member, devices] of deviceMap.entries()) {
+		for (const device of devices.values()) {
+			if (!device.verified) {
+				verificationPromises.push( verifyDevice(client, member, device.deviceId) );
 			}
 		}
 	}
