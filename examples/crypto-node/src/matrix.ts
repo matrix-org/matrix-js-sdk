@@ -3,8 +3,18 @@
  * sdk.
  */
 
+ import { LocalStorage } from 'node-localstorage';
+ import { LocalStorageCryptoStore } from "../node_modules/matrix-js-sdk/lib/crypto/store/localStorage-crypto-store.js";
+ import { MemoryStore } from "../node_modules/matrix-js-sdk/lib/store/memory.js";
+
+
 import sdk from "./matrix-importer.js";
 import type { ICreateClientOpts, MatrixClient, Room } from "matrix-js-sdk";
+
+// Setup the local stores.
+const localStorage = new LocalStorage("./localstorage");
+const cryptoStore = new LocalStorageCryptoStore(localStorage);
+const store = new MemoryStore({ localStorage });
 
 /**
  * This interface provides the details needed to perform a password login.
@@ -31,7 +41,11 @@ export interface TokenLogin {
 export const startWithToken = async (tokenLogin: TokenLogin | ICreateClientOpts): Promise<MatrixClient> => {
 	// If tokenLogin does not include store or cryptoStore parameters the client
 	// will use the default in-memory ones.
-	const client = sdk.createClient(tokenLogin);
+	const client = sdk.createClient({
+		...tokenLogin,
+		store,
+		cryptoStore
+	});
 
 	// We must initialize the crypto before starting the client.
 	await client.initCrypto();
