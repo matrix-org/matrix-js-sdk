@@ -24,6 +24,16 @@ import { EventType } from "../../../@types/event";
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
+import {
+    canAcceptVerificationRequest,
+    VerificationPhase as Phase,
+    VerificationRequest as IVerificationRequest,
+    VerificationRequestEvent,
+    VerificationRequestEventHandlerMap,
+} from "../../../crypto-api/verification";
+
+// backwards-compatibility exports
+export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -44,15 +54,6 @@ export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
 export const READY_TYPE = EVENT_PREFIX + "ready";
 
-export enum Phase {
-    Unsent = 1,
-    Requested,
-    Ready,
-    Started,
-    Cancelled,
-    Done,
-}
-
 // Legacy export fields
 export const PHASE_UNSENT = Phase.Unsent;
 export const PHASE_REQUESTED = Phase.Requested;
@@ -71,26 +72,17 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
-export enum VerificationRequestEvent {
-    Change = "change",
-}
-
-type EventHandlerMap = {
-    /**
-     * Fires whenever the state of the request object has changed.
-     */
-    [VerificationRequestEvent.Change]: () => void;
-};
-
 /**
  * State machine for verification requests.
  * Things that differ based on what channel is used to
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
+ *
+ * @deprecated Avoid direct references: instead prefer {@link Crypto.VerificationRequest}.
  */
-export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends TypedEventEmitter<
-    VerificationRequestEvent,
-    EventHandlerMap
-> {
+export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel>
+    extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
+    implements IVerificationRequest
+{
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
@@ -257,7 +249,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     }
 
     public get canAccept(): boolean {
-        return this.phase < PHASE_READY && !this._accepting && !this._declining;
+        return canAcceptVerificationRequest(this);
     }
 
     public get accepting(): boolean {

@@ -17,10 +17,10 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
 
-import { createClient, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, MatrixClient } from "../../../src";
 import { ShowQrCodeCallbacks, ShowSasCallbacks, Verifier, VerifierEvent } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
@@ -349,6 +349,49 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(Phase.Done);
         },
     );
+
+    oldBackendOnly("Incoming verification: can accept", async () => {
+        // expect requests to download our own keys
+        fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
+            device_keys: {
+                [TEST_USER_ID]: {
+                    [TEST_DEVICE_ID]: SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const TRANSACTION_ID = "abcd";
+
+        // Initiate the request by sending a to-device message
+        returnToDeviceMessageFromSync({
+            type: "m.key.verification.request",
+            content: {
+                from_device: TEST_DEVICE_ID,
+                methods: ["m.sas.v1"],
+                transaction_id: TRANSACTION_ID,
+                timestamp: Date.now() - 1000,
+            },
+        });
+        const request: VerificationRequest = await emitPromise(aliceClient, CryptoEvent.VerificationRequest);
+        expect(request.transactionId).toEqual(TRANSACTION_ID);
+        expect(request.phase).toEqual(Phase.Requested);
+        expect(request.roomId).toBeUndefined();
+        expect(request.canAccept).toBe(true);
+
+        // Alice accepts, by sending a to-device message
+        const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.ready");
+        const acceptPromise = request.accept();
+        expect(request.canAccept).toBe(false);
+        expect(request.phase).toEqual(Phase.Requested);
+        await acceptPromise;
+        const requestBody = await sendToDevicePromise;
+        expect(request.phase).toEqual(Phase.Ready);
+
+        const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+        expect(toDeviceMessage.methods).toContain("m.sas.v1");
+        expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+        expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
+    });
 
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
