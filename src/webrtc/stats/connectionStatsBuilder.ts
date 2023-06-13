@@ -15,7 +15,7 @@ limitations under the License.
 */
 import { Bitrate } from "./media/mediaTrackStats";
 
-export class ConnectionStatsReporter {
+export class ConnectionStatsBuilder {
     public static buildBandwidthReport(now: RTCIceCandidatePairStats): Bitrate {
         const availableIncomingBitrate = now.availableIncomingBitrate;
         const availableOutgoingBitrate = now.availableOutgoingBitrate;

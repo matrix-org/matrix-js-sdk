@@ -24,18 +24,26 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
-import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
+import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
+import { Device, DeviceMap } from "../models/device";
+import { ServerSideSecretStorage } from "../secret-storage";
+import { CrossSigningKey } from "../crypto/api";
+import { CrossSigningIdentity } from "./CrossSigningIdentity";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  */
 export class RustCrypto implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;
+    private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -49,16 +57,32 @@ export class RustCrypto implements CryptoBackend {
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
+    private crossSigningIdentity: CrossSigningIdentity;
 
     public constructor(
+        /** The `OlmMachine` from the underlying rust crypto sdk. */
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+
+        /**
+         * Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
+         *
+         * We expect it to set the access token, etc.
+         */
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+
+        /** The local user's User ID. */
         _userId: string,
+
+        /** The local user's Device ID. */
         _deviceId: string,
+
+        /** Interface to server-side secret storage */
+        _secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,9 +154,30 @@ export class RustCrypto implements CryptoBackend {
         return new UserTrustLevel(false, false, false);
     }
 
-    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
         // TODO
-        return new DeviceTrustLevel(false, false, false, false);
+        return;
+    }
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getStoredCrossSigningForUser(userId: string): null {
+        // TODO
+        return null;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,6 +210,146 @@ export class RustCrypto implements CryptoBackend {
         return [];
     }
 
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+
+        // Convert RustSdkCryptoJs.UserId to a `Set<string>`
+        const trackedUsers = new Set<string>();
+        rustTrackedUsers.forEach((rustUserId) => trackedUsers.add(rustUserId.toString()));
+
+        // Keep untracked user to download their keys after
+        const untrackedUsers: Set<string> = new Set();
+
+        for (const userId of userIds) {
+            // if this is a tracked user, we can just fetch the device list from the rust-sdk
+            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
+            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
+            if (trackedUsers.has(userId)) {
+                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
+            } else {
+                untrackedUsers.add(userId);
+            }
+        }
+
+        // for any users whose device lists we are not tracking, fall back to downloading the device list
+        // over HTTP.
+        if (downloadUncached && untrackedUsers.size >= 1) {
+            const queryResult = await this.downloadDeviceList(untrackedUsers);
+            Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
+                deviceMapByUserId.set(userId, deviceKeysToDeviceMap(deviceKeys)),
+            );
+        }
+
+        return deviceMapByUserId;
+    }
+
+    /**
+     * Get the device list for the given user from the olm machine
+     * @param userId - Rust SDK UserId
+     */
+    private async getUserDevices(userId: string): Promise<Map<string, Device>> {
+        const rustUserId = new RustSdkCryptoJs.UserId(userId);
+        const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        return new Map(
+            devices
+                .devices()
+                .map((device: RustSdkCryptoJs.Device) => [
+                    device.deviceId.toString(),
+                    rustDeviceToJsDevice(device, rustUserId),
+                ]),
+        );
+    }
+
+    /**
+     * Download the given user keys by calling `/keys/query` request
+     * @param untrackedUsers - download keys of these users
+     */
+    private async downloadDeviceList(untrackedUsers: Set<string>): Promise<IDownloadKeyResult> {
+        const queryBody: IQueryKeysRequest = { device_keys: {} };
+        untrackedUsers.forEach((user) => (queryBody.device_keys[user] = []));
+
+        return await this.http.authedRequest(Method.Post, "/_matrix/client/v3/keys/query", undefined, queryBody, {
+            prefix: "",
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
+    public getTrustCrossSignedDevices(): boolean {
+        return this._trustCrossSignedDevices;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setTrustCrossSignedDevices(val: boolean): void {
+        this._trustCrossSignedDevices = val;
+        // TODO: legacy crypto goes through the list of known devices and emits DeviceVerificationChanged
+        //  events. Maybe we need to do the same?
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getDeviceVerificationStatus}.
+     */
+    public async getDeviceVerificationStatus(
+        userId: string,
+        deviceId: string,
+    ): Promise<DeviceVerificationStatus | null> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) return null;
+
+        return new DeviceVerificationStatus({
+            signedByOwner: device.isCrossSignedByOwner(),
+            crossSigningVerified: device.isCrossSigningTrusted(),
+            localVerified: device.isLocallyTrusted(),
+            trustCrossSignedDevices: this._trustCrossSignedDevices,
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isCrossSigningReady}
+     */
+    public async isCrossSigningReady(): Promise<boolean> {
+        return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningKeyId}
+     */
+    public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
+        // TODO
+        return null;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#boostrapCrossSigning}
+     */
+    public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
+        await this.crossSigningIdentity.bootstrapCrossSigning(opts);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isSecretStorageReady}
+     */
+    public async isSecretStorageReady(): Promise<boolean> {
+        return false;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -182,7 +367,7 @@ export class RustCrypto implements CryptoBackend {
     private async receiveSyncChanges({
         events,
         oneTimeKeysCounts = new Map<string, number>(),
-        unusedFallbackKeys = new Set<string>(),
+        unusedFallbackKeys,
         devices = new RustSdkCryptoJs.DeviceLists(),
     }: {
         events?: IToDeviceEvent[];

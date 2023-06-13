@@ -25,6 +25,7 @@ import {
     CallType,
     CallState,
     CallParty,
+    CallDirection,
 } from "../../../src/webrtc/call";
 import {
     MCallAnswer,
@@ -1053,14 +1054,7 @@ describe("Call", function () {
 
             mockSendEvent.mockReset();
 
-            let caught = false;
-            try {
-                call.reject();
-            } catch (e) {
-                caught = true;
-            }
-
-            expect(caught).toEqual(true);
+            expect(() => call.reject()).toThrow();
             expect(client.client.sendEvent).not.toHaveBeenCalled();
 
             call.hangup(CallErrorCode.UserHangup, true);
@@ -1652,16 +1646,36 @@ describe("Call", function () {
         beforeEach(async () => {
             jest.useFakeTimers();
             jest.spyOn(call, "hangup");
-
             await fakeIncomingCall(client, call, "1");
 
             mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
             mockPeerConn.iceConnectionState = "disconnected";
             mockPeerConn.iceConnectionStateChangeListener!();
+            jest.spyOn(mockPeerConn, "restartIce");
+        });
+
+        it("should restart ICE gathering after being disconnected for 2 seconds", () => {
+            jest.advanceTimersByTime(3 * 1000);
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
         });
 
         it("should hang up after being disconnected for 30 seconds", () => {
             jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
+        it("should restart ICE gathering once again after ICE being failed", () => {
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
+        });
+
+        it("should call hangup after ICE being failed and if there not exists a restartIce method", () => {
+            // @ts-ignore
+            mockPeerConn.restartIce = null;
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
             expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
         });
 
@@ -1690,6 +1704,112 @@ describe("Call", function () {
             call.replacedBy(call2);
 
             expect(onReplace).toHaveBeenCalled();
+        });
+    });
+    describe("should handle glare in negotiation process", () => {
+        beforeEach(async () => {
+            // cut methods not want to test
+            call.hangup = () => null;
+            call.isLocalOnHold = () => true;
+            // @ts-ignore
+            call.updateRemoteSDPStreamMetadata = jest.fn();
+            // @ts-ignore
+            call.getRidOfRTXCodecs = jest.fn();
+            // @ts-ignore
+            call.createAnswer = jest.fn().mockResolvedValue({});
+            // @ts-ignore
+            call.sendVoipEvent = jest.fn();
+        });
+
+        it("and reject remote offer if not polite and have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).not.toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do have pending answer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have not a local offer
+            // @ts-ignore
+            call.makingOffer = false;
+
+            // If we have a setRemoteDescription() answer operation pending, then
+            // we will be "stable" by the time the next setRemoteDescription() is
+            // executed, so we count this being readyForOffer when deciding whether to
+            // ignore the offer.
+            // @ts-ignore
+            call.isSettingRemoteAnswerPending = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do not have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have no local offer
+            // @ts-ignore
+            call.makingOffer = false;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "stable",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and if polite do rollback pending local offer", async () => {
+            // polite user == CallDirection.Inbound
+            call.direction = CallDirection.Inbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
         });
     });
 });

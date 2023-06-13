@@ -435,4 +435,8 @@ export class MemoryStore implements IStore {
         this.pendingToDeviceBatches = this.pendingToDeviceBatches.filter((batch) => batch.id !== id);
         return Promise.resolve();
     }
+
+    public async destroy(): Promise<void> {
+        // Nothing to do
+    }
 }

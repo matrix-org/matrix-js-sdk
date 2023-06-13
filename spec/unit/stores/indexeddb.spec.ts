@@ -254,4 +254,31 @@ describe("IndexedDBStore", () => {
         });
         await expect(store.startup()).rejects.toThrow("Test");
     });
+
+    it("remote worker should terminate upon destroy call", async () => {
+        const terminate = jest.fn();
+        const worker = new (class MockWorker {
+            private onmessage!: (data: any) => void;
+            postMessage(data: any) {
+                this.onmessage({
+                    data: {
+                        command: "cmd_success",
+                        seq: data.seq,
+                        result: [],
+                    },
+                });
+            }
+            public terminate = terminate;
+        })() as unknown as Worker;
+
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+            workerFactory: () => worker,
+        });
+        await store.startup();
+        await expect(store.destroy()).resolves;
+        expect(terminate).toHaveBeenCalled();
+    });
 });

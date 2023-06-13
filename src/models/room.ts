@@ -24,7 +24,7 @@ import {
 } from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
-import * as utils from "../utils";
+import { compare, removeElement } from "../utils";
 import { normalize, noUnsafeEventProps } from "../utils";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
 import { EventStatus } from "./event-status";
@@ -39,6 +39,7 @@ import {
     UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
+    UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
@@ -72,8 +73,8 @@ import { isPollEvent, Poll, PollEvent } from "./poll";
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-export const KNOWN_SAFE_ROOM_VERSION = "9";
-const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+export const KNOWN_SAFE_ROOM_VERSION = "10";
+const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
 interface IOpts {
     /**
@@ -368,22 +369,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * The room summary.
      */
     public summary: RoomSummary | null = null;
-    // legacy fields
     /**
      * The live event timeline for this room, with the oldest event at index 0.
-     * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
      */
     public timeline!: MatrixEvent[];
     /**
-     * oldState The state of the room at the time of the oldest
-     * event in the live timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
+     * oldState The state of the room at the time of the oldest event in the live timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.BACKWARDS) instead
      */
     public oldState!: RoomState;
     /**
-     * currentState The state of the room at the time of the
-     * newest event in the timeline. Present for backwards compatibility -
-     * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
+     * currentState The state of the room at the time of the newest event in the timeline.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
     public readonly relations = new RelationsContainer(this.client, this);
@@ -393,6 +397,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
+
+    /**
+     * @deprecated This value is unreliable. It may not contain the last thread.
+     *             Use {@link Room.getLastThread} instead.
+     */
     public lastThread?: Thread;
 
     /**
@@ -725,7 +734,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             );
         }
 
-        const removed = utils.removeElement(
+        const removed = removeElement(
             this.pendingEventList,
             function (ev) {
                 return ev.getId() == eventId;
@@ -780,6 +789,54 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             return Number.MIN_SAFE_INTEGER;
         }
+    }
+
+    /**
+     * Returns the last live event of this room.
+     * "last" means latest timestamp.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
+     * "live of this room" means from all live timelines: the room and the threads.
+     *
+     * @returns MatrixEvent if there is a last event; else undefined.
+     */
+    public getLastLiveEvent(): MatrixEvent | undefined {
+        const roomEvents = this.getLiveTimeline().getEvents();
+        const lastRoomEvent = roomEvents[roomEvents.length - 1] as MatrixEvent | undefined;
+        const lastThread = this.getLastThread();
+
+        if (!lastThread) return lastRoomEvent;
+
+        const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
+
+        return (lastRoomEvent?.getTs() ?? 0) > (lastThreadEvent?.getTs() ?? 0) ? lastRoomEvent : lastThreadEvent;
+    }
+
+    /**
+     * Returns the last thread of this room.
+     * "last" means latest timestamp of the last thread event.
+     * Instead of using timestamps, it would be better to do the comparison based on the order of the homeserver DAG.
+     * Unfortunately, this information is currently not available in the client.
+     * See {@link https://github.com/matrix-org/matrix-js-sdk/issues/3325}.
+     *
+     * @returns the thread with the most recent event in its live time line. undefined if there is no thread.
+     */
+    public getLastThread(): Thread | undefined {
+        return this.getThreads().reduce<Thread | undefined>((lastThread: Thread | undefined, thread: Thread) => {
+            if (!lastThread) return thread;
+
+            const threadEvent = thread.events[thread.events.length - 1];
+            const lastThreadEvent = lastThread.events[lastThread.events.length - 1];
+
+            if ((threadEvent?.getTs() ?? 0) >= (lastThreadEvent?.getTs() ?? 0)) {
+                // Last message of current thread is newer → new last thread.
+                // Equal also means newer, because it was added to the thread map later.
+                return thread;
+            }
+
+            return lastThread;
+        }, undefined);
     }
 
     /**
@@ -2076,6 +2133,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return this.eventShouldLiveIn(parentEvent, events, roots);
         }
 
+        if (!event.isRelation()) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+
         // Edge case where we know the event is a relation but don't have the parentEvent
         if (roots?.has(event.relationEventId!)) {
             return {
@@ -2085,9 +2149,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // We've exhausted all scenarios, can safely assume that this event should live in the room timeline only
+        const unsigned = event.getUnsigned();
+        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+            return {
+                shouldLiveInRoom: false,
+                shouldLiveInThread: true,
+                threadId: unsigned[UNSIGNED_THREAD_ID_FIELD.name],
+            };
+        }
+
+        // We've exhausted all scenarios,
+        // we cannot assume that it lives in the main timeline as this may be a relation for an unknown thread
+        // adding the event in the wrong timeline causes stuck notifications and can break ability to send read receipts
         return {
-            shouldLiveInRoom: true,
+            shouldLiveInRoom: false,
             shouldLiveInThread: false,
         };
     }
@@ -2100,14 +2175,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private addThreadedEvents(threadId: string, events: MatrixEvent[], toStartOfTimeline = false): void {
-        let thread = this.getThread(threadId);
-
-        if (!thread) {
+        const thread = this.getThread(threadId);
+        if (thread) {
+            thread.addEvents(events, toStartOfTimeline);
+        } else {
             const rootEvent = this.findEventById(threadId) ?? events.find((e) => e.getId() === threadId);
-            thread = this.createThread(threadId, rootEvent, events, toStartOfTimeline);
+            this.createThread(threadId, rootEvent, events, toStartOfTimeline);
         }
-
-        thread.addEvents(events, toStartOfTimeline);
     }
 
     /**
@@ -2644,16 +2718,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param addLiveEventOptions - addLiveEvent options
      * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
      */
-    public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void>;
     /**
      * @deprecated In favor of the overload with `IAddLiveEventOptions`
      */
-    public addLiveEvents(events: MatrixEvent[], duplicateStrategy?: DuplicateStrategy, fromCache?: boolean): void;
-    public addLiveEvents(
+    public async addLiveEvents(
+        events: MatrixEvent[],
+        duplicateStrategy?: DuplicateStrategy,
+        fromCache?: boolean,
+    ): Promise<void>;
+    public async addLiveEvents(
         events: MatrixEvent[],
         duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
         fromCache = false,
-    ): void {
+    ): Promise<void> {
         let duplicateStrategy: DuplicateStrategy | undefined = duplicateStrategyOrOpts as DuplicateStrategy;
         let timelineWasEmpty: boolean | undefined = false;
         if (typeof duplicateStrategyOrOpts === "object") {
@@ -2704,6 +2782,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             timelineWasEmpty,
         };
 
+        // List of extra events to check for being parents of any relations encountered
+        const neighbouringEvents = [...events];
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
@@ -2717,11 +2798,34 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
 
-            const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+            let { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
                 event,
-                events,
+                neighbouringEvents,
                 threadRoots,
             );
+
+            if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
+                try {
+                    const parentEvent = new MatrixEvent(
+                        await this.client.fetchRoomEvent(this.roomId, event.relationEventId!),
+                    );
+                    neighbouringEvents.push(parentEvent);
+                    if (parentEvent.threadRootId) {
+                        threadRoots.add(parentEvent.threadRootId);
+                        const unsigned = event.getUnsigned();
+                        unsigned[UNSIGNED_THREAD_ID_FIELD.name] = parentEvent.threadRootId;
+                        event.setUnsigned(unsigned);
+                    }
+
+                    ({ shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+                        event,
+                        neighbouringEvents,
+                        threadRoots,
+                    ));
+                } catch (e) {
+                    logger.error("Failed to load parent event of unhandled relation", e);
+                }
+            }
 
             if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
                 eventsByThread[threadId ?? ""] = [];
@@ -2730,6 +2834,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
+            } else if (!shouldLiveInThread && event.isRelation()) {
+                this.relations.aggregateChildEvent(event);
             }
         }
 
@@ -2740,13 +2846,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     public partitionThreadedEvents(
         events: MatrixEvent[],
-    ): [timelineEvents: MatrixEvent[], threadedEvents: MatrixEvent[]] {
+    ): [timelineEvents: MatrixEvent[], threadedEvents: MatrixEvent[], unknownRelations: MatrixEvent[]] {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
+        const UNKNOWN_RELATION = 2;
         if (this.client.supportsThreads()) {
             const threadRoots = this.findThreadRoots(events);
-            return events.reduce(
+            return events.reduce<[MatrixEvent[], MatrixEvent[], MatrixEvent[]]>(
                 (memo, event: MatrixEvent) => {
                     const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
                         event,
@@ -2763,13 +2870,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         memo[THREAD].push(event);
                     }
 
+                    if (!shouldLiveInThread && !shouldLiveInRoom) {
+                        memo[UNKNOWN_RELATION].push(event);
+                    }
+
                     return memo;
                 },
-                [[] as MatrixEvent[], [] as MatrixEvent[]],
+                [[], [], []],
             );
         } else {
             // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
-            return [events as MatrixEvent[], [] as MatrixEvent[]];
+            return [events as MatrixEvent[], [] as MatrixEvent[], [] as MatrixEvent[]];
         }
     }
 
@@ -2781,6 +2892,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const event of events) {
             if (event.isRelation(THREAD_RELATION_TYPE.name)) {
                 threadRoots.add(event.relationEventId ?? "");
+            }
+            const unsigned = event.getUnsigned();
+            if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+                threadRoots.add(unsigned[UNSIGNED_THREAD_ID_FIELD.name]!);
             }
         }
         return threadRoots;
@@ -3211,7 +3326,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return true;
             });
             // make sure members have stable order
-            otherMembers.sort((a, b) => utils.compare(a.userId, b.userId));
+            otherMembers.sort((a, b) => compare(a.userId, b.userId));
             // only 5 first members, immitate summaryHeroes
             otherMembers = otherMembers.slice(0, 5);
             otherNames = otherMembers.map((m) => m.name);

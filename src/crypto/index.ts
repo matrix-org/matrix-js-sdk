@@ -35,7 +35,13 @@ import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
-import { ICreateSecretStorageOpts, IEncryptedEventInfo, IImportRoomKeysOpts, IRecoveryKey } from "./api";
+import {
+    CrossSigningKey,
+    ICreateSecretStorageOpts,
+    IEncryptedEventInfo,
+    IImportRoomKeysOpts,
+    IRecoveryKey,
+} from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
@@ -45,7 +51,7 @@ import { keyFromPassphrase } from "./key_passphrase";
 import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey";
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
+import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
@@ -54,7 +60,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
@@ -70,7 +76,6 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IContent } from "../models/event";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
@@ -80,14 +85,20 @@ import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageCallbacks,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
-    SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorageCallbacks,
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
+import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import { Device, DeviceMap } from "../models/device";
+import { deviceInfoToDevice } from "./device-converter";
+
+/* re-exports for backwards compatibility */
+export type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -122,16 +133,6 @@ const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
-}
-
-export interface IBootstrapCrossSigningOpts {
-    /** Optional. Reset even if keys already exist. */
-    setupNewCrossSigning?: boolean;
-    /**
-     * A function that makes the request requiring auth. Receives the auth data as an object.
-     * Can be called multiple times, first with an empty authDict, to obtain the flows.
-     */
-    authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
 export interface ICryptoCallbacks extends SecretStorageCallbacks {
@@ -605,18 +606,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns True if trusting cross-signed devices
      */
+    public getTrustCrossSignedDevices(): boolean {
+        return this.trustCrossSignedDevices;
+    }
+
+    /**
+     * @deprecated Use {@link Crypto.CryptoApi#getTrustCrossSignedDevices}.
+     */
     public getCryptoTrustCrossSignedDevices(): boolean {
         return this.trustCrossSignedDevices;
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
-
-     * This may be set before initCrypto() is called to ensure no races occur.
      *
      * @param val - True to trust cross-signed devices
      */
-    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+    public setTrustCrossSignedDevices(val: boolean): void {
         this.trustCrossSignedDevices = val;
 
         for (const userId of this.deviceList.getKnownUserIds()) {
@@ -632,6 +638,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 }
             }
         }
+    }
+
+    /**
+     * @deprecated Use {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setCryptoTrustCrossSignedDevices(val: boolean): void {
+        this.setTrustCrossSignedDevices(val);
     }
 
     /**
@@ -754,7 +767,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async bootstrapCrossSigning({
         authUploadDeviceSigningKeys,
         setupNewCrossSigning,
-    }: IBootstrapCrossSigningOpts = {}): Promise<void> {
+    }: BootstrapCrossSigningOpts = {}): Promise<void> {
         logger.log("Bootstrapping cross-signing");
 
         const delegateCryptoCallbacks = this.baseApis.cryptoCallbacks;
@@ -1407,6 +1420,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns the key ID
      */
+    public getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
+        return Promise.resolve(this.getCrossSigningId(type));
+    }
+
+    // old name, for backwards compatibility
     public getCrossSigningId(type: string): string | null {
         return this.crossSigningInfo.getId(type);
     }
@@ -1440,10 +1458,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check whether a given device is trusted.
      *
-     * @param userId - The ID of the user whose devices is to be checked.
+     * @param userId - The ID of the user whose device is to be checked.
      * @param deviceId - The ID of the device to check
-     *
-     * @returns
+     */
+    public async getDeviceVerificationStatus(
+        userId: string,
+        deviceId: string,
+    ): Promise<DeviceVerificationStatus | null> {
+        const device = this.deviceList.getStoredDevice(userId, deviceId);
+        if (!device) {
+            return null;
+        }
+        return this.checkDeviceInfoTrust(userId, device);
+    }
+
+    /**
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
         const device = this.deviceList.getStoredDevice(userId, deviceId);
@@ -1456,7 +1486,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userId - The ID of the user whose devices is to be checked.
      * @param device - The device info object to check
      *
-     * @returns
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus}.
      */
     public checkDeviceInfoTrust(userId: string, device?: DeviceInfo): DeviceTrustLevel {
         const trustedLocally = !!device?.isVerified();
@@ -1805,7 +1835,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param value - whether to blacklist all unverified devices by default
      *
-     * @deprecated Set {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Set {@link Crypto.CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1814,7 +1844,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @returns whether to blacklist all unverified devices by default
      *
-     * @deprecated Reference {@link CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
+     * @deprecated Reference {@link Crypto.CryptoApi#globalBlacklistUnverifiedDevices | CryptoApi.globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
@@ -2036,6 +2066,54 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getStoredDevicesForUser(userId: string): Array<DeviceInfo> | null {
         return this.deviceList.getStoredDevicesForUser(userId);
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
+        // Keep the users without device to download theirs keys
+        const usersWithoutDeviceInfo: string[] = [];
+
+        for (const userId of userIds) {
+            const deviceInfos = await this.getStoredDevicesForUser(userId);
+            // If there are device infos for a userId, we transform it into a map
+            // Else, the keys will be downloaded after
+            if (deviceInfos) {
+                const deviceMap = new Map(
+                    // Convert DeviceInfo to Device
+                    deviceInfos.map((deviceInfo) => [deviceInfo.deviceId, deviceInfoToDevice(deviceInfo, userId)]),
+                );
+                deviceMapByUserId.set(userId, deviceMap);
+            } else {
+                usersWithoutDeviceInfo.push(userId);
+            }
+        }
+
+        // Download device info for users without device infos
+        if (downloadUncached && usersWithoutDeviceInfo.length > 0) {
+            const newDeviceInfoMap = await this.downloadKeys(usersWithoutDeviceInfo);
+
+            newDeviceInfoMap.forEach((deviceInfoMap, userId) => {
+                const deviceMap = new Map<string, Device>();
+                // Convert DeviceInfo to Device
+                deviceInfoMap.forEach((deviceInfo, deviceId) =>
+                    deviceMap.set(deviceId, deviceInfoToDevice(deviceInfo, userId)),
+                );
+
+                // Put the new device infos into the returned map
+                deviceMapByUserId.set(userId, deviceMap);
+            });
+        }
+
+        return deviceMapByUserId;
     }
 
     /**

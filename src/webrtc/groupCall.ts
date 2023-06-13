@@ -236,7 +236,12 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
 
-    private readonly stats: GroupCallStats;
+    private stats: GroupCallStats | undefined;
+    /**
+     * Configure default webrtc stats collection interval in ms
+     * Disable collecting webrtc stats by setting interval to 0
+     */
+    private statsCollectIntervalTime = 0;
 
     public constructor(
         private client: MatrixClient,
@@ -261,12 +266,6 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
-
-        const userID = this.client.getUserId() || "unknown";
-        this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
-        this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
@@ -553,7 +552,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
-        this.stats.stop();
+        this.stats?.stop();
     }
 
     public leave(): void {
@@ -656,27 +655,9 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            // We needed this here to avoid an error in case user join a call without a device.
-            // I can not use .then .catch functions because linter :-(
-            try {
-                if (!muted) {
-                    const stream = await this.client
-                        .getMediaHandler()
-                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
-                    if (stream === null) {
-                        // if case permission denied to get a stream stop this here
-                        /* istanbul ignore next */
-                        logger.log(
-                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
-                        );
-                        return false;
-                    }
-                }
-            } catch (e) {
-                /* istanbul ignore next */
-                logger.log(
-                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
-                );
+            const hasPermission = await this.checkAudioPermissionIfNecessary(muted);
+
+            if (!hasPermission) {
                 return false;
             }
 
@@ -697,6 +678,42 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
+
+        return true;
+    }
+
+    /**
+     * If we allow entering a call without a camera and without video, it can happen that the access rights to the
+     * devices have not yet been queried. If a stream does not yet have an audio track, we assume that the rights have
+     * not yet been checked.
+     *
+     * `this.client.getMediaHandler().getUserMediaStream` clones the current stream, so it only wanted to be called when
+     * not Audio Track exists.
+     * As such, this is a compromise, because, the access rights should always be queried before the call.
+     */
+    private async checkAudioPermissionIfNecessary(muted: boolean): Promise<boolean> {
+        // We needed this here to avoid an error in case user join a call without a device.
+        try {
+            if (!muted && this.localCallFeed && !this.localCallFeed.hasAudioTrack) {
+                const stream = await this.client
+                    .getMediaHandler()
+                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                if (stream?.getTracks().length === 0) {
+                    // if case permission denied to get a stream stop this here
+                    /* istanbul ignore next */
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                    );
+                    return false;
+                }
+            }
+        } catch (e) {
+            /* istanbul ignore next */
+            logger.log(
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+            );
+            return false;
+        }
 
         return true;
     }
@@ -881,6 +898,11 @@ export class GroupCall extends TypedEventEmitter<
         );
 
         if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+        // We must do this before we start initialising / answering the call as we
+        // need to know it is the active call for this user+deviceId and to not ignore
+        // events from it.
+        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
+        this.calls.set(opponentUserId, deviceMap);
 
         this.initCall(newCall);
 
@@ -895,8 +917,6 @@ export class GroupCall extends TypedEventEmitter<
         }
         newCall.answerWithCallFeeds(feeds);
 
-        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
-        this.calls.set(opponentUserId, deviceMap);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     };
 
@@ -1084,7 +1104,7 @@ export class GroupCall extends TypedEventEmitter<
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
 
-        call.initStats(this.stats);
+        call.initStats(this.getGroupCallStats());
 
         onCallFeedsChanged();
     }
@@ -1137,6 +1157,14 @@ export class GroupCall extends TypedEventEmitter<
         const currentUserMediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
         const remoteUsermediaFeed = call.remoteUsermediaFeed;
         const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
+
+        const deviceMap = this.calls.get(opponentMemberId);
+        const currentCallForUserDevice = deviceMap?.get(opponentDeviceId);
+        if (currentCallForUserDevice?.callId !== call.callId) {
+            // the call in question is not the current call for this user/deviceId
+            // so ignore feed events from it otherwise we'll remove our real feeds
+            return;
+        }
 
         if (remoteFeedChanged) {
             if (!currentUserMediaFeed && remoteUsermediaFeed) {
@@ -1598,6 +1626,24 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     public getGroupCallStats(): GroupCallStats {
+        if (this.stats === undefined) {
+            const userID = this.client.getUserId() || "unknown";
+            this.stats = new GroupCallStats(this.groupCallId, userID, this.statsCollectIntervalTime);
+            this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+            this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
+            this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
+        }
         return this.stats;
+    }
+
+    public setGroupCallStatsInterval(interval: number): void {
+        this.statsCollectIntervalTime = interval;
+        if (this.stats !== undefined) {
+            this.stats.stop();
+            this.stats.setInterval(interval);
+            if (interval > 0) {
+                this.stats.start();
+            }
+        }
     }
 }

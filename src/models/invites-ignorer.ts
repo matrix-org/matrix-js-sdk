@@ -186,7 +186,7 @@ export class IgnoredInvites {
                     }
                     let regexp: RegExp;
                     try {
-                        regexp = new RegExp(globToRegexp(glob, false));
+                        regexp = new RegExp(globToRegexp(glob));
                     } catch (ex) {
                         // Assume invalid event.
                         continue;

@@ -10,18 +10,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-export class StatsValueFormatter {
-    public static getNonNegativeValue(imput: any): number {
-        let value = imput;
+export interface CallStatsReportSummary {
+    receivedMedia: number;
+    receivedAudioMedia: number;
+    receivedVideoMedia: number;
+    audioTrackSummary: TrackSummary;
+    videoTrackSummary: TrackSummary;
 
-        if (typeof value !== "number") {
-            value = Number(value);
-        }
+    isFirstCollection: Boolean;
+}
 
-        if (isNaN(value)) {
-            return 0;
-        }
-
-        return Math.max(0, value);
-    }
+export interface TrackSummary {
+    count: number;
+    muted: number;
+    maxJitter: number;
+    maxPacketLoss: number;
+    concealedAudio: number;
+    totalAudio: number;
 }

@@ -18,9 +18,10 @@ import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
-import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
+import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 
 /**
  * Common interface for the crypto implementations
@@ -52,16 +53,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     checkUserTrust(userId: string): UserTrustLevel;
 
     /**
-     * Get the verification level for a given device
-     *
-     * TODO: define this better
-     *
-     * @param userId - user to be checked
-     * @param deviceId - device to be checked
-     */
-    checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
-
-    /**
      * Encrypt an event according to the configuration of the room.
      *
      * @param event -  event to be sent
@@ -87,6 +78,26 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param event - event to be checked
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 }
 
 /** The methods which crypto implementations should expose to the Sync api */

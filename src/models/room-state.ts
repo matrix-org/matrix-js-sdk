@@ -16,7 +16,7 @@ limitations under the License.
 
 import { RoomMember } from "./room-member";
 import { logger } from "../logger";
-import * as utils from "../utils";
+import { isNumber, removeHiddenChars } from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
@@ -759,7 +759,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @returns An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
+        return this.displayNameToUserIds.get(removeHiddenChars(displayName)) ?? [];
     }
 
     /**
@@ -798,7 +798,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
 
         let requiredLevel = 50;
-        if (utils.isNumber(powerLevels[action])) {
+        if (isNumber(powerLevels[action])) {
             requiredLevel = powerLevels[action]!;
         }
 
@@ -928,7 +928,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             powerLevelsEvent &&
             powerLevelsEvent.getContent() &&
             powerLevelsEvent.getContent().notifications &&
-            utils.isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
+            isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
         ) {
             notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
         }
@@ -1058,7 +1058,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // We clobber the user_id > name lookup but the name -> [user_id] lookup
             // means we need to remove that user ID from that array rather than nuking
             // the lot.
-            const strippedOldName = utils.removeHiddenChars(oldName);
+            const strippedOldName = removeHiddenChars(oldName);
 
             const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
@@ -1070,7 +1070,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.userIdsToDisplayNames[userId] = displayName;
 
-        const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
+        const strippedDisplayname = displayName && removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
             const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];

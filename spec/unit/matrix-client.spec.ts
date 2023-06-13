@@ -70,6 +70,7 @@ import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 jest.useFakeTimers();
 
@@ -2750,6 +2751,60 @@ describe("MatrixClient", function () {
         });
     });
 
+    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
+    describe("Crypto wrappers", () => {
+        describe("exception if no crypto", () => {
+            it("isCrossSigningReady", () => {
+                expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
+            });
+
+            it("bootstrapCrossSigning", () => {
+                expect(() => client.bootstrapCrossSigning({})).toThrow("End-to-end encryption disabled");
+            });
+
+            it("isSecretStorageReady", () => {
+                expect(() => client.isSecretStorageReady()).toThrow("End-to-end encryption disabled");
+            });
+        });
+
+        describe("defer to crypto backend", () => {
+            let mockCryptoBackend: Mocked<CryptoBackend>;
+
+            beforeEach(() => {
+                mockCryptoBackend = {
+                    isCrossSigningReady: jest.fn(),
+                    bootstrapCrossSigning: jest.fn(),
+                    isSecretStorageReady: jest.fn(),
+                    stop: jest.fn().mockResolvedValue(undefined),
+                } as unknown as Mocked<CryptoBackend>;
+                client["cryptoBackend"] = mockCryptoBackend;
+            });
+
+            it("isCrossSigningReady", async () => {
+                const testResult = "test";
+                mockCryptoBackend.isCrossSigningReady.mockResolvedValue(testResult as unknown as boolean);
+                expect(await client.isCrossSigningReady()).toBe(testResult);
+                expect(mockCryptoBackend.isCrossSigningReady).toHaveBeenCalledTimes(1);
+            });
+
+            it("bootstrapCrossSigning", async () => {
+                const testOpts = {};
+                mockCryptoBackend.bootstrapCrossSigning.mockResolvedValue(undefined);
+                await client.bootstrapCrossSigning(testOpts);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledTimes(1);
+                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledWith(testOpts);
+            });
+
+            it("isSecretStorageReady", async () => {
+                client["cryptoBackend"] = mockCryptoBackend;
+                const testResult = "test";
+                mockCryptoBackend.isSecretStorageReady.mockResolvedValue(testResult as unknown as boolean);
+                expect(await client.isSecretStorageReady()).toBe(testResult);
+                expect(mockCryptoBackend.isSecretStorageReady).toHaveBeenCalledTimes(1);
+            });
+        });
+    });
+
     describe("paginateEventTimeline()", () => {
         describe("notifications timeline", () => {
             const unsafeNotification = {
@@ -2907,6 +2962,45 @@ describe("MatrixClient", function () {
                     },
                 });
             });
+        });
+    });
+
+    describe("pushers", () => {
+        const pusher = {
+            app_id: "test",
+            app_display_name: "Test App",
+            data: {},
+            device_display_name: "test device",
+            kind: "http",
+            lang: "en-NZ",
+            pushkey: "1234",
+        };
+
+        beforeEach(() => {
+            makeClient();
+            const response: HttpLookup = {
+                method: Method.Post,
+                path: "/pushers/set",
+                data: {},
+            };
+            httpLookups = [response];
+            jest.spyOn(client.http, "authedRequest").mockClear();
+        });
+
+        it("should make correct request to set pusher", async () => {
+            const result = await client.setPusher(pusher);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Post, "/pushers/set", undefined, pusher);
+            expect(result).toEqual({});
+        });
+
+        it("should make correct request to remove pusher", async () => {
+            const result = await client.removePusher(pusher.pushkey, pusher.app_id);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(Method.Post, "/pushers/set", undefined, {
+                pushkey: pusher.pushkey,
+                app_id: pusher.app_id,
+                kind: null,
+            });
+            expect(result).toEqual({});
         });
     });
 });

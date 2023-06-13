@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { getHttpUriForMxc } from "../content-repo";
-import * as utils from "../utils";
+import { removeDirectionOverrideChars, removeHiddenChars } from "../utils";
 import { User } from "./user";
 import { MatrixEvent } from "./event";
 import { RoomState } from "./room-state";
@@ -206,8 +206,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
         // not quite raw: we strip direction override chars so it can safely be inserted into
         // blocks of text without breaking the text direction
-        this.rawDisplayName = utils.removeDirectionOverrideChars(event.getDirectionalContent().displayname ?? "");
-        if (!this.rawDisplayName || !utils.removeHiddenChars(this.rawDisplayName)) {
+        this.rawDisplayName = removeDirectionOverrideChars(event.getDirectionalContent().displayname ?? "");
+        if (!this.rawDisplayName || !removeHiddenChars(this.rawDisplayName)) {
             this.rawDisplayName = this.userId;
         }
 
@@ -407,7 +407,7 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!utils.removeHiddenChars(displayName)) return false;
+    if (!removeHiddenChars(displayName)) return false;
 
     if (!roomState) return false;
 
@@ -432,11 +432,11 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
 function calculateDisplayName(selfUserId: string, displayName: string | undefined, disambiguate: boolean): string {
     if (!displayName || displayName === selfUserId) return selfUserId;
 
-    if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
+    if (disambiguate) return removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!utils.removeHiddenChars(displayName)) return selfUserId;
+    if (!removeHiddenChars(displayName)) return selfUserId;
 
     // We always strip the direction override characters (LRO and RLO).
     // These override the text direction for all subsequent characters
@@ -449,5 +449,5 @@ function calculateDisplayName(selfUserId: string, displayName: string | undefine
     // names should flip into the correct direction automatically based on
     // the characters, and you can still embed rtl in ltr or vice versa
     // with the embed chars or marker chars.
-    return utils.removeDirectionOverrideChars(displayName);
+    return removeDirectionOverrideChars(displayName);
 }

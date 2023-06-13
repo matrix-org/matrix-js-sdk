@@ -36,7 +36,11 @@ import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
-import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from "./webrtc/groupCallEventHandler";
+import {
+    GroupCallEventHandler,
+    GroupCallEventHandlerEvent,
+    GroupCallEventHandlerEventHandlerMap,
+} from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
 import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
@@ -74,7 +78,6 @@ import {
     CryptoEventHandlerMap,
     fixBackupKey,
     ICryptoCallbacks,
-    IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
     isCryptoAvailable,
     VerificationMethod,
@@ -181,7 +184,6 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
@@ -205,7 +207,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { CryptoApi } from "./crypto-api";
+import { BootstrapCrossSigningOpts, CryptoApi } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -635,7 +637,7 @@ interface IJoinRequestBody {
 
 interface ITagMetadata {
     [key: string]: any;
-    order: number;
+    order?: number;
 }
 
 interface IMessagesResponse {
@@ -715,7 +717,7 @@ interface IJoinedMembersResponse {
 }
 
 export interface IRegisterRequestParams {
-    auth?: IAuthData;
+    auth?: IAuthDict;
     username?: string;
     password?: string;
     refresh_token?: boolean;
@@ -2228,7 +2230,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId, this.secretStorage);
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto
@@ -2295,6 +2297,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param forceDownload - Always download the keys even if cached.
      *
      * @returns A promise which resolves to a map userId-\>deviceId-\>`DeviceInfo`
+     *
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         if (!this.crypto) {
@@ -2309,6 +2313,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - the user to list keys for.
      *
      * @returns list of devices
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public getStoredDevicesForUser(userId: string): DeviceInfo[] {
         if (!this.crypto) {
@@ -2324,6 +2329,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param deviceId - unique identifier for the device
      *
      * @returns device or null
+     * @deprecated Prefer {@link CryptoApi.getUserDeviceInfo}
      */
     public getStoredDevice(userId: string, deviceId: string): DeviceInfo | null {
         if (!this.crypto) {
@@ -2434,10 +2440,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the VerificationRequest that is in progress, if any
      */
     public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.findVerificationRequestDMInProgress(roomId);
+        return this.cryptoBackend.findVerificationRequestDMInProgress(roomId);
     }
 
     /**
@@ -2568,14 +2574,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the user's cross-signing key ID.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * Get the ID of one of the user's cross-signing keys
      *
      * @param type - The type of key to get the ID of.  One of
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
+     * @deprecated prefer {@link Crypto.CryptoApi#getCrossSigningKeyId}
      */
     public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {
@@ -2594,10 +2599,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns the cross signing information for the user.
      */
     public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getStoredCrossSigningForUser(userId);
+        return this.cryptoBackend.getStoredCrossSigningForUser(userId);
     }
 
     /**
@@ -2621,12 +2626,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param userId - The ID of the user whose devices is to be checked.
      * @param deviceId - The ID of the device to check
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.getDeviceVerificationStatus | `CryptoApi.getDeviceVerificationStatus`}
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
-        if (!this.cryptoBackend) {
+        if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.cryptoBackend.checkDeviceTrust(userId, deviceId);
+        return this.crypto.checkDeviceTrust(userId, deviceId);
     }
 
     /**
@@ -2730,12 +2737,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * bootstrapCrossSigning() completes successfully, this function should
      * return true.
      * @returns True if cross-signing is ready to be used on this device
+     * @deprecated Prefer {@link CryptoApi.isCrossSigningReady | `CryptoApi.isCrossSigningReady`}:
      */
     public isCrossSigningReady(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isCrossSigningReady();
+        return this.cryptoBackend.isCrossSigningReady();
     }
 
     /**
@@ -2745,15 +2753,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This function:
      * - creates new cross-signing keys if they are not found locally cached nor in
-     *   secret storage (if it has been setup)
+     *   secret storage (if it has been set up)
      *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * @deprecated Prefer {@link CryptoApi.bootstrapCrossSigning | `CryptoApi.bootstrapCrossSigning`}.
      */
-    public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts): Promise<void> {
-        if (!this.crypto) {
+    public bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.bootstrapCrossSigning(opts);
+        return this.cryptoBackend.bootstrapCrossSigning(opts);
     }
 
     /**
@@ -2764,24 +2772,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Default: true
      *
      * @returns True if trusting cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.getTrustCrossSignedDevices | `CryptoApi.getTrustCrossSignedDevices`}.
      */
     public getCryptoTrustCrossSignedDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getCryptoTrustCrossSignedDevices();
+        return this.cryptoBackend.getTrustCrossSignedDevices();
     }
 
     /**
      * See getCryptoTrustCrossSignedDevices
      *
      * @param val - True to trust cross-signed devices
+     *
+     * @deprecated Prefer {@link CryptoApi.setTrustCrossSignedDevices | `CryptoApi.setTrustCrossSignedDevices`}.
      */
     public setCryptoTrustCrossSignedDevices(val: boolean): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.setCryptoTrustCrossSignedDevices(val);
+        this.cryptoBackend.setTrustCrossSignedDevices(val);
     }
 
     /**
@@ -2838,15 +2850,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * bootstrapSecretStorage() completes successfully, this function should
      * return true.
      *
-     * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
-     *
      * @returns True if secret storage is ready to be used on this device
+     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}:
      */
     public isSecretStorageReady(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.isSecretStorageReady();
+        return this.cryptoBackend.isSecretStorageReady();
     }
 
     /**
@@ -4079,27 +4090,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             queryString["server_name"] = opts.viaServers;
         }
 
-        try {
-            const data: IJoinRequestBody = {};
-            const signedInviteObj = await signPromise;
-            if (signedInviteObj) {
-                data.third_party_signed = signedInviteObj;
-            }
-
-            const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
-            const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
-
-            const roomId = res.room_id;
-            const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-            const room = syncApi.createRoom(roomId);
-            if (opts.syncRoom) {
-                // v2 will do this for us
-                // return syncApi.syncRoom(room);
-            }
-            return room;
-        } catch (e) {
-            throw e; // rethrow for reject
+        const data: IJoinRequestBody = {};
+        const signedInviteObj = await signPromise;
+        if (signedInviteObj) {
+            data.third_party_signed = signedInviteObj;
         }
+
+        const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
+        const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
+
+        const roomId = res.room_id;
+        const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
+        const syncRoom = syncApi.createRoom(roomId);
+        if (opts.syncRoom) {
+            // v2 will do this for us
+            // return syncApi.syncRoom(room);
+        }
+        return syncRoom;
     }
 
     /**
@@ -4179,7 +4186,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata): Promise<{}> {
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -4997,7 +5004,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rpEvent?: MatrixEvent,
     ): Promise<{}> {
         const room = this.getRoom(roomId);
-        if (room && room.hasPendingEvent(rmEventId)) {
+        if (room?.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
         }
 
@@ -5050,9 +5057,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const key = ts + "_" + url;
 
         // If there's already a request in flight (or we've handled it), return that instead.
-        const cachedPreview = this.urlPreviewCache[key];
-        if (cachedPreview) {
-            return cachedPreview;
+        if (key in this.urlPreviewCache) {
+            return this.urlPreviewCache[key];
         }
 
         const resp = this.http.authedRequest<IPreviewUrlResponse>(
@@ -5567,11 +5573,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.currentState.setUnknownStateEvents(stateEvents);
                     }
 
-                    const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, threadedEvents, unknownRelations] =
+                        room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     room.oldState.paginationToken = res.end ?? null;
                     if (res.chunk.length === 0) {
@@ -5680,11 +5688,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
+        unknownRelations.forEach((event) => timelineSet.relations.aggregateChildEvent(event));
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5730,6 +5739,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return undefined;
         }
 
+        const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
         if (Thread.hasServerSideSupport) {
             if (Thread.hasServerSideFwdPaginationSupport) {
                 if (!timelineSet.thread) {
@@ -5742,14 +5752,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start },
+                    { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Forward, from: res.end },
+                    { dir: Direction.Forward, from: res.end, recurse: recurse || undefined },
                 );
                 const events = [
                     // Order events from most recent to oldest (reverse-chronological).
@@ -5797,7 +5807,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
-                    { dir: Direction.Backward, from: res.start },
+                    { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
@@ -5807,7 +5817,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         thread.id,
                         THREAD_RELATION_TYPE.name,
                         null,
-                        { dir: Direction.Forward, from: nextBatch },
+                        { dir: Direction.Forward, from: nextBatch, recurse: recurse || undefined },
                     );
                     nextBatch = resNewer.next_batch ?? null;
                     eventsNewer.push(...resNewer.chunk);
@@ -5878,12 +5888,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
             event = res.chunk?.[0];
         } else if (timelineSet.thread && Thread.hasServerSideSupport) {
+            const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
             const res = await this.fetchRelations(
                 timelineSet.room.roomId,
                 timelineSet.thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
-                { dir: Direction.Backward, limit: 1 },
+                { dir: Direction.Backward, limit: 1, recurse: recurse || undefined },
             );
             event = res.chunk?.[0];
         } else {
@@ -6158,10 +6169,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
             }
 
+            const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
             promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, THREAD_RELATION_TYPE.name, null, {
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
+                recurse: recurse || undefined,
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
@@ -6220,7 +6233,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
@@ -6228,6 +6241,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     const atEnd = res.end === undefined || res.end === res.start;
 
@@ -7851,7 +7865,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public async requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: IAuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
@@ -7949,6 +7963,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let params = opts as QueryDict;
         if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
             params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+        }
+        if (this.canSupport.get(Feature.RelationsRecursion) === ServerSupport.Unstable) {
+            params = replaceParam("recurse", "org.matrix.msc3981.recurse", params);
         }
         const queryString = utils.encodeParams(params);
 
@@ -8230,7 +8247,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getRoomIdForAlias(alias: string): Promise<{ room_id: string; servers: string[] }> {
         // eslint-disable-line camelcase
-        // TODO: deprecate this or resolveRoomAlias
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8240,10 +8256,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: Object with room_id and servers.
      * @returns Rejects: with an error response.
+     * @deprecated use `getRoomIdForAlias` instead
      */
     // eslint-disable-next-line camelcase
     public resolveRoomAlias(roomAlias: string): Promise<{ room_id: string; servers: string[] }> {
-        // TODO: deprecate this or getRoomIdForAlias
         const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
         return this.http.request(Method.Get, path);
     }
@@ -8616,6 +8632,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Removes an existing pusher
+     * @param pushKey - pushkey of pusher to remove
+     * @param appId - app_id of pusher to remove
+     * @returns Promise which resolves: Empty json object on success
+     * @returns Rejects: with an error response.
+     */
+    public removePusher(pushKey: string, appId: string): Promise<{}> {
+        const path = "/pushers/set";
+        const body = {
+            pushkey: pushKey,
+            app_id: appId,
+            kind: null, // marks pusher for removal
+        };
+        return this.http.authedRequest(Method.Post, path, undefined, body);
+    }
+
+    /**
      * Persists local notification settings
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
@@ -8837,7 +8870,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: IAuthData, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: IAuthDict, keys?: CrossSigningKeys): Promise<{}> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
@@ -8986,7 +9019,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param identityAccessToken - The `access_token` field of the Identity
      * Server `/account/register` response (see {@link registerWithIdentityServer}).
      *
-     * @returns Promise which resolves: Object, currently with no parameters.
+     * @returns Promise which resolves: Object, containing success boolean.
      * @returns Rejects: with an error response.
      * @throws Error if No identity server is set
      */
@@ -8995,8 +9028,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         clientSecret: string,
         msisdnToken: string,
         identityAccessToken: string,
-    ): Promise<any> {
-        // TODO: Types
+    ): Promise<{ success: boolean }> {
         const params = {
             sid: sid,
             client_secret: clientSecret,
@@ -9027,7 +9059,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                 This must be the same value submitted in the requestToken call.
      * @param msisdnToken - The MSISDN token, as enetered by the user.
      *
-     * @returns Promise which resolves: Object, currently with no parameters.
+     * @returns Promise which resolves: Object, containing success boolean.
      * @returns Rejects: with an error response.
      */
     public submitMsisdnTokenOtherUrl(
@@ -9035,8 +9067,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         sid: string,
         clientSecret: string,
         msisdnToken: string,
-    ): Promise<any> {
-        // TODO: Types
+    ): Promise<{ success: boolean }> {
         const params = {
             sid: sid,
             client_secret: clientSecret,

@@ -128,12 +128,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.emit(CallFeedEvent.ConnectedChanged, this.connected);
     }
 
-    private get hasAudioTrack(): boolean {
+    public get hasAudioTrack(): boolean {
         return this.stream.getAudioTracks().length > 0;
     }
 
     private updateStream(oldStream: MediaStream | null, newStream: MediaStream): void {
         if (newStream === oldStream) return;
+
+        const wasMeasuringVolumeActivity = this.measuringVolumeActivity;
 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
@@ -145,6 +147,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
+            if (wasMeasuringVolumeActivity) this.measureVolumeActivity(true);
         } else {
             this.measureVolumeActivity(false);
         }

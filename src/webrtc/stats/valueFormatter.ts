@@ -10,15 +10,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-export interface SummaryStats {
-    receivedMedia: number;
-    receivedAudioMedia: number;
-    receivedVideoMedia: number;
-    audioTrackSummary: TrackSummary;
-    videoTrackSummary: TrackSummary;
-}
+export class ValueFormatter {
+    public static getNonNegativeValue(imput: any): number {
+        let value = imput;
 
-export interface TrackSummary {
-    count: number;
-    muted: number;
+        if (typeof value !== "number") {
+            value = Number(value);
+        }
+
+        if (isNaN(value)) {
+            return 0;
+        }
+
+        return Math.max(0, value);
+    }
 }

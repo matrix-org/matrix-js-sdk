@@ -381,12 +381,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -617,12 +612,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await secondAliceClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(secondAliceClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -725,12 +715,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -805,12 +790,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -897,12 +877,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
