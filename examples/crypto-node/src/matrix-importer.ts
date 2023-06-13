@@ -38,7 +38,7 @@ global.fetch = async (input: RequestInfo | URL | string, init?: RequestInit): Pr
 /**
  * We will increase the logger severity to reduce clutter.
  */
-import { logger } from "../../../lib/logger.js";
+import { logger } from "../node_modules/matrix-js-sdk/lib/logger.js";
 
 logger.setLevel(5);
 
