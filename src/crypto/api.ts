@@ -20,6 +20,12 @@ import type { AddSecretStorageKeyOpts } from "../secret-storage";
 
 /* re-exports for backwards compatibility. */
 export { CrossSigningKey } from "../crypto-api";
+
+export type {
+    ImportRoomKeyProgressData as IImportOpts,
+    ImportRoomKeysOpts as IImportRoomKeysOpts,
+} from "../crypto-api";
+
 export type {
     AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
@@ -99,18 +105,4 @@ export interface ICreateSecretStorageOpts {
      * containing the key, or rejects if the key cannot be obtained.
      */
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
-}
-
-export interface IImportOpts {
-    stage: string; // TODO: Enum
-    successes: number;
-    failures: number;
-    total: number;
-}
-
-export interface IImportRoomKeysOpts {
-    /** called with an object that has a "stage" param */
-    progressCallback?: (stage: IImportOpts) => void;
-    untrusted?: boolean;
-    source?: string; // TODO: Enum
 }

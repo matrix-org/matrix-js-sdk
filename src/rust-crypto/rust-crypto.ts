@@ -30,7 +30,13 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { BootstrapCrossSigningOpts, CrossSigningStatus, DeviceVerificationStatus } from "../crypto-api";
+import {
+    BootstrapCrossSigningOpts,
+    CrossSigningStatus,
+    DeviceVerificationStatus,
+    ImportRoomKeyProgressData,
+    ImportRoomKeysOpts,
+} from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
@@ -207,8 +213,22 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        // TODO
-        return [];
+        const raw = await this.olmMachine.exportRoomKeys(() => true);
+        return JSON.parse(raw);
+    }
+
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
     }
 
     /**
