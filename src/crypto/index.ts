@@ -87,7 +87,12 @@ import {
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus, ImportRoomKeysOpts } from "../crypto-api";
+import {
+    BootstrapCrossSigningOpts,
+    CrossSigningStatus,
+    DeviceVerificationStatus,
+    ImportRoomKeysOpts,
+} from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 
@@ -736,6 +741,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             !this.backupManager.getKeyBackupEnabled() || (await this.baseApis.isKeyBackupKeyStored());
 
         return !!(secretStorageKeyInAccount && privateKeysInStorage && sessionBackupInStorage);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
+        const publicKeysOnDevice = Boolean(this.crossSigningInfo.getId());
+        const privateKeysInSecretStorage = Boolean(
+            await this.crossSigningInfo.isStoredInSecretStorage(this.secretStorage),
+        );
+        const cacheCallbacks = this.crossSigningInfo.getCacheCallbacks();
+        const masterKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("master"));
+        const selfSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("self_signing"));
+        const userSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("user_signing"));
+
+        return {
+            publicKeysOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey,
+                selfSigningKey,
+                userSigningKey,
+            },
+        };
     }
 
     /**
