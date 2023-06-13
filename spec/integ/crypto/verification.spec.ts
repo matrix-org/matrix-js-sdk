@@ -47,14 +47,14 @@ beforeAll(() => {
     // Stub out global.crypto
     previousCrypto = global["crypto"];
 
-    Object.defineProperty(global, "crypto", {
+    /*    Object.defineProperty(global, "crypto", {
         value: {
             getRandomValues: function <T extends Uint8Array>(array: T): T {
                 array.fill(0x12);
                 return array;
             },
         },
-    });
+    });*/
 });
 
 // restore the original global.crypto
