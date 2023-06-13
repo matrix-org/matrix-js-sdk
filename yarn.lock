@@ -3623,10 +3623,10 @@ eslint-plugin-jest@^27.1.6:
   dependencies:
     "@typescript-eslint/utils" "^5.10.0"
 
-eslint-plugin-jsdoc@^45.0.0:
-  version "45.0.0"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-jsdoc/-/eslint-plugin-jsdoc-45.0.0.tgz#6be84e4842a7138cc571a907ea9c31c42eaac5c0"
-  integrity sha512-l2+Jcs/Ps7oFA+SWY+0sweU/e5LgricnEl6EsDlyRTF5y0+NWL1y9Qwz9PHwHAxtdJq6lxPjEQWmYLMkvhzD4g==
+eslint-plugin-jsdoc@^46.0.0:
+  version "46.2.6"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-jsdoc/-/eslint-plugin-jsdoc-46.2.6.tgz#f25590d371859f20691d65b5dcd4cbe370d65564"
+  integrity sha512-zIaK3zbSrKuH12bP+SPybPgcHSM6MFzh3HFeaODzmsF1N8C1l8dzJ22cW1aq4g0+nayU1VMjmNf7hg0dpShLrA==
   dependencies:
     "@es-joy/jsdoccomment" "~0.39.4"
     are-docs-informative "^0.0.2"
@@ -3634,6 +3634,7 @@ eslint-plugin-jsdoc@^45.0.0:
     debug "^4.3.4"
     escape-string-regexp "^4.0.0"
     esquery "^1.5.0"
+    is-builtin-module "^3.2.1"
     semver "^7.5.1"
     spdx-expression-parse "^3.0.1"
 
