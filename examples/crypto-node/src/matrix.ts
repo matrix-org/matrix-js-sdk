@@ -40,9 +40,11 @@ export interface TokenLogin {
  */
 export const startWithToken = async (tokenLogin: TokenLogin | ICreateClientOpts): Promise<MatrixClient> => {
 	// If tokenLogin does not include store or cryptoStore parameters the client
-	// will use the default in-memory ones.
+	// will use the default in-memory ones. The default in-memory ones can have
+	// issues when it comes to E2EE.
 	const client = sdk.createClient({
 		...tokenLogin,
+		// @ts-ignore TS2322 Ignore slight store signature mismatch.
 		store,
 		cryptoStore
 	});
