@@ -32,7 +32,7 @@ global.fetch = async (input: RequestInfo | URL | string, init?: RequestInit): Pr
 	}
 
 	// Since this is not fetching the wasm we can just use the old implementation.
-	return await oldFetch.apply(this, [input, init]);
+	return await oldFetch(input, init);
 };
 
 /**
