@@ -16,10 +16,10 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import type { AddSecretStorageKeyOpts } from "../secret-storage";
+import { GeneratedSecretStorageKey } from "../crypto-api";
 
 /* re-exports for backwards compatibility. */
-export { CrossSigningKey } from "../crypto-api";
+export { CrossSigningKey, GeneratedSecretStorageKey as IRecoveryKey } from "../crypto-api";
 
 export type {
     ImportRoomKeyProgressData as IImportOpts,
@@ -66,12 +66,6 @@ export interface IEncryptedEventInfo {
     mismatchedSender: boolean;
 }
 
-export interface IRecoveryKey {
-    keyInfo?: AddSecretStorageKeyOpts;
-    privateKey: Uint8Array;
-    encodedPrivateKey?: string;
-}
-
 export interface ICreateSecretStorageOpts {
     /**
      * Function called to await a secret storage key creation flow.
@@ -79,7 +73,7 @@ export interface ICreateSecretStorageOpts {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    createSecretStorageKey?: () => Promise<IRecoveryKey>;
+    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
 
     /**
      * The current key backup object. If passed,

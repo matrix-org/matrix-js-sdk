@@ -34,16 +34,20 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
     DeviceVerificationStatus,
+    GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
+    CrossSigningKey,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { ServerSideSecretStorage } from "../secret-storage";
-import { CrossSigningKey } from "../crypto/api";
+import { AddSecretStorageKeyOpts, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { keyFromPassphrase } from "../crypto/key_passphrase";
+import { encodeRecoveryKey } from "../crypto/recoverykey";
+import { crypto } from "../crypto/crypto";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -402,6 +406,36 @@ export class RustCrypto implements CryptoBackend {
                 userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
                 selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
             },
+        };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
+     */
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
+        let key: Uint8Array;
+
+        const keyInfo: AddSecretStorageKeyOpts = {};
+        if (password) {
+            // Generate the key from the passphrase
+            const derivation = await keyFromPassphrase(password);
+            keyInfo.passphrase = {
+                algorithm: "m.pbkdf2",
+                iterations: derivation.iterations,
+                salt: derivation.salt,
+            };
+            key = derivation.key;
+        } else {
+            // Using the navigator crypto API to generate the private key
+            key = new Uint8Array(32);
+            crypto.getRandomValues(key);
+        }
+
+        const encodedPrivateKey = encodeRecoveryKey(key);
+        return {
+            keyInfo,
+            encodedPrivateKey,
+            privateKey: key,
         };
     }
 

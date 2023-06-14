@@ -356,6 +356,39 @@ describe("RustCrypto", () => {
             expect(res).toBe(null);
         });
     });
+
+    describe("createRecoveryKeyFromPassphrase", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto();
+        });
+
+        it("should create a recovery key without password", async () => {
+            const recoveryKey = await rustCrypto.createRecoveryKeyFromPassphrase();
+
+            // Expected the encoded private key to have 59 chars
+            expect(recoveryKey.encodedPrivateKey?.length).toBe(59);
+            // Expect the private key to be an Uint8Array with a length of 32
+            expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
+            expect(recoveryKey.privateKey.length).toBe(32);
+            // Expect keyInfo to be empty
+            expect(Object.keys(recoveryKey.keyInfo!).length).toBe(0);
+        });
+
+        it("should create a recovery key with password", async () => {
+            const recoveryKey = await rustCrypto.createRecoveryKeyFromPassphrase("my password");
+
+            // Expected the encoded private key to have 59 chars
+            expect(recoveryKey.encodedPrivateKey?.length).toBe(59);
+            // Expect the private key to be an Uint8Array with a length of 32
+            expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
+            expect(recoveryKey.privateKey.length).toBe(32);
+            // Expect keyInfo.passphrase to be filled
+            expect(recoveryKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
+            expect(recoveryKey.keyInfo?.passphrase?.iterations).toBe(500000);
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
