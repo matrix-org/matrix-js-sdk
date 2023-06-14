@@ -30,7 +30,7 @@ export enum CrossSigningKey {
 /**
  * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
  */
-export interface IRecoveryKey {
+export interface GeneratedSecretStorageKey {
     keyInfo?: AddSecretStorageKeyOpts;
     /* Generated private key Uint8Array(32) */
     privateKey: Uint8Array;
@@ -223,7 +223,7 @@ export interface CryptoApi {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey>;
+    createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 }
 
 /**

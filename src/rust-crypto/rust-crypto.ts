@@ -34,14 +34,15 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
     DeviceVerificationStatus,
+    GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
+    CrossSigningKey,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { ServerSideSecretStorage } from "../secret-storage";
-import { CrossSigningKey, IRecoveryKey } from "../crypto/api";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
@@ -411,10 +412,10 @@ export class RustCrypto implements CryptoBackend {
     /**
      * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
      */
-    public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
         let privateKey: Uint8Array;
 
-        const keyInfo: Partial<IRecoveryKey["keyInfo"]> = {};
+        const keyInfo: Partial<GeneratedSecretStorageKey["keyInfo"]> = {};
         if (password) {
             // Get the private key from the passphrase
             const derivation = await keyFromPassphrase(password);
@@ -432,7 +433,7 @@ export class RustCrypto implements CryptoBackend {
 
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
         return {
-            keyInfo: keyInfo as IRecoveryKey["keyInfo"],
+            keyInfo: keyInfo as GeneratedSecretStorageKey["keyInfo"],
             encodedPrivateKey,
             privateKey,
         };
