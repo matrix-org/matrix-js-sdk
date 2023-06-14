@@ -417,7 +417,7 @@ export class RustCrypto implements CryptoBackend {
 
         const keyInfo: Partial<GeneratedSecretStorageKey["keyInfo"]> = {};
         if (password) {
-            // Get the private key from the passphrase
+            // Generate the key from the passphrase
             const derivation = await keyFromPassphrase(password);
             keyInfo.passphrase = {
                 algorithm: "m.pbkdf2",

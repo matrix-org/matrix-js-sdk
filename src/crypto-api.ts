@@ -32,8 +32,9 @@ export enum CrossSigningKey {
  */
 export interface GeneratedSecretStorageKey {
     keyInfo?: AddSecretStorageKeyOpts;
-    /* Generated private key Uint8Array(32) */
+    /** The raw generated private key. */
     privateKey: Uint8Array;
+    /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
 }
 
@@ -214,14 +215,16 @@ export interface CryptoApi {
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 
     /**
-     * Create a recovery key from a user-supplied passphrase.
+     * Create a recovery key (ie, a key suitable for use with server-side secret storage).
      *
-     * @param password - Passphrase string that can be entered by the user
-     *     when restoring the backup as an alternative to entering the recovery key.
-     *     Optional.
-     * @returns Object with encoded private
-     *     recovery key which should be disposed of after displaying to the user,
-     *     and raw private key to avoid round tripping if needed.
+     * The key can either be based on a user-supplied passphrase, or just created randomly.
+     *
+     * @param password - Optional passphrase string to use to derive the key,
+     *      which can later be entered by the user as an alternative to entering the
+     *      recovery key itself. If omitted, a key is generated randomly.
+     *
+     * @returns Object including recovery key and server upload parameters.
+     *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 }
