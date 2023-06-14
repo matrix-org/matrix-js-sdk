@@ -163,9 +163,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 method: "m.sas.v1",
                 transaction_id: transactionId,
                 hashes: ["sha256"],
-                key_agreement_protocols: ["curve25519"],
+                key_agreement_protocols: ["curve25519-hkdf-sha256"],
                 message_authentication_codes: ["hkdf-hmac-sha256.v2"],
-                short_authentication_string: ["emoji"],
+                // we have to include "decimal" per the spec.
+                short_authentication_string: ["decimal", "emoji"],
             },
         });
         await waitForVerificationRequestChanged(request);
@@ -184,8 +185,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
         requestBody = await expectSendToDeviceMessage("m.key.verification.accept");
         toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519");
-        expect(toDeviceMessage.short_authentication_string).toEqual(["emoji"]);
+        expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
+        expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
         expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
         // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
@@ -239,6 +240,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
         // that should satisfy Alice, who should reply with a 'done'
         await expectSendToDeviceMessage("m.key.verification.done");
+
+        // the dummy device also confirms done-ness
+        returnToDeviceMessageFromSync({
+            type: "m.key.verification.done",
+            content: {
+                transaction_id: transactionId,
+            },
+        });
 
         // ... and the whole thing should be done!
         await verificationPromise;
