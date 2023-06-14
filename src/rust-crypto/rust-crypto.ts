@@ -42,7 +42,7 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { ServerSideSecretStorage } from "../secret-storage";
+import { AddSecretStorageKeyOpts, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
@@ -413,9 +413,9 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
      */
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
-        let privateKey: Uint8Array;
+        let key: Uint8Array;
 
-        const keyInfo: Partial<GeneratedSecretStorageKey["keyInfo"]> = {};
+        const keyInfo: AddSecretStorageKeyOpts = {};
         if (password) {
             // Generate the key from the passphrase
             const derivation = await keyFromPassphrase(password);
@@ -424,18 +424,18 @@ export class RustCrypto implements CryptoBackend {
                 iterations: derivation.iterations,
                 salt: derivation.salt,
             };
-            privateKey = derivation.key;
+            key = derivation.key;
         } else {
             // Using the navigator crypto API to generate the private key
-            privateKey = new Uint8Array(32);
-            crypto.getRandomValues(privateKey);
+            key = new Uint8Array(32);
+            crypto.getRandomValues(key);
         }
 
-        const encodedPrivateKey = encodeRecoveryKey(privateKey);
+        const encodedPrivateKey = encodeRecoveryKey(key);
         return {
-            keyInfo: keyInfo as GeneratedSecretStorageKey["keyInfo"],
+            keyInfo,
             encodedPrivateKey,
-            privateKey,
+            privateKey: key,
         };
     }
 
