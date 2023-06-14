@@ -35,7 +35,7 @@ Once it starts up you can list commands by typing:
 /help
 ```
 
-If you have trouble with encryption errors caused by devices with broken olm sessions you can delete them all by running:
+If you have trouble with encryption errors caused by devices with broken olm sessions (Usually occurring from use of the in-memory crypto store.) you can delete them all by running:
 
 ```
 /cleardevices
@@ -47,30 +47,7 @@ This will delete all the devices on the account (except for the current one) so 
 
 This example does not provide any way of verifying your sessions, so on some clients, users in the room will get a warning that someone is using an unverified session.
 
-This example does not store your access token meaning you log in everytime and generate a new one, if you have access to persistant storage you should save your device ID and access token so that you can reuse the old session.
-
-This example does not provide any persistent storage so encryption keys for the device it creates are not persisted. This means every time the client starts it generates a new unverified device which is inaccessable when the program exits.
-
-If you want to persist data you will need to overwrite the default memory stores with stores that save data with a IndexedDB implementation:
-
-```javascript
-import sqlite3 from "sqlite3";
-import indexeddbjs from "indexeddb-js";
-
-const engine = new sqlite3.Database("./sqlite");
-const { indexedDB } = indexeddbjs.makeScope("sqlite3", engine);
-
-sdk.createClient({
-	baseUrl: "https://matrix.org",
-	userId: "@my_user:matrix.org",
-	accessToken: "my_access_token",
-	deviceId: "my_device_id",
-	store: new sdk.IndexedDBStore({ indexedDB }),
-	cryptoStore: new sdk.IndexedDBCryptoStore(indexedDB, "crypto")
-});
-```
-
-Alternatively you could create your own store implementation using whatever backend storage you want.
+This example relies on the `node-localstorage` package to provide persistance which is more or less required for E2EE and at the time of writing there are no working alternative packages.
 
 ## Structure
 
