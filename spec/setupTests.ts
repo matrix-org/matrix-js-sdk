@@ -15,12 +15,8 @@ limitations under the License.
 */
 
 import DOMException from "domexception";
-import * as crypto from "crypto";
 
 global.DOMException = DOMException as typeof global.DOMException;
-// Set node crypto into global.crypto
-// Needed in `CryptoApi#createRecoveryKeyFromPassphrase` and `crypto/crypto.ts`
-global.crypto = crypto.webcrypto as typeof global.crypto;
 
 jest.mock("../src/http-api/utils", () => ({
     ...jest.requireActual("../src/http-api/utils"),

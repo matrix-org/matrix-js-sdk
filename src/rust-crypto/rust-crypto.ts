@@ -46,6 +46,7 @@ import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
+import { crypto } from "../crypto/crypto";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -426,7 +427,7 @@ export class RustCrypto implements CryptoBackend {
         } else {
             // Using the navigator crypto API to generate the private key
             privateKey = new Uint8Array(32);
-            global.crypto.getRandomValues(privateKey);
+            crypto.getRandomValues(privateKey);
         }
 
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
