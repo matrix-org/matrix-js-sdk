@@ -109,8 +109,8 @@ export const clearDevices = async (client: MatrixClient) => {
  */
 export const start = async (passwordLogin: PasswordLogin): Promise<MatrixClient> => {
 	// Attempt to get the access token and device ID from the storage.
-	let accessToken = localStorage.getItem(`token/${passwordLogin.userId}`);
-	let deviceId = localStorage.getItem(`device/${passwordLogin.userId}`);
+	let accessToken = localStorage.getItem(`token-${passwordLogin.userId}`);
+	let deviceId = localStorage.getItem(`device-${passwordLogin.userId}`);
 
 	// Get the token login details.
 	let tokenLogin: TokenLogin;
@@ -121,8 +121,8 @@ export const start = async (passwordLogin: PasswordLogin): Promise<MatrixClient>
 		tokenLogin = await getTokenLogin(passwordLogin);
 
 		// Save the generated access token and device ID for another session.
-		localStorage.setItem(`token/${passwordLogin.userId}`, tokenLogin.accessToken);
-		localStorage.setItem(`device/${passwordLogin.userId}`, tokenLogin.deviceId);
+		localStorage.setItem(`token-${passwordLogin.userId}`, tokenLogin.accessToken);
+		localStorage.setItem(`device-${passwordLogin.userId}`, tokenLogin.deviceId);
 	} else {
 		// We have the access token and device ID, we can skip password login.
 		tokenLogin = {
