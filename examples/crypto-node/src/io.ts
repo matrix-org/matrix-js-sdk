@@ -202,6 +202,8 @@ export const printMessage = (event: MatrixEvent) => {
 
 	console.log(`[${time}] ${name}`);
 
+	content = content ?? "";
+
 	for (const line of content.split("\n")) {
 		console.log(`  ${line}`);
 	}
