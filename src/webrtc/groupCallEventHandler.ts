@@ -189,6 +189,7 @@ export class GroupCallEventHandler {
             content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
+            this.client.useLivekitForGroupCalls,
         );
 
         this.groupCalls.set(room.roomId, groupCall);

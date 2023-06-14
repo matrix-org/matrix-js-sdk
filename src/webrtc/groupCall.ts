@@ -268,6 +268,10 @@ export class GroupCall extends TypedEventEmitter<
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
         isCallWithoutVideoAndAudio?: boolean,
+        // this tells the js-sdk not to actually establish any calls to exchange media and just to
+        // create the group call signaling events, with the intention that the actual media will be
+        // handled using livekit. The js-sdk doesn't contain any code to do the actual livekit call though.
+        private useLivekit = false,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
@@ -442,6 +446,11 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async initLocalCallFeed(): Promise<void> {
+        if (this.useLivekit) {
+            logger.info("Livekit group call: not starting local call feed.");
+            return;
+        }
+
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
@@ -537,11 +546,13 @@ export class GroupCall extends TypedEventEmitter<
             this.onIncomingCall(call);
         }
 
-        this.retryCallLoopInterval = setInterval(this.onRetryCallLoop, this.retryCallInterval);
+        if (!this.useLivekit) {
+            this.retryCallLoopInterval = setInterval(this.onRetryCallLoop, this.retryCallInterval);
 
-        this.activeSpeaker = undefined;
-        this.onActiveSpeakerLoop();
-        this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
+            this.activeSpeaker = undefined;
+            this.onActiveSpeakerLoop();
+            this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
+        }
     }
 
     private dispose(): void {
@@ -920,6 +931,11 @@ export class GroupCall extends TypedEventEmitter<
         const opponentUserId = newCall.getOpponentMember()?.userId;
         if (opponentUserId === undefined) {
             logger.warn(`GroupCall ${this.groupCallId} onIncomingCall() incoming call with no member - ignoring`);
+            return;
+        }
+
+        if (this.useLivekit) {
+            logger.info("Received incoming call whilst in signaling-only mode! Ignoring.");
             return;
         }
 
@@ -1629,7 +1645,7 @@ export class GroupCall extends TypedEventEmitter<
             }
         });
 
-        if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
+        if (this.state === GroupCallState.Entered && !this.useLivekit) this.placeOutgoingCalls();
 
         // Update the participants stored in the stats object
     };

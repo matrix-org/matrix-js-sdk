@@ -381,6 +381,12 @@ export interface ICreateClientOpts {
      * Default: false.
      */
     isVoipWithNoMediaAllowed?: boolean;
+
+    /**
+     * If true, group calls will not establish media connectivity and only create the signaling events,
+     * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
+     */
+    useLivekitForGroupCalls?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1205,6 +1211,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
 
+    public useLivekitForGroupCalls: boolean;
+
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
 
@@ -1310,6 +1318,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } else if (opts.pickleKey) {
             this.pickleKey = opts.pickleKey;
         }
+
+        this.useLivekitForGroupCalls = Boolean(opts.useLivekitForGroupCalls);
 
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
@@ -1931,6 +1941,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.isVoipWithNoMediaAllowed,
+            this.useLivekitForGroupCalls,
         ).create();
     }
 
