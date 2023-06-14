@@ -18,12 +18,23 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
+import { AddSecretStorageKeyOpts } from "./secret-storage";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
     Master = "master",
     SelfSigning = "self_signing",
     UserSigning = "user_signing",
+}
+
+/**
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ */
+export interface IRecoveryKey {
+    keyInfo?: AddSecretStorageKeyOpts;
+    /* Generated private key Uint8Array(32) */
+    privateKey: Uint8Array;
+    encodedPrivateKey?: string;
 }
 
 /**
@@ -201,6 +212,18 @@ export interface CryptoApi {
      * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
+
+    /**
+     * Create a recovery key from a user-supplied passphrase.
+     *
+     * @param password - Passphrase string that can be entered by the user
+     *     when restoring the backup as an alternative to entering the recovery key.
+     *     Optional.
+     * @returns Object with encoded private
+     *     recovery key which should be disposed of after displaying to the user,
+     *     and raw private key to avoid round tripping if needed.
+     */
+    createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey>;
 }
 
 /**

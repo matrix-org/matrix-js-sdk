@@ -41,9 +41,11 @@ import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter"
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { ServerSideSecretStorage } from "../secret-storage";
-import { CrossSigningKey } from "../crypto/api";
+import { CrossSigningKey, IRecoveryKey } from "../crypto/api";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { keyFromPassphrase } from "../crypto/key_passphrase";
+import { encodeRecoveryKey } from "../crypto/recoverykey";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -402,6 +404,36 @@ export class RustCrypto implements CryptoBackend {
                 userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
                 selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
             },
+        };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
+     */
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
+        let privateKey: Uint8Array;
+
+        const keyInfo: Partial<IRecoveryKey["keyInfo"]> = {};
+        if (password) {
+            // Get the private key from the passphrase
+            const derivation = await keyFromPassphrase(password);
+            keyInfo.passphrase = {
+                algorithm: "m.pbkdf2",
+                iterations: derivation.iterations,
+                salt: derivation.salt,
+            };
+            privateKey = derivation.key;
+        } else {
+            // Using the navigator crypto API to generate the private key
+            privateKey = new Uint8Array(32);
+            global.crypto.getRandomValues(privateKey);
+        }
+
+        const encodedPrivateKey = encodeRecoveryKey(privateKey);
+        return {
+            keyInfo: keyInfo as IRecoveryKey["keyInfo"],
+            encodedPrivateKey,
+            privateKey,
         };
     }
 

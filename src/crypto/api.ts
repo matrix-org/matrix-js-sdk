@@ -16,10 +16,10 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import type { AddSecretStorageKeyOpts } from "../secret-storage";
+import { IRecoveryKey } from "../crypto-api";
 
 /* re-exports for backwards compatibility. */
-export { CrossSigningKey } from "../crypto-api";
+export { CrossSigningKey, IRecoveryKey } from "../crypto-api";
 
 export type {
     ImportRoomKeyProgressData as IImportOpts,
@@ -64,12 +64,6 @@ export interface IEncryptedEventInfo {
      * if the event's ed25519 and curve25519 keys don't match (only meaningful if `sender` is set)
      */
     mismatchedSender: boolean;
-}
-
-export interface IRecoveryKey {
-    keyInfo?: AddSecretStorageKeyOpts;
-    privateKey: Uint8Array;
-    encodedPrivateKey?: string;
 }
 
 export interface ICreateSecretStorageOpts {
