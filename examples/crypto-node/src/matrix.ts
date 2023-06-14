@@ -39,9 +39,9 @@ export interface TokenLogin {
  * Create a matrix client using a token login.
  */
 export const startWithToken = async (tokenLogin: TokenLogin | ICreateClientOpts): Promise<MatrixClient> => {
-	// If tokenLogin does not include store or cryptoStore parameters the client
-	// will use the default in-memory ones. The default in-memory ones can have
-	// issues when it comes to E2EE.
+	// If sdk.createClient does not include store or cryptoStore parameters the
+	// client will use the default in-memory ones. The default in-memory ones can
+	// have issues when it comes to E2EE.
 	const client = sdk.createClient({
 		...tokenLogin,
 		// @ts-ignore TS2322 Ignore slight store signature mismatch.
@@ -108,16 +108,36 @@ export const clearDevices = async (client: MatrixClient) => {
  * Start the client with a password login.
  */
 export const start = async (passwordLogin: PasswordLogin): Promise<MatrixClient> => {
+	// Attempt to get the access token and device ID from the storage.
+	let accessToken = localStorage.getItem(`token/${passwordLogin.userId}`);
+	let deviceId = localStorage.getItem(`device/${passwordLogin.userId}`);
+
 	// Get the token login details.
-	const tokenLogin = await getTokenLogin(passwordLogin);
+	let tokenLogin: TokenLogin;
+
+	if (accessToken == null || deviceId == null) {
+		// Storage doesn't have the access token or device ID, use password to
+		// generate a new one.
+		tokenLogin = await getTokenLogin(passwordLogin);
+
+		// Save the generated access token and device ID for another session.
+		localStorage.setItem(`token/${passwordLogin.userId}`, tokenLogin.accessToken);
+		localStorage.setItem(`device/${passwordLogin.userId}`, tokenLogin.deviceId);
+	} else {
+		// We have the access token and device ID, we can skip password login.
+		tokenLogin = {
+			baseUrl: passwordLogin.baseUrl,
+			userId: passwordLogin.userId,
+			accessToken,
+			deviceId
+		};
+	}
 
 	// Start the client with the token.
-	// Here we are not adding a store or a cryptoStore to the tokenLogin so the
-	// client will default to the in-memory one.
 	const client = await startWithToken(tokenLogin);
 
 	return client;
-}
+};
 
 /**
  * Mark a device associated with a user as verified.
