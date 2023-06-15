@@ -32,12 +32,13 @@ import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import {
     BootstrapCrossSigningOpts,
+    CrossSigningKey,
     CrossSigningStatus,
     DeviceVerificationStatus,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
-    CrossSigningKey,
+    VerificationRequest,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -163,18 +164,6 @@ export class RustCrypto implements CryptoBackend {
     public checkUserTrust(userId: string): UserTrustLevel {
         // TODO
         return new UserTrustLevel(false, false, false);
-    }
-
-    /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     */
-    public findVerificationRequestDMInProgress(roomId: string): undefined {
-        // TODO
-        return;
     }
 
     /**
@@ -437,6 +426,64 @@ export class RustCrypto implements CryptoBackend {
             encodedPrivateKey,
             privateKey: key,
         };
+    }
+
+    /**
+     * Returns to-device verification requests that are already in progress for the given user id.
+     *
+     * Implementation of {@link CryptoApi#getVerificationRequestsToDeviceInProgress}
+     *
+     * @param userId - the ID of the user to query
+     *
+     * @returns the VerificationRequests that are in progress
+     */
+    public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
+        // TODO
+        return [];
+    }
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * Implementation of {@link CryptoApi#findVerificationRequestDMInProgress}
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     *
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
+        // TODO
+        return;
+    }
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestOwnUserVerification}.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public requestOwnUserVerification(): Promise<VerificationRequest> {
+        throw new Error("not implemented");
+    }
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestDeviceVerification }.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
+        throw new Error("not implemented");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

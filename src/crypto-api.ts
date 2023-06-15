@@ -19,6 +19,7 @@ import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts } from "./secret-storage";
+import { VerificationRequest } from "./crypto-api/verification";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -227,6 +228,51 @@ export interface CryptoApi {
      *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Device/User verification
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns to-device verification requests that are already in progress for the given user id.
+     *
+     * @param userId - the ID of the user to query
+     *
+     * @returns the VerificationRequests that are in progress
+     */
+    getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[];
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestOwnUserVerification(): Promise<VerificationRequest>;
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
 }
 
 /**

@@ -2356,6 +2356,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
+    /** @deprecated Use `requestOwnUserVerificationToDevice` or `requestDeviceVerification` */
     public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(userId));
@@ -2366,6 +2367,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         const channel = new ToDeviceChannel(this.baseApis, userId, devices, ToDeviceChannel.makeTransactionId());
         return this.requestVerificationWithChannel(userId, channel, this.toDeviceVerificationRequests);
+    }
+
+    public requestOwnUserVerification(): Promise<VerificationRequest> {
+        return this.requestVerification(this.userId);
+    }
+
+    public requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
+        return this.requestVerification(userId, [deviceId]);
     }
 
     private async requestVerificationWithChannel(

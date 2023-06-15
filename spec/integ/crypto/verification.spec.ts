@@ -19,14 +19,14 @@ import { MockResponse } from "fetch-mock";
 
 import { createClient, CryptoEvent, MatrixClient } from "../../../src";
 import {
+    canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
     ShowSasCallbacks,
-    Verifier,
-    VerifierEvent,
     VerificationPhase,
     VerificationRequest,
     VerificationRequestEvent,
-    canAcceptVerificationRequest,
+    Verifier,
+    VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
 import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
@@ -130,7 +130,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         // have alice initiate a verification. She should send a m.key.verification.request
         let [requestBody, request] = await Promise.all([
             expectSendToDeviceMessage("m.key.verification.request"),
-            aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
+            aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
         ]);
         const transactionId = request.transactionId;
         expect(transactionId).toBeDefined();
@@ -273,7 +273,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // have alice initiate a verification. She should send a m.key.verification.request
             const [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
-                aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
             ]);
             const transactionId = request.transactionId;
 

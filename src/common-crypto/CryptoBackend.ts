@@ -21,7 +21,6 @@ import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 
 /**
  * Common interface for the crypto implementations
@@ -78,15 +77,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param event - event to be checked
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
-
-    /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     */
-    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
 
     /**
      * Get the cross signing information for a given user.
