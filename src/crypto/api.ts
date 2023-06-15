@@ -19,7 +19,9 @@ import { IKeyBackupInfo } from "./keybackup";
 import { GeneratedSecretStorageKey } from "../crypto-api";
 
 /* re-exports for backwards compatibility. */
-export { CrossSigningKey, GeneratedSecretStorageKey as IRecoveryKey } from "../crypto-api";
+// CrossSigningKey is used as a value in `client.ts`, we can't export it as a type
+export { CrossSigningKey } from "../crypto-api";
+export type { GeneratedSecretStorageKey as IRecoveryKey } from "../crypto-api";
 
 export type {
     ImportRoomKeyProgressData as IImportOpts,
