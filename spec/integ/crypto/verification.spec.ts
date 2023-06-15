@@ -18,7 +18,16 @@ import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
 
 import { createClient, CryptoEvent, MatrixClient } from "../../../src";
-import { ShowQrCodeCallbacks, ShowSasCallbacks, Verifier, VerifierEvent } from "../../../src/crypto-api/verification";
+import {
+    canAcceptVerificationRequest,
+    ShowQrCodeCallbacks,
+    ShowSasCallbacks,
+    VerificationPhase,
+    VerificationRequest,
+    VerificationRequestEvent,
+    Verifier,
+    VerifierEvent,
+} from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
 import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
@@ -31,11 +40,6 @@ import {
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import {
-    Phase,
-    VerificationRequest,
-    VerificationRequestEvent,
-} from "../../../src/crypto/verification/request/VerificationRequest";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -126,11 +130,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         // have alice initiate a verification. She should send a m.key.verification.request
         let [requestBody, request] = await Promise.all([
             expectSendToDeviceMessage("m.key.verification.request"),
-            aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
+            aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
         ]);
         const transactionId = request.transactionId;
         expect(transactionId).toBeDefined();
-        expect(request.phase).toEqual(Phase.Requested);
+        expect(request.phase).toEqual(VerificationPhase.Requested);
         expect(request.roomId).toBeUndefined();
 
         let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
@@ -148,7 +152,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             },
         });
         await waitForVerificationRequestChanged(request);
-        expect(request.phase).toEqual(Phase.Ready);
+        expect(request.phase).toEqual(VerificationPhase.Ready);
         expect(request.otherDeviceId).toEqual(TEST_DEVICE_ID);
 
         // ... and picks a method with m.key.verification.start
@@ -165,7 +169,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             },
         });
         await waitForVerificationRequestChanged(request);
-        expect(request.phase).toEqual(Phase.Started);
+        expect(request.phase).toEqual(VerificationPhase.Started);
         expect(request.chosenMethod).toEqual("m.sas.v1");
 
         // there should now be a verifier
@@ -238,7 +242,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
         // ... and the whole thing should be done!
         await verificationPromise;
-        expect(request.phase).toEqual(Phase.Done);
+        expect(request.phase).toEqual(VerificationPhase.Done);
 
         // we're done with the temporary keypair
         olmSAS.free();
@@ -269,7 +273,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // have alice initiate a verification. She should send a m.key.verification.request
             const [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
-                aliceClient.requestVerification(TEST_USER_ID, [TEST_DEVICE_ID]),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
             ]);
             const transactionId = request.transactionId;
 
@@ -290,7 +294,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 },
             });
             await waitForVerificationRequestChanged(request);
-            expect(request.phase).toEqual(Phase.Ready);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
 
             // we should now have QR data we can display
             const qrCodeBuffer = request.getQRCodeBytes()!;
@@ -320,7 +324,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 },
             });
             await waitForVerificationRequestChanged(request);
-            expect(request.phase).toEqual(Phase.Started);
+            expect(request.phase).toEqual(VerificationPhase.Started);
             expect(request.chosenMethod).toEqual("m.reciprocate.v1");
 
             // there should now be a verifier
@@ -346,7 +350,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // ... and the whole thing should be done!
             await verificationPromise;
-            expect(request.phase).toEqual(Phase.Done);
+            expect(request.phase).toEqual(VerificationPhase.Done);
         },
     );
 
@@ -374,18 +378,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
         const request: VerificationRequest = await emitPromise(aliceClient, CryptoEvent.VerificationRequest);
         expect(request.transactionId).toEqual(TRANSACTION_ID);
-        expect(request.phase).toEqual(Phase.Requested);
+        expect(request.phase).toEqual(VerificationPhase.Requested);
         expect(request.roomId).toBeUndefined();
-        expect(request.canAccept).toBe(true);
+        expect(canAcceptVerificationRequest(request)).toBe(true);
 
         // Alice accepts, by sending a to-device message
         const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.ready");
         const acceptPromise = request.accept();
-        expect(request.canAccept).toBe(false);
-        expect(request.phase).toEqual(Phase.Requested);
+        expect(canAcceptVerificationRequest(request)).toBe(false);
+        expect(request.phase).toEqual(VerificationPhase.Requested);
         await acceptPromise;
         const requestBody = await sendToDevicePromise;
-        expect(request.phase).toEqual(Phase.Ready);
+        expect(request.phase).toEqual(VerificationPhase.Ready);
 
         const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
         expect(toDeviceMessage.methods).toContain("m.sas.v1");
