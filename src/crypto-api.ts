@@ -231,20 +231,16 @@ export interface CryptoApi {
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 
     /**
+     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
      *
-     * @param createSecretStorageKey
-     * @param keyBackupInfo
-     * @param setupNewKeyBackup
-     * @param setupNewSecretStorage
-     * @param getKeyBackupPassphrase
+     * - Do nothing if an AES key is already stored in the secret storage;
+     * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
+     * - Store this key in the secret storage and set it as the default key.
+     * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
+     *
+     * @param opts - Options object.
      */
-    bootstrapSecretStorage({
-        createSecretStorageKey,
-        keyBackupInfo,
-        setupNewKeyBackup,
-        setupNewSecretStorage,
-        getKeyBackupPassphrase,
-    }: ICreateSecretStorageOpts): Promise<void>;
+    bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
