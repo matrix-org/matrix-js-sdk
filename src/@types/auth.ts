@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IClientWellKnown } from "../client";
 import { UnstableValue } from "../NamespacedValue";
 
 // disable lint because these are wire responses
@@ -36,6 +37,8 @@ export interface IRefreshTokenResponse {
 export interface ILoginFlowsResponse {
     flows: LoginFlow[];
 }
+
+export type LoginType = "m.login.password" | "m.login.token" | "m.login.saml2";
 
 export type LoginFlow = ISSOFlow | IPasswordFlow | ILoginFlow;
 
@@ -121,3 +124,59 @@ export interface LoginTokenPostResponse {
      */
     expires_in_ms: number;
 }
+
+/**
+ * Response from a successful /login
+ * See spec: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login
+ */
+export interface LoginResponse {
+    access_token: string;
+    device_id: string;
+    expires_in_ms?: number;
+    refresh_token?: string;
+    user_id: string;
+    well_known?: IClientWellKnown;
+}
+
+// https://spec.matrix.org/v1.7/client-server-api/#identifier-types
+export type UserIdentifier = "m.id.user" | "m.id.thirdparty" | "m.id.phone";
+
+/**
+ * Params passed to /login request
+ * https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login
+ */
+interface LoginCoreParams {
+    device_id?: string;
+    identifier?: {
+        type: UserIdentifier;
+    };
+    initial_device_display_name?: string;
+    refresh_token?: boolean;
+    // @deprecated, use `identifier`
+    user?: string;
+    // @deprecated, use `identifier`
+    address?: string;
+}
+
+export interface ThirdPartyLoginParams extends LoginCoreParams {
+    // @deprecated, use `identifier`
+    medium?: "email";
+}
+
+export interface PasswordLoginParams extends LoginCoreParams {
+    password: string;
+}
+
+export interface TokenLoginParams extends LoginCoreParams {
+    token: string;
+}
+
+export interface Saml2LoginParams {
+    relay_state: string;
+}
+
+export type LoginParams = ThirdPartyLoginParams | PasswordLoginParams | TokenLoginParams | Saml2LoginParams;
+
+export type LoginRequestBody = (ThirdPartyLoginParams | PasswordLoginParams | TokenLoginParams | Saml2LoginParams) & {
+    type: LoginType;
+};

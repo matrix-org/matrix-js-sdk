@@ -209,6 +209,7 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
+import { LoginResponse, LoginType, LoginRequestBody, LoginParams } from "./@types/auth";
 
 export type Store = IStore;
 
@@ -7770,39 +7771,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: TODO
+     * @param loginType - password or token login
+     * @param data - request params for given login type
+     * @returns Promise which resolves with LoginResponse
      * @returns Rejects: with an error response.
      */
-    public login(loginType: string, data: any): Promise<any> {
-        // TODO: Types
-        const loginData = {
+    public login(loginType: LoginType, data: LoginParams): Promise<LoginResponse> {
+        const loginData: LoginRequestBody = {
             type: loginType,
+            ...data,
         };
 
-        // merge data into loginData
-        Object.assign(loginData, data);
-
-        return this.http
-            .authedRequest<{
-                access_token?: string;
-                user_id?: string;
-            }>(Method.Post, "/login", undefined, loginData)
-            .then((response) => {
-                if (response.access_token && response.user_id) {
-                    this.http.opts.accessToken = response.access_token;
-                    this.credentials = {
-                        userId: response.user_id,
-                    };
-                }
-                return response;
-            });
+        return this.http.authedRequest<LoginResponse>(Method.Post, "/login", undefined, loginData).then((response) => {
+            if (response.access_token && response.user_id) {
+                this.http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+            return response;
+        });
     }
 
     /**
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public loginWithPassword(user: string, password: string): Promise<any> {
+    public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         // TODO: Types
         return this.login("m.login.password", {
             user: user,
@@ -7815,7 +7810,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public loginWithSAML2(relayState: string): Promise<any> {
+    public loginWithSAML2(relayState: string): Promise<LoginResponse> {
         // TODO: Types
         return this.login("m.login.saml2", {
             relay_state: relayState,
@@ -7859,7 +7854,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public loginWithToken(token: string): Promise<any> {
+    public loginWithToken(token: string): Promise<LoginResponse> {
         // TODO: Types
         return this.login("m.login.token", {
             token: token,

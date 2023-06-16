@@ -26,6 +26,7 @@ import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { LoginType } from "../../src/@types/auth";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -1326,7 +1327,7 @@ describe("MatrixClient", function () {
                 access_token: token,
                 user_id: userId,
             });
-            const prom = client!.login("fake.login", {});
+            const prom = client!.login("fake.login" as unknown as LoginType, {});
             await httpBackend!.flushAllExpected();
             const resp = await prom;
             expect(resp.access_token).toBe(token);
