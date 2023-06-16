@@ -436,11 +436,11 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#bootstrapSecretStorage}
      */
     public async bootstrapSecretStorage({
-        createSecretStorageKey = async (): Promise<GeneratedSecretStorageKey> => ({} as GeneratedSecretStorageKey),
+        createSecretStorageKey,
         setupNewSecretStorage,
     }: ICreateSecretStorageOpts = {}): Promise<void> {
         // If setupNewSecretStorage is not set, we stop
-        if (!setupNewSecretStorage) return;
+        if (!setupNewSecretStorage || !createSecretStorageKey) return;
 
         const secretStorageKeyTuple = await this.secretStorage.getKey();
 
