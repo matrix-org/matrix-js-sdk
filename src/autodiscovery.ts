@@ -19,11 +19,11 @@ import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersio
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
 import {
-    OidcDiscoveryError,
     ValidatedIssuerConfig,
     validateOIDCIssuerWellKnown,
     validateWellKnownAuthentication,
 } from "./oidc/validate";
+import { OidcError } from "./oidc/error";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -297,7 +297,7 @@ export class AutoDiscovery {
 
             if (issuerWellKnown.action !== AutoDiscoveryAction.SUCCESS) {
                 logger.error("Failed to fetch issuer openid configuration");
-                throw new Error(OidcDiscoveryError.General);
+                throw new Error(OidcError.General);
             }
 
             const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown.raw);
@@ -310,15 +310,11 @@ export class AutoDiscovery {
             };
             return delegatedAuthConfig;
         } catch (error) {
-            const errorMessage = (error as Error).message as unknown as OidcDiscoveryError;
-            const errorType = Object.values(OidcDiscoveryError).includes(errorMessage)
-                ? errorMessage
-                : OidcDiscoveryError.General;
+            const errorMessage = (error as Error).message as unknown as OidcError;
+            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
 
             const state =
-                errorType === OidcDiscoveryError.NotSupported
-                    ? AutoDiscoveryAction.IGNORE
-                    : AutoDiscoveryAction.FAIL_ERROR;
+                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
 
             return {
                 state,
