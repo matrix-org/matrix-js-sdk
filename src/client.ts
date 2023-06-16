@@ -388,6 +388,10 @@ export interface ICreateClientOpts {
      */
     isVoipWithNoMediaAllowed?: boolean;
 
+    /**
+     * A logger to associate with this MatrixClient.
+     * Defaults to the build-in global logger.
+     */
     logger?: PrefixedLogger;
 }
 
