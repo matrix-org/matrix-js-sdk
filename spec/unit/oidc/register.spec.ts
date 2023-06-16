@@ -19,8 +19,6 @@ import fetchMockJest from "fetch-mock-jest";
 import { OidcError } from "../../../src/oidc/error";
 import { registerOidcClient } from "../../../src/oidc/register";
 
-fetchMockJest;
-
 describe("registerOidcClient()", () => {
     const issuer = "https://auth.com/";
     const registrationEndpoint = "https://auth.com/register";
@@ -45,7 +43,6 @@ describe("registerOidcClient()", () => {
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
         expect(await registerOidcClient(delegatedAuthConfig, clientName, baseUrl)).toEqual(dynamicClientId);
-        // didn't try to register
         expect(fetchMockJest).toHaveBeenCalledWith(registrationEndpoint, {
             headers: {
                 "Accept": "application/json",
