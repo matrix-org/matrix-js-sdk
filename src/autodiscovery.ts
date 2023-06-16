@@ -18,11 +18,7 @@ limitations under the License.
 import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions, M_AUTHENTICATION } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
-import {
-    ValidatedIssuerConfig,
-    validateOIDCIssuerWellKnown,
-    validateWellKnownAuthentication,
-} from "./oidc/validate";
+import { ValidatedIssuerConfig, validateOIDCIssuerWellKnown, validateWellKnownAuthentication } from "./oidc/validate";
 import { OidcError } from "./oidc/error";
 
 // Dev note: Auto discovery is part of the spec.

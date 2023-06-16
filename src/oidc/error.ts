@@ -19,4 +19,7 @@ export enum OidcError {
     Misconfigured = "OIDC is misconfigured",
     General = "Something went wrong with OIDC discovery",
     OpSupport = "Configured OIDC OP does not support required functions",
+    DynamicRegistrationNotSupported = "Dynamic registration not supported",
+    DynamicRegistrationFailed = "Dynamic registration failed",
+    DynamicRegistrationInvalid = "Dynamic registration invalid response",
 }
