@@ -7798,7 +7798,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
-        // TODO: Types
         return this.login("m.login.password", {
             user: user,
             password: password,
@@ -7811,7 +7810,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public loginWithSAML2(relayState: string): Promise<LoginResponse> {
-        // TODO: Types
         return this.login("m.login.saml2", {
             relay_state: relayState,
         });
@@ -7855,7 +7853,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public loginWithToken(token: string): Promise<LoginResponse> {
-        // TODO: Types
         return this.login("m.login.token", {
             token: token,
         });
