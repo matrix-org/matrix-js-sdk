@@ -219,6 +219,7 @@ export type SasEvent = VerifierEvent;
 /** @deprecated use VerifierEvent */
 export const SasEvent = VerifierEvent;
 
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
 export class SAS extends Base {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;
@@ -479,5 +480,9 @@ export class SAS extends Base {
                 throw newKeyMismatchError();
             }
         });
+    }
+
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return this.sasEvent ?? null;
     }
 }

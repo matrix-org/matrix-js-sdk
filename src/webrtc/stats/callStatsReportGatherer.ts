@@ -26,6 +26,8 @@ import { TrackStatsBuilder } from "./trackStatsBuilder";
 import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
 import { ValueFormatter } from "./valueFormatter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
+import { logger } from "../../logger";
+import { CallFeedStatsReporter } from "./callFeedStatsReporter";
 
 export class CallStatsReportGatherer {
     private isActive = true;
@@ -62,10 +64,11 @@ export class CallStatsReportGatherer {
                     .then((report) => {
                         // @ts-ignore
                         this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
+
                         try {
                             this.processStatsReport(groupCallId, localUserId);
                         } catch (error) {
-                            this.isActive = false;
+                            this.handleError(error);
                             return summary;
                         }
 
@@ -161,6 +164,9 @@ export class CallStatsReportGatherer {
         });
 
         this.emitter.emitByteSendReport(byteSentStatsReport);
+        this.emitter.emitCallFeedReport(
+            CallFeedStatsReporter.buildCallFeedReport(this.callId, this.opponentMemberId, this.pc),
+        );
         this.processAndEmitConnectionStatsReport();
     }
 
@@ -172,8 +178,9 @@ export class CallStatsReportGatherer {
         return this.isActive;
     }
 
-    private handleError(_: any): void {
+    private handleError(error: any): void {
         this.isActive = false;
+        logger.warn(`CallStatsReportGatherer ${this.callId} processStatsReport fails and set to inactive ${error}`);
     }
 
     private processAndEmitConnectionStatsReport(): void {

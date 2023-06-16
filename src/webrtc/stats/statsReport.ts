@@ -20,19 +20,22 @@ import { Resolution } from "./media/mediaTrackStats";
 
 export enum StatsReport {
     CONNECTION_STATS = "StatsReport.connection_stats",
+    CALL_FEED_REPORT = "StatsReport.call_feed_report",
     BYTE_SENT_STATS = "StatsReport.byte_sent_stats",
     SUMMARY_STATS = "StatsReport.summary_stats",
 }
 
-export type TrackID = string;
-export type ByteSend = number;
-
+/// ByteSentStatsReport ################################################################################################
 export interface ByteSentStatsReport extends Map<TrackID, ByteSend> {
     callId?: string;
     opponentMemberId?: string;
     // is a map: `local trackID` => byte send
 }
 
+export type TrackID = string;
+export type ByteSend = number;
+
+/// ConnectionStatsReport ##############################################################################################
 export interface ConnectionStatsReport {
     callId?: string;
     opponentMemberId?: string;
@@ -68,6 +71,7 @@ export interface CodecMap {
     remote: Map<TrackID, string>;
 }
 
+/// SummaryStatsReport #################################################################################################
 export interface SummaryStatsReport {
     /**
      * Aggregated the information for percentage of received media
@@ -83,4 +87,47 @@ export interface SummaryStatsReport {
     maxPacketLoss: number;
     percentageConcealedAudio: number;
     peerConnections: number;
+    opponentUsersInCall?: number;
+    opponentDevicesInCall?: number;
+    diffDevicesToPeerConnections?: number;
+    ratioPeerConnectionToDevices?: number;
+    // Todo: Decide if we want an index (or a timestamp) of this report in relation to the group call, to help differenciate when issues occur and ignore/track initial connection delays.
+}
+
+/// CallFeedReport #####################################################################################################
+export interface CallFeedReport {
+    callId: string;
+    opponentMemberId: string;
+    transceiver: TransceiverStats[];
+    callFeeds: CallFeedStats[];
+}
+
+export interface CallFeedStats {
+    stream: string;
+    type: "remote" | "local";
+    audio: TrackStats | null;
+    video: TrackStats | null;
+    purpose: string;
+    prefix: string;
+    isVideoMuted: boolean;
+    isAudioMuted: boolean;
+}
+
+export interface TransceiverStats {
+    readonly mid: string;
+    readonly sender: TrackStats | null;
+    readonly receiver: TrackStats | null;
+    readonly direction: string;
+    readonly currentDirection: string;
+}
+
+export interface TrackStats {
+    readonly id: string;
+    readonly kind: "audio" | "video";
+    readonly settingDeviceId: string;
+    readonly constrainDeviceId: string;
+    readonly muted: boolean;
+    readonly enabled: boolean;
+    readonly readyState: "ended" | "live";
+    readonly label: string;
 }

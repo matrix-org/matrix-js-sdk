@@ -16,10 +16,18 @@ limitations under the License.
 
 import { DeviceInfo } from "./deviceinfo";
 import { IKeyBackupInfo } from "./keybackup";
-import type { AddSecretStorageKeyOpts } from "../secret-storage";
+import { GeneratedSecretStorageKey } from "../crypto-api";
 
 /* re-exports for backwards compatibility. */
+// CrossSigningKey is used as a value in `client.ts`, we can't export it as a type
 export { CrossSigningKey } from "../crypto-api";
+export type { GeneratedSecretStorageKey as IRecoveryKey } from "../crypto-api";
+
+export type {
+    ImportRoomKeyProgressData as IImportOpts,
+    ImportRoomKeysOpts as IImportRoomKeysOpts,
+} from "../crypto-api";
+
 export type {
     AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
@@ -60,12 +68,6 @@ export interface IEncryptedEventInfo {
     mismatchedSender: boolean;
 }
 
-export interface IRecoveryKey {
-    keyInfo?: AddSecretStorageKeyOpts;
-    privateKey: Uint8Array;
-    encodedPrivateKey?: string;
-}
-
 export interface ICreateSecretStorageOpts {
     /**
      * Function called to await a secret storage key creation flow.
@@ -73,7 +75,7 @@ export interface ICreateSecretStorageOpts {
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
-    createSecretStorageKey?: () => Promise<IRecoveryKey>;
+    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
 
     /**
      * The current key backup object. If passed,
@@ -99,18 +101,4 @@ export interface ICreateSecretStorageOpts {
      * containing the key, or rejects if the key cannot be obtained.
      */
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
-}
-
-export interface IImportOpts {
-    stage: string; // TODO: Enum
-    successes: number;
-    failures: number;
-    total: number;
-}
-
-export interface IImportRoomKeysOpts {
-    /** called with an object that has a "stage" param */
-    progressCallback?: (stage: IImportOpts) => void;
-    untrusted?: boolean;
-    source?: string; // TODO: Enum
 }

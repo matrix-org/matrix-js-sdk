@@ -55,6 +55,7 @@ import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { IMessageOpts } from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -3387,6 +3388,23 @@ describe("Room", function () {
             // the poll should now show up in the room's polls
             const poll = room.polls.get(pollStartEventId);
             expect(poll?.pollId).toBe(pollStartEventId);
+        });
+
+        it("removes poll from state when redacted", async () => {
+            const pollStartEvent = makePollStart("1");
+            const events = [pollStartEvent];
+
+            await room.processPollEvents(events);
+
+            expect(room.polls.get(pollStartEvent.getId()!)).toBeTruthy();
+
+            const redactedEvent = new MatrixEvent({ type: "m.room.redaction" });
+            pollStartEvent.makeRedacted(redactedEvent);
+
+            await flushPromises();
+
+            // removed from poll state
+            expect(room.polls.get(pollStartEvent.getId()!)).toBeFalsy();
         });
     });
 

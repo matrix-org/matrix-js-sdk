@@ -18,12 +18,25 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
+import { AddSecretStorageKeyOpts } from "./secret-storage";
+import { VerificationRequest } from "./crypto-api/verification";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
     Master = "master",
     SelfSigning = "self_signing",
     UserSigning = "user_signing",
+}
+
+/**
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ */
+export interface GeneratedSecretStorageKey {
+    keyInfo?: AddSecretStorageKeyOpts;
+    /** The raw generated private key. */
+    privateKey: Uint8Array;
+    /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
+    encodedPrivateKey?: string;
 }
 
 /**
@@ -81,6 +94,15 @@ export interface CryptoApi {
      *    session export objects
      */
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeys
+     *
+     * @param keys - a list of session export objects
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
      * Get the device information for the given list of users.
@@ -185,6 +207,72 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Get the status of our cross-signing keys.
+     *
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     */
+    getCrossSigningStatus(): Promise<CrossSigningStatus>;
+
+    /**
+     * Create a recovery key (ie, a key suitable for use with server-side secret storage).
+     *
+     * The key can either be based on a user-supplied passphrase, or just created randomly.
+     *
+     * @param password - Optional passphrase string to use to derive the key,
+     *      which can later be entered by the user as an alternative to entering the
+     *      recovery key itself. If omitted, a key is generated randomly.
+     *
+     * @returns Object including recovery key and server upload parameters.
+     *      The private key should be disposed of after displaying to the use.
+     */
+    createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Device/User verification
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns to-device verification requests that are already in progress for the given user id.
+     *
+     * @param userId - the ID of the user to query
+     *
+     * @returns the VerificationRequests that are in progress
+     */
+    getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[];
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     */
+    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestOwnUserVerification(): Promise<VerificationRequest>;
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
 }
 
 /**
@@ -262,4 +350,49 @@ export class DeviceVerificationStatus {
     }
 }
 
+/**
+ * Room key import progress report.
+ * Used when calling {@link CryptoApi#importRoomKeys} as the parameter of
+ * the progressCallback. Used to display feedback.
+ */
+export interface ImportRoomKeyProgressData {
+    stage: string; // TODO: Enum
+    successes: number;
+    failures: number;
+    total: number;
+}
+
+/**
+ * Options object for {@link CryptoApi#importRoomKeys}.
+ */
+export interface ImportRoomKeysOpts {
+    /** Reports ongoing progress of the import process. Can be used for feedback. */
+    progressCallback?: (stage: ImportRoomKeyProgressData) => void;
+    // TODO, the rust SDK will always such imported keys as untrusted
+    untrusted?: boolean;
+    source?: String; // TODO: Enum (backup, file, ??)
+}
+
 export * from "./crypto-api/verification";
+
+/**
+ * The result of a call to {@link CryptoApi.getCrossSigningStatus}.
+ */
+export interface CrossSigningStatus {
+    /**
+     * True if the public master, self signing and user signing keys are available on this device.
+     */
+    publicKeysOnDevice: boolean;
+    /**
+     * True if the private keys are stored in the secret storage.
+     */
+    privateKeysInSecretStorage: boolean;
+    /**
+     * True if the private keys are stored locally.
+     */
+    privateKeysCachedLocally: {
+        masterKey: boolean;
+        selfSigningKey: boolean;
+        userSigningKey: boolean;
+    };
+}

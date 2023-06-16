@@ -30,13 +30,25 @@ import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import {
+    BootstrapCrossSigningOpts,
+    CrossSigningKey,
+    CrossSigningStatus,
+    DeviceVerificationStatus,
+    GeneratedSecretStorageKey,
+    ImportRoomKeyProgressData,
+    ImportRoomKeysOpts,
+    VerificationRequest,
+} from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { ServerSideSecretStorage } from "../secret-storage";
-import { CrossSigningKey } from "../crypto/api";
+import { AddSecretStorageKeyOpts, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
+import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { keyFromPassphrase } from "../crypto/key_passphrase";
+import { encodeRecoveryKey } from "../crypto/recoverykey";
+import { crypto } from "../crypto/crypto";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -71,13 +83,13 @@ export class RustCrypto implements CryptoBackend {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
 
         /** The local user's User ID. */
-        _userId: string,
+        private readonly userId: string,
 
         /** The local user's Device ID. */
         _deviceId: string,
 
         /** Interface to server-side secret storage */
-        _secretStorage: ServerSideSecretStorage,
+        private readonly secretStorage: ServerSideSecretStorage,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
@@ -155,18 +167,6 @@ export class RustCrypto implements CryptoBackend {
     }
 
     /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     */
-    public findVerificationRequestDMInProgress(roomId: string): undefined {
-        // TODO
-        return;
-    }
-
-    /**
      * Get the cross signing information for a given user.
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
@@ -206,8 +206,22 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        // TODO
-        return [];
+        const raw = await this.olmMachine.exportRoomKeys(() => true);
+        return JSON.parse(raw);
+    }
+
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
     }
 
     /**
@@ -325,7 +339,15 @@ export class RustCrypto implements CryptoBackend {
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
-        return false;
+        const { publicKeysOnDevice, privateKeysInSecretStorage, privateKeysCachedLocally } =
+            await this.getCrossSigningStatus();
+        const hasKeysInCache =
+            Boolean(privateKeysCachedLocally.masterKey) &&
+            Boolean(privateKeysCachedLocally.selfSigningKey) &&
+            Boolean(privateKeysCachedLocally.userSigningKey);
+
+        // The cross signing is ready if the public and private keys are available
+        return publicKeysOnDevice && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
@@ -348,6 +370,120 @@ export class RustCrypto implements CryptoBackend {
      */
     public async isSecretStorageReady(): Promise<boolean> {
         return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        const publicKeysOnDevice =
+            Boolean(userIdentity?.masterKey) &&
+            Boolean(userIdentity?.selfSigningKey) &&
+            Boolean(userIdentity?.userSigningKey);
+        const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
+            await this.olmMachine.crossSigningStatus();
+
+        return {
+            publicKeysOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey: Boolean(crossSigningStatus?.hasMaster),
+                userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
+                selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
+            },
+        };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
+     */
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
+        let key: Uint8Array;
+
+        const keyInfo: AddSecretStorageKeyOpts = {};
+        if (password) {
+            // Generate the key from the passphrase
+            const derivation = await keyFromPassphrase(password);
+            keyInfo.passphrase = {
+                algorithm: "m.pbkdf2",
+                iterations: derivation.iterations,
+                salt: derivation.salt,
+            };
+            key = derivation.key;
+        } else {
+            // Using the navigator crypto API to generate the private key
+            key = new Uint8Array(32);
+            crypto.getRandomValues(key);
+        }
+
+        const encodedPrivateKey = encodeRecoveryKey(key);
+        return {
+            keyInfo,
+            encodedPrivateKey,
+            privateKey: key,
+        };
+    }
+
+    /**
+     * Returns to-device verification requests that are already in progress for the given user id.
+     *
+     * Implementation of {@link CryptoApi#getVerificationRequestsToDeviceInProgress}
+     *
+     * @param userId - the ID of the user to query
+     *
+     * @returns the VerificationRequests that are in progress
+     */
+    public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
+        // TODO
+        return [];
+    }
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * Implementation of {@link CryptoApi#findVerificationRequestDMInProgress}
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     *
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
+        // TODO
+        return;
+    }
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestOwnUserVerification}.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public requestOwnUserVerification(): Promise<VerificationRequest> {
+        throw new Error("not implemented");
+    }
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestDeviceVerification }.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
+        throw new Error("not implemented");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

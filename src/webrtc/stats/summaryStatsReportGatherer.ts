@@ -13,6 +13,8 @@ limitations under the License.
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReport } from "./statsReport";
+import { ParticipantState } from "../groupCall";
+import { RoomMember } from "../../matrix";
 
 interface CallStatsReportSummaryCounter {
     receivedAudio: number;
@@ -31,9 +33,12 @@ export class SummaryStatsReportGatherer {
         // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
         const summary = allSummary.filter((s) => !s.isFirstCollection);
         const summaryTotalCount = summary.length;
+        // For counting the peer connections we also want to consider the ignored summaries
+        const peerConnectionsCount = allSummary.length;
         if (summaryTotalCount === 0) {
             return;
         }
+
         const summaryCounter: CallStatsReportSummaryCounter = {
             receivedAudio: 0,
             receivedVideo: 0,
@@ -65,9 +70,31 @@ export class SummaryStatsReportGatherer {
                     ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
                     : 0,
             ),
-            peerConnections: summaryTotalCount,
+            peerConnections: peerConnectionsCount,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
+    }
+
+    public static extendSummaryReport(
+        report: SummaryStatsReport,
+        callParticipants: Map<RoomMember, Map<string, ParticipantState>>,
+    ): void {
+        // Calculate the actual number of devices based on the participants state event
+        // (this is used, to compare the expected participant count from the room state with the acutal peer connections)
+        // const devices = callParticipants.()
+        const devices: [string, ParticipantState][] = [];
+        const users: [RoomMember, Map<string, ParticipantState>][] = [];
+        for (const userEntry of callParticipants) {
+            users.push(userEntry);
+            for (const device of userEntry[1]) {
+                devices.push(device);
+            }
+        }
+        report.opponentDevicesInCall = Math.max(0, devices.length - 1);
+        report.opponentUsersInCall = Math.max(0, users.length - 1);
+        report.diffDevicesToPeerConnections = Math.max(0, devices.length - 1) - report.peerConnections;
+        report.ratioPeerConnectionToDevices =
+            Math.max(0, devices.length - 1) == 0 ? 0 : report.peerConnections / (devices.length - 1);
     }
 
     private countTrackListReceivedMedia(counter: CallStatsReportSummaryCounter, stats: CallStatsReportSummary): void {

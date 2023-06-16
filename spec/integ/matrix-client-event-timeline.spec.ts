@@ -1274,6 +1274,7 @@ describe("MatrixClient event timelines", function () {
             THREAD_ROOT.event_id,
             THREAD_REPLY.event_id,
             THREAD_REPLY2.getId(),
+            THREAD_ROOT_REACTION.getId(),
             THREAD_REPLY3.getId(),
         ]);
     });
@@ -1322,7 +1323,7 @@ describe("MatrixClient event timelines", function () {
             request.respond(200, function () {
                 return {
                     original_event: root,
-                    chunk: [replies],
+                    chunk: replies,
                     // no next batch as this is the oldest end of the timeline
                 };
             });
@@ -1452,7 +1453,7 @@ describe("MatrixClient event timelines", function () {
                 expect(room.getPendingEvents()).toHaveLength(1);
             });
 
-            it("should handle thread updates by reordering the thread list", async () => {
+            it("should handle new thread replies by reordering the thread list", async () => {
                 // Test data for a second thread
                 const THREAD2_ROOT = utils.mkEvent({
                     room: roomId,
@@ -1479,7 +1480,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread2 reply",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1499,7 +1500,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread reply2",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1571,6 +1572,7 @@ describe("MatrixClient event timelines", function () {
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD_ROOT_UPDATED);
+                respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
@@ -1580,6 +1582,134 @@ describe("MatrixClient event timelines", function () {
                 expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD2_ROOT.event_id,
                     THREAD_ROOT.event_id,
+                ]);
+            });
+
+            it("should not reorder the thread list on other thread updates", async () => {
+                // Test data for a second thread
+                const THREAD2_ROOT = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.room.message",
+                    content: {
+                        body: "thread root",
+                        msgtype: "m.text",
+                    },
+                    unsigned: {
+                        "m.relations": {
+                            "io.element.thread": {
+                                //"latest_event": undefined,
+                                count: 1,
+                                current_user_participated: true,
+                            },
+                        },
+                    },
+                    event: false,
+                });
+
+                const THREAD2_REPLY = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.room.message",
+                    content: {
+                        "body": "thread2 reply",
+                        "msgtype": "m.text",
+                        "m.relates_to": {
+                            // We can't use the const here because we change server support mode for test
+                            rel_type: "io.element.thread",
+                            event_id: THREAD_ROOT.event_id,
+                        },
+                    },
+                    event: false,
+                });
+
+                // @ts-ignore we know this is a defined path for THREAD ROOT
+                THREAD2_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD2_REPLY;
+
+                const THREAD_REPLY_REACTION = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.reaction",
+                    content: {
+                        "m.relates_to": {
+                            rel_type: RelationType.Annotation,
+                            event_id: THREAD_REPLY.event_id,
+                            key: "🪿",
+                        },
+                    },
+                    event: true,
+                });
+                THREAD_REPLY_REACTION.localTimestamp += 1000;
+
+                // Modified thread root event containing latest thread reply in its unsigned
+                const THREAD_ROOT_UPDATED = {
+                    ...THREAD_ROOT,
+                    unsigned: {
+                        ...THREAD_ROOT.unsigned,
+                        "m.relations": {
+                            ...THREAD_ROOT.unsigned!["m.relations"],
+                            "io.element.thread": {
+                                ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
+                                count: 2,
+                                latest_event: THREAD_REPLY,
+                            },
+                        },
+                    },
+                };
+
+                // Response with test data for the thread list request
+                const threadsResponse = {
+                    chunk: [THREAD2_ROOT, THREAD_ROOT],
+                    state: [],
+                    next_batch: RANDOM_TOKEN as string | null,
+                };
+
+                // @ts-ignore
+                client.clientOpts.threadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Stable);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+                Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+                await client.stopClient(); // we don't need the client to be syncing at this time
+                const room = client.getRoom(roomId)!;
+
+                // Set up room threads
+                const timelineSets = await room!.createThreadsTimelineSets();
+                expect(timelineSets).not.toBeNull();
+                respondToThreads(threadsResponse);
+                respondToThreads(threadsResponse);
+                respondToEvent(THREAD_ROOT);
+                respondToEvent(THREAD2_ROOT);
+                respondToThread(THREAD_ROOT, [THREAD_REPLY]);
+                respondToThread(THREAD2_ROOT, [THREAD2_REPLY]);
+                await flushHttp(room.fetchRoomThreads());
+                const threadIds = room.getThreads().map((thread) => thread.id);
+                expect(threadIds).toContain(THREAD_ROOT.event_id);
+                expect(threadIds).toContain(THREAD2_ROOT.event_id);
+                const [allThreads] = timelineSets!;
+                const timeline = allThreads.getLiveTimeline()!;
+                // Test threads are in chronological order
+                expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
+                    THREAD_ROOT.event_id,
+                    THREAD2_ROOT.event_id,
+                ]);
+
+                // Test adding a second event to the first thread
+                const thread = room.getThread(THREAD_ROOT.event_id!)!;
+                thread.initialEventsFetched = true;
+                const prom = emitPromise(room, ThreadEvent.Update);
+                respondToEvent(THREAD_ROOT_UPDATED);
+                respondToEvent(THREAD_ROOT_UPDATED);
+                respondToEvent(THREAD_ROOT_UPDATED);
+                respondToEvent(THREAD2_ROOT);
+                await room.addLiveEvents([THREAD_REPLY_REACTION]);
+                await httpBackend.flushAllExpected();
+                await prom;
+                expect(thread.length).toBe(2);
+                // Test thread order is unchanged
+                expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
+                    THREAD_ROOT.event_id,
+                    THREAD2_ROOT.event_id,
                 ]);
             });
         });

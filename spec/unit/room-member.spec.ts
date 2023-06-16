@@ -14,9 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "fetch-mock-jest";
+
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
-import { EventType, RoomState } from "../../src";
+import {
+    createClient,
+    EventType,
+    MatrixClient,
+    RoomState,
+    UNSTABLE_MSC2666_MUTUAL_ROOMS,
+    UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
+    UNSTABLE_MSC2666_SHARED_ROOMS,
+} from "../../src";
 
 describe("RoomMember", function () {
     const roomId = "!foo:bar";
@@ -478,6 +488,128 @@ describe("RoomMember", function () {
             expect(member.name).not.toEqual("Alíce"); // it should disambig.
             // user_id should be there somewhere
             expect(member.name.indexOf(userA)).not.toEqual(-1);
+        });
+    });
+});
+
+describe("MutualRooms", () => {
+    let client: MatrixClient;
+    const HS_URL = "https://example.com";
+    const TEST_USER_ID = "@alice:localhost";
+    const TEST_DEVICE_ID = "xzcvb";
+    const QUERIED_USER = "@user:example.com";
+
+    beforeEach(async () => {
+        // anything that we don't have a specific matcher for silently returns a 404
+        fetchMock.catch(404);
+        fetchMock.config.warnOnFallback = true;
+
+        client = createClient({
+            baseUrl: HS_URL,
+            userId: TEST_USER_ID,
+            accessToken: "akjgkrgjs",
+            deviceId: TEST_DEVICE_ID,
+        });
+    });
+
+    afterEach(async () => {
+        await client.stopClient();
+        fetchMock.mockReset();
+    });
+
+    function enableFeature(feature: string) {
+        const mapping: Record<string, boolean> = {};
+
+        mapping[feature] = true;
+
+        fetchMock.get(`${HS_URL}/_matrix/client/versions`, {
+            unstable_features: mapping,
+            versions: ["v1.1"],
+        });
+    }
+
+    it("supports the initial MSC version (shared rooms)", async () => {
+        enableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
+
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/:user_id", (rawUrl) => {
+            const segments = rawUrl.split("/");
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
+
+            expect(lastSegment).toEqual(QUERIED_USER);
+
+            return {
+                joined: ["!test:example.com"],
+            };
+        });
+
+        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+        expect(rooms).toEqual(["!test:example.com"]);
+    });
+
+    it("supports the renaming MSC version (mutual rooms)", async () => {
+        enableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
+
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/:user_id", (rawUrl) => {
+            const segments = rawUrl.split("/");
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
+
+            expect(lastSegment).toEqual(QUERIED_USER);
+
+            return {
+                joined: ["!test2:example.com"],
+            };
+        });
+
+        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+        expect(rooms).toEqual(["!test2:example.com"]);
+    });
+
+    describe("can work the latest MSC version (query mutual rooms)", () => {
+        beforeEach(() => {
+            enableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS);
+        });
+
+        it("works with a simple response", async () => {
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
+                const url = new URL(rawUrl);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                return {
+                    joined: ["!test3:example.com"],
+                };
+            });
+
+            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!test3:example.com"]);
+        });
+
+        it("works with a paginated response", async () => {
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
+                const url = new URL(rawUrl);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                const token = url.searchParams.get("batch_token");
+
+                if (token == "yahaha") {
+                    return {
+                        joined: ["!korok:example.com"],
+                    };
+                } else {
+                    return {
+                        joined: ["!rock:example.com"],
+                        next_batch_token: "yahaha",
+                    };
+                }
+            });
+
+            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!rock:example.com", "!korok:example.com"]);
         });
     });
 });
