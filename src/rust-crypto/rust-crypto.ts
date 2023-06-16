@@ -18,7 +18,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import type { IEncryptedEventInfo } from "../crypto/api";
+import type { ICreateSecretStorageOpts, IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
@@ -43,12 +43,13 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { AddSecretStorageKeyOpts, ServerSideSecretStorage } from "../secret-storage";
+import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
+import { ICryptoCallbacks } from "../crypto";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -90,6 +91,9 @@ export class RustCrypto implements CryptoBackend {
 
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
+
+        /** Crypto callbacks called during the lifetime of the e2e */
+        private readonly cryptoCallbacks: ICryptoCallbacks,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
@@ -426,6 +430,46 @@ export class RustCrypto implements CryptoBackend {
             encodedPrivateKey,
             privateKey: key,
         };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#bootstrapSecretStorage}
+     */
+    public async bootstrapSecretStorage({
+        createSecretStorageKey = async (): Promise<GeneratedSecretStorageKey> => ({} as GeneratedSecretStorageKey),
+        setupNewSecretStorage,
+    }: ICreateSecretStorageOpts = {}): Promise<void> {
+        // If setupNewSecretStorage is not set, we stop
+        if (!setupNewSecretStorage) return;
+
+        const secretStorageKeyTuple = await this.secretStorage.getKey();
+
+        if (secretStorageKeyTuple) {
+            const [, keyInfo] = secretStorageKeyTuple;
+
+            // If an AES Key is already stored in the secret storage
+            // We stop
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                return;
+            }
+        }
+
+        const recoveryKey = await createSecretStorageKey();
+
+        // keyInfo is required to continue
+        if (!recoveryKey.keyInfo) return;
+
+        const secretStorageKeyObject = await this.secretStorage.addKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES,
+            recoveryKey.keyInfo,
+        );
+        await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
+
+        this.cryptoCallbacks.cacheSecretStorageKey?.(
+            secretStorageKeyObject.keyId,
+            secretStorageKeyObject.keyInfo,
+            recoveryKey.privateKey,
+        );
     }
 
     /**

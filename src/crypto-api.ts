@@ -20,6 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
+import { ICreateSecretStorageOpts } from "./crypto/api";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -228,6 +229,22 @@ export interface CryptoApi {
      *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
+
+    /**
+     *
+     * @param createSecretStorageKey
+     * @param keyBackupInfo
+     * @param setupNewKeyBackup
+     * @param setupNewSecretStorage
+     * @param getKeyBackupPassphrase
+     */
+    bootstrapSecretStorage({
+        createSecretStorageKey,
+        keyBackupInfo,
+        setupNewKeyBackup,
+        setupNewSecretStorage,
+        getKeyBackupPassphrase,
+    }: ICreateSecretStorageOpts): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
