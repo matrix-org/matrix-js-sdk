@@ -2195,13 +2195,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     "express:/_matrix/client/r0/user/:userId/account_data/:type",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
-                        // Resolve with request payload
 
                         if (content.key) {
                             resolve(content.key);
                         }
 
-                        // Return an empty object
                         return {};
                     },
                 );
