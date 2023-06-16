@@ -2253,6 +2253,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(createSecretStorageKey).toHaveBeenCalledTimes(0);
         });
 
+        newBackendOnly("should do no nothing if createSecretStorageKey is not set", async () => {
+            await aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true });
+
+            // No key was created
+            expect(createSecretStorageKey).toHaveBeenCalledTimes(0);
+        });
+
         newBackendOnly("should create a new key", async () => {
             const bootstrapPromise = aliceClient
                 .getCrypto()!
