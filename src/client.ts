@@ -52,7 +52,7 @@ import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from "./ReEmitter";
 import { IRoomEncryption, RoomList } from "./crypto/RoomList";
-import { logger } from "./logger";
+import { logger, Logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
     Body,
@@ -415,6 +415,12 @@ export interface ICreateClientOpts {
      * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
      */
     useLivekitForGroupCalls?: boolean;
+
+    /**
+     * A logger to associate with this MatrixClient.
+     * Defaults to the built-in global logger.
+     */
+    logger?: Logger;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1207,6 +1213,8 @@ const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action"
 export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = "RESTORE_BACKUP_ERROR_BAD_KEY";
 
+    private readonly logger: Logger;
+
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
     public olmVersion: [number, number, number] | null = null; // populated after initCrypto
     public usingExternalCrypto = false;
@@ -1311,6 +1319,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
+
+        // If a custom logger is provided, use it. Otherwise, default to the global
+        // one in logger.ts.
+        this.logger = opts.logger ?? logger;
 
         opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
         opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
