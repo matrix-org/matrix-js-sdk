@@ -52,7 +52,7 @@ import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from "./ReEmitter";
 import { IRoomEncryption, RoomList } from "./crypto/RoomList";
-import { logger } from "./logger";
+import { PrefixedLogger, logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
     HttpApiEvent,
@@ -387,6 +387,8 @@ export interface ICreateClientOpts {
      * Default: false.
      */
     isVoipWithNoMediaAllowed?: boolean;
+
+    logger?: PrefixedLogger;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1211,6 +1213,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public idBaseUrl?: string;
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
+    public readonly logger: PrefixedLogger;
 
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
@@ -1267,6 +1270,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
+
+        // If a custom logger is provided, use it. Otherwise, default to the global
+        // one in this.logger.ts.
+        if (opts.logger) {
+            this.logger = opts.logger;
+        } else {
+            this.logger = logger;
+        }
 
         opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
         opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
