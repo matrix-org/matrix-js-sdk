@@ -271,7 +271,7 @@ export interface CryptoApi {
     /**
      * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
      *
-     * - Do nothing if an AES key is already stored in the secret storage;
+     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
      * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
      * - Store this key in the secret storage and set it as the default key.
      * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
