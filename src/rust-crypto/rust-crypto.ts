@@ -377,6 +377,46 @@ export class RustCrypto implements CryptoBackend {
     }
 
     /**
+     * Implementation of {@link CryptoApi#bootstrapSecretStorage}
+     */
+    public async bootstrapSecretStorage({
+        createSecretStorageKey,
+        setupNewSecretStorage,
+    }: ICreateSecretStorageOpts = {}): Promise<void> {
+        // If setupNewSecretStorage is not set, we stop
+        if (!setupNewSecretStorage || !createSecretStorageKey) return;
+
+        const secretStorageKeyTuple = await this.secretStorage.getKey();
+
+        if (secretStorageKeyTuple) {
+            const [, keyInfo] = secretStorageKeyTuple;
+
+            // If an AES Key is already stored in the secret storage
+            // We stop
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+                return;
+            }
+        }
+
+        const recoveryKey = await createSecretStorageKey();
+
+        // keyInfo is required to continue
+        if (!recoveryKey.keyInfo) return;
+
+        const secretStorageKeyObject = await this.secretStorage.addKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES,
+            recoveryKey.keyInfo,
+        );
+        await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
+
+        this.cryptoCallbacks.cacheSecretStorageKey?.(
+            secretStorageKeyObject.keyId,
+            secretStorageKeyObject.keyInfo,
+            recoveryKey.privateKey,
+        );
+    }
+
+    /**
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
@@ -430,46 +470,6 @@ export class RustCrypto implements CryptoBackend {
             encodedPrivateKey,
             privateKey: key,
         };
-    }
-
-    /**
-     * Implementation of {@link CryptoApi#bootstrapSecretStorage}
-     */
-    public async bootstrapSecretStorage({
-        createSecretStorageKey,
-        setupNewSecretStorage,
-    }: ICreateSecretStorageOpts = {}): Promise<void> {
-        // If setupNewSecretStorage is not set, we stop
-        if (!setupNewSecretStorage || !createSecretStorageKey) return;
-
-        const secretStorageKeyTuple = await this.secretStorage.getKey();
-
-        if (secretStorageKeyTuple) {
-            const [, keyInfo] = secretStorageKeyTuple;
-
-            // If an AES Key is already stored in the secret storage
-            // We stop
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
-                return;
-            }
-        }
-
-        const recoveryKey = await createSecretStorageKey();
-
-        // keyInfo is required to continue
-        if (!recoveryKey.keyInfo) return;
-
-        const secretStorageKeyObject = await this.secretStorage.addKey(
-            SECRET_STORAGE_ALGORITHM_V1_AES,
-            recoveryKey.keyInfo,
-        );
-        await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
-
-        this.cryptoCallbacks.cacheSecretStorageKey?.(
-            secretStorageKeyObject.keyId,
-            secretStorageKeyObject.keyInfo,
-            recoveryKey.privateKey,
-        );
     }
 
     /**
