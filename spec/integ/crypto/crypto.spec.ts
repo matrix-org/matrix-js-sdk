@@ -2325,7 +2325,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
-                // createSecretStorageKey should have been called twice, one by bootstrapSecretStorage call
+                // createSecretStorageKey should have been called twice, one time every bootstrapSecretStorage call
                 expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
             },
         );
