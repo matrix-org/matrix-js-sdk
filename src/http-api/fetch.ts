@@ -25,6 +25,7 @@ import { ConnectionError, MatrixError } from "./errors";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
+import { logger } from "../logger";
 
 type Body = Record<string, any> | BodyInit;
 
@@ -225,6 +226,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
+        logger.debug(`FetchHttpApi: ${method} --> ${url}`);
+
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
         // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
@@ -260,6 +263,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const { signal, cleanup } = anySignal(signals);
 
         let res: Response;
+        const start = Date.now();
         try {
             res = await this.fetch(url, {
                 signal,
@@ -274,7 +278,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 credentials: "omit", // we send credentials via headers
                 keepalive: keepAlive,
             });
+
+            logger.debug(`FetchHttpApi:  <-- ${res.status} ${Date.now() - start}ms ${url}`);
         } catch (e) {
+            logger.debug(`FetchHttpApi:  <-- ${e} ${url}`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
