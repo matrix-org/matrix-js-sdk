@@ -194,9 +194,9 @@ class OlmDecryption extends DecryptionAlgorithm {
 
         // check that the device that encrypted the event belongs to the user that the event claims it's from.
         //
-        // To do this, we need to make sure that our device list is up-to-date. If the device is unknown, we can only
-        // assume that the device logged out and accept it anyway. Some event handlers, such as secret sharing, may be
-        // more strict and reject events that come from unknown devices.
+        // If the device is unknown then we check that we're not in the process of fetching the keys. If after that the
+        // device is still unknown, then we can only assume that the device logged out and accept it anyway. Some event
+        // handlers, such as secret sharing, may be more strict and reject events that come from unknown devices.
         //
         // This is a defence against the following scenario:
         //
@@ -209,8 +209,21 @@ class OlmDecryption extends DecryptionAlgorithm {
         //
         // In practice, it's not clear that the js-sdk would behave that way, so this may be only a defence in depth.
 
-        await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
-        const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
+        let senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
+        if (senderKeyUser == undefined) {
+            // Await for any ongoing key query fetches for the user before trying the lookup again.
+            try {
+                await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
+            } catch (e) {
+                throw new DecryptionError("OLM_BAD_SENDER_CHECK_FAILED", "Could not verify sender identity", {
+                    sender: deviceKey,
+                    err: e as Error,
+                });
+            }
+
+            senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
+        }
+
         if (senderKeyUser !== event.getSender() && senderKeyUser != undefined) {
             throw new DecryptionError("OLM_BAD_SENDER", "Message claimed to be from " + event.getSender(), {
                 real_sender: senderKeyUser,
