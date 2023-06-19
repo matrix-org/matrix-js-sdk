@@ -383,8 +383,8 @@ export class RustCrypto implements CryptoBackend {
         createSecretStorageKey,
         setupNewSecretStorage,
     }: ICreateSecretStorageOpts = {}): Promise<void> {
-        // If setupNewSecretStorage is not set, we stop
-        if (!setupNewSecretStorage || !createSecretStorageKey) return;
+        // If createSecretStorageKey is not set, we stop
+        if (!createSecretStorageKey) return;
 
         // See if we already have an AES secret-storage key.
         const secretStorageKeyTuple = await this.secretStorage.getKey();
@@ -392,9 +392,9 @@ export class RustCrypto implements CryptoBackend {
         if (secretStorageKeyTuple) {
             const [, keyInfo] = secretStorageKeyTuple;
 
-            // If an AES Key is already stored in the secret storage
-            // We stop
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
+            // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
+            // we don't want to create a new key
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES && !setupNewSecretStorage) {
                 return;
             }
         }

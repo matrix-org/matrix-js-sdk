@@ -2202,6 +2202,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                         return {};
                     },
+                    { overwriteRoutes: true },
                 );
             });
         }
@@ -2244,13 +2245,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
         });
 
-        newBackendOnly("should do no nothing if setupNewSecretStorage is not set", async () => {
-            await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
-
-            // No key was created
-            expect(createSecretStorageKey).toHaveBeenCalledTimes(0);
-        });
-
         newBackendOnly("should do no nothing if createSecretStorageKey is not set", async () => {
             await aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true });
 
@@ -2279,27 +2273,61 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(defaultKeyId).toBe(secretStorageKey);
         });
 
-        newBackendOnly("should do nothing if an AES key is already in the secret storage", async () => {
-            const bootstrapPromise = aliceClient
-                .getCrypto()!
-                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+        newBackendOnly(
+            "should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set",
+            async () => {
+                const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
 
-            // Wait for the key to be uploaded in the account data
-            const secretStorageKey = await awaitKeyStoredInAccountData();
+                // Wait for the key to be uploaded in the account data
+                const secretStorageKey = await awaitKeyStoredInAccountData();
 
-            // Return the newly created key in the sync response
-            sendSyncResponse(secretStorageKey);
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
 
-            // Wait for bootstrapSecretStorage to finished
-            await bootstrapPromise;
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
 
-            // Call again bootstrapSecretStorage
-            await aliceClient
-                .getCrypto()!
-                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+                // Call again bootstrapSecretStorage
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
 
-            // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
-            expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
-        });
+                // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
+            },
+        );
+
+        newBackendOnly(
+            "should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage",
+            async () => {
+                let bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                let secretStorageKey = await awaitKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // Call again bootstrapSecretStorage
+                bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                secretStorageKey = await awaitKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // createSecretStorageKey should have been called twice, one by bootstrapSecretStorage call
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
+            },
+        );
     });
 });
