@@ -40,6 +40,7 @@ import {
     ImportRoomKeysOpts,
     VerificationRequest,
     CreateSecretStorageOpts,
+    CryptoCallbacks,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -50,7 +51,6 @@ import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
-import { ICryptoCallbacks } from "../crypto";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -94,7 +94,7 @@ export class RustCrypto implements CryptoBackend {
         private readonly secretStorage: ServerSideSecretStorage,
 
         /** Crypto callbacks provided by the application */
-        private readonly cryptoCallbacks: ICryptoCallbacks,
+        private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);

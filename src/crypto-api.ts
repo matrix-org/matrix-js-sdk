@@ -18,7 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { AddSecretStorageKeyOpts } from "./secret-storage";
+import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { KeyBackupInfo } from "./rust-crypto/keybackup";
 
@@ -446,4 +446,23 @@ export interface CrossSigningStatus {
         selfSigningKey: boolean;
         userSigningKey: boolean;
     };
+}
+
+export interface CryptoCallbacks extends SecretStorageCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    onSecretRequested?: (
+        userId: string,
+        deviceId: string,
+        requestId: string,
+        secretName: string,
+        deviceTrust: DeviceVerificationStatus,
+    ) => Promise<string | undefined>;
+    getDehydrationKey?: (
+        keyInfo: SecretStorageKeyDescription,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }

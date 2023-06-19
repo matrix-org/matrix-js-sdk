@@ -22,13 +22,13 @@ import { Mocked } from "jest-mock";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { ICryptoCallbacks, IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -211,7 +211,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as ICryptoCallbacks,
+                {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -334,7 +334,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as ICryptoCallbacks,
+                {} as CryptoCallbacks,
             );
         });
 
@@ -402,7 +402,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
-    cryptoCallbacks: ICryptoCallbacks = {} as ICryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
     return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
 }

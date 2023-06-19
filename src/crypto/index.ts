@@ -80,7 +80,6 @@ import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
     SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorageCallbacks,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
@@ -97,7 +96,10 @@ import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 
 /* re-exports for backwards compatibility */
-export type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
+export type {
+    BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
+    CryptoCallbacks as ICryptoCallbacks,
+} from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -132,25 +134,6 @@ const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
-}
-
-export interface ICryptoCallbacks extends SecretStorageCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
-    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
-    onSecretRequested?: (
-        userId: string,
-        deviceId: string,
-        requestId: string,
-        secretName: string,
-        deviceTrust: DeviceTrustLevel,
-    ) => Promise<string | undefined>;
-    getDehydrationKey?: (
-        keyInfo: SecretStorageKeyDescription,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
-    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /* eslint-disable camelcase */
