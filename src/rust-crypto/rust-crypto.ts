@@ -18,7 +18,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import type { ICreateSecretStorageOpts, IEncryptedEventInfo } from "../crypto/api";
+import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
@@ -39,6 +39,7 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
+    CreateSecretStorageOpts,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -382,7 +383,7 @@ export class RustCrypto implements CryptoBackend {
     public async bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage,
-    }: ICreateSecretStorageOpts = {}): Promise<void> {
+    }: CreateSecretStorageOpts = {}): Promise<void> {
         // If createSecretStorageKey is not set, we stop
         if (!createSecretStorageKey) return;
 

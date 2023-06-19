@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { ICreateSecretStorageOpts } from "./crypto/api";
+import { KeyBackupInfo } from "./rust-crypto/keybackup";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -38,6 +38,44 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
+}
+
+/**
+ * Parameter of {@link CryptoApi#bootstrapSecretStorage}
+ */
+export interface CreateSecretStorageOpts {
+    /**
+     * Function called to await a secret storage key creation flow.
+     * @returns Promise resolving to an object with public key metadata, encoded private
+     *     recovery key which should be disposed of after displaying to the user,
+     *     and raw private key to avoid round tripping if needed.
+     */
+    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
+
+    /**
+     * The current key backup object. If passed,
+     * the passphrase and recovery key from this backup will be used.
+     */
+    keyBackupInfo?: KeyBackupInfo;
+
+    /**
+     * If true, a new key backup version will be
+     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
+     * is supplied.
+     */
+    setupNewKeyBackup?: boolean;
+
+    /**
+     * Reset even if keys already exist.
+     */
+    setupNewSecretStorage?: boolean;
+
+    /**
+     * Function called to get the user's
+     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
+     * containing the key, or rejects if the key cannot be obtained.
+     */
+    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
 /**
@@ -240,7 +278,7 @@ export interface CryptoApi {
      *
      * @param opts - Options object.
      */
-    bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void>;
+    bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
