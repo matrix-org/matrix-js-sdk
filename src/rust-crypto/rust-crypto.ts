@@ -402,7 +402,9 @@ export class RustCrypto implements CryptoBackend {
         const recoveryKey = await createSecretStorageKey();
 
         // keyInfo is required to continue
-        if (!recoveryKey.keyInfo) return;
+        if (!recoveryKey.keyInfo) {
+            throw new Error("missing keyInfo field in the secret storage key created by createSecretStorageKey");
+        }
 
         const secretStorageKeyObject = await this.secretStorage.addKey(
             SECRET_STORAGE_ALGORITHM_V1_AES,
