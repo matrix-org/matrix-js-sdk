@@ -448,10 +448,19 @@ export interface CrossSigningStatus {
     };
 }
 
+/**
+ * Crypto callbacks provided by the application
+ */
 export interface CryptoCallbacks extends SecretStorageCallbacks {
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+    /**
+     * Called by {@link CryptoApi#bootstrapSecretStorage}
+     * @param keyId - secret storage key id
+     * @param keyInfo - secret storage key info
+     * @param key - private key to store
+     */
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
     onSecretRequested?: (
         userId: string,
