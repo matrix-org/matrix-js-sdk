@@ -31,7 +31,7 @@ import { ICryptoCallbacks } from "../crypto";
  * @param userId - The local user's User ID.
  * @param deviceId - The local user's Device ID.
  * @param secretStorage - Interface to server-side secret storage.
- * @param cryptoCallbacks - Crypto callbacks called during the lifetime of the e2e
+ * @param cryptoCallbacks - Crypto callbacks provided by the application
  */
 export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,

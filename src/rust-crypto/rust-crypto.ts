@@ -92,7 +92,7 @@ export class RustCrypto implements CryptoBackend {
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
 
-        /** Crypto callbacks called during the lifetime of the e2e */
+        /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: ICryptoCallbacks,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
@@ -386,6 +386,7 @@ export class RustCrypto implements CryptoBackend {
         // If setupNewSecretStorage is not set, we stop
         if (!setupNewSecretStorage || !createSecretStorageKey) return;
 
+        // See if we already have an AES secret-storage key.
         const secretStorageKeyTuple = await this.secretStorage.getKey();
 
         if (secretStorageKeyTuple) {
