@@ -51,6 +51,7 @@ import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
+import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 
 const ROOM_ID = "!room:id";
 
@@ -402,6 +403,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+    const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
     const Olm = global.Olm;
 
@@ -2168,5 +2170,164 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 downloadDeviceToJsDevice(queryResponseBody.device_keys[user]["EBMMPAFOPU"]),
             );
         });
+    });
+
+    describe("bootstrapSecretStorage", () => {
+        /**
+         * Create a fake secret storage key
+         * Async because `bootstrapSecretStorage` expect an async method
+         */
+        const createSecretStorageKey = jest.fn().mockResolvedValue({
+            keyInfo: {}, // Returning undefined here used to cause a crash
+            privateKey: Uint8Array.of(32, 33),
+        });
+
+        /**
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/:type`
+         * Resolved when a key is uploaded (ie in `body.content.key`)
+         * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
+         */
+        function awaitKeyStoredInAccountData(): Promise<string> {
+            return new Promise((resolve) => {
+                // This url is called multiple times during the secret storage bootstrap process
+                // When we received the newly generated key, we return it
+                fetchMock.put(
+                    "express:/_matrix/client/r0/user/:userId/account_data/:type",
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+
+                        if (content.key) {
+                            resolve(content.key);
+                        }
+
+                        return {};
+                    },
+                    { overwriteRoutes: true },
+                );
+            });
+        }
+
+        /**
+         * Send in the sync response the provided `secretStorageKey` into the account_data field
+         * The key is set for the `m.secret_storage.default_key` and `m.secret_storage.key.${secretStorageKey}` events
+         * https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
+         * @param secretStorageKey
+         */
+        function sendSyncResponse(secretStorageKey: string) {
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                account_data: {
+                    events: [
+                        {
+                            type: "m.secret_storage.default_key",
+                            content: {
+                                key: secretStorageKey,
+                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+                            },
+                        },
+                        // Needed for secretStorage.getKey or secretStorage.hasKey
+                        {
+                            type: `m.secret_storage.key.${secretStorageKey}`,
+                            content: {
+                                key: secretStorageKey,
+                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+                            },
+                        },
+                    ],
+                },
+            });
+        }
+
+        beforeEach(async () => {
+            createSecretStorageKey.mockClear();
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
+
+        newBackendOnly("should do no nothing if createSecretStorageKey is not set", async () => {
+            await aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true });
+
+            // No key was created
+            expect(createSecretStorageKey).toHaveBeenCalledTimes(0);
+        });
+
+        newBackendOnly("should create a new key", async () => {
+            const bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Finally, wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+
+            const defaultKeyId = await aliceClient.secretStorage.getDefaultKeyId();
+            // Check that the uploaded key in stored in the secret storage
+            expect(await aliceClient.secretStorage.hasKey(secretStorageKey)).toBeTruthy();
+            // Check that the uploaded key is the default key
+            expect(defaultKeyId).toBe(secretStorageKey);
+        });
+
+        newBackendOnly(
+            "should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set",
+            async () => {
+                const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                const secretStorageKey = await awaitKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // Call again bootstrapSecretStorage
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+
+                // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
+            },
+        );
+
+        newBackendOnly(
+            "should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage",
+            async () => {
+                let bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                let secretStorageKey = await awaitKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // Call again bootstrapSecretStorage
+                bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                secretStorageKey = await awaitKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // createSecretStorageKey should have been called twice, one time every bootstrapSecretStorage call
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
+            },
+        );
     });
 });

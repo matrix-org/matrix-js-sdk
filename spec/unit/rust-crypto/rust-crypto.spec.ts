@@ -28,7 +28,7 @@ import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 
 afterEach(() => {
@@ -212,6 +212,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -334,6 +335,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
         });
 
@@ -430,6 +432,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
 }

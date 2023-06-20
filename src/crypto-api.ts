@@ -18,8 +18,9 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { AddSecretStorageKeyOpts } from "./secret-storage";
+import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
+import { KeyBackupInfo } from "./crypto-api/keybackup";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -189,6 +190,18 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
+     *
+     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
+     * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
+     * - Store this key in the secret storage and set it as the default key.
+     * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
+     *
+     * @param opts - Options object.
+     */
+    bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
 
     /**
      * Get the status of our cross-signing keys.
@@ -377,6 +390,72 @@ export interface CrossSigningStatus {
     };
 }
 
+/**
+ * Crypto callbacks provided by the application
+ */
+export interface CryptoCallbacks extends SecretStorageCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+    /**
+     * Called by {@link CryptoApi#bootstrapSecretStorage}
+     * @param keyId - secret storage key id
+     * @param keyInfo - secret storage key info
+     * @param key - private key to store
+     */
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    onSecretRequested?: (
+        userId: string,
+        deviceId: string,
+        requestId: string,
+        secretName: string,
+        deviceTrust: DeviceVerificationStatus,
+    ) => Promise<string | undefined>;
+    getDehydrationKey?: (
+        keyInfo: SecretStorageKeyDescription,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
+}
+
+/**
+ * Parameter of {@link CryptoApi#bootstrapSecretStorage}
+ */
+export interface CreateSecretStorageOpts {
+    /**
+     * Function called to await a secret storage key creation flow.
+     * @returns Promise resolving to an object with public key metadata, encoded private
+     *     recovery key which should be disposed of after displaying to the user,
+     *     and raw private key to avoid round tripping if needed.
+     */
+    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
+
+    /**
+     * The current key backup object. If passed,
+     * the passphrase and recovery key from this backup will be used.
+     */
+    keyBackupInfo?: KeyBackupInfo;
+
+    /**
+     * If true, a new key backup version will be
+     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
+     * is supplied.
+     */
+    setupNewKeyBackup?: boolean;
+
+    /**
+     * Reset even if keys already exist.
+     */
+    setupNewSecretStorage?: boolean;
+
+    /**
+     * Function called to get the user's
+     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
+     * containing the key, or rejects if the key cannot be obtained.
+     */
+    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
+}
+
 /** Types of cross-signing key */
 export enum CrossSigningKey {
     Master = "master",
@@ -396,3 +475,4 @@ export interface GeneratedSecretStorageKey {
 }
 
 export * from "./crypto-api/verification";
+export * from "./crypto-api/keybackup";

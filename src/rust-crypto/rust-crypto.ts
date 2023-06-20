@@ -39,11 +39,13 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
+    CreateSecretStorageOpts,
+    CryptoCallbacks,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { AddSecretStorageKeyOpts, ServerSideSecretStorage } from "../secret-storage";
+import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
@@ -90,6 +92,9 @@ export class RustCrypto implements CryptoBackend {
 
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
+
+        /** Crypto callbacks provided by the application */
+        private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
@@ -373,6 +378,49 @@ export class RustCrypto implements CryptoBackend {
      */
     public async isSecretStorageReady(): Promise<boolean> {
         return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#bootstrapSecretStorage}
+     */
+    public async bootstrapSecretStorage({
+        createSecretStorageKey,
+        setupNewSecretStorage,
+    }: CreateSecretStorageOpts = {}): Promise<void> {
+        // If createSecretStorageKey is not set, we stop
+        if (!createSecretStorageKey) return;
+
+        // See if we already have an AES secret-storage key.
+        const secretStorageKeyTuple = await this.secretStorage.getKey();
+
+        if (secretStorageKeyTuple) {
+            const [, keyInfo] = secretStorageKeyTuple;
+
+            // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
+            // we don't want to create a new key
+            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES && !setupNewSecretStorage) {
+                return;
+            }
+        }
+
+        const recoveryKey = await createSecretStorageKey();
+
+        // keyInfo is required to continue
+        if (!recoveryKey.keyInfo) {
+            throw new Error("missing keyInfo field in the secret storage key created by createSecretStorageKey");
+        }
+
+        const secretStorageKeyObject = await this.secretStorage.addKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES,
+            recoveryKey.keyInfo,
+        );
+        await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
+
+        this.cryptoCallbacks.cacheSecretStorageKey?.(
+            secretStorageKeyObject.keyId,
+            secretStorageKeyObject.keyInfo,
+            recoveryKey.privateKey,
+        );
     }
 
     /**
