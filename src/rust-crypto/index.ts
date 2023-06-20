@@ -57,6 +57,17 @@ export async function initRustCrypto(
         rustCrypto.onRoomKeysUpdated(sessions),
     );
 
+    // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
+    //
+    // This is primarily a fudge to get it to correctly populate the `users_for_key_query` list, so that future
+    // calls to getIdentity (etc) block until the key queries are performed.
+    //
+    // Note that we don't actually need to *make* any requests here; it is sufficient to tell the Rust side to think
+    // about them.
+    //
+    // XXX: find a less hacky way to do this.
+    await olmMachine.outgoingRequests();
+
     logger.info("Completed rust crypto-sdk setup");
     return rustCrypto;
 }

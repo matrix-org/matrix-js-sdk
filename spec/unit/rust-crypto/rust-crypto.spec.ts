@@ -19,10 +19,19 @@ import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import {
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    IHttpOpts,
+    IToDeviceEvent,
+    MatrixClient,
+    MatrixHttpApi,
+    TypedEventEmitter,
+} from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
@@ -420,6 +429,37 @@ describe("RustCrypto", () => {
             expect(recoveryKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
             expect(recoveryKey.keyInfo?.passphrase?.iterations).toBe(500000);
         });
+    });
+
+    it("should wait for a keys/query before returning devices", async () => {
+        jest.useFakeTimers();
+
+        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+            baseUrl: "http://server/",
+            prefix: "",
+            onlyData: true,
+        });
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+
+        // an attempt to fetch the device list should block
+        const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
+        // ... until a /sync completes, and we trigger the outgoingRequests.
+        rustCrypto.onSyncCompleted({});
+
+        const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
+        expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
+        expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
     });
 });
 
