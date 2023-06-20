@@ -194,7 +194,7 @@ class OlmDecryption extends DecryptionAlgorithm {
 
         // check that the device that encrypted the event belongs to the user that the event claims it's from.
         //
-        // If the device is unknown then we check that we're not in the process of fetching the keys. If after that the
+        // If the device is unknown then we check that we don't have any pending key-query requests for the sender. If after that the
         // device is still unknown, then we can only assume that the device logged out and accept it anyway. Some event
         // handlers, such as secret sharing, may be more strict and reject events that come from unknown devices.
         //
