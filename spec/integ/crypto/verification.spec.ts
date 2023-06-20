@@ -40,6 +40,7 @@ import {
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -90,6 +91,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: SyncResponder;
 
+    /** an object which intercepts `/keys/query` requests from {@link #aliceClient} */
+    let e2eKeyResponder: E2EKeyResponder;
+
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -104,6 +108,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         await initCrypto(aliceClient);
+
+        e2eKeyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+        syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
+        mockInitialApiRequests(aliceClient.getHomeserverUrl());
+        aliceClient.startClient();
     });
 
     afterEach(async () => {
@@ -111,172 +120,153 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         fetchMock.mockReset();
     });
 
-    beforeEach(() => {
-        syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
-        mockInitialApiRequests(aliceClient.getHomeserverUrl());
-        aliceClient.startClient();
-    });
+    describe("Outgoing verification requests for another device", () => {
+        beforeEach(async () => {
+            // pretend that we have another device, which we will verify
+            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+        });
 
-    oldBackendOnly("Outgoing verification: can verify another device via SAS", async () => {
-        // expect requests to download our own keys
-        fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
-            device_keys: {
-                [TEST_USER_ID]: {
-                    [TEST_DEVICE_ID]: SIGNED_TEST_DEVICE_DATA,
+        oldBackendOnly("can verify via SAS", async () => {
+            // have alice initiate a verification. She should send a m.key.verification.request
+            let [requestBody, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId;
+            expect(transactionId).toBeDefined();
+            expect(request.phase).toEqual(VerificationPhase.Requested);
+            expect(request.roomId).toBeUndefined();
+            expect(request.isSelfVerification).toBe(true);
+            expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(false); // no reply yet
+            expect(request.chosenMethod).toBe(null); // nothing chosen yet
+            expect(request.initiatedByMe).toBe(true);
+            expect(request.otherUserId).toEqual(TEST_USER_ID);
+
+            let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.methods).toContain("m.sas.v1");
+            expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+
+            // The dummy device replies with an m.key.verification.ready...
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.ready",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    methods: ["m.sas.v1"],
+                    transaction_id: transactionId,
                 },
-            },
-        });
+            });
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.otherDeviceId).toEqual(TEST_DEVICE_ID);
 
-        // have alice initiate a verification. She should send a m.key.verification.request
-        let [requestBody, request] = await Promise.all([
-            expectSendToDeviceMessage("m.key.verification.request"),
-            aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
-        ]);
-        const transactionId = request.transactionId;
-        expect(transactionId).toBeDefined();
-        expect(request.phase).toEqual(VerificationPhase.Requested);
-        expect(request.roomId).toBeUndefined();
-        expect(request.isSelfVerification).toBe(true);
-        expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(false); // no reply yet
-        expect(request.chosenMethod).toBe(null); // nothing chosen yet
-        expect(request.initiatedByMe).toBe(true);
-        expect(request.otherUserId).toEqual(TEST_USER_ID);
-
-        let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.methods).toContain("m.sas.v1");
-        expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
-        expect(toDeviceMessage.transaction_id).toEqual(transactionId);
-
-        // The dummy device replies with an m.key.verification.ready...
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.ready",
-            content: {
-                from_device: TEST_DEVICE_ID,
-                methods: ["m.sas.v1"],
-                transaction_id: transactionId,
-            },
-        });
-        await waitForVerificationRequestChanged(request);
-        expect(request.phase).toEqual(VerificationPhase.Ready);
-        expect(request.otherDeviceId).toEqual(TEST_DEVICE_ID);
-
-        // ... and picks a method with m.key.verification.start
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.start",
-            content: {
-                from_device: TEST_DEVICE_ID,
-                method: "m.sas.v1",
-                transaction_id: transactionId,
-                hashes: ["sha256"],
-                key_agreement_protocols: ["curve25519-hkdf-sha256"],
-                message_authentication_codes: ["hkdf-hmac-sha256.v2"],
-                // we have to include "decimal" per the spec.
-                short_authentication_string: ["decimal", "emoji"],
-            },
-        });
-        await waitForVerificationRequestChanged(request);
-        expect(request.phase).toEqual(VerificationPhase.Started);
-        expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
-        expect(request.chosenMethod).toEqual("m.sas.v1");
-
-        // there should now be a verifier
-        const verifier: Verifier = request.verifier!;
-        expect(verifier).toBeDefined();
-        expect(verifier.getShowSasCallbacks()).toBeNull();
-
-        // start off the verification process: alice will send an `accept`
-        const verificationPromise = verifier.verify();
-        // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-        jest.advanceTimersByTime(10);
-
-        requestBody = await expectSendToDeviceMessage("m.key.verification.accept");
-        toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
-        expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
-        const macMethod = toDeviceMessage.message_authentication_code;
-        expect(macMethod).toEqual("hkdf-hmac-sha256.v2");
-        expect(toDeviceMessage.transaction_id).toEqual(transactionId);
-
-        // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
-        // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
-        const olmSAS = new global.Olm.SAS();
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.key",
-            content: {
-                transaction_id: transactionId,
-                key: olmSAS.get_pubkey(),
-            },
-        });
-
-        // alice responds with a 'key' ...
-        requestBody = await expectSendToDeviceMessage("m.key.verification.key");
-        toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.transaction_id).toEqual(transactionId);
-        const aliceDevicePubKeyBase64 = toDeviceMessage.key;
-        olmSAS.set_their_key(aliceDevicePubKeyBase64);
-
-        // ... and the client is notified to show the emoji
-        const showSas = await new Promise<ShowSasCallbacks>((resolve) => {
-            verifier.once(VerifierEvent.ShowSas, resolve);
-        });
-
-        // `getShowSasCallbacks` is an alternative way to get the callbacks
-        expect(verifier.getShowSasCallbacks()).toBe(showSas);
-        expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
-
-        // user confirms that the emoji match, and alice sends a 'mac'
-        [requestBody] = await Promise.all([expectSendToDeviceMessage("m.key.verification.mac"), showSas.confirm()]);
-        toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.transaction_id).toEqual(transactionId);
-
-        // the dummy device also confirms that the emoji match, and sends a mac
-        const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${TEST_USER_ID}${aliceClient.deviceId}${transactionId}`;
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.mac",
-            content: {
-                keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
-                transaction_id: transactionId,
-                mac: {
-                    [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
-                        olmSAS,
-                        TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
-                        `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
-                    ),
+            // ... and picks a method with m.key.verification.start
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.start",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    method: "m.sas.v1",
+                    transaction_id: transactionId,
+                    hashes: ["sha256"],
+                    key_agreement_protocols: ["curve25519-hkdf-sha256"],
+                    message_authentication_codes: ["hkdf-hmac-sha256.v2"],
+                    // we have to include "decimal" per the spec.
+                    short_authentication_string: ["decimal", "emoji"],
                 },
-            },
-        });
+            });
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Started);
+            expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
+            expect(request.chosenMethod).toEqual("m.sas.v1");
 
-        // that should satisfy Alice, who should reply with a 'done'
-        await expectSendToDeviceMessage("m.key.verification.done");
+            // there should now be a verifier
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(verifier.getShowSasCallbacks()).toBeNull();
 
-        // the dummy device also confirms done-ness
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.done",
-            content: {
-                transaction_id: transactionId,
-            },
-        });
+            // start off the verification process: alice will send an `accept`
+            const verificationPromise = verifier.verify();
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            jest.advanceTimersByTime(10);
 
-        // ... and the whole thing should be done!
-        await verificationPromise;
-        expect(request.phase).toEqual(VerificationPhase.Done);
+            requestBody = await expectSendToDeviceMessage("m.key.verification.accept");
+            toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
+            expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
+            const macMethod = toDeviceMessage.message_authentication_code;
+            expect(macMethod).toEqual("hkdf-hmac-sha256.v2");
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
-        // we're done with the temporary keypair
-        olmSAS.free();
-    });
+            // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
+            // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
+            const olmSAS = new global.Olm.SAS();
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.key",
+                content: {
+                    transaction_id: transactionId,
+                    key: olmSAS.get_pubkey(),
+                },
+            });
 
-    oldBackendOnly(
-        "Outgoing verification: can verify another device via QR code with an untrusted cross-signing key",
-        async () => {
-            // expect requests to download our own keys
-            fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
-                device_keys: {
-                    [TEST_USER_ID]: {
-                        [TEST_DEVICE_ID]: SIGNED_TEST_DEVICE_DATA,
+            // alice responds with a 'key' ...
+            requestBody = await expectSendToDeviceMessage("m.key.verification.key");
+            toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+            const aliceDevicePubKeyBase64 = toDeviceMessage.key;
+            olmSAS.set_their_key(aliceDevicePubKeyBase64);
+
+            // ... and the client is notified to show the emoji
+            const showSas = await new Promise<ShowSasCallbacks>((resolve) => {
+                verifier.once(VerifierEvent.ShowSas, resolve);
+            });
+
+            // `getShowSasCallbacks` is an alternative way to get the callbacks
+            expect(verifier.getShowSasCallbacks()).toBe(showSas);
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
+
+            // user confirms that the emoji match, and alice sends a 'mac'
+            [requestBody] = await Promise.all([expectSendToDeviceMessage("m.key.verification.mac"), showSas.confirm()]);
+            toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+
+            // the dummy device also confirms that the emoji match, and sends a mac
+            const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${TEST_USER_ID}${aliceClient.deviceId}${transactionId}`;
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.mac",
+                content: {
+                    keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
+                    transaction_id: transactionId,
+                    mac: {
+                        [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
+                            olmSAS,
+                            TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+                            `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
+                        ),
                     },
                 },
-                ...SIGNED_CROSS_SIGNING_KEYS_DATA,
             });
+
+            // that should satisfy Alice, who should reply with a 'done'
+            await expectSendToDeviceMessage("m.key.verification.done");
+
+            // the dummy device also confirms done-ness
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.done",
+                content: {
+                    transaction_id: transactionId,
+                },
+            });
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
+            expect(request.phase).toEqual(VerificationPhase.Done);
+
+            // we're done with the temporary keypair
+            olmSAS.free();
+        });
+
+        oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             //
@@ -368,53 +358,50 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // ... and the whole thing should be done!
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
-        },
-    );
+        });
+    });
 
-    oldBackendOnly("Incoming verification: can accept", async () => {
-        // expect requests to download our own keys
-        fetchMock.post(new RegExp("/_matrix/client/(r0|v3)/keys/query"), {
-            device_keys: {
-                [TEST_USER_ID]: {
-                    [TEST_DEVICE_ID]: SIGNED_TEST_DEVICE_DATA,
+    describe("Incoming verification from another device", () => {
+        beforeEach(() => {
+            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+        });
+
+        oldBackendOnly("Incoming verification: can accept", async () => {
+            const TRANSACTION_ID = "abcd";
+
+            // Initiate the request by sending a to-device message
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.request",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    methods: ["m.sas.v1"],
+                    transaction_id: TRANSACTION_ID,
+                    timestamp: Date.now() - 1000,
                 },
-            },
+            });
+            const request: VerificationRequest = await emitPromise(aliceClient, CryptoEvent.VerificationRequest);
+            expect(request.transactionId).toEqual(TRANSACTION_ID);
+            expect(request.phase).toEqual(VerificationPhase.Requested);
+            expect(request.roomId).toBeUndefined();
+            expect(request.initiatedByMe).toBe(false);
+            expect(request.otherUserId).toEqual(TEST_USER_ID);
+            expect(request.chosenMethod).toBe(null); // nothing chosen yet
+            expect(canAcceptVerificationRequest(request)).toBe(true);
+
+            // Alice accepts, by sending a to-device message
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.ready");
+            const acceptPromise = request.accept();
+            expect(canAcceptVerificationRequest(request)).toBe(false);
+            expect(request.phase).toEqual(VerificationPhase.Requested);
+            await acceptPromise;
+            const requestBody = await sendToDevicePromise;
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.methods).toContain("m.sas.v1");
+            expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+            expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
         });
-
-        const TRANSACTION_ID = "abcd";
-
-        // Initiate the request by sending a to-device message
-        returnToDeviceMessageFromSync({
-            type: "m.key.verification.request",
-            content: {
-                from_device: TEST_DEVICE_ID,
-                methods: ["m.sas.v1"],
-                transaction_id: TRANSACTION_ID,
-                timestamp: Date.now() - 1000,
-            },
-        });
-        const request: VerificationRequest = await emitPromise(aliceClient, CryptoEvent.VerificationRequest);
-        expect(request.transactionId).toEqual(TRANSACTION_ID);
-        expect(request.phase).toEqual(VerificationPhase.Requested);
-        expect(request.roomId).toBeUndefined();
-        expect(request.initiatedByMe).toBe(false);
-        expect(request.otherUserId).toEqual(TEST_USER_ID);
-        expect(request.chosenMethod).toBe(null); // nothing chosen yet
-        expect(canAcceptVerificationRequest(request)).toBe(true);
-
-        // Alice accepts, by sending a to-device message
-        const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.ready");
-        const acceptPromise = request.accept();
-        expect(canAcceptVerificationRequest(request)).toBe(false);
-        expect(request.phase).toEqual(VerificationPhase.Requested);
-        await acceptPromise;
-        const requestBody = await sendToDevicePromise;
-        expect(request.phase).toEqual(VerificationPhase.Ready);
-
-        const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-        expect(toDeviceMessage.methods).toContain("m.sas.v1");
-        expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
-        expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
     });
 
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
