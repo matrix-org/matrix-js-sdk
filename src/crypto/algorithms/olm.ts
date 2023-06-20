@@ -225,7 +225,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
         }
 
-        if (senderKeyUser !== event.getSender() && senderKeyUser != undefined) {
+        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined) {
             throw new DecryptionError("OLM_BAD_SENDER", "Message claimed to be from " + event.getSender(), {
                 real_sender: senderKeyUser,
             });
