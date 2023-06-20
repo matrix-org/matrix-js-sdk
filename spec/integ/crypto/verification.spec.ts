@@ -136,6 +136,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         expect(transactionId).toBeDefined();
         expect(request.phase).toEqual(VerificationPhase.Requested);
         expect(request.roomId).toBeUndefined();
+        expect(request.isSelfVerification).toBe(true);
+        expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(false); // no reply yet
+        expect(request.chosenMethod).toBe(null); // nothing chosen yet
+        expect(request.initiatedByMe).toBe(true);
+        expect(request.otherUserId).toEqual(TEST_USER_ID);
 
         let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
         expect(toDeviceMessage.methods).toContain("m.sas.v1");
@@ -171,6 +176,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
         await waitForVerificationRequestChanged(request);
         expect(request.phase).toEqual(VerificationPhase.Started);
+        expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
         expect(request.chosenMethod).toEqual("m.sas.v1");
 
         // there should now be a verifier
@@ -187,6 +193,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
         expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
         expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
+        const macMethod = toDeviceMessage.message_authentication_code;
+        expect(macMethod).toEqual("hkdf-hmac-sha256.v2");
         expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
         // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
@@ -389,6 +397,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         expect(request.transactionId).toEqual(TRANSACTION_ID);
         expect(request.phase).toEqual(VerificationPhase.Requested);
         expect(request.roomId).toBeUndefined();
+        expect(request.initiatedByMe).toBe(false);
+        expect(request.otherUserId).toEqual(TEST_USER_ID);
+        expect(request.chosenMethod).toBe(null); // nothing chosen yet
         expect(canAcceptVerificationRequest(request)).toBe(true);
 
         // Alice accepts, by sending a to-device message
