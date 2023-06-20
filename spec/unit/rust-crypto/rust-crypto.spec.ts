@@ -367,7 +367,35 @@ describe("RustCrypto", () => {
             rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
         });
 
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("returns false initially", async () => {
+            jest.useFakeTimers();
+            const prom = rustCrypto.userHasCrossSigningKeys();
+            // the getIdentity() request should wait for a /keys/query request to complete, but times out after 1500ms
+            await jest.advanceTimersByTimeAsync(2000);
+            await expect(prom).resolves.toBe(false);
+        });
+
         it("returns false if there is no cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the device keys but *no* cross-signing keys.
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify({
+                    device_keys: {
+                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                    },
+                }),
+            );
+
             await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
         });
 
@@ -381,7 +409,12 @@ describe("RustCrypto", () => {
             await olmMachine.markRequestAsSent(
                 req.id!,
                 req.type,
-                JSON.stringify(testData.SIGNED_CROSS_SIGNING_KEYS_DATA),
+                JSON.stringify({
+                    device_keys: {
+                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                    },
+                    ...testData.SIGNED_CROSS_SIGNING_KEYS_DATA,
+                }),
             );
 
             // ... and we should now have cross-signing keys.
