@@ -35,9 +35,9 @@ import {
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 
 afterEach(() => {
@@ -221,6 +221,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -343,6 +344,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
         });
 
@@ -364,6 +366,35 @@ describe("RustCrypto", () => {
             olmMachine.getDevice.mockResolvedValue(undefined);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
             expect(res).toBe(null);
+        });
+    });
+
+    describe("userHasCrossSigningKeys", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
+        });
+
+        it("returns false if there is no cross-signing identity", async () => {
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
+        });
+
+        it("returns true if OlmMachine has a cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the cross-signing keys
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify(testData.SIGNED_CROSS_SIGNING_KEYS_DATA),
+            );
+
+            // ... and we should now have cross-signing keys.
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
         });
     });
 
@@ -441,6 +472,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
 }
