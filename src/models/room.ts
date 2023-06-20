@@ -2103,6 +2103,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         threadId?: string;
     } {
         if (!this.client?.supportsThreads()) {
+            logger.debug(`Room::eventShouldLiveIn: eventId=${event.getId()} client does not support threads`);
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2111,6 +2112,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // A thread root is always shown in both timelines
         if (event.isThreadRoot || roots?.has(event.getId()!)) {
+            if (event.isThreadRoot) {
+                logger.debug(`Room::eventShouldLiveIn: eventId=${event.getId()} isThreadRoot is true`);
+            } else {
+                logger.debug(`Room::eventShouldLiveIn: eventId=${event.getId()} is a known thread root`);
+            }
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
@@ -2121,6 +2127,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // A thread relation (1st and 2nd order) is always only shown in a thread
         const threadRootId = event.threadRootId;
         if (threadRootId != undefined) {
+            logger.debug(
+                `Room::eventShouldLiveIn: eventId=${event.getId()} threadRootId=${threadRootId} is part of a thread`,
+            );
             return {
                 shouldLiveInRoom: false,
                 shouldLiveInThread: true,
@@ -2132,6 +2141,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let parentEvent: MatrixEvent | undefined;
         if (parentEventId) {
             parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+            logger.debug(
+                `Room::eventShouldLiveIn: eventId=${event.getId()} parentEventId=${parentEventId} found=${!!parentEvent}`,
+            );
         }
 
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
@@ -2140,6 +2152,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (!event.isRelation()) {
+            logger.debug(`Room::eventShouldLiveIn: eventId=${event.getId()} not a relation`);
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2148,6 +2161,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // Edge case where we know the event is a relation but don't have the parentEvent
         if (roots?.has(event.relationEventId!)) {
+            logger.debug(
+                `Room::eventShouldLiveIn: eventId=${event.getId()} relationEventId=${
+                    event.relationEventId
+                } is a known root`,
+            );
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
@@ -2158,6 +2176,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // We've exhausted all scenarios,
         // we cannot assume that it lives in the main timeline as this may be a relation for an unknown thread
         // adding the event in the wrong timeline causes stuck notifications and can break ability to send read receipts
+        logger.debug(`Room::eventShouldLiveIn: eventId=${event.getId()} belongs to an unknown timeline`);
         return {
             shouldLiveInRoom: false,
             shouldLiveInThread: false,

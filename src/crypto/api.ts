@@ -15,13 +15,14 @@ limitations under the License.
 */
 
 import { DeviceInfo } from "./deviceinfo";
-import { IKeyBackupInfo } from "./keybackup";
-import { GeneratedSecretStorageKey } from "../crypto-api";
 
 /* re-exports for backwards compatibility. */
 // CrossSigningKey is used as a value in `client.ts`, we can't export it as a type
 export { CrossSigningKey } from "../crypto-api";
-export type { GeneratedSecretStorageKey as IRecoveryKey } from "../crypto-api";
+export type {
+    GeneratedSecretStorageKey as IRecoveryKey,
+    CreateSecretStorageOpts as ICreateSecretStorageOpts,
+} from "../crypto-api";
 
 export type {
     ImportRoomKeyProgressData as IImportOpts,
@@ -66,39 +67,4 @@ export interface IEncryptedEventInfo {
      * if the event's ed25519 and curve25519 keys don't match (only meaningful if `sender` is set)
      */
     mismatchedSender: boolean;
-}
-
-export interface ICreateSecretStorageOpts {
-    /**
-     * Function called to await a secret storage key creation flow.
-     * @returns Promise resolving to an object with public key metadata, encoded private
-     *     recovery key which should be disposed of after displaying to the user,
-     *     and raw private key to avoid round tripping if needed.
-     */
-    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
-
-    /**
-     * The current key backup object. If passed,
-     * the passphrase and recovery key from this backup will be used.
-     */
-    keyBackupInfo?: IKeyBackupInfo;
-
-    /**
-     * If true, a new key backup version will be
-     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
-     * is supplied.
-     */
-    setupNewKeyBackup?: boolean;
-
-    /**
-     * Reset even if keys already exist.
-     */
-    setupNewSecretStorage?: boolean;
-
-    /**
-     * Function called to get the user's
-     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
-     * containing the key, or rejects if the key cannot be obtained.
-     */
-    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }

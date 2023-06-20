@@ -19,16 +19,26 @@ import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import {
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    IHttpOpts,
+    IToDeviceEvent,
+    MatrixClient,
+    MatrixHttpApi,
+    TypedEventEmitter,
+} from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
+import * as testData from "../../test-utils/test-data";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -211,6 +221,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -333,6 +344,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
         });
 
@@ -354,6 +366,35 @@ describe("RustCrypto", () => {
             olmMachine.getDevice.mockResolvedValue(undefined);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
             expect(res).toBe(null);
+        });
+    });
+
+    describe("userHasCrossSigningKeys", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
+        });
+
+        it("returns false if there is no cross-signing identity", async () => {
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
+        });
+
+        it("returns true if OlmMachine has a cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the cross-signing keys
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify(testData.SIGNED_CROSS_SIGNING_KEYS_DATA),
+            );
+
+            // ... and we should now have cross-signing keys.
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
         });
     });
 
@@ -389,6 +430,37 @@ describe("RustCrypto", () => {
             expect(recoveryKey.keyInfo?.passphrase?.iterations).toBe(500000);
         });
     });
+
+    it("should wait for a keys/query before returning devices", async () => {
+        jest.useFakeTimers();
+
+        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+            baseUrl: "http://server/",
+            prefix: "",
+            onlyData: true,
+        });
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+
+        // an attempt to fetch the device list should block
+        const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
+        // ... until a /sync completes, and we trigger the outgoingRequests.
+        rustCrypto.onSyncCompleted({});
+
+        const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
+        expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
+        expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
+    });
 });
 
 /** build a basic RustCrypto instance for testing
@@ -400,6 +472,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
 }
