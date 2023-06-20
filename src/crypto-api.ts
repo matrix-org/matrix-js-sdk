@@ -22,24 +22,6 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { KeyBackupInfo } from "./crypto-api/keybackup";
 
-/** Types of cross-signing key */
-export enum CrossSigningKey {
-    Master = "master",
-    SelfSigning = "self_signing",
-    UserSigning = "user_signing",
-}
-
-/**
- * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
- */
-export interface GeneratedSecretStorageKey {
-    keyInfo?: AddSecretStorageKeyOpts;
-    /** The raw generated private key. */
-    privateKey: Uint8Array;
-    /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
-    encodedPrivateKey?: string;
-}
-
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
@@ -386,8 +368,6 @@ export interface ImportRoomKeysOpts {
     source?: String; // TODO: Enum (backup, file, ??)
 }
 
-export * from "./crypto-api/verification";
-
 /**
  * The result of a call to {@link CryptoApi.getCrossSigningStatus}.
  */
@@ -476,5 +456,23 @@ export interface CreateSecretStorageOpts {
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
-// Export key backup as public identifiers
+/** Types of cross-signing key */
+export enum CrossSigningKey {
+    Master = "master",
+    SelfSigning = "self_signing",
+    UserSigning = "user_signing",
+}
+
+/**
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ */
+export interface GeneratedSecretStorageKey {
+    keyInfo?: AddSecretStorageKeyOpts;
+    /** The raw generated private key. */
+    privateKey: Uint8Array;
+    /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
+    encodedPrivateKey?: string;
+}
+
+export * from "./crypto-api/verification";
 export * from "./crypto-api/keybackup";
