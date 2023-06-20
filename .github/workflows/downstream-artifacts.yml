@@ -19,7 +19,7 @@ concurrency:
 jobs:
     build-element-web:
         name: Build element-web
-        uses: matrix-org/matrix-react-sdk/.github/workflows/element-web.yaml@develop
+        uses: matrix-org/matrix-react-sdk/.github/workflows/element-web.yaml@v3.73.1
         with:
             matrix-js-sdk-sha: ${{ github.sha }}
             react-sdk-repository: matrix-org/matrix-react-sdk
