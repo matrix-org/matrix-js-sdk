@@ -22,9 +22,6 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { KeyBackupInfo } from "./crypto-api/keybackup";
 
-// Export key backup as public identifiers
-export * from "./crypto-api/keybackup";
-
 /** Types of cross-signing key */
 export enum CrossSigningKey {
     Master = "master",
@@ -478,3 +475,6 @@ export interface CreateSecretStorageOpts {
      */
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
+
+// Export key backup as public identifiers
+export * from "./crypto-api/keybackup";
