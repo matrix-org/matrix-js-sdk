@@ -194,9 +194,10 @@ class OlmDecryption extends DecryptionAlgorithm {
 
         // check that the device that encrypted the event belongs to the user that the event claims it's from.
         //
-        // If the device is unknown then we check that we don't have any pending key-query requests for the sender. If after that the
-        // device is still unknown, then we can only assume that the device logged out and accept it anyway. Some event
-        // handlers, such as secret sharing, may be more strict and reject events that come from unknown devices.
+        // If the device is unknown then we check that we don't have any pending key-query requests for the sender. If
+        // after that the device is still unknown, then we can only assume that the device logged out and accept it
+        // anyway. Some event handlers, such as secret sharing, may be more strict and reject events that come from
+        // unknown devices.
         //
         // This is a defence against the following scenario:
         //
@@ -204,8 +205,8 @@ class OlmDecryption extends DecryptionAlgorithm {
         //   * Mallory gets control of Alice's server, and sends a megolm session to Alice using her (Mallory's)
         //     senderkey, but claiming to be from Bob.
         //   * Mallory sends more events using that session, claiming to be from Bob.
-        //   * Alice sees that the senderkey is verified (since she verified Mallory) so marks events those
-        //     events as verified even though the sender is forged.
+        //   * Alice sees that the senderkey is verified (since she verified Mallory) so marks events those events as
+        //     verified even though the sender is forged.
         //
         // In practice, it's not clear that the js-sdk would behave that way, so this may be only a defence in depth.
 
