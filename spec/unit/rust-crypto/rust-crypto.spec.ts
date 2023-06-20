@@ -26,9 +26,10 @@ import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../..
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
+import * as testData from "../../test-utils/test-data";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -356,6 +357,35 @@ describe("RustCrypto", () => {
             olmMachine.getDevice.mockResolvedValue(undefined);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
             expect(res).toBe(null);
+        });
+    });
+
+    describe("userHasCrossSigningKeys", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
+        });
+
+        it("returns false if there is no cross-signing identity", async () => {
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
+        });
+
+        it("returns true if OlmMachine has a cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the cross-signing keys
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify(testData.SIGNED_CROSS_SIGNING_KEYS_DATA),
+            );
+
+            // ... and we should now have cross-signing keys.
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
         });
     });
 

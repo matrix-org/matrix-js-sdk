@@ -193,9 +193,12 @@ export class RustCrypto implements CryptoBackend {
 
     public globalBlacklistUnverifiedDevices = false;
 
+    /**
+     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
+     */
     public async userHasCrossSigningKeys(): Promise<boolean> {
-        // TODO
-        return false;
+        const userIdentity = await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+        return userIdentity !== undefined;
     }
 
     public prepareToEncrypt(room: Room): void {
