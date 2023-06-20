@@ -20,7 +20,10 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./rust-crypto/keybackup";
+import { KeyBackupInfo } from "./crypto-api/keybackup";
+
+// Export key backup as public identifiers
+export * from "./crypto-api/keybackup";
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
@@ -38,44 +41,6 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
-}
-
-/**
- * Parameter of {@link CryptoApi#bootstrapSecretStorage}
- */
-export interface CreateSecretStorageOpts {
-    /**
-     * Function called to await a secret storage key creation flow.
-     * @returns Promise resolving to an object with public key metadata, encoded private
-     *     recovery key which should be disposed of after displaying to the user,
-     *     and raw private key to avoid round tripping if needed.
-     */
-    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
-
-    /**
-     * The current key backup object. If passed,
-     * the passphrase and recovery key from this backup will be used.
-     */
-    keyBackupInfo?: KeyBackupInfo;
-
-    /**
-     * If true, a new key backup version will be
-     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
-     * is supplied.
-     */
-    setupNewKeyBackup?: boolean;
-
-    /**
-     * Reset even if keys already exist.
-     */
-    setupNewSecretStorage?: boolean;
-
-    /**
-     * Function called to get the user's
-     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
-     * containing the key, or rejects if the key cannot be obtained.
-     */
-    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
 /**
@@ -248,6 +213,18 @@ export interface CryptoApi {
     isSecretStorageReady(): Promise<boolean>;
 
     /**
+     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
+     *
+     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
+     * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
+     * - Store this key in the secret storage and set it as the default key.
+     * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
+     *
+     * @param opts - Options object.
+     */
+    bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
+
+    /**
      * Get the status of our cross-signing keys.
      *
      * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
@@ -267,18 +244,6 @@ export interface CryptoApi {
      *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
-
-    /**
-     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
-     *
-     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
-     * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
-     * - Store this key in the secret storage and set it as the default key.
-     * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
-     *
-     * @param opts - Options object.
-     */
-    bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -474,4 +439,42 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
         checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
+}
+
+/**
+ * Parameter of {@link CryptoApi#bootstrapSecretStorage}
+ */
+export interface CreateSecretStorageOpts {
+    /**
+     * Function called to await a secret storage key creation flow.
+     * @returns Promise resolving to an object with public key metadata, encoded private
+     *     recovery key which should be disposed of after displaying to the user,
+     *     and raw private key to avoid round tripping if needed.
+     */
+    createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
+
+    /**
+     * The current key backup object. If passed,
+     * the passphrase and recovery key from this backup will be used.
+     */
+    keyBackupInfo?: KeyBackupInfo;
+
+    /**
+     * If true, a new key backup version will be
+     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
+     * is supplied.
+     */
+    setupNewKeyBackup?: boolean;
+
+    /**
+     * Reset even if keys already exist.
+     */
+    setupNewSecretStorage?: boolean;
+
+    /**
+     * Function called to get the user's
+     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
+     * containing the key, or rejects if the key cannot be obtained.
+     */
+    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }

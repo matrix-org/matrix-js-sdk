@@ -39,7 +39,7 @@ export type {
     Curve25519AuthData as ICurve25519AuthData,
     Aes256AuthData as IAes256AuthData,
     KeyBackupInfo as IKeyBackupInfo,
-} from "../rust-crypto/keybackup";
+} from "../crypto-api/keybackup";
 
 /* eslint-enable camelcase */
 
