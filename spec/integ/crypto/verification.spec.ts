@@ -80,7 +80,18 @@ afterAll(() => {
  * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
  * to provide the most effective integration tests possible.
  */
+// we test with both crypto stacks...
 describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
+    // and with (1) the default verification method list, (2) a custom verification method list.
+    describe.each([undefined, ["m.sas.v1", "m.qr_code.show.v1", "m.reciprocate.v1"]])(
+        "supported methods=%s",
+        (methods) => {
+            runTests(backend, initCrypto, methods);
+        },
+    );
+});
+
+function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | undefined) {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
@@ -105,6 +116,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             userId: TEST_USER_ID,
             accessToken: "akjgkrgjs",
             deviceId: "device_under_test",
+            verificationMethods: methods,
         });
 
         await initCrypto(aliceClient);
@@ -143,9 +155,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.otherUserId).toEqual(TEST_USER_ID);
 
             let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
-            expect(toDeviceMessage.methods).toContain("m.sas.v1");
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+            if (methods !== undefined) {
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(new Set(toDeviceMessage.methods)).toEqual(new Set(methods));
+            }
 
             // The dummy device replies with an m.key.verification.ready...
             returnToDeviceMessageFromSync({
@@ -286,8 +301,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.methods).toContain("m.qr_code.show.v1");
-            expect(toDeviceMessage.methods).toContain("m.qr_code.scan.v1");
             expect(toDeviceMessage.methods).toContain("m.reciprocate.v1");
+            if (methods === undefined) {
+                expect(toDeviceMessage.methods).toContain("m.qr_code.scan.v1");
+            }
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
@@ -408,7 +425,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         ev.sender ??= TEST_USER_ID;
         syncResponder.sendOrQueueSyncResponse({ to_device: { events: [ev] } });
     }
-});
+}
 
 /**
  * Wait for the client under test to send a to-device message of the given type.
