@@ -16,6 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
+import "fake-indexeddb/auto";
 
 import { createClient, CryptoEvent, MatrixClient } from "../../../src";
 import {
@@ -49,7 +50,7 @@ jest.useFakeTimers();
 
 let previousCrypto: Crypto | undefined;
 
-beforeAll(() => {
+beforeAll(async () => {
     // Stub out global.crypto
     previousCrypto = global["crypto"];
 
@@ -61,6 +62,9 @@ beforeAll(() => {
             },
         },
     });
+
+    // we use the libolm primitives in the test, so init the Olm library
+    await global.Olm.init();
 });
 
 // restore the original global.crypto
@@ -136,6 +140,10 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
 
     afterEach(async () => {
         await aliceClient.stopClient();
+
+        // Allow in-flight things to complete before we tear down the test
+        await jest.runAllTimersAsync();
+
         fetchMock.mockReset();
     });
 
@@ -145,7 +153,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
         });
 
-        oldBackendOnly("can verify via SAS", async () => {
+        it("can verify another device via SAS", async () => {
+            await waitForDeviceList();
+
             // have alice initiate a verification. She should send a m.key.verification.request
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
@@ -207,11 +217,12 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(verifier.getShowSasCallbacks()).toBeNull();
 
             // start off the verification process: alice will send an `accept`
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             jest.advanceTimersByTime(10);
 
-            requestBody = await expectSendToDeviceMessage("m.key.verification.accept");
+            requestBody = await sendToDevicePromise;
             toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
             expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
@@ -288,15 +299,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
-            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
-
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
-            //
-            // Completing the initial sync will make the device list download outdated device lists (of which our own
-            // user will be one).
-            syncResponder.sendOrQueueSyncResponse({});
-            // DeviceList has a sleep(5) which we need to make happen
-            await jest.advanceTimersByTimeAsync(10);
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
             expect(aliceClient.getStoredCrossSigningForUser(TEST_USER_ID)).toBeTruthy();
 
             // have alice initiate a verification. She should send a m.key.verification.request
@@ -384,7 +389,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(request.phase).toEqual(VerificationPhase.Done);
         });
 
-        oldBackendOnly("can cancel during the SAS phase", async () => {
+        it("can cancel during the SAS phase", async () => {
+            await waitForDeviceList();
+
             // have alice initiate a verification. She should send a m.key.verification.request
             const [, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
@@ -426,12 +433,13 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(verifier.hasBeenCancelled).toBe(false);
 
             // start off the verification process: alice will send an `accept`
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             jest.advanceTimersByTime(10);
-            await expectSendToDeviceMessage("m.key.verification.accept");
+            await sendToDevicePromise;
 
-            // now we unceremoniously cancel
+            // now we unceremoniously cancel. We expect the verificatationPromise to reject.
             const requestPromise = expectSendToDeviceMessage("m.key.verification.cancel");
             verifier.cancel(new Error("blah"));
             await requestPromise;
@@ -485,6 +493,19 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
         });
     });
+
+    /** make sure that the client knows about the dummy device */
+    async function waitForDeviceList(): Promise<void> {
+        // Completing the initial sync will make the device list download outdated device lists (of which our own
+        // user will be one).
+        syncResponder.sendOrQueueSyncResponse({});
+        // DeviceList has a sleep(5) which we need to make happen
+        await jest.advanceTimersByTimeAsync(10);
+
+        // The client should now know about the dummy device
+        const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+        expect(devices.get(TEST_USER_ID)!.keys()).toContain(TEST_DEVICE_ID);
+    }
 
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
