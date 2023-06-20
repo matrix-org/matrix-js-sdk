@@ -41,6 +41,7 @@ import {
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -105,6 +106,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
     /** an object which intercepts `/keys/query` requests from {@link #aliceClient} */
     let e2eKeyResponder: E2EKeyResponder;
 
+    /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} */
+    let e2eKeyReceiver: E2EKeyReceiver;
+
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -121,7 +125,10 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
 
         await initCrypto(aliceClient);
 
+        e2eKeyReceiver = new E2EKeyReceiver(aliceClient.getHomeserverUrl());
         e2eKeyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+        e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
+
         syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
         mockInitialApiRequests(aliceClient.getHomeserverUrl());
         await aliceClient.startClient();
