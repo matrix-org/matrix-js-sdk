@@ -211,7 +211,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         // In practice, it's not clear that the js-sdk would behave that way, so this may be only a defence in depth.
 
         let senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
-        if (senderKeyUser === undefined) {
+        if (senderKeyUser === undefined || senderKeyUser === null) {
             // Wait for any pending key query fetches for the user to complete before trying the lookup again.
             try {
                 await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
@@ -224,8 +224,7 @@ class OlmDecryption extends DecryptionAlgorithm {
 
             senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
         }
-
-        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined) {
+        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined && senderKeyUser !== null) {
             throw new DecryptionError("OLM_BAD_SENDER", "Message claimed to be from " + event.getSender(), {
                 real_sender: senderKeyUser,
             });
