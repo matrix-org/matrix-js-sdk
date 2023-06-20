@@ -1,3 +1,25 @@
+Changes in [26.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.1.0) (2023-06-20)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Introduce a new `Crypto.Verifier` interface, and deprecate direct access to `VerificationBase`, `SAS` and `ReciprocateQRCode` ([\#3414](https://github.com/matrix-org/matrix-js-sdk/pull/3414)).
+
+## ✨ Features
+ * Add `rust-crypto#isCrossSigningReady` implementation ([\#3462](https://github.com/matrix-org/matrix-js-sdk/pull/3462)). Contributed by @florianduros.
+ * OIDC: Validate `m.authentication` configuration ([\#3419](https://github.com/matrix-org/matrix-js-sdk/pull/3419)). Contributed by @kerryarchibald.
+ * ElementR: Add `CryptoApi.getCrossSigningStatus` ([\#3452](https://github.com/matrix-org/matrix-js-sdk/pull/3452)). Contributed by @florianduros.
+ * Extend stats summary with call device and user count based on room state ([\#3424](https://github.com/matrix-org/matrix-js-sdk/pull/3424)). Contributed by @toger5.
+ * Update MSC3912 implementation to use `with_rel_type` instead of `with_relations` ([\#3420](https://github.com/matrix-org/matrix-js-sdk/pull/3420)).
+ * Export thread-related types from SDK ([\#3447](https://github.com/matrix-org/matrix-js-sdk/pull/3447)). Contributed by @stas-demydiuk.
+ * Use correct /v3 prefix for /refresh ([\#3016](https://github.com/matrix-org/matrix-js-sdk/pull/3016)). Contributed by @davidisaaclee.
+
+## 🐛 Bug Fixes
+ * Fix thread list being ordered based on all updates ([\#3458](https://github.com/matrix-org/matrix-js-sdk/pull/3458)). Fixes vector-im/element-web#25522.
+ * Fix: handle `baseUrl` with trailing slash in `fetch.getUrl` ([\#3455](https://github.com/matrix-org/matrix-js-sdk/pull/3455)). Fixes vector-im/element-web#25526. Contributed by @kerryarchibald.
+ * use cli.canSupport to determine intentional mentions support ([\#3445](https://github.com/matrix-org/matrix-js-sdk/pull/3445)). Fixes vector-im/element-web#25497. Contributed by @kerryarchibald.
+ * Make sliding sync linearize processing of sync requests ([\#3442](https://github.com/matrix-org/matrix-js-sdk/pull/3442)).
+ * Fix edge cases around 2nd order relations and threads ([\#3437](https://github.com/matrix-org/matrix-js-sdk/pull/3437)).
+
 Changes in [26.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.0.1) (2023-06-09)
 ==================================================================================================
 
