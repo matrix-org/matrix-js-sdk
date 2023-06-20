@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "26.0.1",
+    "version": "26.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=16.0.0"
