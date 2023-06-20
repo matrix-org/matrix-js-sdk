@@ -1,5 +1,5 @@
-Changes in [26.1.0-rc1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.1.0-rc1) (2023-06-13)
-==========================================================================================================
+Changes in [26.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.1.0) (2023-06-20)
+==================================================================================================
 
 ## 🦖 Deprecations
  * Introduce a new `Crypto.Verifier` interface, and deprecate direct access to `VerificationBase`, `SAS` and `ReciprocateQRCode` ([\#3414](https://github.com/matrix-org/matrix-js-sdk/pull/3414)).
