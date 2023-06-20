@@ -210,8 +210,8 @@ class OlmDecryption extends DecryptionAlgorithm {
         // In practice, it's not clear that the js-sdk would behave that way, so this may be only a defence in depth.
 
         let senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
-        if (senderKeyUser == undefined) {
-            // Await for any ongoing key query fetches for the user before trying the lookup again.
+        if (senderKeyUser === undefined) {
+            // Wait for any pending key query fetches for the user to complete before trying the lookup again.
             try {
                 await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
             } catch (e) {
