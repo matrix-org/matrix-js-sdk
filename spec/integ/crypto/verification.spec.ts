@@ -376,6 +376,64 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
         });
+
+        oldBackendOnly("can cancel during the SAS phase", async () => {
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId;
+
+            // The dummy device replies with an m.key.verification.ready...
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.ready",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    methods: ["m.sas.v1"],
+                    transaction_id: transactionId,
+                },
+            });
+            await waitForVerificationRequestChanged(request);
+
+            // ... and picks a method with m.key.verification.start
+            returnToDeviceMessageFromSync({
+                type: "m.key.verification.start",
+                content: {
+                    from_device: TEST_DEVICE_ID,
+                    method: "m.sas.v1",
+                    transaction_id: transactionId,
+                    hashes: ["sha256"],
+                    key_agreement_protocols: ["curve25519-hkdf-sha256"],
+                    message_authentication_codes: ["hkdf-hmac-sha256.v2"],
+                    // we have to include "decimal" per the spec.
+                    short_authentication_string: ["decimal", "emoji"],
+                },
+            });
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Started);
+
+            // there should now be a verifier...
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(verifier.hasBeenCancelled).toBe(false);
+
+            // start off the verification process: alice will send an `accept`
+            const verificationPromise = verifier.verify();
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            jest.advanceTimersByTime(10);
+            await expectSendToDeviceMessage("m.key.verification.accept");
+
+            // now we unceremoniously cancel
+            const requestPromise = expectSendToDeviceMessage("m.key.verification.cancel");
+            verifier.cancel(new Error("blah"));
+            await requestPromise;
+
+            // ... which should cancel the verifier
+            await expect(verificationPromise).rejects.toThrow();
+            expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(verifier.hasBeenCancelled).toBe(true);
+        });
     });
 
     describe("Incoming verification from another device", () => {
