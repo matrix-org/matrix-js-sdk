@@ -778,7 +778,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      */
     public insertEventIntoTimeline(event: MatrixEvent, timeline: EventTimeline, roomState: RoomState): void {
         if (timeline.getTimelineSet() !== this) {
-            throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +
+            throw new Error(`EventTimelineSet.insertEventIntoTimeline: Timeline=${timeline.toString()} does not belong " +
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 
@@ -793,7 +793,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 eventDebugString += `(belongs to thread=${event.threadRootId})`;
             }
             logger.warn(
-                `EventTimelineSet.addEventToTimeline: Ignoring ${eventDebugString} that does not belong ` +
+                `EventTimelineSet.insertEventIntoTimeline: Ignoring ${eventDebugString} that does not belong ` +
                     `in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`,
             );
             return;
