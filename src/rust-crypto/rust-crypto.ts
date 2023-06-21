@@ -387,40 +387,76 @@ export class RustCrypto implements CryptoBackend {
         createSecretStorageKey,
         setupNewSecretStorage,
     }: CreateSecretStorageOpts = {}): Promise<void> {
-        // If createSecretStorageKey is not set, we stop
-        if (!createSecretStorageKey) return;
+        // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
+        // we don't want to create a new key
+        const isNewSecretStorageKeyNeeded = setupNewSecretStorage || !(await this.secretStorageHasAESKey());
 
-        // See if we already have an AES secret-storage key.
-        const secretStorageKeyTuple = await this.secretStorage.getKey();
-
-        if (secretStorageKeyTuple) {
-            const [, keyInfo] = secretStorageKeyTuple;
-
-            // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
-            // we don't want to create a new key
-            if (keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES && !setupNewSecretStorage) {
-                return;
-            }
+        if (isNewSecretStorageKeyNeeded && createSecretStorageKey) {
+            // Create a new storage key and add it to secret storage
+            const recoveryKey = await createSecretStorageKey();
+            await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
 
-        const recoveryKey = await createSecretStorageKey();
+        // If we have cross-signing private keys cached, store them in secret
+        // storage if they are not there already.
+        if (
+            (await this.isCrossSigningReady()) &&
+            (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
+        ) {
+            const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
+                await this.olmMachine.exportCrossSigningKeys();
 
+            if (!crossSigningPrivateKeys.masterKey) {
+                throw new Error("missing master key in cross signing private keys");
+            }
+
+            await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
+        }
+    }
+
+    /**
+     * Add the secretStorage key to the secret storage
+     * - The secret storage key must have the `keyInfo` field filled
+     * - The secret storage key is set as the default key of the secret storage
+     * - Call `cryptoCallbacks.cacheSecretStorageKey` when done
+     *
+     * @param secretStorageKey - The secret storage key to add in the secret storage.
+     */
+    private async addSecretStorageKeyToSecretStorage(secretStorageKey: GeneratedSecretStorageKey): Promise<void> {
         // keyInfo is required to continue
-        if (!recoveryKey.keyInfo) {
-            throw new Error("missing keyInfo field in the secret storage key created by createSecretStorageKey");
+        if (!secretStorageKey.keyInfo) {
+            throw new Error("missing keyInfo field in the secret storage key");
         }
 
         const secretStorageKeyObject = await this.secretStorage.addKey(
             SECRET_STORAGE_ALGORITHM_V1_AES,
-            recoveryKey.keyInfo,
+            secretStorageKey.keyInfo,
         );
+
         await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
 
         this.cryptoCallbacks.cacheSecretStorageKey?.(
             secretStorageKeyObject.keyId,
             secretStorageKeyObject.keyInfo,
-            recoveryKey.privateKey,
+            secretStorageKey.privateKey,
         );
+    }
+
+    /**
+     * Check if a secret storage AES Key is already added in secret storage
+     *
+     * @returns True if an AES key is in the secret storage
+     */
+    private async secretStorageHasAESKey(): Promise<boolean> {
+        // See if we already have an AES secret-storage key.
+        const secretStorageKeyTuple = await this.secretStorage.getKey();
+
+        if (!secretStorageKeyTuple) return false;
+
+        const [, keyInfo] = secretStorageKeyTuple;
+
+        // Check if the key is an AES key
+        return keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES;
     }
 
     /**

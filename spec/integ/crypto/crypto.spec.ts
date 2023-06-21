@@ -51,7 +51,9 @@ import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { mockSetupCrossSigningRequests } from "../../test-utils/cross-signing";
+import { CryptoCallbacks } from "../../../src/crypto-api";
 
 const ROOM_ID = "!room:id";
 
@@ -530,6 +532,27 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
     }
 
+    /**
+     * Create the {@link CryptoCallbacks}
+     */
+    function createCryptoCallbacks(): CryptoCallbacks {
+        // Store the cached secret storage key and return it when `getSecretStorageKey` is called
+        let cachedKey: { keyId: string; key: Uint8Array };
+        const cacheSecretStorageKey = (keyId: string, keyInfo: AddSecretStorageKeyOpts, key: Uint8Array) => {
+            cachedKey = {
+                keyId,
+                key,
+            };
+        };
+
+        const getSecretStorageKey = () => Promise.resolve<[string, Uint8Array]>([cachedKey.keyId, cachedKey.key]);
+
+        return {
+            cacheSecretStorageKey,
+            getSecretStorageKey,
+        };
+    }
+
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -541,6 +564,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             userId: "@alice:localhost",
             accessToken: "akjgkrgjs",
             deviceId: "xzcvb",
+            cryptoCallbacks: createCryptoCallbacks(),
         });
 
         /* set up listeners for /keys/upload and /sync */
@@ -2183,16 +2207,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         /**
-         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/:type`
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)`
          * Resolved when a key is uploaded (ie in `body.content.key`)
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
-        function awaitKeyStoredInAccountData(): Promise<string> {
+        function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
             return new Promise((resolve) => {
                 // This url is called multiple times during the secret storage bootstrap process
                 // When we received the newly generated key, we return it
                 fetchMock.put(
-                    "express:/_matrix/client/r0/user/:userId/account_data/:type",
+                    "express:/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
 
@@ -2203,6 +2227,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         return {};
                     },
                     { overwriteRoutes: true },
+                );
+            });
+        }
+
+        /**
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/m.cross_signing.master`
+         * Resolved when the cross signing master key is uploaded
+         * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
+         */
+        function awaitCrossSigningMasterKeyUpload(): Promise<Record<string, {}>> {
+            return new Promise((resolve) => {
+                // Called when the cross signing key master key is uploaded
+                fetchMock.put(
+                    "express:/_matrix/client/r0/user/:userId/account_data/m.cross_signing.master",
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+                        resolve(content.encrypted);
+                        return {};
+                    },
                 );
             });
         }
@@ -2258,7 +2301,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
             // Wait for the key to be uploaded in the account data
-            const secretStorageKey = await awaitKeyStoredInAccountData();
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
             // Return the newly created key in the sync response
             sendSyncResponse(secretStorageKey);
@@ -2279,7 +2322,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
-                const secretStorageKey = await awaitKeyStoredInAccountData();
+                const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
                 sendSyncResponse(secretStorageKey);
@@ -2303,7 +2346,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
-                let secretStorageKey = await awaitKeyStoredInAccountData();
+                let secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
                 sendSyncResponse(secretStorageKey);
@@ -2317,7 +2360,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
-                secretStorageKey = await awaitKeyStoredInAccountData();
+                secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
                 sendSyncResponse(secretStorageKey);
@@ -2329,5 +2372,30 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
             },
         );
+
+        newBackendOnly("should upload cross signing master key", async () => {
+            mockSetupCrossSigningRequests();
+
+            await aliceClient.getCrypto()?.bootstrapCrossSigning({});
+
+            const bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Wait for the cross signing key to be uploaded
+            const crossSigningKey = await awaitCrossSigningMasterKeyUpload();
+
+            // Finally, wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+
+            // Expect the cross signing master key to be uploaded and to be encrypted with `secretStorageKey`
+            expect(crossSigningKey[secretStorageKey]).toBeDefined();
+        });
     });
 });
