@@ -391,7 +391,11 @@ export class RustCrypto implements CryptoBackend {
         // we don't want to create a new key
         const isNewSecretStorageKeyNeeded = setupNewSecretStorage || !(await this.secretStorageHasAESKey());
 
-        if (isNewSecretStorageKeyNeeded && createSecretStorageKey) {
+        if (isNewSecretStorageKeyNeeded) {
+            if (!createSecretStorageKey) {
+                throw new Error("unable to create a new secret storage key, createSecretStorageKey is not set");
+            }
+
             // Create a new storage key and add it to secret storage
             const recoveryKey = await createSecretStorageKey();
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
