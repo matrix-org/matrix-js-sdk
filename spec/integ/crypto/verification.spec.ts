@@ -206,15 +206,21 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
                     short_authentication_string: ["decimal", "emoji"],
                 },
             });
-            await waitForVerificationRequestChanged(request);
-            expect(request.phase).toEqual(VerificationPhase.Started);
-            expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
-            expect(request.chosenMethod).toEqual("m.sas.v1");
+            // as soon as the Changed event arrives, `verifier` should be defined
+            const verifier = await new Promise<Verifier>((resolve) => {
+                function onChange() {
+                    expect(request.phase).toEqual(VerificationPhase.Started);
+                    expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
+                    expect(request.chosenMethod).toEqual("m.sas.v1");
 
-            // there should now be a verifier
-            const verifier: Verifier = request.verifier!;
-            expect(verifier).toBeDefined();
-            expect(verifier.getShowSasCallbacks()).toBeNull();
+                    const verifier: Verifier = request.verifier!;
+                    expect(verifier).toBeDefined();
+                    expect(verifier.getShowSasCallbacks()).toBeNull();
+
+                    resolve(verifier);
+                }
+                request.once(VerificationRequestEvent.Change, onChange);
+            });
 
             // start off the verification process: alice will send an `accept`
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");

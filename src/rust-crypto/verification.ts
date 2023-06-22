@@ -47,8 +47,6 @@ export class RustVerificationRequest
         super();
 
         const onChange = async (): Promise<void> => {
-            this.emit(VerificationRequestEvent.Change);
-
             // if we now have a `Verification` where we lacked one before, wrap it.
             // TODO: QR support
             if (this._verifier === undefined) {
@@ -57,6 +55,8 @@ export class RustVerificationRequest
                     this._verifier = new RustSASVerifier(verification, this, outgoingRequestProcessor);
                 }
             }
+
+            this.emit(VerificationRequestEvent.Change);
         };
         inner.registerChangesCallback(onChange);
     }
