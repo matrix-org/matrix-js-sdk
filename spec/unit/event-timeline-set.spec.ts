@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import * as utils from "../test-utils/test-utils";
 import {
     DuplicateStrategy,
@@ -28,7 +30,6 @@ import {
 } from "../../src";
 import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
-import { mocked } from "jest-mock";
 
 describe("EventTimelineSet", () => {
     const roomId = "!foo:bar";
