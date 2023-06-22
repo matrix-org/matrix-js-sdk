@@ -18,6 +18,7 @@ import { subtleCrypto } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 
+// See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
 type AuthorizationParams = {
     state: string;
     scope: string;

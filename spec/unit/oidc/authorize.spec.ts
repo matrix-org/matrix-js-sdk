@@ -67,8 +67,6 @@ describe("oidc authorization", () => {
             expect(authUrl.searchParams.get("response_type")).toEqual("code");
             expect(authUrl.searchParams.get("client_id")).toEqual(clientId);
             expect(authUrl.searchParams.get("code_challenge_method")).toEqual("S256");
-
-            // scope ends with a 10char randomstring deviceId
             expect(authUrl.searchParams.get("scope")).toEqual(authorizationParams.scope);
             expect(authUrl.searchParams.get("state")).toEqual(authorizationParams.state);
             expect(authUrl.searchParams.get("nonce")).toEqual(authorizationParams.nonce);
