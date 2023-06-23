@@ -42,7 +42,7 @@ export class RustVerificationRequest
 
     public constructor(
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
-        outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
 
@@ -210,8 +210,11 @@ export class RustVerificationRequest
      *
      * @returns Promise which resolves when the event has been sent.
      */
-    public cancel(params?: { reason?: string; code?: string }): Promise<void> {
-        throw new Error("not implemented");
+    public async cancel(params?: { reason?: string; code?: string }): Promise<void> {
+        const req: undefined | OutgoingRequest = this.inner.cancel();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
     }
 
     /**

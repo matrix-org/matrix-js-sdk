@@ -290,6 +290,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
 
+            // at this point, cancelling should do nothing.
+            await request.cancel();
+            expect(request.phase).toEqual(VerificationPhase.Done);
+
             // we're done with the temporary keypair
             olmSAS.free();
         });
@@ -406,11 +410,41 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
         });
+    });
 
-        it("can cancel during the SAS phase", async () => {
+    describe("cancellation", () => {
+        beforeEach(async () => {
+            // pretend that we have another device, which we will start verifying
+            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+
             aliceClient = await startTestClient();
             await waitForDeviceList();
+        });
 
+        it("can cancel during the Ready phase", async () => {
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready...
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+
+            // now alice changes her mind
+            const [requestBody] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.cancel"),
+                request.cancel(),
+            ]);
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+            expect(toDeviceMessage.code).toEqual("m.user");
+            expect(request.phase).toEqual(VerificationPhase.Cancelled);
+        });
+
+        it("can cancel during the SAS phase", async () => {
             // have alice initiate a verification. She should send a m.key.verification.request
             const [, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),

@@ -108,7 +108,7 @@ export interface VerificationRequest
      * Cancels the request, sending a cancellation to the other party
      *
      * @param params - Details for the cancellation, including `reason` (defaults to "User declined"), and `code`
-     *    (defaults to `m.user`).
+     *    (defaults to `m.user`). **Deprecated**: this parameter is ignored by the Rust cryptography implementation.
      *
      * @returns Promise which resolves when the event has been sent.
      */
