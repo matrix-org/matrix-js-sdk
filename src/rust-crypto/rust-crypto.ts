@@ -584,7 +584,19 @@ export class RustCrypto implements CryptoBackend {
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
     public async requestOwnUserVerification(): Promise<VerificationRequest> {
-        throw new Error("not implemented");
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        if (userIdentity === undefined) {
+            throw new Error("cannot request verification for this device when there is no existing cross-signing key");
+        }
+
+        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+            await userIdentity.requestVerification(
+                this.supportedVerificationMethods?.map(verificationMethodIdentifierToMethod),
+            );
+        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor);
     }
 
     /**
