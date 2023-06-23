@@ -20,7 +20,7 @@ import { MockResponse } from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 
-import { createClient, CryptoEvent, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
 import {
     canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
@@ -136,20 +136,12 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
 
         mockInitialApiRequests(TEST_HOMESERVER_URL);
-
-        aliceClient = createClient({
-            baseUrl: TEST_HOMESERVER_URL,
-            userId: TEST_USER_ID,
-            accessToken: "akjgkrgjs",
-            deviceId: "device_under_test",
-            verificationMethods: methods,
-        });
-        await initCrypto(aliceClient);
-        await aliceClient.startClient();
     });
 
     afterEach(async () => {
-        await aliceClient.stopClient();
+        if (aliceClient !== undefined) {
+            await aliceClient.stopClient();
+        }
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();
@@ -164,6 +156,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         it("can verify another device via SAS", async () => {
+            aliceClient = await startTestClient({ verificationMethods: methods });
             await waitForDeviceList();
 
             // initially there should be no verifications in progress
@@ -328,6 +321,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         it("Can make a verification request to *all* devices", async () => {
+            aliceClient = await startTestClient({ verificationMethods: methods });
             // we need an existing cross-signing key for this
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
@@ -357,6 +351,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
+            aliceClient = await startTestClient({ verificationMethods: methods });
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
@@ -448,6 +443,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         it("can cancel during the SAS phase", async () => {
+            aliceClient = await startTestClient({ verificationMethods: methods });
             await waitForDeviceList();
 
             // have alice initiate a verification. She should send a m.key.verification.request
@@ -515,6 +511,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("Incoming verification: can accept", async () => {
+            aliceClient = await startTestClient({ verificationMethods: methods });
             const TRANSACTION_ID = "abcd";
 
             // Initiate the request by sending a to-device message
@@ -551,6 +548,19 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
         });
     });
+
+    async function startTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
+        const client = createClient({
+            baseUrl: TEST_HOMESERVER_URL,
+            userId: TEST_USER_ID,
+            accessToken: "akjgkrgjs",
+            deviceId: "device_under_test",
+            ...opts,
+        });
+        await initCrypto(client);
+        await client.startClient();
+        return client;
+    }
 
     /** make sure that the client knows about the dummy device */
     async function waitForDeviceList(): Promise<void> {
