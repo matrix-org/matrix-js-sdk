@@ -69,9 +69,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
      * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
      */
     async function bootstrapCrossSigning(authDict: IAuthDict): Promise<void> {
-        // now bootstrap cross signing, and check it resolves successfully
         await aliceClient.getCrypto()?.bootstrapCrossSigning({
-            // Expecting to return a promise
             authUploadDeviceSigningKeys: (makeRequest) => makeRequest(authDict).then(() => undefined),
         });
     }
