@@ -18,7 +18,7 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import { AutoDiscovery } from "../../src/autodiscovery";
-import { OidcDiscoveryError } from "../../src/oidc/validate";
+import { OidcError } from "../../src/oidc/error";
 
 describe("AutoDiscovery", function () {
     const getHttpBackend = (): MockHttpBackend => {
@@ -400,7 +400,7 @@ describe("AutoDiscovery", function () {
                     },
                     "m.authentication": {
                         state: "IGNORE",
-                        error: OidcDiscoveryError.NotSupported,
+                        error: OidcError.NotSupported,
                     },
                 };
 
@@ -441,7 +441,7 @@ describe("AutoDiscovery", function () {
                     },
                     "m.authentication": {
                         state: "IGNORE",
-                        error: OidcDiscoveryError.NotSupported,
+                        error: OidcError.NotSupported,
                     },
                 };
 
@@ -485,7 +485,7 @@ describe("AutoDiscovery", function () {
                     },
                     "m.authentication": {
                         state: "FAIL_ERROR",
-                        error: OidcDiscoveryError.Misconfigured,
+                        error: OidcError.Misconfigured,
                     },
                 };
 
@@ -719,7 +719,7 @@ describe("AutoDiscovery", function () {
                     },
                     "m.authentication": {
                         state: "IGNORE",
-                        error: OidcDiscoveryError.NotSupported,
+                        error: OidcError.NotSupported,
                     },
                 };
 
@@ -775,7 +775,7 @@ describe("AutoDiscovery", function () {
                     },
                     "m.authentication": {
                         state: "IGNORE",
-                        error: OidcDiscoveryError.NotSupported,
+                        error: OidcError.NotSupported,
                     },
                 };
 

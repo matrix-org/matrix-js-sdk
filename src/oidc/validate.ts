@@ -16,13 +16,13 @@ limitations under the License.
 
 import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
 import { logger } from "../logger";
+import { OidcError } from "./error";
 
-export enum OidcDiscoveryError {
-    NotSupported = "OIDC authentication not supported",
-    Misconfigured = "OIDC is misconfigured",
-    General = "Something went wrong with OIDC discovery",
-    OpSupport = "Configured OIDC OP does not support required functions",
-}
+/**
+ * re-export for backwards compatibility
+ * @deprecated use OidcError
+ */
+export { OidcError as OidcDiscoveryError };
 
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
@@ -41,7 +41,7 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
     const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown);
 
     if (!authentication) {
-        throw new Error(OidcDiscoveryError.NotSupported);
+        throw new Error(OidcError.NotSupported);
     }
 
     if (
@@ -54,7 +54,7 @@ export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): ID
         };
     }
 
-    throw new Error(OidcDiscoveryError.Misconfigured);
+    throw new Error(OidcError.Misconfigured);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -93,7 +93,7 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
 export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuerConfig => {
     if (!isRecord(wellKnown)) {
         logger.error("Issuer configuration not found or malformed");
-        throw new Error(OidcDiscoveryError.OpSupport);
+        throw new Error(OidcError.OpSupport);
     }
 
     const isInvalid = [
@@ -114,5 +114,5 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     }
 
     logger.error("Issuer configuration not valid");
-    throw new Error(OidcDiscoveryError.OpSupport);
+    throw new Error(OidcError.OpSupport);
 };
