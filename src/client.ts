@@ -863,6 +863,7 @@ export interface TimestampToEventResponse {
 interface IWhoamiResponse {
     user_id: string;
     device_id?: string;
+    is_guest?: boolean;
 }
 /* eslint-enable camelcase */
 
