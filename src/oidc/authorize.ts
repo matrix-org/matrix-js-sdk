@@ -81,7 +81,7 @@ export const generateAuthorizationUrl = async (
     { scope, redirectUri, state, nonce, codeVerifier }: AuthorizationParams,
 ): Promise<string> => {
     const url = new URL(authorizationUrl);
-    url.searchParams.append("response_mode", "fragment");
+    url.searchParams.append("response_mode", "query");
     url.searchParams.append("response_type", "code");
     url.searchParams.append("redirect_uri", redirectUri);
     url.searchParams.append("client_id", clientId);
