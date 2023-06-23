@@ -99,16 +99,6 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  */
 // we test with both crypto stacks...
 describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // and with (1) the default verification method list, (2) a custom verification method list.
-    describe.each([undefined, ["m.sas.v1", "m.qr_code.show.v1", "m.reciprocate.v1"]])(
-        "supported methods=%s",
-        (methods) => {
-            runTests(backend, initCrypto, methods);
-        },
-    );
-});
-
-function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | undefined) {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
@@ -155,7 +145,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
         });
 
-        it("can verify another device via SAS", async () => {
+        // test with (1) the default verification method list, (2) a custom verification method list.
+        const TEST_METHODS = ["m.sas.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+        it.each([undefined, TEST_METHODS])("can verify via SAS (supported methods=%s)", async (methods) => {
             aliceClient = await startTestClient({ verificationMethods: methods });
             await waitForDeviceList();
 
@@ -321,7 +313,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         it("Can make a verification request to *all* devices", async () => {
-            aliceClient = await startTestClient({ verificationMethods: methods });
+            aliceClient = await startTestClient();
             // we need an existing cross-signing key for this
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
@@ -351,7 +343,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
-            aliceClient = await startTestClient({ verificationMethods: methods });
+            aliceClient = await startTestClient();
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
@@ -367,9 +359,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.methods).toContain("m.qr_code.show.v1");
             expect(toDeviceMessage.methods).toContain("m.reciprocate.v1");
-            if (methods === undefined) {
-                expect(toDeviceMessage.methods).toContain("m.qr_code.scan.v1");
-            }
+            expect(toDeviceMessage.methods).toContain("m.qr_code.scan.v1");
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
@@ -443,7 +433,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         it("can cancel during the SAS phase", async () => {
-            aliceClient = await startTestClient({ verificationMethods: methods });
+            aliceClient = await startTestClient();
             await waitForDeviceList();
 
             // have alice initiate a verification. She should send a m.key.verification.request
@@ -511,7 +501,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("Incoming verification: can accept", async () => {
-            aliceClient = await startTestClient({ verificationMethods: methods });
+            aliceClient = await startTestClient();
             const TRANSACTION_ID = "abcd";
 
             // Initiate the request by sending a to-device message
@@ -579,7 +569,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         ev.sender ??= TEST_USER_ID;
         syncResponder.sendOrQueueSyncResponse({ to_device: { events: [ev] } });
     }
-}
+});
 
 /**
  * Wait for the client under test to send a to-device message of the given type.
