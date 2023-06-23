@@ -16,11 +16,8 @@ limitations under the License.
 
 import { M_AUTHENTICATION } from "../../../src";
 import { logger } from "../../../src/logger";
-import {
-    OidcDiscoveryError,
-    validateOIDCIssuerWellKnown,
-    validateWellKnownAuthentication,
-} from "../../../src/oidc/validate";
+import { validateOIDCIssuerWellKnown, validateWellKnownAuthentication } from "../../../src/oidc/validate";
+import { OidcError } from "../../../src/oidc/error";
 
 describe("validateWellKnownAuthentication()", () => {
     const baseWk = {
@@ -29,7 +26,7 @@ describe("validateWellKnownAuthentication()", () => {
         },
     };
     it("should throw not supported error when wellKnown has no m.authentication section", () => {
-        expect(() => validateWellKnownAuthentication(baseWk)).toThrow(OidcDiscoveryError.NotSupported);
+        expect(() => validateWellKnownAuthentication(baseWk)).toThrow(OidcError.NotSupported);
     });
 
     it("should throw misconfigured error when authentication issuer is not a string", () => {
@@ -39,7 +36,7 @@ describe("validateWellKnownAuthentication()", () => {
                 issuer: { url: "test.com" },
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
     });
 
     it("should throw misconfigured error when authentication account is not a string", () => {
@@ -50,7 +47,7 @@ describe("validateWellKnownAuthentication()", () => {
                 account: { url: "test" },
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
     });
 
     it("should throw misconfigured error when authentication account is false", () => {
@@ -61,7 +58,7 @@ describe("validateWellKnownAuthentication()", () => {
                 account: false,
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcDiscoveryError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
     });
 
     it("should return valid config when wk uses stable m.authentication", () => {
@@ -137,7 +134,7 @@ describe("validateOIDCIssuerWellKnown", () => {
     it("should throw OP support error when wellKnown is not an object", () => {
         expect(() => {
             validateOIDCIssuerWellKnown([]);
-        }).toThrow(OidcDiscoveryError.OpSupport);
+        }).toThrow(OidcError.OpSupport);
         expect(logger.error).toHaveBeenCalledWith("Issuer configuration not found or malformed");
     });
 
@@ -148,7 +145,7 @@ describe("validateOIDCIssuerWellKnown", () => {
                 authorization_endpoint: undefined,
                 response_types_supported: [],
             });
-        }).toThrow(OidcDiscoveryError.OpSupport);
+        }).toThrow(OidcError.OpSupport);
         expect(logger.error).toHaveBeenCalledWith("OIDC issuer configuration: authorization_endpoint is invalid");
         expect(logger.error).toHaveBeenCalledWith(
             "OIDC issuer configuration: response_types_supported is invalid. code is required.",
@@ -194,6 +191,6 @@ describe("validateOIDCIssuerWellKnown", () => {
             ...validWk,
             [key]: value,
         };
-        expect(() => validateOIDCIssuerWellKnown(wk)).toThrow(OidcDiscoveryError.OpSupport);
+        expect(() => validateOIDCIssuerWellKnown(wk)).toThrow(OidcError.OpSupport);
     });
 });
