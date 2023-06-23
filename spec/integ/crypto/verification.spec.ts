@@ -124,7 +124,7 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         e2eKeyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
         syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
         mockInitialApiRequests(aliceClient.getHomeserverUrl());
-        aliceClient.startClient();
+        await aliceClient.startClient();
     });
 
     afterEach(async () => {
