@@ -162,7 +162,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
             ]);
-            const transactionId = request.transactionId;
+            const transactionId = request.transactionId!;
             expect(transactionId).toBeDefined();
             expect(request.phase).toEqual(VerificationPhase.Requested);
             expect(request.roomId).toBeUndefined();
@@ -188,32 +188,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             }
 
             // The dummy device replies with an m.key.verification.ready...
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.ready",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    methods: ["m.sas.v1"],
-                    transaction_id: transactionId,
-                },
-            });
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
             await waitForVerificationRequestChanged(request);
             expect(request.phase).toEqual(VerificationPhase.Ready);
             expect(request.otherDeviceId).toEqual(TEST_DEVICE_ID);
 
             // ... and picks a method with m.key.verification.start
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.start",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    method: "m.sas.v1",
-                    transaction_id: transactionId,
-                    hashes: ["sha256"],
-                    key_agreement_protocols: ["curve25519-hkdf-sha256"],
-                    message_authentication_codes: ["hkdf-hmac-sha256.v2"],
-                    // we have to include "decimal" per the spec.
-                    short_authentication_string: ["decimal", "emoji"],
-                },
-            });
+            returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
+
             // as soon as the Changed event arrives, `verifier` should be defined
             const verifier = await new Promise<Verifier>((resolve) => {
                 function onChange() {
@@ -354,7 +336,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
             ]);
-            const transactionId = request.transactionId;
+            const transactionId = request.transactionId!;
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.methods).toContain("m.qr_code.show.v1");
@@ -364,14 +346,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
             // The dummy device replies with an m.key.verification.ready, with an indication we can scan the QR code
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.ready",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    methods: ["m.qr_code.scan.v1"],
-                    transaction_id: transactionId,
-                },
-            });
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.qr_code.scan.v1"]));
             await waitForVerificationRequestChanged(request);
             expect(request.phase).toEqual(VerificationPhase.Ready);
 
@@ -441,33 +416,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
             ]);
-            const transactionId = request.transactionId;
+            const transactionId = request.transactionId!;
 
             // The dummy device replies with an m.key.verification.ready...
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.ready",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    methods: ["m.sas.v1"],
-                    transaction_id: transactionId,
-                },
-            });
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
             await waitForVerificationRequestChanged(request);
 
             // ... and picks a method with m.key.verification.start
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.start",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    method: "m.sas.v1",
-                    transaction_id: transactionId,
-                    hashes: ["sha256"],
-                    key_agreement_protocols: ["curve25519-hkdf-sha256"],
-                    message_authentication_codes: ["hkdf-hmac-sha256.v2"],
-                    // we have to include "decimal" per the spec.
-                    short_authentication_string: ["decimal", "emoji"],
-                },
-            });
+            returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
             await waitForVerificationRequestChanged(request);
             expect(request.phase).toEqual(VerificationPhase.Started);
 
@@ -613,4 +569,33 @@ function calculateMAC(olmSAS: Olm.SAS, input: string, info: string): string {
 
 function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
+}
+
+/** build an m.key.verification.ready to-device message originating from the dummy device */
+function buildReadyMessage(transactionId: string, methods: string[]): { type: string; content: object } {
+    return {
+        type: "m.key.verification.ready",
+        content: {
+            from_device: TEST_DEVICE_ID,
+            methods: methods,
+            transaction_id: transactionId,
+        },
+    };
+}
+
+/** build an m.key.verification.start to-device message suitable for the SAS flow, originating from the dummy device */
+function buildSasStartMessage(transactionId: string): { type: string; content: object } {
+    return {
+        type: "m.key.verification.start",
+        content: {
+            from_device: TEST_DEVICE_ID,
+            method: "m.sas.v1",
+            transaction_id: transactionId,
+            hashes: ["sha256"],
+            key_agreement_protocols: ["curve25519-hkdf-sha256"],
+            message_authentication_codes: ["hkdf-hmac-sha256.v2"],
+            // we have to include "decimal" per the spec.
+            short_authentication_string: ["decimal", "emoji"],
+        },
+    };
 }
