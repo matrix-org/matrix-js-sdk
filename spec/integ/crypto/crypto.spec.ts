@@ -530,32 +530,36 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
     }
 
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+    beforeEach(
+        async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
 
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: "@alice:localhost",
-            accessToken: "akjgkrgjs",
-            deviceId: "xzcvb",
-        });
+            const homeserverUrl = "https://alice-server.com";
+            aliceClient = createClient({
+                baseUrl: homeserverUrl,
+                userId: "@alice:localhost",
+                accessToken: "akjgkrgjs",
+                deviceId: "xzcvb",
+            });
 
-        /* set up listeners for /keys/upload and /sync */
-        keyReceiver = new E2EKeyReceiver(homeserverUrl);
-        syncResponder = new SyncResponder(homeserverUrl);
+            /* set up listeners for /keys/upload and /sync */
+            keyReceiver = new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl);
 
-        await initCrypto(aliceClient);
+            await initCrypto(aliceClient);
 
-        // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
-        await Olm.init();
-        testOlmAccount = new Olm.Account();
-        testOlmAccount.create();
-        const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
-        testSenderKey = testE2eKeys.curve25519;
-    });
+            // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+            await Olm.init();
+            testOlmAccount = new Olm.Account();
+            testOlmAccount.create();
+            const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
+            testSenderKey = testE2eKeys.curve25519;
+        },
+        /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+        10000,
+    );
 
     afterEach(async () => {
         await aliceClient.stopClient();
