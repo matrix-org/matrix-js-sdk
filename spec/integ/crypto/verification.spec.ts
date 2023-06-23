@@ -88,6 +88,9 @@ afterAll(() => {
     }
 });
 
+/** The homeserver url that we give to the test client, and where we intercept /sync, /keys, etc requests. */
+const TEST_HOMESERVER_URL = "https://alice-server.com";
+
 /**
  * Integration tests for verification functionality.
  *
@@ -113,13 +116,13 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
     /** the client under test */
     let aliceClient: MatrixClient;
 
-    /** an object which intercepts `/sync` requests from {@link #aliceClient} */
+    /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
 
-    /** an object which intercepts `/keys/query` requests from {@link #aliceClient} */
+    /** an object which intercepts `/keys/query` requests on the test homeserver */
     let e2eKeyResponder: E2EKeyResponder;
 
-    /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} */
+    /** an object which intercepts `/keys/upload` requests on the test homeserver */
     let e2eKeyReceiver: E2EKeyReceiver;
 
     beforeEach(async () => {
@@ -127,23 +130,21 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         fetchMock.catch(404);
         fetchMock.config.warnOnFallback = false;
 
-        const homeserverUrl = "https://alice-server.com";
+        e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
+        e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
+        e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
+        syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+
+        mockInitialApiRequests(TEST_HOMESERVER_URL);
+
         aliceClient = createClient({
-            baseUrl: homeserverUrl,
+            baseUrl: TEST_HOMESERVER_URL,
             userId: TEST_USER_ID,
             accessToken: "akjgkrgjs",
             deviceId: "device_under_test",
             verificationMethods: methods,
         });
-
         await initCrypto(aliceClient);
-
-        e2eKeyReceiver = new E2EKeyReceiver(aliceClient.getHomeserverUrl());
-        e2eKeyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
-        e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
-
-        syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
-        mockInitialApiRequests(aliceClient.getHomeserverUrl());
         await aliceClient.startClient();
     });
 
