@@ -401,10 +401,14 @@ export class RustCrypto implements CryptoBackend {
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
 
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const hasPrivateKeys =
+            crossSigningStatus.hasMaster && crossSigningStatus.hasSelfSigning && crossSigningStatus.hasUserSigning;
+
         // If we have cross-signing private keys cached, store them in secret
         // storage if they are not there already.
         if (
-            (await this.isCrossSigningReady()) &&
+            hasPrivateKeys &&
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
             const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
@@ -414,7 +418,17 @@ export class RustCrypto implements CryptoBackend {
                 throw new Error("missing master key in cross signing private keys");
             }
 
+            if (!crossSigningPrivateKeys.userSigningKey) {
+                throw new Error("missing user signing key in cross signing private keys");
+            }
+
+            if (!crossSigningPrivateKeys.self_signing_key) {
+                throw new Error("missing self signing key in cross signing private keys");
+            }
+
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
+            await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
+            await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
         }
     }
 

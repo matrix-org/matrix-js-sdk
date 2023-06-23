@@ -2235,11 +2235,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          * Resolved when the cross signing master key is uploaded
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
-        function awaitCrossSigningMasterKeyUpload(): Promise<Record<string, {}>> {
+        function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
             return new Promise((resolve) => {
-                // Called when the cross signing key master key is uploaded
+                // Called when the cross signing key is uploaded
                 fetchMock.put(
-                    "express:/_matrix/client/r0/user/:userId/account_data/m.cross_signing.master",
+                    `express:/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`,
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
                         resolve(content.encrypted);
@@ -2374,11 +2374,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             },
         );
 
-        newBackendOnly("should upload cross signing master key", async () => {
+        newBackendOnly("should upload cross signing keys", async () => {
             mockSetupCrossSigningRequests();
 
+            // Before setting up secret-storage, bootstrap cross-signing, so that the client has cross-signing keys.
             await aliceClient.getCrypto()?.bootstrapCrossSigning({});
 
+            // Now, when we bootstrap secret-storage, the cross-signing keys should be uploaded.
             const bootstrapPromise = aliceClient
                 .getCrypto()!
                 .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
@@ -2389,14 +2391,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Return the newly created key in the sync response
             sendSyncResponse(secretStorageKey);
 
-            // Wait for the cross signing key to be uploaded
-            const crossSigningKey = await awaitCrossSigningMasterKeyUpload();
+            // Wait for the cross signing keys to be uploaded
+            const [masterKey, userSigningKey, selfSigningKey] = await Promise.all([
+                awaitCrossSigningKeyUpload("master"),
+                awaitCrossSigningKeyUpload("user_signing"),
+                awaitCrossSigningKeyUpload("self_signing"),
+            ]);
 
             // Finally, wait for bootstrapSecretStorage to finished
             await bootstrapPromise;
 
             // Expect the cross signing master key to be uploaded and to be encrypted with `secretStorageKey`
-            expect(crossSigningKey[secretStorageKey]).toBeDefined();
+            expect(masterKey[secretStorageKey]).toBeDefined();
+            expect(userSigningKey[secretStorageKey]).toBeDefined();
+            expect(selfSigningKey[secretStorageKey]).toBeDefined();
         });
     });
 });
