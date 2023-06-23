@@ -19,8 +19,8 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
-import { createClient, MatrixClient } from "../../../src";
-import { bootstrapCrossSigning, mockSetupCrossSigningRequests } from "../../test-utils/cross-signing";
+import { createClient, IAuthDict, MatrixClient } from "../../../src";
+import { mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -62,13 +62,27 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         fetchMock.mockReset();
     });
 
+    /**
+     * Create cross-signing keys and publish the keys
+     *
+     * @param authDict - The parameters to as the `auth` dict in the key upload request.
+     * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
+     */
+    async function bootstrapCrossSigning(authDict: IAuthDict): Promise<void> {
+        // now bootstrap cross signing, and check it resolves successfully
+        await aliceClient.getCrypto()?.bootstrapCrossSigning({
+            // Expecting to return a promise
+            authUploadDeviceSigningKeys: (makeRequest) => makeRequest(authDict).then(() => undefined),
+        });
+    }
+
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
         it("publishes keys if none were yet published", async () => {
             mockSetupCrossSigningRequests();
 
             // provide a UIA callback, so that the cross-signing keys are uploaded
             const authDict = { type: "test" };
-            await bootstrapCrossSigning(aliceClient, authDict);
+            await bootstrapCrossSigning(authDict);
 
             // check the cross-signing keys upload
             expect(fetchMock.called("upload-keys")).toBeTruthy();
@@ -114,7 +128,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             // provide a UIA callback, so that the cross-signing keys are uploaded
             const authDict = { type: "test" };
-            await bootstrapCrossSigning(aliceClient, authDict);
+            await bootstrapCrossSigning(authDict);
 
             const crossSigningStatus = await aliceClient.getCrypto()!.getCrossSigningStatus();
 
@@ -138,7 +152,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
         it("should return true after bootstrapping cross-signing", async () => {
             mockSetupCrossSigningRequests();
-            await bootstrapCrossSigning(aliceClient, { type: "test" });
+            await bootstrapCrossSigning({ type: "test" });
 
             const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
 

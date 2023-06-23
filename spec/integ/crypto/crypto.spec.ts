@@ -50,9 +50,8 @@ import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
+import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { mockSetupCrossSigningRequests } from "../../test-utils/cross-signing";
 import { CryptoCallbacks } from "../../../src/crypto-api";
 
 const ROOM_ID = "!room:id";
