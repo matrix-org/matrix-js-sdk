@@ -236,7 +236,7 @@ export class GroupCall extends TypedEventEmitter<
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
-    public readonly allowCallWithoutVideoAndAudio: boolean;
+    public allowCallWithoutVideoAndAudio: boolean;
 
     private readonly calls = new Map<string, Map<string, MatrixCall>>(); // user_id -> device_id -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // user_id -> device_id -> ICallHandlers
@@ -522,6 +522,7 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async enter(): Promise<void> {
+        this.allowCallWithoutVideoAndAudio = true;
         if (this.state === GroupCallState.LocalCallFeedUninitialized) {
             await this.initLocalCallFeed();
         } else if (this.state !== GroupCallState.LocalCallFeedInitialized) {
