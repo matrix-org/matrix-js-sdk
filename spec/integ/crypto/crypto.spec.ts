@@ -2231,8 +2231,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         /**
-         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/m.cross_signing.master`
-         * Resolved when the cross signing master key is uploaded
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`
+         * Resolved when the cross signing key is uploaded
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
         function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
