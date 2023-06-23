@@ -192,12 +192,17 @@ export interface CryptoApi {
     isSecretStorageReady(): Promise<boolean>;
 
     /**
-     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
+     * Bootstrap the secret storage by creating a new secret storage key, add it in the secret storage and
+     * store the cross signing keys in the secret storage.
      *
-     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
      * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
+     *   Only if `setupNewSecretStorage` is set or if there is no AES key in the secret storage
      * - Store this key in the secret storage and set it as the default key.
      * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
+     * - Store the cross signing keys in the secret storage if
+     *      - the cross signing is ready
+     *      - a new key was created during the previous step
+     *      - or the secret storage already contains the cross signing keys
      *
      * @param opts - Options object.
      */
