@@ -552,19 +552,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
     }
 
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+    beforeEach(
+        async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
 
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: "@alice:localhost",
-            accessToken: "akjgkrgjs",
-            deviceId: "xzcvb",
-            cryptoCallbacks: createCryptoCallbacks(),
-        });
+            const homeserverUrl = "https://alice-server.com";
+            aliceClient = createClient({
+                baseUrl: homeserverUrl,
+                userId: "@alice:localhost",
+                accessToken: "akjgkrgjs",
+                deviceId: "xzcvb",
+                cryptoCallbacks: createCryptoCallbacks(),
+            });
 
             /* set up listeners for /keys/upload and /sync */
             keyReceiver = new E2EKeyReceiver(homeserverUrl);
