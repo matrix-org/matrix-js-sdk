@@ -98,6 +98,7 @@ export const generateAuthorizationUrl = async (
 export type BearerToken = {
     token_type: "Bearer";
     access_token: string;
+    scope: string;
     refresh_token?: string;
     expires_in?: number;
     id_token?: string;
