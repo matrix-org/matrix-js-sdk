@@ -14,9 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IDelegatedAuthConfig } from "../client";
+import { Method } from "../http-api";
 import { subtleCrypto } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
+import { OidcError } from "./error";
+import { ValidatedIssuerConfig } from "./validate";
 
 // See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
 type AuthorizationParams = {
@@ -89,4 +93,68 @@ export const generateAuthorizationUrl = async (
     url.searchParams.append("code_challenge", await generateCodeChallenge(codeVerifier));
 
     return url.toString();
+};
+
+export type BearerToken = {
+    token_type: "Bearer";
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+    id_token?: string;
+};
+const isValidBearerToken = (token: any): token is BearerToken =>
+    typeof token == "object" &&
+    token["token_type"] === "Bearer" &&
+    typeof token["access_token"] === "string" &&
+    (!("refresh_token" in token) || typeof token["refresh_token"] === "string") &&
+    (!("expires_in" in token) || typeof token["expires_in"] === "number");
+
+/**
+ * Attempts to exchange authorization code for bearer token
+ * @param code - authorization code as returned by OP during authorization
+ * @param storedAuthorizationParams - stored params from start of oidc login flow
+ * @returns valid bearer token
+ * @throws when request fails, or returned token is invalid
+ */
+export const completeAuthorizationCodeGrant = async (
+    code: string,
+    {
+        clientId,
+        codeVerifier,
+        redirectUri,
+        delegatedAuthConfig,
+    }: {
+        clientId: string;
+        codeVerifier: string;
+        redirectUri: string;
+        delegatedAuthConfig: IDelegatedAuthConfig & ValidatedIssuerConfig;
+    },
+): Promise<BearerToken> => {
+    const params = new URLSearchParams();
+    params.append("grant_type", "authorization_code");
+    params.append("client_id", clientId);
+    params.append("code_verifier", codeVerifier);
+    params.append("redirect_uri", redirectUri);
+    params.append("code", code);
+    const metadata = params.toString();
+
+    const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+
+    const response = await fetch(delegatedAuthConfig.tokenEndpoint, {
+        method: Method.Post,
+        headers,
+        body: metadata,
+    });
+
+    if (response.status >= 400) {
+        throw new Error(OidcError.CodeExchangeFailed);
+    }
+
+    const token = await response.json();
+
+    if (isValidBearerToken(token)) {
+        return token;
+    }
+
+    throw new Error(OidcError.InvalidBearerToken);
 };

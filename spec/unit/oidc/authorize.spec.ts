@@ -14,15 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMockJest from "fetch-mock-jest";
+
+import { Method } from "../../../src";
 import * as crypto from "../../../src/crypto/crypto";
 import { logger } from "../../../src/logger";
-import { generateAuthorizationParams, generateAuthorizationUrl } from "../../../src/oidc/authorize";
+import {
+    completeAuthorizationCodeGrant,
+    generateAuthorizationParams,
+    generateAuthorizationUrl,
+} from "../../../src/oidc/authorize";
+import { OidcError } from "../../../src/oidc/error";
 
 // save for resetting mocks
 const realSubtleCrypto = crypto.subtleCrypto;
 
 describe("oidc authorization", () => {
+    const issuer = "https://auth.com/";
     const authorizationEndpoint = "https://auth.com/authorization";
+    const tokenEndpoint = "https://auth.com/token";
+    const delegatedAuthConfig = {
+        issuer,
+        registrationEndpoint: issuer + "registration",
+        authorizationEndpoint: issuer + "auth",
+        tokenEndpoint,
+    };
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
@@ -91,6 +107,77 @@ describe("oidc authorization", () => {
             // didn't use plain text code challenge
             expect(authorizationParams.codeVerifier).not.toEqual(codeChallenge);
             expect(codeChallenge).toBeTruthy();
+        });
+    });
+
+    describe("completeAuthorizationCodeGrant", () => {
+        const codeVerifier = "abc123";
+        const redirectUri = baseUrl;
+        const code = "auth_code_xyz";
+        const validBearerToken = {
+            token_type: "Bearer",
+            access_token: "test_access_token",
+            refresh_token: "test_refresh_token",
+            expires_in: 12345,
+        };
+
+        beforeEach(() => {
+            fetchMockJest.mockClear();
+            fetchMockJest.resetBehavior();
+
+            fetchMockJest.post(tokenEndpoint, {
+                status: 200,
+                body: JSON.stringify(validBearerToken),
+            });
+        });
+
+        it("should make correct request to the token endpoint", async () => {
+            await completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig });
+
+            expect(fetchMockJest).toHaveBeenCalledWith(tokenEndpoint, {
+                method: Method.Post,
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `grant_type=authorization_code&client_id=${clientId}&code_verifier=${codeVerifier}&redirect_uri=https%3A%2F%2Ftest.com&code=${code}`,
+            });
+        });
+
+        it("should return with valid bearer token", async () => {
+            const result = await completeAuthorizationCodeGrant(code, {
+                clientId,
+                codeVerifier,
+                redirectUri,
+                delegatedAuthConfig,
+            });
+
+            expect(result).toEqual(validBearerToken);
+        });
+
+        it("should throw with code exchange failed error when request fails", async () => {
+            fetchMockJest.post(
+                tokenEndpoint,
+                {
+                    status: 500,
+                },
+                { overwriteRoutes: true },
+            );
+            await expect(() =>
+                completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig }),
+            ).rejects.toThrow(new Error(OidcError.CodeExchangeFailed));
+        });
+
+        it("should throw invalid token error when token is invalid", async () => {
+            const invalidBearerToken = {
+                ...validBearerToken,
+                access_token: null,
+            };
+            fetchMockJest.post(
+                tokenEndpoint,
+                { status: 200, body: JSON.stringify(invalidBearerToken) },
+                { overwriteRoutes: true },
+            );
+            await expect(() =>
+                completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig }),
+            ).rejects.toThrow(new Error(OidcError.InvalidBearerToken));
         });
     });
 });
