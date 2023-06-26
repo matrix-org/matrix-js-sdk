@@ -22,8 +22,12 @@ import { randomString } from "../randomstring";
 import { OidcError } from "./error";
 import { ValidatedIssuerConfig } from "./validate";
 
-// See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
-type AuthorizationParams = {
+/**
+ * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
+ *
+ * See https://openid.net/specs/openid-connect-basic-1_0.html#RequestParameters.
+ */
+export type AuthorizationParams = {
     state: string;
     scope: string;
     redirectUri: string;
@@ -54,8 +58,10 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
 };
 
 /**
- * Generate authorization params to pass to authorizationEndpoint
- * As part of an authorization code OIDC flow
+ * Generate authorization params to pass to {@link #generateAuthorizationUrl}.
+ *
+ * Used as part of an authorization code OIDC flow: see https://openid.net/specs/openid-connect-basic-1_0.html#CodeFlow.
+ *
  * @param redirectUri - absolute url for OP to redirect to after authorization
  * @returns AuthorizationParams
  */
@@ -111,7 +117,11 @@ const isValidBearerToken = (token: any): token is BearerToken =>
     (!("expires_in" in token) || typeof token["expires_in"] === "number");
 
 /**
- * Attempts to exchange authorization code for bearer token
+ * Attempt to exchange authorization code for bearer token.
+ *
+ * Takes the authorization code returned by the OpenID Provider via the authorization URL, and makes a
+ * request to the Token Endpoint, to obtain the access token, refresh token, etc.
+ *
  * @param code - authorization code as returned by OP during authorization
  * @param storedAuthorizationParams - stored params from start of oidc login flow
  * @returns valid bearer token
