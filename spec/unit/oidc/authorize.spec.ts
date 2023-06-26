@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMockJest from "fetch-mock-jest";
+import fetchMock from "fetch-mock-jest";
 
 import { Method } from "../../../src";
 import * as crypto from "../../../src/crypto/crypto";
@@ -122,10 +122,10 @@ describe("oidc authorization", () => {
         };
 
         beforeEach(() => {
-            fetchMockJest.mockClear();
-            fetchMockJest.resetBehavior();
+            fetchMock.mockClear();
+            fetchMock.resetBehavior();
 
-            fetchMockJest.post(tokenEndpoint, {
+            fetchMock.post(tokenEndpoint, {
                 status: 200,
                 body: JSON.stringify(validBearerToken),
             });
@@ -134,7 +134,7 @@ describe("oidc authorization", () => {
         it("should make correct request to the token endpoint", async () => {
             await completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig });
 
-            expect(fetchMockJest).toHaveBeenCalledWith(tokenEndpoint, {
+            expect(fetchMock).toHaveBeenCalledWith(tokenEndpoint, {
                 method: Method.Post,
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: `grant_type=authorization_code&client_id=${clientId}&code_verifier=${codeVerifier}&redirect_uri=https%3A%2F%2Ftest.com&code=${code}`,
@@ -153,7 +153,7 @@ describe("oidc authorization", () => {
         });
 
         it("should throw with code exchange failed error when request fails", async () => {
-            fetchMockJest.post(
+            fetchMock.post(
                 tokenEndpoint,
                 {
                     status: 500,
@@ -170,7 +170,7 @@ describe("oidc authorization", () => {
                 ...validBearerToken,
                 access_token: null,
             };
-            fetchMockJest.post(
+            fetchMock.post(
                 tokenEndpoint,
                 { status: 200, body: JSON.stringify(invalidBearerToken) },
                 { overwriteRoutes: true },
