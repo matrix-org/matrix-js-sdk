@@ -91,6 +91,7 @@ import {
     CrossSigningStatus,
     DeviceVerificationStatus,
     ImportRoomKeysOpts,
+    VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -218,7 +219,16 @@ export enum CryptoEvent {
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
+    /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
+
+    /**
+     * Fires when a key verification request is received.
+     *
+     * The payload is a {@link Crypto.VerificationRequest}.
+     */
+    VerificationRequestReceived = "crypto.verificationRequestReceived",
+
     Warning = "crypto.warning",
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
@@ -280,8 +290,16 @@ export type CryptoEventHandlerMap = {
     ) => void;
     /**
      * Fires when a key verification is requested.
+     *
+     * Deprecated: use `CryptoEvent.VerificationRequestReceived`.
      */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
+
+    /**
+     * Fires when a key verification request is received.
+     */
+    [CryptoEvent.VerificationRequestReceived]: (request: CryptoApiVerificationRequest) => void;
+
     /**
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
@@ -3541,6 +3559,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             !request.observeOnly;
         if (shouldEmit) {
             this.baseApis.emit(CryptoEvent.VerificationRequest, request);
+            this.baseApis.emit(CryptoEvent.VerificationRequestReceived, request);
         }
     }
 
