@@ -16,7 +16,7 @@ limitations under the License.
 
 import { IDelegatedAuthConfig } from "../client";
 import { Method } from "../http-api";
-import { subtleCrypto } from "../crypto/crypto";
+import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
