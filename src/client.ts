@@ -2238,6 +2238,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.secretStorage,
             this.cryptoCallbacks,
         );
+        rustCrypto.supportedVerificationMethods = this.verificationMethods;
+
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto

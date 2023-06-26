@@ -16,6 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
+import "fake-indexeddb/auto";
 
 import { createClient, CryptoEvent, MatrixClient } from "../../../src";
 import {
@@ -41,6 +42,7 @@ import {
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -48,7 +50,7 @@ jest.useFakeTimers();
 
 let previousCrypto: Crypto | undefined;
 
-beforeAll(() => {
+beforeAll(async () => {
     // Stub out global.crypto
     previousCrypto = global["crypto"];
 
@@ -60,6 +62,9 @@ beforeAll(() => {
             },
         },
     });
+
+    // we use the libolm primitives in the test, so init the Olm library
+    await global.Olm.init();
 });
 
 // restore the original global.crypto
@@ -105,6 +110,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
     /** an object which intercepts `/keys/query` requests from {@link #aliceClient} */
     let e2eKeyResponder: E2EKeyResponder;
 
+    /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} */
+    let e2eKeyReceiver: E2EKeyReceiver;
+
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -121,7 +129,10 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
 
         await initCrypto(aliceClient);
 
+        e2eKeyReceiver = new E2EKeyReceiver(aliceClient.getHomeserverUrl());
         e2eKeyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+        e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
+
         syncResponder = new SyncResponder(aliceClient.getHomeserverUrl());
         mockInitialApiRequests(aliceClient.getHomeserverUrl());
         await aliceClient.startClient();
@@ -129,6 +140,10 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
 
     afterEach(async () => {
         await aliceClient.stopClient();
+
+        // Allow in-flight things to complete before we tear down the test
+        await jest.runAllTimersAsync();
+
         fetchMock.mockReset();
     });
 
@@ -138,7 +153,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
         });
 
-        oldBackendOnly("can verify via SAS", async () => {
+        it("can verify another device via SAS", async () => {
+            await waitForDeviceList();
+
             // have alice initiate a verification. She should send a m.key.verification.request
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
@@ -189,22 +206,29 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
                     short_authentication_string: ["decimal", "emoji"],
                 },
             });
-            await waitForVerificationRequestChanged(request);
-            expect(request.phase).toEqual(VerificationPhase.Started);
-            expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
-            expect(request.chosenMethod).toEqual("m.sas.v1");
+            // as soon as the Changed event arrives, `verifier` should be defined
+            const verifier = await new Promise<Verifier>((resolve) => {
+                function onChange() {
+                    expect(request.phase).toEqual(VerificationPhase.Started);
+                    expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
+                    expect(request.chosenMethod).toEqual("m.sas.v1");
 
-            // there should now be a verifier
-            const verifier: Verifier = request.verifier!;
-            expect(verifier).toBeDefined();
-            expect(verifier.getShowSasCallbacks()).toBeNull();
+                    const verifier: Verifier = request.verifier!;
+                    expect(verifier).toBeDefined();
+                    expect(verifier.getShowSasCallbacks()).toBeNull();
+
+                    resolve(verifier);
+                }
+                request.once(VerificationRequestEvent.Change, onChange);
+            });
 
             // start off the verification process: alice will send an `accept`
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             jest.advanceTimersByTime(10);
 
-            requestBody = await expectSendToDeviceMessage("m.key.verification.accept");
+            requestBody = await sendToDevicePromise;
             toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.key_agreement_protocol).toEqual("curve25519-hkdf-sha256");
             expect(toDeviceMessage.short_authentication_string).toEqual(["decimal", "emoji"]);
@@ -281,15 +305,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         });
 
         oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
-            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
-
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
-            //
-            // Completing the initial sync will make the device list download outdated device lists (of which our own
-            // user will be one).
-            syncResponder.sendOrQueueSyncResponse({});
-            // DeviceList has a sleep(5) which we need to make happen
-            await jest.advanceTimersByTimeAsync(10);
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
             expect(aliceClient.getStoredCrossSigningForUser(TEST_USER_ID)).toBeTruthy();
 
             // have alice initiate a verification. She should send a m.key.verification.request
@@ -377,7 +395,9 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(request.phase).toEqual(VerificationPhase.Done);
         });
 
-        oldBackendOnly("can cancel during the SAS phase", async () => {
+        it("can cancel during the SAS phase", async () => {
+            await waitForDeviceList();
+
             // have alice initiate a verification. She should send a m.key.verification.request
             const [, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
@@ -419,12 +439,13 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(verifier.hasBeenCancelled).toBe(false);
 
             // start off the verification process: alice will send an `accept`
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             jest.advanceTimersByTime(10);
-            await expectSendToDeviceMessage("m.key.verification.accept");
+            await sendToDevicePromise;
 
-            // now we unceremoniously cancel
+            // now we unceremoniously cancel. We expect the verificatationPromise to reject.
             const requestPromise = expectSendToDeviceMessage("m.key.verification.cancel");
             verifier.cancel(new Error("blah"));
             await requestPromise;
@@ -478,6 +499,19 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
         });
     });
+
+    /** make sure that the client knows about the dummy device */
+    async function waitForDeviceList(): Promise<void> {
+        // Completing the initial sync will make the device list download outdated device lists (of which our own
+        // user will be one).
+        syncResponder.sendOrQueueSyncResponse({});
+        // DeviceList has a sleep(5) which we need to make happen
+        await jest.advanceTimersByTimeAsync(10);
+
+        // The client should now know about the dummy device
+        const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+        expect(devices.get(TEST_USER_ID)!.keys()).toContain(TEST_DEVICE_ID);
+    }
 
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
