@@ -152,6 +152,26 @@ describe("oidc authorization", () => {
             expect(result).toEqual(validBearerTokenResponse);
         });
 
+        it("should return with valid bearer token where token_type is lowercase", async () => {
+            const tokenResponse = {
+                ...validBearerTokenResponse,
+                token_type: "bearer",
+            };
+            fetchMock.post(tokenEndpoint, {
+                status: 200,
+                body: JSON.stringify(tokenResponse),
+            }, { overwriteRoutes: true });
+            
+            const result = await completeAuthorizationCodeGrant(code, {
+                clientId,
+                codeVerifier,
+                redirectUri,
+                delegatedAuthConfig,
+            });
+
+            expect(result).toEqual(validBearerTokenResponse);
+        });
+
         it("should throw with code exchange failed error when request fails", async () => {
             fetchMock.post(
                 tokenEndpoint,
