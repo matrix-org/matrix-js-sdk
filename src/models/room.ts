@@ -2054,7 +2054,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const rootEvent of matrixEvents) {
             timelineSet.addLiveEvent(rootEvent, {
                 duplicateStrategy: DuplicateStrategy.Replace,
-                fromCache: false,
+                // We say these events are from cache as we're abusing a single timeline to maintain events
+                // from multiple threads and as such do not want to emit Room.Timeline events for these events
+                fromCache: true,
                 roomState,
             });
         }
