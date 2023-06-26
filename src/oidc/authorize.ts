@@ -58,7 +58,7 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
 };
 
 /**
- * Generate authorization params to pass to {@link #generateAuthorizationUrl}.
+ * Generate authorization params to pass to {@link generateAuthorizationUrl}.
  *
  * Used as part of an authorization code OIDC flow: see https://openid.net/specs/openid-connect-basic-1_0.html#CodeFlow.
  *
@@ -103,8 +103,9 @@ export const generateAuthorizationUrl = async (
 
 /**
  * The expected response type from the token endpoint during authorization code flow
+ * Normalized to always use capitalized 'Bearer' for token_type
  *
- * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4, 
+ * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
  * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
  */
 export type BearerTokenResponse = {
@@ -115,12 +116,44 @@ export type BearerTokenResponse = {
     expires_in?: number;
     id_token?: string;
 };
-const isValidBearerTokenResponse = (token: any): token is BearerTokenResponse =>
-    typeof token == "object" &&
-    token["token_type"] === "Bearer" &&
-    typeof token["access_token"] === "string" &&
-    (!("refresh_token" in token) || typeof token["refresh_token"] === "string") &&
-    (!("expires_in" in token) || typeof token["expires_in"] === "number");
+
+/**
+ * Expected response type from the token endpoint during authorization code flow
+ * as it comes over the wire.
+ * Should be normalized to use capital case 'Bearer' for token_type property
+ *
+ * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
+ * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
+ */
+type WireBearerTokenResponse = BearerTokenResponse & {
+    token_type: "Bearer" | "bearer";
+};
+
+const isResponseObject = (response: unknown): response is Record<string, unknown> =>
+    !!response && typeof response === "object";
+
+/**
+ * Normalize token_type to use capital case to make consuming the token response easier
+ * token_type is case insensitive, and it is spec-compliant for OPs to return token_type: "bearer"
+ * Later, when used in auth headers it is case sensitive and must be Bearer
+ * See: https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4
+ *
+ * @param response - validated token response
+ * @returns response with token_type set to 'Bearer'
+ */
+const normalizeBearerTokenResponseTokenType = (response: WireBearerTokenResponse): BearerTokenResponse => ({
+    ...response,
+    token_type: "Bearer",
+});
+
+const isValidBearerTokenResponse = (response: unknown): response is WireBearerTokenResponse =>
+    isResponseObject(response) &&
+    typeof response["token_type"] === "string" &&
+    // token_type is case insensitive, some OPs return `token_type: "bearer"`
+    response["token_type"].toLowerCase() === "bearer" &&
+    typeof response["access_token"] === "string" &&
+    (!("refresh_token" in response) || typeof response["refresh_token"] === "string") &&
+    (!("expires_in" in response) || typeof response["expires_in"] === "number");
 
 /**
  * Attempt to exchange authorization code for bearer token.
@@ -170,7 +203,7 @@ export const completeAuthorizationCodeGrant = async (
     const token = await response.json();
 
     if (isValidBearerTokenResponse(token)) {
-        return token;
+        return normalizeBearerTokenResponseTokenType(token);
     }
 
     throw new Error(OidcError.InvalidBearerTokenResponse);
