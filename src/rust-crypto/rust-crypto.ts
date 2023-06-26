@@ -544,8 +544,12 @@ export class RustCrypto implements CryptoBackend {
      * @returns the VerificationRequests that are in progress
      */
     public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
-        // TODO
-        return [];
+        const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        return requests
+            .filter((request) => request.roomId === undefined)
+            .map((request) => new RustVerificationRequest(request, this.outgoingRequestProcessor));
     }
 
     /**

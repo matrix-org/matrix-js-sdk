@@ -156,6 +156,12 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
         it("can verify another device via SAS", async () => {
             await waitForDeviceList();
 
+            // initially there should be no verifications in progress
+            {
+                const requests = aliceClient.getCrypto()!.getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+                expect(requests.length).toEqual(0);
+            }
+
             // have alice initiate a verification. She should send a m.key.verification.request
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
@@ -170,6 +176,13 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
             expect(request.chosenMethod).toBe(null); // nothing chosen yet
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
+
+            // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
+            {
+                const requests = aliceClient.getCrypto()!.getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+                expect(requests.length).toEqual(1);
+                expect(requests[0].transactionId).toEqual(transactionId);
+            }
 
             let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
