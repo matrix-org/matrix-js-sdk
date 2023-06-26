@@ -74,7 +74,7 @@ export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: stri
 });
 
 /**
- * Generates a URL to attempt authorization with the OP
+ * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
  * @param authorizationUrl - endpoint to attempt authorization with the OP
  * @param clientId - id of this client as registered with the OP
