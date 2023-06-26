@@ -18,25 +18,25 @@ import { mocked } from "jest-mock";
 
 import { EventType, GroupCallIntent, GroupCallType, MatrixCall, MatrixEvent, Room, RoomMember } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
-import { GroupCall, GroupCallEvent, GroupCallState } from "../../../src/webrtc/groupCall";
+import { GroupCall, GroupCallEvent, GroupCallState, GroupCallStatsReportEvent } from "../../../src/webrtc/groupCall";
 import { IMyDevice, MatrixClient } from "../../../src/client";
 import {
+    FAKE_CONF_ID,
+    FAKE_DEVICE_ID_1,
+    FAKE_DEVICE_ID_2,
+    FAKE_ROOM_ID,
+    FAKE_SESSION_ID_1,
+    FAKE_SESSION_ID_2,
+    FAKE_USER_ID_1,
+    FAKE_USER_ID_2,
+    FAKE_USER_ID_3,
     installWebRTCMocks,
     MockCallFeed,
     MockCallMatrixClient,
+    MockMatrixCall,
     MockMediaStream,
     MockMediaStreamTrack,
     MockRTCPeerConnection,
-    MockMatrixCall,
-    FAKE_ROOM_ID,
-    FAKE_USER_ID_1,
-    FAKE_CONF_ID,
-    FAKE_DEVICE_ID_2,
-    FAKE_SESSION_ID_2,
-    FAKE_USER_ID_2,
-    FAKE_DEVICE_ID_1,
-    FAKE_SESSION_ID_1,
-    FAKE_USER_ID_3,
 } from "../../test-utils/webrtc";
 import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import { sleep } from "../../../src/utils";
@@ -44,6 +44,9 @@ import { CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { CallEvent, CallState } from "../../../src/webrtc/call";
 import { flushPromises } from "../../test-utils/flushPromises";
+import { CallFeedReport } from "../../../src/webrtc/stats/statsReport";
+import { CallFeedStatsReporter } from "../../../src/webrtc/stats/callFeedStatsReporter";
+import { StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
 
 const FAKE_STATE_EVENTS = [
     {
@@ -1724,6 +1727,91 @@ describe("Group Call", function () {
 
             expect(stop).toHaveBeenCalled();
             expect(start).toHaveBeenCalled();
+        });
+    });
+
+    describe("as stats event listener and a CallFeedReport was triggered", () => {
+        let groupCall: GroupCall;
+        let reportEmitter: StatsReportEmitter;
+        const report: CallFeedReport = {} as CallFeedReport;
+        beforeEach(async () => {
+            CallFeedStatsReporter.expandCallFeedReport = jest.fn().mockReturnValue(report);
+            const typedMockClient = new MockCallMatrixClient(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1);
+            const mockClient = typedMockClient.typed();
+            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
+            room.currentState.members[FAKE_USER_ID_2] = {
+                userId: FAKE_USER_ID_2,
+                membership: "join",
+            } as unknown as RoomMember;
+            room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
+            groupCall = await createAndEnterGroupCall(mockClient, room);
+            reportEmitter = groupCall.getGroupCallStats().reports;
+        });
+
+        it("should not extends with feed stats if no call exists", async () => {
+            const testPromise = new Promise<void>((done) => {
+                groupCall.on(GroupCallStatsReportEvent.CallFeedStats, () => {
+                    expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith({}, [], "from-call-feed");
+                    done();
+                });
+            });
+            const report: CallFeedReport = {} as CallFeedReport;
+            reportEmitter.emitCallFeedReport(report);
+            await testPromise;
+        });
+
+        it("and a CallFeedReport was triggered then it should extends with local feed", async () => {
+            const localCallFeed = {} as CallFeed;
+            groupCall.localCallFeed = localCallFeed;
+
+            const testPromise = new Promise<void>((done) => {
+                groupCall.on(GroupCallStatsReportEvent.CallFeedStats, () => {
+                    expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith(
+                        report,
+                        [localCallFeed],
+                        "from-local-feed",
+                    );
+                    expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith(
+                        report,
+                        [],
+                        "from-call-feed",
+                    );
+                    done();
+                });
+            });
+            const report: CallFeedReport = {} as CallFeedReport;
+            reportEmitter.emitCallFeedReport(report);
+            await testPromise;
+        });
+
+        it("and a CallFeedReport was triggered then it should extends with remote feed", async () => {
+            const localCallFeed = {} as CallFeed;
+            groupCall.localCallFeed = localCallFeed;
+            // @ts-ignore Suppress error because access to private property
+            const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
+            report.callId = call.callId;
+            const feeds = call.getFeeds();
+            const testPromise = new Promise<void>((done) => {
+                groupCall.on(GroupCallStatsReportEvent.CallFeedStats, () => {
+                    expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith(
+                        report,
+                        [localCallFeed],
+                        "from-local-feed",
+                    );
+                    expect(CallFeedStatsReporter.expandCallFeedReport).toHaveBeenCalledWith(
+                        report,
+                        feeds,
+                        "from-call-feed",
+                    );
+                    done();
+                });
+            });
+            reportEmitter.emitCallFeedReport(report);
+            await testPromise;
         });
     });
 });

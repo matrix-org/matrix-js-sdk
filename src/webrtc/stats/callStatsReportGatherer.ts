@@ -17,17 +17,19 @@ limitations under the License.
 import { ConnectionStats } from "./connectionStats";
 import { StatsReportEmitter } from "./statsReportEmitter";
 import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
-import { ConnectionStatsReporter } from "./connectionStatsReporter";
-import { TransportStatsReporter } from "./transportStatsReporter";
+import { ConnectionStatsBuilder } from "./connectionStatsBuilder";
+import { TransportStatsBuilder } from "./transportStatsBuilder";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
 import { MediaTrackHandler } from "./media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
-import { TrackStatsReporter } from "./trackStatsReporter";
-import { StatsReportBuilder } from "./statsReportBuilder";
-import { StatsValueFormatter } from "./statsValueFormatter";
-import { SummaryStats } from "./summaryStats";
+import { TrackStatsBuilder } from "./trackStatsBuilder";
+import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
+import { ValueFormatter } from "./valueFormatter";
+import { CallStatsReportSummary } from "./callStatsReportSummary";
+import { logger } from "../../logger";
+import { CallFeedStatsReporter } from "./callFeedStatsReporter";
 
-export class StatsReportGatherer {
+export class CallStatsReportGatherer {
     private isActive = true;
     private previousStatsReport: RTCStatsReport | undefined;
     private currentStatsReport: RTCStatsReport | undefined;
@@ -37,7 +39,7 @@ export class StatsReportGatherer {
 
     public constructor(
         public readonly callId: string,
-        public readonly remoteUserId: string,
+        private opponentMemberId: string,
         private readonly pc: RTCPeerConnection,
         private readonly emitter: StatsReportEmitter,
         private readonly isFocus = true,
@@ -46,7 +48,7 @@ export class StatsReportGatherer {
         this.trackStats = new MediaTrackStatsHandler(new MediaSsrcHandler(), new MediaTrackHandler(pc));
     }
 
-    public async processStats(groupCallId: string, localUserId: string): Promise<SummaryStats> {
+    public async processStats(groupCallId: string, localUserId: string): Promise<CallStatsReportSummary> {
         const summary = {
             isFirstCollection: this.previousStatsReport === undefined,
             receivedMedia: 0,
@@ -54,7 +56,7 @@ export class StatsReportGatherer {
             receivedVideoMedia: 0,
             audioTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0, concealedAudio: 0, totalAudio: 0 },
             videoTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0, concealedAudio: 0, totalAudio: 0 },
-        } as SummaryStats;
+        } as CallStatsReportSummary;
         if (this.isActive) {
             const statsPromise = this.pc.getStats();
             if (typeof statsPromise?.then === "function") {
@@ -62,10 +64,11 @@ export class StatsReportGatherer {
                     .then((report) => {
                         // @ts-ignore
                         this.currentStatsReport = typeof report?.result === "function" ? report.result() : report;
+
                         try {
                             this.processStatsReport(groupCallId, localUserId);
                         } catch (error) {
-                            this.isActive = false;
+                            this.handleError(error);
                             return summary;
                         }
 
@@ -73,7 +76,7 @@ export class StatsReportGatherer {
                         summary.receivedMedia = this.connectionStats.bitrate.download;
                         summary.receivedAudioMedia = this.connectionStats.bitrate.audio?.download || 0;
                         summary.receivedVideoMedia = this.connectionStats.bitrate.video?.download || 0;
-                        const trackSummary = TrackStatsReporter.buildTrackSummary(
+                        const trackSummary = TrackStatsBuilder.buildTrackSummary(
                             Array.from(this.trackStats.getTrack2stats().values()),
                         );
                         return {
@@ -93,14 +96,16 @@ export class StatsReportGatherer {
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStats: ByteSentStatsReport = new Map<TrackID, ByteSend>();
+        const byteSentStatsReport: ByteSentStatsReport = new Map<TrackID, ByteSend>() as ByteSentStatsReport;
+        byteSentStatsReport.callId = this.callId;
+        byteSentStatsReport.opponentMemberId = this.opponentMemberId;
 
         this.currentStatsReport?.forEach((now) => {
             const before = this.previousStatsReport ? this.previousStatsReport.get(now.id) : null;
             // RTCIceCandidatePairStats - https://w3c.github.io/webrtc-stats/#candidatepair-dict*
             if (now.type === "candidate-pair" && now.nominated && now.state === "succeeded") {
-                this.connectionStats.bandwidth = ConnectionStatsReporter.buildBandwidthReport(now);
-                this.connectionStats.transport = TransportStatsReporter.buildReport(
+                this.connectionStats.bandwidth = ConnectionStatsBuilder.buildBandwidthReport(now);
+                this.connectionStats.transport = TransportStatsBuilder.buildReport(
                     this.currentStatsReport,
                     now,
                     this.connectionStats.transport,
@@ -121,7 +126,7 @@ export class StatsReportGatherer {
                 }
 
                 if (before) {
-                    TrackStatsReporter.buildPacketsLost(trackStats, now, before);
+                    TrackStatsBuilder.buildPacketsLost(trackStats, now, before);
                 }
 
                 // Get the resolution and framerate for only remote video sources here. For the local video sources,
@@ -130,26 +135,26 @@ export class StatsReportGatherer {
                 // more calculations needed to determine what is the highest resolution stream sent by the client if the
                 // 'outbound-rtp' stats are used.
                 if (now.type === "inbound-rtp") {
-                    TrackStatsReporter.buildFramerateResolution(trackStats, now);
+                    TrackStatsBuilder.buildFramerateResolution(trackStats, now);
                     if (before) {
-                        TrackStatsReporter.buildBitrateReceived(trackStats, now, before);
+                        TrackStatsBuilder.buildBitrateReceived(trackStats, now, before);
                     }
                     const ts = this.trackStats.findTransceiverByTrackId(trackStats.trackId);
-                    TrackStatsReporter.setTrackStatsState(trackStats, ts);
-                    TrackStatsReporter.buildJitter(trackStats, now);
-                    TrackStatsReporter.buildAudioConcealment(trackStats, now);
+                    TrackStatsBuilder.setTrackStatsState(trackStats, ts);
+                    TrackStatsBuilder.buildJitter(trackStats, now);
+                    TrackStatsBuilder.buildAudioConcealment(trackStats, now);
                 } else if (before) {
-                    byteSentStats.set(trackStats.trackId, StatsValueFormatter.getNonNegativeValue(now.bytesSent));
-                    TrackStatsReporter.buildBitrateSend(trackStats, now, before);
+                    byteSentStatsReport.set(trackStats.trackId, ValueFormatter.getNonNegativeValue(now.bytesSent));
+                    TrackStatsBuilder.buildBitrateSend(trackStats, now, before);
                 }
-                TrackStatsReporter.buildCodec(this.currentStatsReport, trackStats, now);
+                TrackStatsBuilder.buildCodec(this.currentStatsReport, trackStats, now);
             } else if (now.type === "track" && now.kind === "video" && !now.remoteSource) {
                 const trackStats = this.trackStats.findLocalVideoTrackStats(now);
                 if (!trackStats) {
                     return;
                 }
-                TrackStatsReporter.buildFramerateResolution(trackStats, now);
-                TrackStatsReporter.calculateSimulcastFramerate(
+                TrackStatsBuilder.buildFramerateResolution(trackStats, now);
+                TrackStatsBuilder.calculateSimulcastFramerate(
                     trackStats,
                     now,
                     before,
@@ -158,8 +163,11 @@ export class StatsReportGatherer {
             }
         });
 
-        this.emitter.emitByteSendReport(byteSentStats);
-        this.processAndEmitReport();
+        this.emitter.emitByteSendReport(byteSentStatsReport);
+        this.emitter.emitCallFeedReport(
+            CallFeedStatsReporter.buildCallFeedReport(this.callId, this.opponentMemberId, this.pc),
+        );
+        this.processAndEmitConnectionStatsReport();
     }
 
     public setActive(isActive: boolean): void {
@@ -170,12 +178,15 @@ export class StatsReportGatherer {
         return this.isActive;
     }
 
-    private handleError(_: any): void {
+    private handleError(error: any): void {
         this.isActive = false;
+        logger.warn(`CallStatsReportGatherer ${this.callId} processStatsReport fails and set to inactive ${error}`);
     }
 
-    private processAndEmitReport(): void {
-        const report = StatsReportBuilder.build(this.trackStats.getTrack2stats());
+    private processAndEmitConnectionStatsReport(): void {
+        const report = ConnectionStatsReportBuilder.build(this.trackStats.getTrack2stats());
+        report.callId = this.callId;
+        report.opponentMemberId = this.opponentMemberId;
 
         this.connectionStats.bandwidth = report.bandwidth;
         this.connectionStats.bitrate = report.bitrate;
@@ -200,5 +211,9 @@ export class StatsReportGatherer {
                 this.trackStats.mediaSsrcHandler.parse(this.pc.currentLocalDescription.sdp, "local");
             }
         }
+    }
+
+    public setOpponentMemberId(id: string): void {
+        this.opponentMemberId = id;
     }
 }

@@ -11,10 +11,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { StatsReportEmitter } from "./statsReportEmitter";
-import { SummaryStats } from "./summaryStats";
+import { CallStatsReportSummary } from "./callStatsReportSummary";
 import { SummaryStatsReport } from "./statsReport";
+import { ParticipantState } from "../groupCall";
+import { RoomMember } from "../../matrix";
 
-interface SummaryCounter {
+interface CallStatsReportSummaryCounter {
     receivedAudio: number;
     receivedVideo: number;
     receivedMedia: number;
@@ -22,19 +24,22 @@ interface SummaryCounter {
     totalAudio: number;
 }
 
-export class SummaryStatsReporter {
+export class SummaryStatsReportGatherer {
     public constructor(private emitter: StatsReportEmitter) {}
 
-    public build(allSummary: SummaryStats[]): void {
+    public build(allSummary: CallStatsReportSummary[]): void {
         // Filter all stats which collect the first time webrtc stats.
         // Because stats based on time interval and the first collection of a summery stats has no previous
         // webrtcStats as basement all the calculation are 0. We don't want track the 0 stats.
         const summary = allSummary.filter((s) => !s.isFirstCollection);
         const summaryTotalCount = summary.length;
+        // For counting the peer connections we also want to consider the ignored summaries
+        const peerConnectionsCount = allSummary.length;
         if (summaryTotalCount === 0) {
             return;
         }
-        const summaryCounter: SummaryCounter = {
+
+        const summaryCounter: CallStatsReportSummaryCounter = {
             receivedAudio: 0,
             receivedVideo: 0,
             receivedMedia: 0,
@@ -65,12 +70,34 @@ export class SummaryStatsReporter {
                     ? (summaryCounter.concealedAudio / summaryCounter.totalAudio).toFixed(decimalPlaces)
                     : 0,
             ),
-            peerConnections: summaryTotalCount,
+            peerConnections: peerConnectionsCount,
         } as SummaryStatsReport;
         this.emitter.emitSummaryStatsReport(report);
     }
 
-    private countTrackListReceivedMedia(counter: SummaryCounter, stats: SummaryStats): void {
+    public static extendSummaryReport(
+        report: SummaryStatsReport,
+        callParticipants: Map<RoomMember, Map<string, ParticipantState>>,
+    ): void {
+        // Calculate the actual number of devices based on the participants state event
+        // (this is used, to compare the expected participant count from the room state with the acutal peer connections)
+        // const devices = callParticipants.()
+        const devices: [string, ParticipantState][] = [];
+        const users: [RoomMember, Map<string, ParticipantState>][] = [];
+        for (const userEntry of callParticipants) {
+            users.push(userEntry);
+            for (const device of userEntry[1]) {
+                devices.push(device);
+            }
+        }
+        report.opponentDevicesInCall = Math.max(0, devices.length - 1);
+        report.opponentUsersInCall = Math.max(0, users.length - 1);
+        report.diffDevicesToPeerConnections = Math.max(0, devices.length - 1) - report.peerConnections;
+        report.ratioPeerConnectionToDevices =
+            Math.max(0, devices.length - 1) == 0 ? 0 : report.peerConnections / (devices.length - 1);
+    }
+
+    private countTrackListReceivedMedia(counter: CallStatsReportSummaryCounter, stats: CallStatsReportSummary): void {
         let hasReceivedAudio = false;
         let hasReceivedVideo = false;
         if (stats.receivedAudioMedia > 0 || stats.audioTrackSummary.count === 0) {
@@ -92,7 +119,7 @@ export class SummaryStatsReporter {
         }
     }
 
-    private buildMaxJitter(maxJitter: number, stats: SummaryStats): number {
+    private buildMaxJitter(maxJitter: number, stats: CallStatsReportSummary): number {
         if (maxJitter < stats.videoTrackSummary.maxJitter) {
             maxJitter = stats.videoTrackSummary.maxJitter;
         }
@@ -103,7 +130,7 @@ export class SummaryStatsReporter {
         return maxJitter;
     }
 
-    private buildMaxPacketLoss(maxPacketLoss: number, stats: SummaryStats): number {
+    private buildMaxPacketLoss(maxPacketLoss: number, stats: CallStatsReportSummary): number {
         if (maxPacketLoss < stats.videoTrackSummary.maxPacketLoss) {
             maxPacketLoss = stats.videoTrackSummary.maxPacketLoss;
         }
@@ -114,7 +141,7 @@ export class SummaryStatsReporter {
         return maxPacketLoss;
     }
 
-    private countConcealedAudio(summaryCounter: SummaryCounter, stats: SummaryStats): void {
+    private countConcealedAudio(summaryCounter: CallStatsReportSummaryCounter, stats: CallStatsReportSummary): void {
         summaryCounter.concealedAudio += stats.audioTrackSummary.concealedAudio;
         summaryCounter.totalAudio += stats.audioTrackSummary.totalAudio;
     }

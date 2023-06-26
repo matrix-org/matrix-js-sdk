@@ -334,7 +334,19 @@ export class MediaHandler extends TypedEventEmitter<
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
 
         if (this.localUserMediaStream === mediaStream) {
+            // if we have this stream cahced, remove it, because we've stopped it
             this.localUserMediaStream = undefined;
+        } else {
+            // If it's not the same stream. remove any tracks from the cached stream that
+            // we have just stopped, and if we do stop any, call the same method on the
+            // cached stream too in order to stop all its tracks (in case they are different)
+            // and un-cache it.
+            for (const track of mediaStream.getTracks()) {
+                if (this.localUserMediaStream?.getTrackById(track.id)) {
+                    this.stopUserMediaStream(this.localUserMediaStream);
+                    break;
+                }
+            }
         }
     }
 

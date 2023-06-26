@@ -35,13 +35,7 @@ import * as algorithms from "./algorithms";
 import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
-import {
-    CrossSigningKey,
-    ICreateSecretStorageOpts,
-    IEncryptedEventInfo,
-    IImportRoomKeysOpts,
-    IRecoveryKey,
-} from "./api";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./api";
 import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
@@ -86,19 +80,26 @@ import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
     SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretStorageCallbacks,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
     ServerSideSecretStorageImpl,
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
-import { BootstrapCrossSigningOpts, DeviceVerificationStatus } from "../crypto-api";
+import {
+    BootstrapCrossSigningOpts,
+    CrossSigningStatus,
+    DeviceVerificationStatus,
+    ImportRoomKeysOpts,
+} from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 
 /* re-exports for backwards compatibility */
-export type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
+export type {
+    BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
+    CryptoCallbacks as ICryptoCallbacks,
+} from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -133,25 +134,6 @@ const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
-}
-
-export interface ICryptoCallbacks extends SecretStorageCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
-    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
-    onSecretRequested?: (
-        userId: string,
-        deviceId: string,
-        requestId: string,
-        secretName: string,
-        deviceTrust: DeviceTrustLevel,
-    ) => Promise<string | undefined>;
-    getDehydrationKey?: (
-        keyInfo: SecretStorageKeyDescription,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
-    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /* eslint-disable camelcase */
@@ -742,6 +724,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             !this.backupManager.getKeyBackupEnabled() || (await this.baseApis.isKeyBackupKeyStored());
 
         return !!(secretStorageKeyInAccount && privateKeysInStorage && sessionBackupInStorage);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
+        const publicKeysOnDevice = Boolean(this.crossSigningInfo.getId());
+        const privateKeysInSecretStorage = Boolean(
+            await this.crossSigningInfo.isStoredInSecretStorage(this.secretStorage),
+        );
+        const cacheCallbacks = this.crossSigningInfo.getCacheCallbacks();
+        const masterKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("master"));
+        const selfSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("self_signing"));
+        const userSigningKey = Boolean(await cacheCallbacks.getCrossSigningKeyCache?.("user_signing"));
+
+        return {
+            publicKeysOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey,
+                selfSigningKey,
+                userSigningKey,
+            },
+        };
     }
 
     /**
@@ -2333,6 +2339,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
+    /** @deprecated Use `requestOwnUserVerificationToDevice` or `requestDeviceVerification` */
     public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(userId));
@@ -2343,6 +2350,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         const channel = new ToDeviceChannel(this.baseApis, userId, devices, ToDeviceChannel.makeTransactionId());
         return this.requestVerificationWithChannel(userId, channel, this.toDeviceVerificationRequests);
+    }
+
+    public requestOwnUserVerification(): Promise<VerificationRequest> {
+        return this.requestVerification(this.userId);
+    }
+
+    public requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
+        return this.requestVerification(userId, [deviceId]);
     }
 
     private async requestVerificationWithChannel(
@@ -2828,7 +2843,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param keys - a list of session export objects
      * @returns a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
+    public importRoomKeys(keys: IMegolmSessionData[], opts: ImportRoomKeysOpts = {}): Promise<void> {
         let successes = 0;
         let failures = 0;
         const total = keys.length;

@@ -103,13 +103,7 @@ import { MatrixScheduler } from "./scheduler";
 import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
 import { IAuthData, IAuthDict } from "./interactive-auth";
 import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
-import {
-    CrossSigningKey,
-    ICreateSecretStorageOpts,
-    IEncryptedEventInfo,
-    IImportRoomKeysOpts,
-    IRecoveryKey,
-} from "./crypto/api";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
@@ -207,7 +201,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { BootstrapCrossSigningOpts, CryptoApi } from "./crypto-api";
+import { BootstrapCrossSigningOpts, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -342,6 +336,11 @@ export interface ICreateClientOpts {
      */
     pickleKey?: string;
 
+    /**
+     * Verification methods we should offer to the other side when performing an interactive verification.
+     * If unset, we will offer all known methods. Currently these are: showing a QR code, scanning a QR code, and SAS
+     * (aka "emojis").
+     */
     verificationMethods?: Array<VerificationMethod>;
 
     /**
@@ -373,6 +372,9 @@ export interface ICreateClientOpts {
      */
     useE2eForGroupCall?: boolean;
 
+    /**
+     * Crypto callbacks provided by the application
+     */
     cryptoCallbacks?: ICryptoCallbacks;
 
     /**
@@ -469,11 +471,6 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
-
-    /**
-     * @experimental
-     */
-    intentionalMentions?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -499,6 +496,10 @@ export interface IThreadsCapability extends ICapability {}
 export interface IMSC3882GetLoginTokenCapability extends ICapability {}
 
 export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
+
+export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
+export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
+export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
 
 /**
  * A representation of the capabilities advertised by a homeserver as defined by
@@ -593,8 +594,8 @@ export interface IClientWellKnown {
     [M_AUTHENTICATION.name]?: IDelegatedAuthConfig; // MSC2965
 }
 
-export interface IWellKnownConfig {
-    raw?: IClientWellKnown;
+export interface IWellKnownConfig<T = IClientWellKnown> {
+    raw?: T;
     action?: AutoDiscoveryAction;
     reason?: string;
     error?: Error | string;
@@ -2230,7 +2231,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId, this.secretStorage);
+        const rustCrypto = await RustCrypto.initRustCrypto(
+            this.http,
+            userId,
+            deviceId,
+            this.secretStorage,
+            this.cryptoCallbacks,
+        );
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto
@@ -2438,12 +2445,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomId - the room to use for verification
      *
      * @returns the VerificationRequest that is in progress, if any
+     * @deprecated Prefer {@link CryptoApi.findVerificationRequestDMInProgress}.
      */
     public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
         if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
+        } else if (!this.crypto) {
+            // Hack for element-R to avoid breaking the cypress tests. We can get rid of this once the react-sdk is
+            // updated to use CryptoApi.findVerificationRequestDMInProgress.
+            return undefined;
         }
-        return this.cryptoBackend.findVerificationRequestDMInProgress(roomId);
+        return this.crypto.findVerificationRequestDMInProgress(roomId);
     }
 
     /**
@@ -2452,6 +2464,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - the ID of the user to query
      *
      * @returns the VerificationRequests that are in progress
+     * @deprecated Prefer {@link CryptoApi.getVerificationRequestsToDeviceInProgress}.
      */
     public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
         if (!this.crypto) {
@@ -2469,6 +2482,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns resolves to a VerificationRequest
      *    when the request has been sent to the other party.
+     *
+     * @deprecated Prefer {@link CryptoApi#requestOwnUserVerification} or {@link CryptoApi#requestDeviceVerification}.
      */
     public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!this.crypto) {
@@ -2873,6 +2888,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
      *   algorithm is found
      *
+     * @deprecated Use {@link CryptoApi#bootstrapSecretStorage}.
      */
     public bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void> {
         if (!this.crypto) {
@@ -3196,14 +3212,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
+     * @param opts - options object
      *
      * @returns a promise which resolves when the keys have been imported
+     *
+     * @deprecated Prefer {@link CryptoApi.importRoomKeys | `CryptoApi.importRoomKeys`}:
+     * ```javascript
+     *  await client.getCrypto()?.importRoomKeys([..]);
+     * ```
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
-        if (!this.crypto) {
+    public importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.importRoomKeys(keys, opts);
+        return this.cryptoBackend.importRoomKeys(keys, opts);
     }
 
     /**
@@ -3811,7 +3833,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             algorithm.free();
         }
 
-        await this.importRoomKeys(keys, {
+        await this.getCrypto()?.importRoomKeys(keys, {
             progressCallback,
             untrusted,
             source: "backup",
@@ -4594,10 +4616,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
+     * @param opts - Redact options
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
-     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     * @throws Error if called with `with_rel_types` (MSC3912) but the server does not support it.
      *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
@@ -4627,34 +4649,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+        const content: IContent = { reason };
 
-        if (
-            opts?.with_relations &&
-            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
-        ) {
-            throw new Error(
-                "Server does not support relation based redactions " +
-                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
-            );
+        if (opts?.with_rel_types !== undefined) {
+            if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
+                throw new Error(
+                    "Server does not support relation based redactions " +
+                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+                );
+            }
+
+            const withRelTypesPropName =
+                this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                    ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                    : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!;
+
+            content[withRelTypesPropName] = opts.with_rel_types;
         }
-
-        const withRelations = opts?.with_relations
-            ? {
-                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
-                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
-                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
-              }
-            : {};
 
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: {
-                    ...withRelations,
-                    reason,
-                },
+                content,
                 redacts: eventId,
             },
             txnId as string,
@@ -5573,11 +5591,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.currentState.setUnknownStateEvents(stateEvents);
                     }
 
-                    const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, threadedEvents, unknownRelations] =
+                        room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     room.oldState.paginationToken = res.end ?? null;
                     if (res.chunk.length === 0) {
@@ -5686,11 +5706,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
-        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
+        unknownRelations.forEach((event) => timelineSet.relations.aggregateChildEvent(event));
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -6230,7 +6251,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
+                    const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
@@ -6238,6 +6259,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
+                    unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
                     const atEnd = res.end === undefined || res.end === res.start;
 
@@ -7144,29 +7166,75 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user
+     * Gets a set of room IDs in common with another user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
+     *
      * @param userId - The userId to check.
-     * @returns Promise which resolves to a set of rooms
+     * @returns Promise which resolves to an array of rooms
      * @returns Rejects: with an error response.
      */
+    // TODO: on spec release, rename this to getMutualRooms
     // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
-        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
+        // Initial variant of the MSC
+        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport) {
-            throw Error("Server does not support mutual_rooms API");
-        }
+        // Newer variant that renamed shared rooms to mutual rooms
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        const path = utils.encodeUri(
-            `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
-            { $userId: userId },
+        // Latest variant that changed from path elements to query elements
+        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
+            UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
-        const res = await this.http.authedRequest<{ joined: string[] }>(Method.Get, path, undefined, undefined, {
-            prefix: ClientPrefix.Unstable,
-        });
-        return res.joined;
+        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
+            throw Error("Server does not support the Mutual Rooms API");
+        }
+
+        let path;
+        let query;
+
+        // Cascading unstable support switching.
+        if (queryMutualRoomsSupport) {
+            path = "/uk.half-shot.msc2666/user/mutual_rooms";
+            query = { user_id: userId };
+        } else {
+            path = utils.encodeUri(
+                `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
+                { $userId: userId },
+            );
+            query = {};
+        }
+
+        // Accumulated rooms
+        const rooms: string[] = [];
+        let token = null;
+
+        do {
+            const tokenQuery: Record<string, string> = {};
+            if (token != null && queryMutualRoomsSupport) {
+                tokenQuery["batch_token"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch_token?: string;
+            }>(Method.Get, path, { ...query, ...tokenQuery }, undefined, {
+                prefix: ClientPrefix.Unstable,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch_token !== undefined) {
+                token = res.next_batch_token;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
     }
 
     /**
@@ -7685,16 +7753,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects with an error response.
      */
     public refreshToken(refreshToken: string): Promise<IRefreshTokenResponse> {
-        return this.http.authedRequest(
-            Method.Post,
-            "/refresh",
-            undefined,
-            { refresh_token: refreshToken },
-            {
-                prefix: ClientPrefix.V1,
-                inhibitLogoutEmit: true, // we don't want to cause logout loops
-            },
-        );
+        const performRefreshRequestWithPrefix = (prefix: ClientPrefix): Promise<IRefreshTokenResponse> =>
+            this.http.authedRequest(
+                Method.Post,
+                "/refresh",
+                undefined,
+                { refresh_token: refreshToken },
+                {
+                    prefix,
+                    inhibitLogoutEmit: true, // we don't want to cause logout loops
+                },
+            );
+
+        // First try with the (specced) /v3/ prefix.
+        // However, before Synapse 1.72.0, Synapse incorrectly required a /v1/ prefix, so we fall
+        // back to that if the request fails, for backwards compatibility.
+        return performRefreshRequestWithPrefix(ClientPrefix.V3).catch((e) => {
+            if (e.errcode === "M_UNRECOGNIZED") {
+                return performRefreshRequestWithPrefix(ClientPrefix.V1);
+            }
+            throw e;
+        });
     }
 
     /**
@@ -9570,11 +9649,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * A helper to determine intentional mentions support
-     * @returns a boolean to determine if intentional mentions are enabled
+     * @returns a boolean to determine if intentional mentions are enabled on the server
      * @experimental
      */
     public supportsIntentionalMentions(): boolean {
-        return this.clientOpts?.intentionalMentions || false;
+        return this.canSupport.get(Feature.IntentionalMentions) !== ServerSupport.Unsupported;
     }
 
     /**

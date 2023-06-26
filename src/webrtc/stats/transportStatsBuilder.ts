@@ -1,6 +1,6 @@
 import { TransportStats } from "./transportStats";
 
-export class TransportStatsReporter {
+export class TransportStatsBuilder {
     public static buildReport(
         report: RTCStatsReport | undefined,
         now: RTCIceCandidatePairStats,

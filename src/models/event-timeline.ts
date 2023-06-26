@@ -458,7 +458,7 @@ export class EventTimeline {
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
                 if (!event.sender || event.getType() === EventType.RoomMember) {
-                    EventTimeline.setEventMetadata(event, roomState!, false);
+                    EventTimeline.setEventMetadata(event, roomState, false);
                 }
             }
         }

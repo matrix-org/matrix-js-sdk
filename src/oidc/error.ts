@@ -13,16 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { Bitrate } from "./media/mediaTrackStats";
 
-export class ConnectionStatsReporter {
-    public static buildBandwidthReport(now: RTCIceCandidatePairStats): Bitrate {
-        const availableIncomingBitrate = now.availableIncomingBitrate;
-        const availableOutgoingBitrate = now.availableOutgoingBitrate;
-
-        return {
-            download: availableIncomingBitrate ? Math.round(availableIncomingBitrate / 1000) : 0,
-            upload: availableOutgoingBitrate ? Math.round(availableOutgoingBitrate / 1000) : 0,
-        };
-    }
+export enum OidcError {
+    NotSupported = "OIDC authentication not supported",
+    Misconfigured = "OIDC is misconfigured",
+    General = "Something went wrong with OIDC discovery",
+    OpSupport = "Configured OIDC OP does not support required functions",
+    DynamicRegistrationNotSupported = "Dynamic registration not supported",
+    DynamicRegistrationFailed = "Dynamic registration failed",
+    DynamicRegistrationInvalid = "Dynamic registration invalid response",
 }
