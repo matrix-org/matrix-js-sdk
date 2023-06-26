@@ -23,5 +23,5 @@ export enum OidcError {
     DynamicRegistrationFailed = "Dynamic registration failed",
     DynamicRegistrationInvalid = "Dynamic registration invalid response",
     CodeExchangeFailed = "Failed to exchange code for token",
-    InvalidBearerToken = "Invalid bearer token",
+    InvalidBearerTokenResponse = "Invalid bearer token",
 }

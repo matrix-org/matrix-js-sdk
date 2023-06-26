@@ -114,7 +114,7 @@ describe("oidc authorization", () => {
         const codeVerifier = "abc123";
         const redirectUri = baseUrl;
         const code = "auth_code_xyz";
-        const validBearerToken = {
+        const validBearerTokenResponse = {
             token_type: "Bearer",
             access_token: "test_access_token",
             refresh_token: "test_refresh_token",
@@ -127,7 +127,7 @@ describe("oidc authorization", () => {
 
             fetchMock.post(tokenEndpoint, {
                 status: 200,
-                body: JSON.stringify(validBearerToken),
+                body: JSON.stringify(validBearerTokenResponse),
             });
         });
 
@@ -149,7 +149,7 @@ describe("oidc authorization", () => {
                 delegatedAuthConfig,
             });
 
-            expect(result).toEqual(validBearerToken);
+            expect(result).toEqual(validBearerTokenResponse);
         });
 
         it("should throw with code exchange failed error when request fails", async () => {
@@ -166,18 +166,18 @@ describe("oidc authorization", () => {
         });
 
         it("should throw invalid token error when token is invalid", async () => {
-            const invalidBearerToken = {
-                ...validBearerToken,
+            const invalidBearerTokenResponse = {
+                ...validBearerTokenResponse,
                 access_token: null,
             };
             fetchMock.post(
                 tokenEndpoint,
-                { status: 200, body: JSON.stringify(invalidBearerToken) },
+                { status: 200, body: JSON.stringify(invalidBearerTokenResponse) },
                 { overwriteRoutes: true },
             );
             await expect(() =>
                 completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig }),
-            ).rejects.toThrow(new Error(OidcError.InvalidBearerToken));
+            ).rejects.toThrow(new Error(OidcError.InvalidBearerTokenResponse));
         });
     });
 });

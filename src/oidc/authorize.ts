@@ -101,7 +101,13 @@ export const generateAuthorizationUrl = async (
     return url.toString();
 };
 
-export type BearerToken = {
+/**
+ * The expected response type from the token endpoint during authorization code flow
+ *
+ * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4, 
+ * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
+ */
+export type BearerTokenResponse = {
     token_type: "Bearer";
     access_token: string;
     scope: string;
@@ -109,7 +115,7 @@ export type BearerToken = {
     expires_in?: number;
     id_token?: string;
 };
-const isValidBearerToken = (token: any): token is BearerToken =>
+const isValidBearerTokenResponse = (token: any): token is BearerTokenResponse =>
     typeof token == "object" &&
     token["token_type"] === "Bearer" &&
     typeof token["access_token"] === "string" &&
@@ -124,8 +130,8 @@ const isValidBearerToken = (token: any): token is BearerToken =>
  *
  * @param code - authorization code as returned by OP during authorization
  * @param storedAuthorizationParams - stored params from start of oidc login flow
- * @returns valid bearer token
- * @throws when request fails, or returned token is invalid
+ * @returns valid bearer token response
+ * @throws when request fails, or returned token response is invalid
  */
 export const completeAuthorizationCodeGrant = async (
     code: string,
@@ -140,7 +146,7 @@ export const completeAuthorizationCodeGrant = async (
         redirectUri: string;
         delegatedAuthConfig: IDelegatedAuthConfig & ValidatedIssuerConfig;
     },
-): Promise<BearerToken> => {
+): Promise<BearerTokenResponse> => {
     const params = new URLSearchParams();
     params.append("grant_type", "authorization_code");
     params.append("client_id", clientId);
@@ -163,9 +169,9 @@ export const completeAuthorizationCodeGrant = async (
 
     const token = await response.json();
 
-    if (isValidBearerToken(token)) {
+    if (isValidBearerTokenResponse(token)) {
         return token;
     }
 
-    throw new Error(OidcError.InvalidBearerToken);
+    throw new Error(OidcError.InvalidBearerTokenResponse);
 };
