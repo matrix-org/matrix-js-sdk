@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
-import { MockResponse } from "fetch-mock";
 import "fake-indexeddb/auto";
+
+import { MockResponse } from "fetch-mock";
+import fetchMock from "fetch-mock-jest";
+import { IDBFactory } from "fake-indexeddb";
 
 import { createClient, CryptoEvent, MatrixClient } from "../../../src";
 import {
@@ -65,6 +67,13 @@ beforeAll(async () => {
 
     // we use the libolm primitives in the test, so init the Olm library
     await global.Olm.init();
+});
+
+afterEach(() => {
+    // reset fake-indexeddb after each test, to make sure we don't leak connections
+    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
+    // eslint-disable-next-line no-global-assign
+    indexedDB = new IDBFactory();
 });
 
 // restore the original global.crypto
@@ -315,6 +324,35 @@ function runTests(backend: string, initCrypto: InitCrypto, methods: string[] | u
 
             // we're done with the temporary keypair
             olmSAS.free();
+        });
+
+        it("Can make a verification request to *all* devices", async () => {
+            // we need an existing cross-signing key for this
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [requestBody, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestOwnUserVerification(),
+            ]);
+
+            const transactionId = request.transactionId;
+            expect(transactionId).toBeDefined();
+            expect(request.phase).toEqual(VerificationPhase.Requested);
+
+            // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
+            {
+                const requests = aliceClient.getCrypto()!.getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+                expect(requests.length).toEqual(1);
+                expect(requests[0].transactionId).toEqual(transactionId);
+            }
+
+            // legacy crypto picks devices individually; rust crypto uses a broadcast message
+            const toDeviceMessage =
+                requestBody.messages[TEST_USER_ID]["*"] ?? requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
         });
 
         oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
