@@ -494,6 +494,15 @@ describe("RustCrypto", () => {
         expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
         rustCrypto.stop();
     });
+
+    describe("requestDeviceVerification", () => {
+        it("throws an error if the device is unknown", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() => rustCrypto.requestDeviceVerification(TEST_USER, "unknown")).rejects.toThrow(
+                "Not a known device",
+            );
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

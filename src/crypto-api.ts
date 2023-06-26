@@ -192,12 +192,17 @@ export interface CryptoApi {
     isSecretStorageReady(): Promise<boolean>;
 
     /**
-     * Bootstrap the secret storage by creating a new secret storage key and store it in the secret storage.
+     * Bootstrap the secret storage by creating a new secret storage key, add it in the secret storage and
+     * store the cross signing keys in the secret storage.
      *
-     * - Do nothing if an AES key is already stored in the secret storage and `setupNewKeyBackup` is not set;
      * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
+     *   Only if `setupNewSecretStorage` is set or if there is no AES key in the secret storage
      * - Store this key in the secret storage and set it as the default key.
      * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
+     * - Store the cross signing keys in the secret storage if
+     *      - the cross signing is ready
+     *      - a new key was created during the previous step
+     *      - or the secret storage already contains the cross signing keys
      *
      * @param opts - Options object.
      */
@@ -251,7 +256,12 @@ export interface CryptoApi {
     /**
      * Send a verification request to our other devices.
      *
-     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     * This is normally used when the current device is new, and we want to ask another of our devices to cross-sign.
+     *
+     * If an all-devices verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
+     * MatrixClient.
      *
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
@@ -260,7 +270,13 @@ export interface CryptoApi {
     /**
      * Request an interactive verification with the given device.
      *
-     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     * This is normally used on one of our own devices, when the current device is already cross-signed, and we want to
+     * validate another device.
+     *
+     * If a verification for this user/device is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
+     * MatrixClient.
      *
      * @param userId - ID of the owner of the device to verify
      * @param deviceId - ID of the device to verify
