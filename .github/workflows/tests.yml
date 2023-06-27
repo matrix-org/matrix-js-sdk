@@ -50,6 +50,9 @@ jobs:
               env:
                   JEST_SONAR_UNIQUE_OUTPUT_NAME: true
 
+                  # tell jest to use coloured output
+                  FORCE_COLOR: true
+
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
               run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
