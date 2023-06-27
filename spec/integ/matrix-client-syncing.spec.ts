@@ -1990,5 +1990,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.verifyNoOutstandingExpectation();
         await idbClient.stopClient();
         await idbHttpBackend.stop();
+
+        // force a save to indexeddb to make sure that we don't have any saves in flight when the test completes.
+        await idbClient.store.save(true);
     });
 });
