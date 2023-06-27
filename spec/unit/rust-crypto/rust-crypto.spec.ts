@@ -54,9 +54,13 @@ describe("RustCrypto", () => {
     describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
-        beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto();
-        });
+        beforeEach(
+            async () => {
+                rustCrypto = await makeTestRustCrypto();
+            },
+            /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+            10000,
+        );
 
         it("should import and export keys", async () => {
             const someRoomKeys = [
