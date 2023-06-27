@@ -36,8 +36,12 @@ jobs:
               if: matrix.specs == 'browserify'
               run: "yarn build"
 
+            # We run the unit tests in parallel where possible. We don't bother for the integ tests,
+            # because there aren't many of them, so the improvement in run time is small, whilst the
+            # interleaving in the test output due to parallelism makes it very hard to read.
             - name: Get number of CPU cores
               id: cpu-cores
+              if: matrix.specs == 'unit'
               uses: SimenB/github-actions-cpu-cores@410541432439795d30db6501fb1d8178eb41e502 # v1
 
             - name: Run tests
@@ -45,7 +49,7 @@ jobs:
                   yarn test \
                       --coverage=${{ env.ENABLE_COVERAGE }} \
                       --ci \
-                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      --max-workers ${{ steps.cpu-cores.outputs.count || 1 }} \
                       ./spec/${{ matrix.specs }}
               env:
                   JEST_SONAR_UNIQUE_OUTPUT_NAME: true
