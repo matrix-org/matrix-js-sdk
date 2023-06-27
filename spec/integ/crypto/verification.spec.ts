@@ -510,7 +510,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                     timestamp: Date.now() - 1000,
                 },
             });
-            const request: VerificationRequest = await emitPromise(aliceClient, CryptoEvent.VerificationRequest);
+            const request: VerificationRequest = await emitPromise(
+                aliceClient,
+                CryptoEvent.VerificationRequestReceived,
+            );
             expect(request.transactionId).toEqual(TRANSACTION_ID);
             expect(request.phase).toEqual(VerificationPhase.Requested);
             expect(request.roomId).toBeUndefined();
