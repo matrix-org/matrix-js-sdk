@@ -1,0 +1,567 @@
+<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>matrix-js-sdk</title><meta name="description" content="Documentation for matrix-js-sdk"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/search.js" id="tsd-search-script"></script></head><body><select id="plugin-versions-select" class="title" name="versions"></select><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os"</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container">
+<div class="table-cell" id="tsd-search" data-base=".">
+<div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M15.7824 13.833L12.6666 10.7177C12.5259 10.5771 12.3353 10.499 12.1353 10.499H11.6259C12.4884 9.39596 13.001 8.00859 13.001 6.49937C13.001 2.90909 10.0914 0 6.50048 0C2.90959 0 0 2.90909 0 6.49937C0 10.0896 2.90959 12.9987 6.50048 12.9987C8.00996 12.9987 9.39756 12.4863 10.5008 11.6239V12.1332C10.5008 12.3332 10.5789 12.5238 10.7195 12.6644L13.8354 15.7797C14.1292 16.0734 14.6042 16.0734 14.8948 15.7797L15.7793 14.8954C16.0731 14.6017 16.0731 14.1267 15.7824 13.833ZM6.50048 10.499C4.29094 10.499 2.50018 8.71165 2.50018 6.49937C2.50018 4.29021 4.28781 2.49976 6.50048 2.49976C8.71001 2.49976 10.5008 4.28708 10.5008 6.49937C10.5008 8.70852 8.71314 10.499 6.50048 10.499Z" fill="var(--color-text)"></path></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div>
+<div class="field">
+<div id="tsd-toolbar-links"></div></div>
+<ul class="results">
+<li class="state loading">Preparing search index...</li>
+<li class="state failure">The search index is not available</li></ul><a href="index.html" class="title">matrix-js-sdk</a></div>
+<div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="2" fill="var(--color-text)"></rect><rect x="1" y="7" width="14" height="2" fill="var(--color-text)"></rect><rect x="1" y="11" width="14" height="2" fill="var(--color-text)"></rect></svg></a></div></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<h2>matrix-js-sdk</h2></div>
+<div class="tsd-panel tsd-typography"><p><a href="https://www.npmjs.com/package/matrix-js-sdk"><img src="https://img.shields.io/npm/v/matrix-js-sdk" alt="npm"></a>
+<img src="https://github.com/matrix-org/matrix-js-sdk/actions/workflows/tests.yml/badge.svg" alt="Tests">
+<img src="https://github.com/matrix-org/matrix-js-sdk/actions/workflows/static_analysis.yml/badge.svg" alt="Static Analysis">
+<a href="https://sonarcloud.io/summary/new_code?id=matrix-js-sdk"><img src="https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=alert_status" alt="Quality Gate Status"></a>
+<a href="https://sonarcloud.io/summary/new_code?id=matrix-js-sdk"><img src="https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=coverage" alt="Coverage"></a>
+<a href="https://sonarcloud.io/summary/new_code?id=matrix-js-sdk"><img src="https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities" alt="Vulnerabilities"></a>
+<a href="https://sonarcloud.io/summary/new_code?id=matrix-js-sdk"><img src="https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs" alt="Bugs"></a></p>
+<a id="md:matrix-javascript-sdk" class="tsd-anchor"></a><h1><a href="#md:matrix-javascript-sdk">Matrix JavaScript SDK</a></h1><p>This is the <a href="https://matrix.org">Matrix</a> Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
+browser or in Node.js.</p>
+<p>The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only
+guarantees that a feature will be supported for at least 4 spec releases. For example, if a feature the js-sdk supports
+is removed in v1.4 then the feature is <em>eligible</em> for removal from the SDK when v1.8 is released. This SDK has no
+guarantee on implementing all features of any particular spec release, currently. This can mean that the SDK will call
+endpoints from before Matrix 1.1, for example.</p>
+<a id="md:quickstart" class="tsd-anchor"></a><h1><a href="#md:quickstart">Quickstart</a></h1><a id="md:in-a-browser" class="tsd-anchor"></a><h2><a href="#md:in-a-browser">In a browser</a></h2><p>Download the browser version from
+<a href="https://github.com/matrix-org/matrix-js-sdk/releases/latest">https://github.com/matrix-org/matrix-js-sdk/releases/latest</a> and add that as a
+<code>&lt;script&gt;</code> to your page. There will be a global variable <code>matrixcs</code>
+attached to <code>window</code> through which you can access the SDK. See below for how to
+include libolm to enable end-to-end-encryption.</p>
+<p>The browser bundle supports recent versions of browsers. Typically this is ES2015
+or <code>&gt; 0.5%, last 2 versions, Firefox ESR, not dead</code> if using
+<a href="https://github.com/browserslist/browserslist">browserlists</a>.</p>
+<p>Please check <a href="examples/browser">the working browser example</a> for more information.</p>
+<a id="md:in-nodejs" class="tsd-anchor"></a><h2><a href="#md:in-nodejs">In Node.js</a></h2><p>Ensure you have the latest LTS version of Node.js installed.
+This library relies on <code>fetch</code> which is available in Node from v18.0.0 - it should work fine also with polyfills.
+If you wish to use a ponyfill or adapter of some sort then pass it as <code>fetchFn</code> to the MatrixClient constructor options.</p>
+<p>Using <code>yarn</code> instead of <code>npm</code> is recommended. Please see the Yarn <a href="https://classic.yarnpkg.com/en/docs/install">install guide</a>
+if you do not have it already.</p>
+<p><code>yarn add matrix-js-sdk</code></p>
+<pre><code class="language-javascript"><span class="hl-0">import</span><span class="hl-1"> </span><span class="hl-2">*</span><span class="hl-1"> </span><span class="hl-0">as</span><span class="hl-1"> </span><span class="hl-3">sdk</span><span class="hl-1"> </span><span class="hl-0">from</span><span class="hl-1"> </span><span class="hl-4">&quot;matrix-js-sdk&quot;</span><span class="hl-1">;</span><br/><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">client</span><span class="hl-1"> = </span><span class="hl-3">sdk</span><span class="hl-1">.</span><span class="hl-6">createClient</span><span class="hl-1">({ </span><span class="hl-3">baseUrl:</span><span class="hl-1"> </span><span class="hl-4">&quot;https://matrix.org&quot;</span><span class="hl-1"> });</span><br/><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">publicRooms</span><span class="hl-1">(</span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">err</span><span class="hl-1">, </span><span class="hl-3">data</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-4">&quot;Public Rooms: %s&quot;</span><span class="hl-1">, </span><span class="hl-5">JSON</span><span class="hl-1">.</span><span class="hl-6">stringify</span><span class="hl-1">(</span><span class="hl-3">data</span><span class="hl-1">));</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<p>See below for how to include libolm to enable end-to-end-encryption. Please check
+<a href="examples/node">the Node.js terminal app</a> for a more complex example.</p>
+<p>You can also use the sdk with <a href="https://deno.land/">Deno</a> (<code>import npm:matrix-js-sdk</code>) but its not officialy supported.</p>
+<p>To start the client:</p>
+<pre><code class="language-javascript"><span class="hl-0">await</span><span class="hl-1"> </span><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">startClient</span><span class="hl-1">({ </span><span class="hl-3">initialSyncLimit:</span><span class="hl-1"> </span><span class="hl-7">10</span><span class="hl-1"> });</span>
+</code><button>Copy</button></pre>
+<p>You can perform a call to <code>/sync</code> to get the current state of the client:</p>
+<pre><code class="language-javascript"><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">once</span><span class="hl-1">(</span><span class="hl-4">&quot;sync&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">state</span><span class="hl-1">, </span><span class="hl-3">prevState</span><span class="hl-1">, </span><span class="hl-3">res</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">state</span><span class="hl-1"> === </span><span class="hl-4">&quot;PREPARED&quot;</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-4">&quot;prepared&quot;</span><span class="hl-1">);</span><br/><span class="hl-1">    } </span><span class="hl-0">else</span><span class="hl-1"> {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">state</span><span class="hl-1">);</span><br/><span class="hl-1">        </span><span class="hl-3">process</span><span class="hl-1">.</span><span class="hl-6">exit</span><span class="hl-1">(</span><span class="hl-7">1</span><span class="hl-1">);</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<p>To send a message:</p>
+<pre><code class="language-javascript"><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">content</span><span class="hl-1"> = {</span><br/><span class="hl-1">    </span><span class="hl-3">body:</span><span class="hl-1"> </span><span class="hl-4">&quot;message text&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-3">msgtype:</span><span class="hl-1"> </span><span class="hl-4">&quot;m.text&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">};</span><br/><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">sendEvent</span><span class="hl-1">(</span><span class="hl-4">&quot;roomId&quot;</span><span class="hl-1">, </span><span class="hl-4">&quot;m.room.message&quot;</span><span class="hl-1">, </span><span class="hl-3">content</span><span class="hl-1">, </span><span class="hl-4">&quot;&quot;</span><span class="hl-1">, (</span><span class="hl-3">err</span><span class="hl-1">, </span><span class="hl-3">res</span><span class="hl-1">) </span><span class="hl-2">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">err</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<p>To listen for message events:</p>
+<pre><code class="language-javascript"><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;Room.timeline&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">, </span><span class="hl-3">room</span><span class="hl-1">, </span><span class="hl-3">toStartOfTimeline</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-6">getType</span><span class="hl-1">() !== </span><span class="hl-4">&quot;m.room.message&quot;</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-0">return</span><span class="hl-1">; </span><span class="hl-8">// only use messages</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-3">content</span><span class="hl-1">.</span><span class="hl-3">body</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<p>By default, the <code>matrix-js-sdk</code> client uses the <code>MemoryStore</code> to store events as they are received. For example to iterate through the currently stored timeline for a room:</p>
+<pre><code class="language-javascript"><span class="hl-3">Object</span><span class="hl-1">.</span><span class="hl-6">keys</span><span class="hl-1">(</span><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-3">store</span><span class="hl-1">.</span><span class="hl-3">rooms</span><span class="hl-1">).</span><span class="hl-6">forEach</span><span class="hl-1">((</span><span class="hl-3">roomId</span><span class="hl-1">) </span><span class="hl-2">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">getRoom</span><span class="hl-1">(</span><span class="hl-3">roomId</span><span class="hl-1">).</span><span class="hl-3">timeline</span><span class="hl-1">.</span><span class="hl-6">forEach</span><span class="hl-1">((</span><span class="hl-3">t</span><span class="hl-1">) </span><span class="hl-2">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">t</span><span class="hl-1">.</span><span class="hl-3">event</span><span class="hl-1">);</span><br/><span class="hl-1">    });</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<a id="md:what-does-this-sdk-do" class="tsd-anchor"></a><h2><a href="#md:what-does-this-sdk-do">What does this SDK do?</a></h2><p>This SDK provides a full object model around the Matrix Client-Server API and emits
+events for incoming data and state changes. Aside from wrapping the HTTP API, it:</p>
+<ul>
+<li>Handles syncing (via <code>/initialSync</code> and <code>/events</code>)</li>
+<li>Handles the generation of &quot;friendly&quot; room and member names.</li>
+<li>Handles historical <code>RoomMember</code> information (e.g. display names).</li>
+<li>Manages room member state across multiple events (e.g. it handles typing, power
+levels and membership changes).</li>
+<li>Exposes high-level objects like <code>Rooms</code>, <code>RoomState</code>, <code>RoomMembers</code> and <code>Users</code>
+which can be listened to for things like name changes, new messages, membership
+changes, presence changes, and more.</li>
+<li>Handle &quot;local echo&quot; of messages sent using the SDK. This means that messages
+that have just been sent will appear in the timeline as &#39;sending&#39;, until it
+completes. This is beneficial because it prevents there being a gap between
+hitting the send button and having the &quot;remote echo&quot; arrive.</li>
+<li>Mark messages which failed to send as not sent.</li>
+<li>Automatically retry requests to send messages due to network errors.</li>
+<li>Automatically retry requests to send messages due to rate limiting errors.</li>
+<li>Handle queueing of messages.</li>
+<li>Handles pagination.</li>
+<li>Handle assigning push actions for events.</li>
+<li>Handles room initial sync on accepting invites.</li>
+<li>Handles WebRTC calling.</li>
+</ul>
+<p>Later versions of the SDK will:</p>
+<ul>
+<li>Expose a <code>RoomSummary</code> which would be suitable for a recents page.</li>
+<li>Provide different pluggable storage layers (e.g. local storage, database-backed)</li>
+</ul>
+<a id="md:usage" class="tsd-anchor"></a><h1><a href="#md:usage">Usage</a></h1><a id="md:conventions" class="tsd-anchor"></a><h2><a href="#md:conventions">Conventions</a></h2><a id="md:emitted-events" class="tsd-anchor"></a><h3><a href="#md:emitted-events">Emitted events</a></h3><p>The SDK will emit events using an <code>EventEmitter</code>. It also
+emits object models (e.g. <code>Rooms</code>, <code>RoomMembers</code>) when they
+are updated.</p>
+<pre><code class="language-javascript"><span class="hl-8">// Listen for low-level MatrixEvents</span><br/><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;event&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-6">getType</span><span class="hl-1">());</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-8">// Listen for typing changes</span><br/><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;RoomMember.typing&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">, </span><span class="hl-3">member</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">typing</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">name</span><span class="hl-1"> + </span><span class="hl-4">&quot; is typing...&quot;</span><span class="hl-1">);</span><br/><span class="hl-1">    } </span><span class="hl-0">else</span><span class="hl-1"> {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">name</span><span class="hl-1"> + </span><span class="hl-4">&quot; stopped typing.&quot;</span><span class="hl-1">);</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-8">// start the client to setup the connection to the server</span><br/><span class="hl-3">client</span><span class="hl-1">.</span><span class="hl-6">startClient</span><span class="hl-1">();</span>
+</code><button>Copy</button></pre>
+<a id="md:promises-and-callbacks" class="tsd-anchor"></a><h3><a href="#md:promises-and-callbacks">Promises and Callbacks</a></h3><p>Most of the methods in the SDK are asynchronous: they do not directly return a
+result, but instead return a <a href="http://documentup.com/kriskowal/q/">Promise</a>
+which will be fulfilled in the future.</p>
+<p>The typical usage is something like:</p>
+<pre><code class="language-javascript"><span class="hl-1">  </span><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">someMethod</span><span class="hl-1">(</span><span class="hl-3">arg1</span><span class="hl-1">, </span><span class="hl-3">arg2</span><span class="hl-1">).</span><span class="hl-6">then</span><span class="hl-1">(</span><span class="hl-2">function</span><span class="hl-1">(</span><span class="hl-3">result</span><span class="hl-1">) {</span><br/><span class="hl-1">    ...</span><br/><span class="hl-1">  });</span>
+</code><button>Copy</button></pre>
+<p>Alternatively, if you have a Node.js-style <code>callback(err, result)</code> function,
+you can pass the result of the promise into it with something like:</p>
+<pre><code class="language-javascript"><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">someMethod</span><span class="hl-1">(</span><span class="hl-3">arg1</span><span class="hl-1">, </span><span class="hl-3">arg2</span><span class="hl-1">).</span><span class="hl-6">nodeify</span><span class="hl-1">(</span><span class="hl-3">callback</span><span class="hl-1">);</span>
+</code><button>Copy</button></pre>
+<p>The main thing to note is that it is problematic to discard the result of a
+promise-returning function, as that will cause exceptions to go unobserved.</p>
+<p>Methods which return a promise show this in their documentation.</p>
+<p>Many methods in the SDK support <em>both</em> Node.js-style callbacks <em>and</em> Promises,
+via an optional <code>callback</code> argument. The callback support is now deprecated:
+new methods do not include a <code>callback</code> argument, and in the future it may be
+removed from existing methods.</p>
+<a id="md:examples" class="tsd-anchor"></a><h2><a href="#md:examples">Examples</a></h2><p>This section provides some useful code snippets which demonstrate the
+core functionality of the SDK. These examples assume the SDK is setup like this:</p>
+<pre><code class="language-javascript"><span class="hl-0">import</span><span class="hl-1"> </span><span class="hl-2">*</span><span class="hl-1"> </span><span class="hl-0">as</span><span class="hl-1"> </span><span class="hl-3">sdk</span><span class="hl-1"> </span><span class="hl-0">from</span><span class="hl-1"> </span><span class="hl-4">&quot;matrix-js-sdk&quot;</span><span class="hl-1">;</span><br/><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">myUserId</span><span class="hl-1"> = </span><span class="hl-4">&quot;@example:localhost&quot;</span><span class="hl-1">;</span><br/><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">myAccessToken</span><span class="hl-1"> = </span><span class="hl-4">&quot;QGV4YW1wbGU6bG9jYWxob3N0.qPEvLuYfNBjxikiCjP&quot;</span><span class="hl-1">;</span><br/><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">matrixClient</span><span class="hl-1"> = </span><span class="hl-3">sdk</span><span class="hl-1">.</span><span class="hl-6">createClient</span><span class="hl-1">({</span><br/><span class="hl-1">    </span><span class="hl-3">baseUrl:</span><span class="hl-1"> </span><span class="hl-4">&quot;http://localhost:8008&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-3">accessToken:</span><span class="hl-1"> </span><span class="hl-3">myAccessToken</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-3">userId:</span><span class="hl-1"> </span><span class="hl-3">myUserId</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button>Copy</button></pre>
+<a id="md:automatically-join-rooms-when-invited" class="tsd-anchor"></a><h3><a href="#md:automatically-join-rooms-when-invited">Automatically join rooms when invited</a></h3><pre><code class="language-javascript"><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;RoomMember.membership&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">, </span><span class="hl-3">member</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">membership</span><span class="hl-1"> === </span><span class="hl-4">&quot;invite&quot;</span><span class="hl-1"> &amp;&amp; </span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">userId</span><span class="hl-1"> === </span><span class="hl-3">myUserId</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">joinRoom</span><span class="hl-1">(</span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">roomId</span><span class="hl-1">).</span><span class="hl-6">then</span><span class="hl-1">(</span><span class="hl-2">function</span><span class="hl-1"> () {</span><br/><span class="hl-1">            </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-4">&quot;Auto-joined %s&quot;</span><span class="hl-1">, </span><span class="hl-3">member</span><span class="hl-1">.</span><span class="hl-3">roomId</span><span class="hl-1">);</span><br/><span class="hl-1">        });</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">startClient</span><span class="hl-1">();</span>
+</code><button>Copy</button></pre>
+<a id="md:print-out-messages-for-all-rooms" class="tsd-anchor"></a><h3><a href="#md:print-out-messages-for-all-rooms">Print out messages for all rooms</a></h3><pre><code class="language-javascript"><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;Room.timeline&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">, </span><span class="hl-3">room</span><span class="hl-1">, </span><span class="hl-3">toStartOfTimeline</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">toStartOfTimeline</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-0">return</span><span class="hl-1">; </span><span class="hl-8">// don&#39;t print paginated results</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-6">getType</span><span class="hl-1">() !== </span><span class="hl-4">&quot;m.room.message&quot;</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-0">return</span><span class="hl-1">; </span><span class="hl-8">// only print messages</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><br/><span class="hl-1">        </span><span class="hl-8">// the room name will update with m.room.name events automatically</span><br/><span class="hl-1">        </span><span class="hl-4">&quot;(%s) %s :: %s&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-3">room</span><span class="hl-1">.</span><span class="hl-3">name</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-6">getSender</span><span class="hl-1">(),</span><br/><span class="hl-1">        </span><span class="hl-3">event</span><span class="hl-1">.</span><span class="hl-6">getContent</span><span class="hl-1">().</span><span class="hl-3">body</span><span class="hl-1">,</span><br/><span class="hl-1">    );</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">startClient</span><span class="hl-1">();</span>
+</code><button>Copy</button></pre>
+<p>Output:</p>
+<pre><code><span class="hl-1">  (</span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">Room</span><span class="hl-1">) @</span><span class="hl-3">megan</span><span class="hl-1">:</span><span class="hl-3">localhost</span><span class="hl-1"> :: </span><span class="hl-3">Hello</span><span class="hl-1"> </span><span class="hl-3">world</span><br/><span class="hl-1">  (</span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">Room</span><span class="hl-1">) @</span><span class="hl-3">megan</span><span class="hl-1">:</span><span class="hl-3">localhost</span><span class="hl-1"> :: </span><span class="hl-3">how</span><span class="hl-1"> </span><span class="hl-3">are</span><span class="hl-1"> </span><span class="hl-3">you</span><span class="hl-1">?</span><br/><span class="hl-1">  (</span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">Room</span><span class="hl-1">) @</span><span class="hl-3">example</span><span class="hl-1">:</span><span class="hl-9">localhost</span><span class="hl-1"> :: </span><span class="hl-5">I</span><span class="hl-1"> </span><span class="hl-3">am</span><span class="hl-1"> </span><span class="hl-3">good</span><br/><span class="hl-1">  (</span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">Room</span><span class="hl-1">) @</span><span class="hl-3">example</span><span class="hl-1">:</span><span class="hl-3">localhost</span><span class="hl-1"> :: </span><span class="hl-3">change</span><span class="hl-1"> </span><span class="hl-3">the</span><span class="hl-1"> </span><span class="hl-3">room</span><span class="hl-1"> </span><span class="hl-3">name</span><br/><span class="hl-1">  (</span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">New</span><span class="hl-1"> </span><span class="hl-3">Room</span><span class="hl-1">) @</span><span class="hl-3">megan</span><span class="hl-1">:</span><span class="hl-3">localhost</span><span class="hl-1"> :: </span><span class="hl-3">done</span>
+</code><button>Copy</button></pre>
+<a id="md:print-out-membership-lists-whenever-they-are-changed" class="tsd-anchor"></a><h3><a href="#md:print-out-membership-lists-whenever-they-are-changed">Print out membership lists whenever they are changed</a></h3><pre><code class="language-javascript"><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-4">&quot;RoomState.members&quot;</span><span class="hl-1">, </span><span class="hl-2">function</span><span class="hl-1"> (</span><span class="hl-3">event</span><span class="hl-1">, </span><span class="hl-3">state</span><span class="hl-1">, </span><span class="hl-3">member</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">room</span><span class="hl-1"> = </span><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">getRoom</span><span class="hl-1">(</span><span class="hl-3">state</span><span class="hl-1">.</span><span class="hl-3">roomId</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-0">if</span><span class="hl-1"> (!</span><span class="hl-3">room</span><span class="hl-1">) {</span><br/><span class="hl-1">        </span><span class="hl-0">return</span><span class="hl-1">;</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">    </span><span class="hl-2">const</span><span class="hl-1"> </span><span class="hl-5">memberList</span><span class="hl-1"> = </span><span class="hl-3">state</span><span class="hl-1">.</span><span class="hl-6">getMembers</span><span class="hl-1">();</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-3">room</span><span class="hl-1">.</span><span class="hl-3">name</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-6">Array</span><span class="hl-1">(</span><span class="hl-3">room</span><span class="hl-1">.</span><span class="hl-3">name</span><span class="hl-1">.</span><span class="hl-3">length</span><span class="hl-1"> + </span><span class="hl-7">1</span><span class="hl-1">).</span><span class="hl-6">join</span><span class="hl-1">(</span><span class="hl-4">&quot;=&quot;</span><span class="hl-1">)); </span><span class="hl-8">// underline</span><br/><span class="hl-1">    </span><span class="hl-0">for</span><span class="hl-1"> (</span><span class="hl-2">var</span><span class="hl-1"> </span><span class="hl-3">i</span><span class="hl-1"> = </span><span class="hl-7">0</span><span class="hl-1">; </span><span class="hl-3">i</span><span class="hl-1"> &lt; </span><span class="hl-3">memberList</span><span class="hl-1">.</span><span class="hl-3">length</span><span class="hl-1">; </span><span class="hl-3">i</span><span class="hl-1">++) {</span><br/><span class="hl-1">        </span><span class="hl-3">console</span><span class="hl-1">.</span><span class="hl-6">log</span><span class="hl-1">(</span><span class="hl-4">&quot;(%s) %s&quot;</span><span class="hl-1">, </span><span class="hl-3">memberList</span><span class="hl-1">[</span><span class="hl-3">i</span><span class="hl-1">].</span><span class="hl-3">membership</span><span class="hl-1">, </span><span class="hl-3">memberList</span><span class="hl-1">[</span><span class="hl-3">i</span><span class="hl-1">].</span><span class="hl-3">name</span><span class="hl-1">);</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-3">matrixClient</span><span class="hl-1">.</span><span class="hl-6">startClient</span><span class="hl-1">();</span>
+</code><button>Copy</button></pre>
+<p>Output:</p>
+<pre><code><span class="hl-1">  </span><span class="hl-3">My</span><span class="hl-1"> </span><span class="hl-3">Room</span><br/><span class="hl-1">  =======</span><br/><span class="hl-1">  (</span><span class="hl-3">join</span><span class="hl-1">) @</span><span class="hl-3">example</span><span class="hl-1">:</span><span class="hl-3">localhost</span><br/><span class="hl-1">  (</span><span class="hl-3">leave</span><span class="hl-1">) @</span><span class="hl-3">alice</span><span class="hl-1">:</span><span class="hl-3">localhost</span><br/><span class="hl-1">  (</span><span class="hl-3">join</span><span class="hl-1">) </span><span class="hl-3">Bob</span><br/><span class="hl-1">  (</span><span class="hl-3">invite</span><span class="hl-1">) @</span><span class="hl-3">charlie</span><span class="hl-1">:</span><span class="hl-3">localhost</span>
+</code><button>Copy</button></pre>
+<a id="md:api-reference" class="tsd-anchor"></a><h1><a href="#md:api-reference">API Reference</a></h1><p>A hosted reference can be found at
+<a href="http://matrix-org.github.io/matrix-js-sdk/index.html">http://matrix-org.github.io/matrix-js-sdk/index.html</a></p>
+<p>This SDK uses <a href="https://typedoc.org/guides/doccomments">Typedoc</a> doc comments. You can manually build and
+host the API reference from the source files like this:</p>
+<pre><code><span class="hl-1">  </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">yarn</span><span class="hl-1"> </span><span class="hl-3">gendoc</span><br/><span class="hl-1">  </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">cd</span><span class="hl-1"> </span><span class="hl-3">_docs</span><br/><span class="hl-1">  </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">python</span><span class="hl-1"> -</span><span class="hl-3">m</span><span class="hl-1"> </span><span class="hl-3">http</span><span class="hl-1">.</span><span class="hl-3">server</span><span class="hl-1"> </span><span class="hl-7">8005</span>
+</code><button>Copy</button></pre>
+<p>Then visit <code>http://localhost:8005</code> to see the API docs.</p>
+<a id="md:end-to-end-encryption-support" class="tsd-anchor"></a><h1><a href="#md:end-to-end-encryption-support">End-to-end encryption support</a></h1><p>The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
+<a href="https://gitlab.matrix.org/matrix-org/olm">libolm</a>. It is left up to the
+application to make libolm available, via the <code>Olm</code> global.</p>
+<p>It is also necessary to call <code>await matrixClient.initCrypto()</code> after creating a new
+<code>MatrixClient</code> (but <strong>before</strong> calling <code>matrixClient.startClient()</code>) to
+initialise the crypto layer.</p>
+<p>If the <code>Olm</code> global is not available, the SDK will show a warning, as shown
+below; <code>initCrypto()</code> will also fail.</p>
+<pre><code><span class="hl-3">Unable</span><span class="hl-1"> </span><span class="hl-3">to</span><span class="hl-1"> </span><span class="hl-3">load</span><span class="hl-1"> </span><span class="hl-3">crypto</span><span class="hl-1"> </span><span class="hl-9">module</span><span class="hl-1">: </span><span class="hl-3">crypto</span><span class="hl-1"> </span><span class="hl-3">will</span><span class="hl-1"> </span><span class="hl-3">be</span><span class="hl-1"> </span><span class="hl-9">disabled</span><span class="hl-1">: </span><span class="hl-9">Error</span><span class="hl-1">: </span><span class="hl-3">global</span><span class="hl-1">.</span><span class="hl-3">Olm</span><span class="hl-1"> </span><span class="hl-3">is</span><span class="hl-1"> </span><span class="hl-3">not</span><span class="hl-1"> </span><span class="hl-3">defined</span>
+</code><button>Copy</button></pre>
+<p>If the crypto layer is not (successfully) initialised, the SDK will continue to
+work for unencrypted rooms, but it will not support the E2E parts of the Matrix
+specification.</p>
+<p>To provide the Olm library in a browser application:</p>
+<ul>
+<li>download the transpiled libolm (from <a href="https://packages.matrix.org/npm/olm/">https://packages.matrix.org/npm/olm/</a>).</li>
+<li>load <code>olm.js</code> as a <code>&lt;script&gt;</code> <em>before</em> <code>browser-matrix.js</code>.</li>
+</ul>
+<p>To provide the Olm library in a node.js application:</p>
+<ul>
+<li><code>yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz</code>
+(replace the URL with the latest version you want to use from
+<a href="https://packages.matrix.org/npm/olm/">https://packages.matrix.org/npm/olm/</a>)</li>
+<li><code>global.Olm = require(&#39;olm&#39;);</code> <em>before</em> loading <code>matrix-js-sdk</code>.</li>
+</ul>
+<p>If you want to package Olm as dependency for your node.js application, you can
+use <code>yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz</code>. If your
+application also works without e2e crypto enabled, add <code>--optional</code> to mark it
+as an optional dependency.</p>
+<a id="md:contributing" class="tsd-anchor"></a><h1><a href="#md:contributing">Contributing</a></h1><p><em>This section is for people who want to modify the SDK. If you just
+want to use this SDK, skip this section.</em></p>
+<p>First, you need to pull in the right build tools:</p>
+<pre><code><span class="hl-1"> </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">yarn</span><span class="hl-1"> </span><span class="hl-3">install</span>
+</code><button>Copy</button></pre>
+<a id="md:building" class="tsd-anchor"></a><h2><a href="#md:building">Building</a></h2><p>To build a browser version from scratch when developing::</p>
+<pre><code><span class="hl-1"> </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">yarn</span><span class="hl-1"> </span><span class="hl-3">build</span>
+</code><button>Copy</button></pre>
+<p>To run tests (Jest):</p>
+<pre><code><span class="hl-1"> </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">yarn</span><span class="hl-1"> </span><span class="hl-3">test</span>
+</code><button>Copy</button></pre>
+<blockquote>
+<p><strong>Note</strong>
+The <code>sync-browserify.spec.ts</code> requires a browser build (<code>yarn build</code>) in order to pass</p>
+</blockquote>
+<p>To run linting:</p>
+<pre><code><span class="hl-1"> </span><span class="hl-3">$</span><span class="hl-1"> </span><span class="hl-3">yarn</span><span class="hl-1"> </span><span class="hl-3">lint</span>
+</code><button>Copy</button></pre>
+</div></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-index-accordion"><summary class="tsd-accordion-summary">
+<h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4.93896 8.531L12 15.591L19.061 8.531L16.939 6.409L12 11.349L7.06098 6.409L4.93896 8.531Z" fill="var(--color-text)" id="icon-chevronDown"></path></svg>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility">
+<h4 class="uppercase">Member Visibility</h4><form>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-private" name="private"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Private</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></form></div>
+<div class="tsd-theme-toggle">
+<h4 class="uppercase">Theme</h4><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-index-accordion tsd-page-navigation"><summary class="tsd-accordion-summary">
+<h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="#icon-chevronDown"></use></svg>On This Page</h3></summary>
+<div class="tsd-accordion-details">
+<ul>
+<li>
+<ul>
+<li><a href="#md:matrix-javascript-sdk"><span>Matrix <wbr/>Java<wbr/>Script SDK</span></a></li>
+<li><a href="#md:quickstart"><span>Quickstart</span></a></li>
+<li>
+<ul>
+<li><a href="#md:in-a-browser"><span>In a browser</span></a></li>
+<li><a href="#md:in-nodejs"><span>In <wbr/>Node.js</span></a></li>
+<li><a href="#md:what-does-this-sdk-do"><span>What does this SDK do?</span></a></li></ul></li>
+<li><a href="#md:usage"><span>Usage</span></a></li>
+<li>
+<ul>
+<li><a href="#md:conventions"><span>Conventions</span></a></li>
+<li>
+<ul>
+<li><a href="#md:emitted-events"><span>Emitted events</span></a></li>
+<li><a href="#md:promises-and-callbacks"><span>Promises and <wbr/>Callbacks</span></a></li></ul></li>
+<li><a href="#md:examples"><span>Examples</span></a></li>
+<li>
+<ul>
+<li><a href="#md:automatically-join-rooms-when-invited"><span>Automatically join rooms when invited</span></a></li>
+<li><a href="#md:print-out-messages-for-all-rooms"><span>Print out messages for all rooms</span></a></li>
+<li><a href="#md:print-out-membership-lists-whenever-they-are-changed"><span>Print out membership lists whenever they are changed</span></a></li></ul></li></ul></li>
+<li><a href="#md:api-reference"><span>API <wbr/>Reference</span></a></li>
+<li><a href="#md:end-to-end-encryption-support"><span>End-<wbr/>to-<wbr/>end encryption support</span></a></li>
+<li><a href="#md:contributing"><span>Contributing</span></a></li>
+<li>
+<ul>
+<li><a href="#md:building"><span>Building</span></a></li></ul></li></ul></li></ul></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="modules.html" class="current"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)"></path></g></svg><span>matrix-<wbr/>js-<wbr/>sdk</span></a>
+<ul class="tsd-small-nested-navigation">
+<li><a href="modules.html#CryptoApi" class="deprecated"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-8388608"><rect fill="var(--color-icon-background)" stroke="#FF4D82" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="12"></rect><path d="M10.354 17V8.24H13.066C13.586 8.24 14.042 8.348 14.434 8.564C14.826 8.772 15.13 9.064 15.346 9.44C15.562 9.816 15.67 10.256 15.67 10.76C15.67 11.352 15.514 11.86 15.202 12.284C14.898 12.708 14.482 13 13.954 13.16L15.79 17H14.518L12.838 13.28H11.434V17H10.354ZM11.434 12.308H13.066C13.514 12.308 13.874 12.168 14.146 11.888C14.418 11.6 14.554 11.224 14.554 10.76C14.554 10.288 14.418 9.912 14.146 9.632C13.874 9.352 13.514 9.212 13.066 9.212H11.434V12.308Z" fill="var(--color-text)"></path></g></svg><span>Crypto<wbr/>Api</span></a></li>
+<li><a href="modules.html#DeviceVerificationStatus" class="deprecated"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8388608"></use></svg><span>Device<wbr/>Verification<wbr/>Status</span></a></li>
+<li><a href="modules/_internal_.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>&lt;internal&gt;</span></a></li>
+<li><a href="modules/ContentHelpers.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>Content<wbr/>Helpers</span></a></li>
+<li><a href="modules/Crypto.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>Crypto</span></a></li>
+<li><a href="modules/SecretStorage.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4"></use></svg><span>Secret<wbr/>Storage</span></a></li>
+<li><a href="enums/AuthType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-8"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-enum)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.45 16V7.24H14.49V8.224H10.518V10.936H14.07V11.908H10.518V15.016H14.49V16H9.45Z" fill="var(--color-text)"></path></g></svg><span>Auth<wbr/>Type</span></a></li>
+<li><a href="enums/AutoDiscoveryAction.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Auto<wbr/>Discovery<wbr/>Action</span></a></li>
+<li><a href="enums/BeaconEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Beacon<wbr/>Event</span></a></li>
+<li><a href="enums/Category.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Category</span></a></li>
+<li><a href="enums/ClientEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Client<wbr/>Event</span></a></li>
+<li><a href="enums/ClientPrefix.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Client<wbr/>Prefix</span></a></li>
+<li><a href="enums/ConditionKind.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Condition<wbr/>Kind</span></a></li>
+<li><a href="enums/ConditionOperator.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Condition<wbr/>Operator</span></a></li>
+<li><a href="enums/CryptoEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Crypto<wbr/>Event</span></a></li>
+<li><a href="enums/DeviceVerification.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Device<wbr/>Verification</span></a></li>
+<li><a href="enums/Direction.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Direction</span></a></li>
+<li><a href="enums/DuplicateStrategy.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Duplicate<wbr/>Strategy</span></a></li>
+<li><a href="enums/EventEmitterEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Event<wbr/>Emitter<wbr/>Events</span></a></li>
+<li><a href="enums/EventStatus.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Event<wbr/>Status</span></a></li>
+<li><a href="enums/EventType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Event<wbr/>Type</span></a></li>
+<li><a href="enums/FeatureSupport.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Feature<wbr/>Support</span></a></li>
+<li><a href="enums/GroupCallEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Group<wbr/>Call<wbr/>Event</span></a></li>
+<li><a href="enums/GroupCallIntent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Group<wbr/>Call<wbr/>Intent</span></a></li>
+<li><a href="enums/GroupCallState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Group<wbr/>Call<wbr/>State</span></a></li>
+<li><a href="enums/GroupCallType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Group<wbr/>Call<wbr/>Type</span></a></li>
+<li><a href="enums/GuestAccess.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Guest<wbr/>Access</span></a></li>
+<li><a href="enums/HistoryVisibility.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>History<wbr/>Visibility</span></a></li>
+<li><a href="enums/HttpApiEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Http<wbr/>Api<wbr/>Event</span></a></li>
+<li><a href="enums/IdentityPrefix.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Identity<wbr/>Prefix</span></a></li>
+<li><a href="enums/InvalidCryptoStoreState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Invalid<wbr/>Crypto<wbr/>Store<wbr/>State</span></a></li>
+<li><a href="enums/InvalidStoreState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Invalid<wbr/>Store<wbr/>State</span></a></li>
+<li><a href="enums/JoinRule.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Join<wbr/>Rule</span></a></li>
+<li><a href="enums/MatrixEventEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Matrix<wbr/>Event<wbr/>Event</span></a></li>
+<li><a href="enums/MediaPrefix.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Media<wbr/>Prefix</span></a></li>
+<li><a href="enums/Method.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Method</span></a></li>
+<li><a href="enums/MsgType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Msg<wbr/>Type</span></a></li>
+<li><a href="enums/NotificationCountType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Notification<wbr/>Count<wbr/>Type</span></a></li>
+<li><a href="enums/PendingEventOrdering.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Pending<wbr/>Event<wbr/>Ordering</span></a></li>
+<li><a href="enums/PollEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Poll<wbr/>Event</span></a></li>
+<li><a href="enums/Preset.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Preset</span></a></li>
+<li><a href="enums/PushRuleActionName.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Push<wbr/>Rule<wbr/>Action<wbr/>Name</span></a></li>
+<li><a href="enums/PushRuleKind.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Push<wbr/>Rule<wbr/>Kind</span></a></li>
+<li><a href="enums/RelationType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Relation<wbr/>Type</span></a></li>
+<li><a href="enums/RestrictedAllowType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Restricted<wbr/>Allow<wbr/>Type</span></a></li>
+<li><a href="enums/RoomEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>Event</span></a></li>
+<li><a href="enums/RoomMemberEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>Member<wbr/>Event</span></a></li>
+<li><a href="enums/RoomNameType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>Name<wbr/>Type</span></a></li>
+<li><a href="enums/RoomStateEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>State<wbr/>Event</span></a></li>
+<li><a href="enums/RoomType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>Type</span></a></li>
+<li><a href="enums/RoomVersionStability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Room<wbr/>Version<wbr/>Stability</span></a></li>
+<li><a href="enums/RuleId.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Rule<wbr/>Id</span></a></li>
+<li><a href="enums/SERVICE_TYPES.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>SERVICE_<wbr/>TYPES</span></a></li>
+<li><a href="enums/SearchOrderBy.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Search<wbr/>Order<wbr/>By</span></a></li>
+<li><a href="enums/ThreadEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Thread<wbr/>Event</span></a></li>
+<li><a href="enums/ThreadFilterType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Thread<wbr/>Filter<wbr/>Type</span></a></li>
+<li><a href="enums/TweakName.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Tweak<wbr/>Name</span></a></li>
+<li><a href="enums/UserEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>User<wbr/>Event</span></a></li>
+<li><a href="enums/Visibility.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-8"></use></svg><span>Visibility</span></a></li>
+<li><a href="classes/AutoDiscovery.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-128"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-class)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M11.898 16.1201C11.098 16.1201 10.466 15.8961 10.002 15.4481C9.53803 15.0001 9.30603 14.3841 9.30603 13.6001V9.64012C9.30603 8.85612 9.53803 8.24012 10.002 7.79212C10.466 7.34412 11.098 7.12012 11.898 7.12012C12.682 7.12012 13.306 7.34812 13.77 7.80412C14.234 8.25212 14.466 8.86412 14.466 9.64012H13.386C13.386 9.14412 13.254 8.76412 12.99 8.50012C12.734 8.22812 12.37 8.09212 11.898 8.09212C11.426 8.09212 11.054 8.22412 10.782 8.48812C10.518 8.75212 10.386 9.13212 10.386 9.62812V13.6001C10.386 14.0961 10.518 14.4801 10.782 14.7521C11.054 15.0161 11.426 15.1481 11.898 15.1481C12.37 15.1481 12.734 15.0161 12.99 14.7521C13.254 14.4801 13.386 14.0961 13.386 13.6001H14.466C14.466 14.3761 14.234 14.9921 13.77 15.4481C13.306 15.8961 12.682 16.1201 11.898 16.1201Z" fill="var(--color-text)"></path></g></svg><span>Auto<wbr/>Discovery</span></a></li>
+<li><a href="classes/Beacon.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Beacon</span></a></li>
+<li><a href="classes/ConnectionError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Connection<wbr/>Error</span></a></li>
+<li><a href="classes/Device.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Device</span></a></li>
+<li><a href="classes/EventTimeline.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Event<wbr/>Timeline</span></a></li>
+<li><a href="classes/EventTimelineSet.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Event<wbr/>Timeline<wbr/>Set</span></a></li>
+<li><a href="classes/Filter.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Filter</span></a></li>
+<li><a href="classes/GroupCall.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Group<wbr/>Call</span></a></li>
+<li><a href="classes/HTTPError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>HTTPError</span></a></li>
+<li><a href="classes/IndexedDBCryptoStore.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>IndexedDBCrypto<wbr/>Store</span></a></li>
+<li><a href="classes/IndexedDBStore.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>IndexedDBStore</span></a></li>
+<li><a href="classes/InteractiveAuth.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Interactive<wbr/>Auth</span></a></li>
+<li><a href="classes/InvalidCryptoStoreError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Invalid<wbr/>Crypto<wbr/>Store<wbr/>Error</span></a></li>
+<li><a href="classes/InvalidStoreError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Invalid<wbr/>Store<wbr/>Error</span></a></li>
+<li><a href="classes/KeySignatureUploadError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Key<wbr/>Signature<wbr/>Upload<wbr/>Error</span></a></li>
+<li><a href="classes/MatrixCall.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Call</span></a></li>
+<li><a href="classes/MatrixClient.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Client</span></a></li>
+<li><a href="classes/MatrixError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Error</span></a></li>
+<li><a href="classes/MatrixEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Event</span></a></li>
+<li><a href="classes/MatrixHttpApi.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Http<wbr/>Api</span></a></li>
+<li><a href="classes/MatrixScheduler.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Matrix<wbr/>Scheduler</span></a></li>
+<li><a href="classes/MemoryCryptoStore.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Memory<wbr/>Crypto<wbr/>Store</span></a></li>
+<li><a href="classes/MemoryStore.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Memory<wbr/>Store</span></a></li>
+<li><a href="classes/NoAuthFlowFoundError.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>No<wbr/>Auth<wbr/>Flow<wbr/>Found<wbr/>Error</span></a></li>
+<li><a href="classes/Poll.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Poll</span></a></li>
+<li><a href="classes/Room.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Room</span></a></li>
+<li><a href="classes/RoomMember.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Room<wbr/>Member</span></a></li>
+<li><a href="classes/RoomState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Room<wbr/>State</span></a></li>
+<li><a href="classes/RoomSummary.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Room<wbr/>Summary</span></a></li>
+<li><a href="classes/RoomWidgetClient.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Room<wbr/>Widget<wbr/>Client</span></a></li>
+<li><a href="classes/SyncAccumulator.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Sync<wbr/>Accumulator</span></a></li>
+<li><a href="classes/Thread.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Thread</span></a></li>
+<li><a href="classes/TimelineIndex.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Timeline<wbr/>Index</span></a></li>
+<li><a href="classes/TimelineWindow.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Timeline<wbr/>Window</span></a></li>
+<li><a href="classes/TypedEventEmitter.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>Typed<wbr/>Event<wbr/>Emitter</span></a></li>
+<li><a href="classes/User.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-128"></use></svg><span>User</span></a></li>
+<li><a href="interfaces/ActualRoomNameState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-256"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-interface)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.51 16V15.016H11.298V8.224H9.51V7.24H14.19V8.224H12.402V15.016H14.19V16H9.51Z" fill="var(--color-text)"></path></g></svg><span>Actual<wbr/>Room<wbr/>Name<wbr/>State</span></a></li>
+<li><a href="interfaces/Capabilities.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Capabilities</span></a></li>
+<li><a href="interfaces/ClientConfig.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Client<wbr/>Config</span></a></li>
+<li><a href="interfaces/DeviceKeys.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Device<wbr/>Keys</span></a></li>
+<li><a href="interfaces/EmptyRoomNameState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Empty<wbr/>Room<wbr/>Name<wbr/>State</span></a></li>
+<li><a href="interfaces/GeneratedRoomNameState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Generated<wbr/>Room<wbr/>Name<wbr/>State</span></a></li>
+<li><a href="interfaces/IAddEventOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAdd<wbr/>Event<wbr/>Options</span></a></li>
+<li><a href="interfaces/IAddEventToTimelineOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAdd<wbr/>Event<wbr/>To<wbr/>Timeline<wbr/>Options</span></a></li>
+<li><a href="interfaces/IAddLiveEventOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAdd<wbr/>Live<wbr/>Event<wbr/>Options</span></a></li>
+<li><a href="interfaces/IAddThreePidOnlyBody.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAdd<wbr/>Three<wbr/>Pid<wbr/>Only<wbr/>Body</span></a></li>
+<li><a href="interfaces/IAggregatedRelation.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAggregated<wbr/>Relation</span></a></li>
+<li><a href="interfaces/IAnnotatedPushRule.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAnnotated<wbr/>Push<wbr/>Rule</span></a></li>
+<li><a href="interfaces/IAuthData.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAuth<wbr/>Data</span></a></li>
+<li><a href="interfaces/IAuthDict.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IAuth<wbr/>Dict</span></a></li>
+<li><a href="interfaces/IBindThreePidBody.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IBind<wbr/>Three<wbr/>Pid<wbr/>Body</span></a></li>
+<li><a href="interfaces/ICallStartedCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICall<wbr/>Started<wbr/>Condition</span></a></li>
+<li><a href="interfaces/ICallStartedPrefixCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICall<wbr/>Started<wbr/>Prefix<wbr/>Condition</span></a></li>
+<li><a href="interfaces/ICapabilities.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICapabilities</span></a></li>
+<li><a href="interfaces/ICapability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICapability</span></a></li>
+<li><a href="interfaces/IChangePasswordCapability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IChange<wbr/>Password<wbr/>Capability</span></a></li>
+<li><a href="interfaces/IClaimKeysRequest.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IClaim<wbr/>Keys<wbr/>Request</span></a></li>
+<li><a href="interfaces/IClaimOTKsResult.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IClaimOTKs<wbr/>Result</span></a></li>
+<li><a href="interfaces/IClearEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IClear<wbr/>Event</span></a></li>
+<li><a href="interfaces/IClientWellKnown.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IClient<wbr/>Well<wbr/>Known</span></a></li>
+<li><a href="interfaces/IContainsDisplayNameCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IContains<wbr/>Display<wbr/>Name<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IContent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IContent</span></a></li>
+<li><a href="interfaces/IContentUri.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IContent<wbr/>Uri</span></a></li>
+<li><a href="interfaces/IContextResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IContext<wbr/>Response</span></a></li>
+<li><a href="interfaces/ICreateClientOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICreate<wbr/>Client<wbr/>Opts</span></a></li>
+<li><a href="interfaces/ICreateFilterOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICreate<wbr/>Filter<wbr/>Opts</span></a></li>
+<li><a href="interfaces/ICreateRoomOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICreate<wbr/>Room<wbr/>Opts</span></a></li>
+<li><a href="interfaces/ICreateRoomStateEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICreate<wbr/>Room<wbr/>State<wbr/>Event</span></a></li>
+<li><a href="interfaces/ICrossSigningKey.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICross<wbr/>Signing<wbr/>Key</span></a></li>
+<li><a href="interfaces/ICryptoCallbacks.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ICrypto<wbr/>Callbacks</span></a></li>
+<li><a href="interfaces/IDecryptOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IDecrypt<wbr/>Options</span></a></li>
+<li><a href="interfaces/IDelegatedAuthConfig.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IDelegated<wbr/>Auth<wbr/>Config</span></a></li>
+<li><a href="interfaces/IDeviceLists.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IDevice<wbr/>Lists</span></a></li>
+<li><a href="interfaces/IDownloadKeyResult.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IDownload<wbr/>Key<wbr/>Result</span></a></li>
+<li><a href="interfaces/IEncryptedFile.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEncrypted<wbr/>File</span></a></li>
+<li><a href="interfaces/IEphemeral.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEphemeral</span></a></li>
+<li><a href="interfaces/IEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent</span></a></li>
+<li><a href="interfaces/IEventMatchCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>Match<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IEventPropertyContainsCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>Property<wbr/>Contains<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IEventPropertyIsCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>Property<wbr/>Is<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IEventRelation.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>Relation</span></a></li>
+<li><a href="interfaces/IEventSearchOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>Search<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IEventWithRoomId.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvent<wbr/>With<wbr/>Room<wbr/>Id</span></a></li>
+<li><a href="interfaces/IEventsResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IEvents<wbr/>Response</span></a></li>
+<li><a href="interfaces/IFieldType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IField<wbr/>Type</span></a></li>
+<li><a href="interfaces/IFilterDefinition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IFilter<wbr/>Definition</span></a></li>
+<li><a href="interfaces/IFilterResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IFilter<wbr/>Response</span></a></li>
+<li><a href="interfaces/IGuestAccessOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IGuest<wbr/>Access<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IHttpOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IHttp<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IImageInfo.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IImage<wbr/>Info</span></a></li>
+<li><a href="interfaces/IInitialiseStateOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInitialise<wbr/>State<wbr/>Options</span></a></li>
+<li><a href="interfaces/IInputs.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInputs</span></a></li>
+<li><a href="interfaces/IInstance.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInstance</span></a></li>
+<li><a href="interfaces/IInvite3PID.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInvite3PID</span></a></li>
+<li><a href="interfaces/IInviteState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInvite<wbr/>State</span></a></li>
+<li><a href="interfaces/IInvitedRoom.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IInvited<wbr/>Room</span></a></li>
+<li><a href="interfaces/IJoinRoomOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IJoin<wbr/>Room<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IJoinRuleEventContent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IJoin<wbr/>Rule<wbr/>Event<wbr/>Content</span></a></li>
+<li><a href="interfaces/IJoinedRoom.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IJoined<wbr/>Room</span></a></li>
+<li><a href="interfaces/IKeysUploadResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IKeys<wbr/>Upload<wbr/>Response</span></a></li>
+<li><a href="interfaces/ILeftRoom.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ILeft<wbr/>Room</span></a></li>
+<li><a href="interfaces/IMSC3882GetLoginTokenCapability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMSC3882<wbr/>Get<wbr/>Login<wbr/>Token<wbr/>Capability</span></a></li>
+<li><a href="interfaces/IMarkerFoundOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMarker<wbr/>Found<wbr/>Options</span></a></li>
+<li><a href="interfaces/IMatrixClientCreateOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMatrix<wbr/>Client<wbr/>Create<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IMatrixProfile.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMatrix<wbr/>Profile</span></a></li>
+<li><a href="interfaces/IMentions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMentions</span></a></li>
+<li><a href="interfaces/IMessageVisibilityHidden.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMessage<wbr/>Visibility<wbr/>Hidden</span></a></li>
+<li><a href="interfaces/IMessageVisibilityVisible.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMessage<wbr/>Visibility<wbr/>Visible</span></a></li>
+<li><a href="interfaces/IMinimalEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMinimal<wbr/>Event</span></a></li>
+<li><a href="interfaces/IMyDevice.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IMy<wbr/>Device</span></a></li>
+<li><a href="interfaces/INotification.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>INotification</span></a></li>
+<li><a href="interfaces/INotificationsResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>INotifications<wbr/>Response</span></a></li>
+<li><a href="interfaces/IOpenIDToken.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IOpenIDToken</span></a></li>
+<li><a href="interfaces/IOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IOpts</span></a></li>
+<li><a href="interfaces/IPaginateOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPaginate<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IPowerLevelsContent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPower<wbr/>Levels<wbr/>Content</span></a></li>
+<li><a href="interfaces/IPresenceOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPresence<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IPreviewUrlResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPreview<wbr/>Url<wbr/>Response</span></a></li>
+<li><a href="interfaces/IProtocol.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IProtocol</span></a></li>
+<li><a href="interfaces/IPublicRoomsChunkRoom.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPublic<wbr/>Rooms<wbr/>Chunk<wbr/>Room</span></a></li>
+<li><a href="interfaces/IPushRule.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPush<wbr/>Rule</span></a></li>
+<li><a href="interfaces/IPushRuleCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPush<wbr/>Rule<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IPushRules.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPush<wbr/>Rules</span></a></li>
+<li><a href="interfaces/IPusher.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPusher</span></a></li>
+<li><a href="interfaces/IPusherRequest.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IPusher<wbr/>Request</span></a></li>
+<li><a href="interfaces/IQueryKeysRequest.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IQuery<wbr/>Keys<wbr/>Request</span></a></li>
+<li><a href="interfaces/IRecommendedVersion.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRecommended<wbr/>Version</span></a></li>
+<li><a href="interfaces/IRedactOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRedact<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IRegisterRequestParams.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRegister<wbr/>Request<wbr/>Params</span></a></li>
+<li><a href="interfaces/IRelationsRequestOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRelations<wbr/>Request<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IRelationsResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRelations<wbr/>Response</span></a></li>
+<li><a href="interfaces/IRequestMsisdnTokenResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRequest<wbr/>Msisdn<wbr/>Token<wbr/>Response</span></a></li>
+<li><a href="interfaces/IRequestOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRequest<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IRequestTokenResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRequest<wbr/>Token<wbr/>Response</span></a></li>
+<li><a href="interfaces/IResultContext.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IResult<wbr/>Context</span></a></li>
+<li><a href="interfaces/IResultRoomEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IResult<wbr/>Room<wbr/>Events</span></a></li>
+<li><a href="interfaces/IRoomDirectoryOptions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Directory<wbr/>Options</span></a></li>
+<li><a href="interfaces/IRoomEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Event</span></a></li>
+<li><a href="interfaces/IRoomEventFilter.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Event<wbr/>Filter</span></a></li>
+<li><a href="interfaces/IRoomMemberCountCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Member<wbr/>Count<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IRoomSummary.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Summary</span></a></li>
+<li><a href="interfaces/IRoomTimelineData.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Timeline<wbr/>Data</span></a></li>
+<li><a href="interfaces/IRoomVersionsCapability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRoom<wbr/>Versions<wbr/>Capability</span></a></li>
+<li><a href="interfaces/IRooms.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IRooms</span></a></li>
+<li><a href="interfaces/ISearchOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISearch<wbr/>Opts</span></a></li>
+<li><a href="interfaces/ISearchRequestBody.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISearch<wbr/>Request<wbr/>Body</span></a></li>
+<li><a href="interfaces/ISearchResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISearch<wbr/>Response</span></a></li>
+<li><a href="interfaces/ISearchResult.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISearch<wbr/>Result</span></a></li>
+<li><a href="interfaces/ISearchResults.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISearch<wbr/>Results</span></a></li>
+<li><a href="interfaces/ISendEventResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISend<wbr/>Event<wbr/>Response</span></a></li>
+<li><a href="interfaces/ISenderNotificationPermissionCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISender<wbr/>Notification<wbr/>Permission<wbr/>Condition</span></a></li>
+<li><a href="interfaces/IServerVersions.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IServer<wbr/>Versions</span></a></li>
+<li><a href="interfaces/ISignedKey.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISigned<wbr/>Key</span></a></li>
+<li><a href="interfaces/IStageStatus.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IStage<wbr/>Status</span></a></li>
+<li><a href="interfaces/IStartClientOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IStart<wbr/>Client<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IStateEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IState<wbr/>Event</span></a></li>
+<li><a href="interfaces/IStateEventWithRoomId.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IState<wbr/>Event<wbr/>With<wbr/>Room<wbr/>Id</span></a></li>
+<li><a href="interfaces/IStatusResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IStatus<wbr/>Response</span></a></li>
+<li><a href="interfaces/IStoredClientOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IStored<wbr/>Client<wbr/>Opts</span></a></li>
+<li><a href="interfaces/IStrippedState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IStripped<wbr/>State</span></a></li>
+<li><a href="interfaces/ISyncData.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISync<wbr/>Data</span></a></li>
+<li><a href="interfaces/ISyncResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ISync<wbr/>Response</span></a></li>
+<li><a href="interfaces/ITagsResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ITags<wbr/>Response</span></a></li>
+<li><a href="interfaces/IThreadBundledRelationship.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IThread<wbr/>Bundled<wbr/>Relationship</span></a></li>
+<li><a href="interfaces/IThreadsCapability.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IThreads<wbr/>Capability</span></a></li>
+<li><a href="interfaces/ITimeline.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ITimeline</span></a></li>
+<li><a href="interfaces/IToDeviceEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ITo<wbr/>Device<wbr/>Event</span></a></li>
+<li><a href="interfaces/ITurnServer.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ITurn<wbr/>Server</span></a></li>
+<li><a href="interfaces/ITurnServerResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>ITurn<wbr/>Server<wbr/>Response</span></a></li>
+<li><a href="interfaces/IUnsigned.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IUnsigned</span></a></li>
+<li><a href="interfaces/IUploadKeySignaturesResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IUpload<wbr/>Key<wbr/>Signatures<wbr/>Response</span></a></li>
+<li><a href="interfaces/IUploadKeysRequest.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IUpload<wbr/>Keys<wbr/>Request</span></a></li>
+<li><a href="interfaces/IUsageLimit.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IUsage<wbr/>Limit</span></a></li>
+<li><a href="interfaces/IVisibilityChange.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IVisibility<wbr/>Change</span></a></li>
+<li><a href="interfaces/IWellKnownConfig.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>IWell<wbr/>Known<wbr/>Config</span></a></li>
+<li><a href="interfaces/Keys.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Keys</span></a></li>
+<li><a href="interfaces/OutgoingRoomKeyRequest.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Outgoing<wbr/>Room<wbr/>Key<wbr/>Request</span></a></li>
+<li><a href="interfaces/PushDetails.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Push<wbr/>Details</span></a></li>
+<li><a href="interfaces/SigningKeys.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Signing<wbr/>Keys</span></a></li>
+<li><a href="interfaces/TimestampToEventResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Timestamp<wbr/>To<wbr/>Event<wbr/>Response</span></a></li>
+<li><a href="interfaces/UIAFlow.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>UIAFlow</span></a></li>
+<li><a href="interfaces/Upload.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Upload</span></a></li>
+<li><a href="interfaces/UploadOpts.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Upload<wbr/>Opts</span></a></li>
+<li><a href="interfaces/UploadProgress.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Upload<wbr/>Progress</span></a></li>
+<li><a href="interfaces/UploadResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-256"></use></svg><span>Upload<wbr/>Response</span></a></li>
+<li><a href="types/AnyMemberCountCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-4194304"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-type-alias)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M11.31 16V8.224H8.91V7.24H14.79V8.224H12.39V16H11.31Z" fill="var(--color-text)"></path></g></svg><span>Any<wbr/>Member<wbr/>Count<wbr/>Condition</span></a></li>
+<li><a href="types/BeaconEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Beacon<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/BeaconIdentifier.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Beacon<wbr/>Identifier</span></a></li>
+<li><a href="types/ClientEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Client<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/CrossSigningKeys.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Cross<wbr/>Signing<wbr/>Keys</span></a></li>
+<li><a href="types/DeviceMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Device<wbr/>Map</span></a></li>
+<li><a href="types/EmittedEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Emitted<wbr/>Events</span></a></li>
+<li><a href="types/EventHandlerMap.html" class="deprecated"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/EventTimelineSetHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Event<wbr/>Timeline<wbr/>Set<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/FileType.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>File<wbr/>Type</span></a></li>
+<li><a href="types/HttpApiEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Http<wbr/>Api<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/IdServerUnbindResult.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Id<wbr/>Server<wbr/>Unbind<wbr/>Result</span></a></li>
+<li><a href="types/KeySignatures.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Key<wbr/>Signatures</span></a></li>
+<li><a href="types/Listener.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Listener</span></a></li>
+<li><a href="types/ListenerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Listener<wbr/>Map</span></a></li>
+<li><a href="types/MatrixEventEmittedEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Matrix<wbr/>Event<wbr/>Emitted<wbr/>Events</span></a></li>
+<li><a href="types/MatrixEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Matrix<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/MemberCountCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Member<wbr/>Count<wbr/>Condition</span></a></li>
+<li><a href="types/MessageVisibility.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Message<wbr/>Visibility</span></a></li>
+<li><a href="types/NotificationCount.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Notification<wbr/>Count</span></a></li>
+<li><a href="types/PollEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Poll<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/PushRuleAction.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Push<wbr/>Rule<wbr/>Action</span></a></li>
+<li><a href="types/PushRuleCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Push<wbr/>Rule<wbr/>Condition</span></a></li>
+<li><a href="types/PushRuleSet.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Push<wbr/>Rule<wbr/>Set</span></a></li>
+<li><a href="types/ResetTimelineCallback.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Reset<wbr/>Timeline<wbr/>Callback</span></a></li>
+<li><a href="types/ResizeMethod.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Resize<wbr/>Method</span></a></li>
+<li><a href="types/RoomEmittedEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Room<wbr/>Emitted<wbr/>Events</span></a></li>
+<li><a href="types/RoomEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Room<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/RoomMemberEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Room<wbr/>Member<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/RoomNameState.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Room<wbr/>Name<wbr/>State</span></a></li>
+<li><a href="types/RoomStateEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Room<wbr/>State<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/SearchKey.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Search<wbr/>Key</span></a></li>
+<li><a href="types/SendToDeviceContentMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Send<wbr/>To<wbr/>Device<wbr/>Content<wbr/>Map</span></a></li>
+<li><a href="types/Store.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Store</span></a></li>
+<li><a href="types/ThreadEmittedEvents.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Thread<wbr/>Emitted<wbr/>Events</span></a></li>
+<li><a href="types/ThreadEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Thread<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="types/Tweak.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Tweak</span></a></li>
+<li><a href="types/TweakHighlight.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Tweak<wbr/>Highlight</span></a></li>
+<li><a href="types/TweakSound.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Tweak<wbr/>Sound</span></a></li>
+<li><a href="types/Tweaks.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>Tweaks</span></a></li>
+<li><a href="types/UIAuthCallback.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>UIAuth<wbr/>Callback</span></a></li>
+<li><a href="types/UserEventHandlerMap.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-4194304"></use></svg><span>User<wbr/>Event<wbr/>Handler<wbr/>Map</span></a></li>
+<li><a href="variables/CRYPTO_ENABLED.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-32"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-variable)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M11.106 16L8.85 7.24H9.966L11.454 13.192C11.558 13.608 11.646 13.996 11.718 14.356C11.79 14.708 11.842 14.976 11.874 15.16C11.906 14.976 11.954 14.708 12.018 14.356C12.09 13.996 12.178 13.608 12.282 13.192L13.758 7.24H14.85L12.582 16H11.106Z" fill="var(--color-text)"></path></g></svg><span>CRYPTO_<wbr/>ENABLED</span></a></li>
+<li><a href="variables/DMMemberCountCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>DMMember<wbr/>Count<wbr/>Condition</span></a></li>
+<li><a href="variables/EVENT_VISIBILITY_CHANGE_TYPE.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>EVENT_<wbr/>VISIBILITY_<wbr/>CHANGE_<wbr/>TYPE</span></a></li>
+<li><a href="variables/FILTER_RELATED_BY_REL_TYPES.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>FILTER_<wbr/>RELATED_<wbr/>BY_<wbr/>REL_<wbr/>TYPES</span></a></li>
+<li><a href="variables/FILTER_RELATED_BY_SENDERS.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>FILTER_<wbr/>RELATED_<wbr/>BY_<wbr/>SENDERS</span></a></li>
+<li><a href="variables/KNOWN_SAFE_ROOM_VERSION.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>KNOWN_<wbr/>SAFE_<wbr/>ROOM_<wbr/>VERSION</span></a></li>
+<li><a href="variables/LOCAL_NOTIFICATION_SETTINGS_PREFIX.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>LOCAL_<wbr/>NOTIFICATION_<wbr/>SETTINGS_<wbr/>PREFIX</span></a></li>
+<li><a href="variables/MSC3912_RELATION_BASED_REDACTIONS_PROP.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>MSC3912_<wbr/>RELATION_<wbr/>BASED_<wbr/>REDACTIONS_<wbr/>PROP</span></a></li>
+<li><a href="variables/M_AUTHENTICATION.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>M_<wbr/>AUTHENTICATION</span></a></li>
+<li><a href="variables/PUSHER_DEVICE_ID.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>PUSHER_<wbr/>DEVICE_<wbr/>ID</span></a></li>
+<li><a href="variables/PUSHER_ENABLED.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>PUSHER_<wbr/>ENABLED</span></a></li>
+<li><a href="variables/RoomCreateTypeField.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>Room<wbr/>Create<wbr/>Type<wbr/>Field</span></a></li>
+<li><a href="variables/THREAD_RELATION_TYPE.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>THREAD_<wbr/>RELATION_<wbr/>TYPE</span></a></li>
+<li><a href="variables/ToDeviceMessageId.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>To<wbr/>Device<wbr/>Message<wbr/>Id</span></a></li>
+<li><a href="variables/UNSIGNED_THREAD_ID_FIELD.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSIGNED_<wbr/>THREAD_<wbr/>ID_<wbr/>FIELD</span></a></li>
+<li><a href="variables/UNSTABLE_ELEMENT_FUNCTIONAL_USERS.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>ELEMENT_<wbr/>FUNCTIONAL_<wbr/>USERS</span></a></li>
+<li><a href="variables/UNSTABLE_MSC2666_MUTUAL_ROOMS.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC2666_<wbr/>MUTUAL_<wbr/>ROOMS</span></a></li>
+<li><a href="variables/UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC2666_<wbr/>QUERY_<wbr/>MUTUAL_<wbr/>ROOMS</span></a></li>
+<li><a href="variables/UNSTABLE_MSC2666_SHARED_ROOMS.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC2666_<wbr/>SHARED_<wbr/>ROOMS</span></a></li>
+<li><a href="variables/UNSTABLE_MSC2716_MARKER.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC2716_<wbr/>MARKER</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3088_ENABLED.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3088_<wbr/>ENABLED</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3088_PURPOSE.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3088_<wbr/>PURPOSE</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3089_BRANCH.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3089_<wbr/>BRANCH</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3089_LEAF.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3089_<wbr/>LEAF</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3089_TREE_SUBTYPE.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3089_<wbr/>TREE_<wbr/>SUBTYPE</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3852_LAST_SEEN_UA.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3852_<wbr/>LAST_<wbr/>SEEN_<wbr/>UA</span></a></li>
+<li><a href="variables/UNSTABLE_MSC3882_CAPABILITY.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-32"></use></svg><span>UNSTABLE_<wbr/>MSC3882_<wbr/>CAPABILITY</span></a></li>
+<li><a href="functions/anySignal.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><g id="icon-64"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-function)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6"></rect><path d="M9.39 16V7.24H14.55V8.224H10.446V11.128H14.238V12.112H10.47V16H9.39Z" fill="var(--color-text)"></path></g></svg><span>any<wbr/>Signal</span></a></li>
+<li><a href="functions/createClient.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>create<wbr/>Client</span></a></li>
+<li><a href="functions/createNewMatrixCall.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>create<wbr/>New<wbr/>Matrix<wbr/>Call</span></a></li>
+<li><a href="functions/createRoomWidgetClient.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>create<wbr/>Room<wbr/>Widget<wbr/>Client</span></a></li>
+<li><a href="functions/determineFeatureSupport.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>determine<wbr/>Feature<wbr/>Support</span></a></li>
+<li><a href="functions/fixNotificationCountOnDecryption.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>fix<wbr/>Notification<wbr/>Count<wbr/>On<wbr/>Decryption</span></a></li>
+<li><a href="functions/getBeaconInfoIdentifier.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>get<wbr/>Beacon<wbr/>Info<wbr/>Identifier</span></a></li>
+<li><a href="functions/getHttpUriForMxc.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>get<wbr/>Http<wbr/>Uri<wbr/>For<wbr/>Mxc</span></a></li>
+<li><a href="functions/isDmMemberCountCondition.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>is<wbr/>Dm<wbr/>Member<wbr/>Count<wbr/>Condition</span></a></li>
+<li><a href="functions/isPollEvent.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>is<wbr/>Poll<wbr/>Event</span></a></li>
+<li><a href="functions/isTimestampInDuration.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>is<wbr/>Timestamp<wbr/>In<wbr/>Duration</span></a></li>
+<li><a href="functions/parseErrorResponse.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>parse<wbr/>Error<wbr/>Response</span></a></li>
+<li><a href="functions/retryNetworkOperation.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>retry<wbr/>Network<wbr/>Operation</span></a></li>
+<li><a href="functions/setCryptoStoreFactory.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>set<wbr/>Crypto<wbr/>Store<wbr/>Factory</span></a></li>
+<li><a href="functions/threadFilterTypeToFilter.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>thread<wbr/>Filter<wbr/>Type<wbr/>To<wbr/>Filter</span></a></li>
+<li><a href="functions/timeoutSignal.html"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="#icon-64"></use></svg><span>timeout<wbr/>Signal</span></a></li></ul></nav></div></div></div>
+<div class="tsd-generator">
+<p>Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></div>
+<div class="overlay"></div><script src="assets/versionsMenu.js" type="module"></script></body></html>
