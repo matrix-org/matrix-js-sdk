@@ -89,4 +89,9 @@ export interface MCallHangupReject extends MCallBase {
     reason?: CallErrorCode;
 }
 
+export interface FocusInfo {
+    url: string;
+    jwtServiceUrl: string;
+}
+
 /* eslint-enable camelcase */
