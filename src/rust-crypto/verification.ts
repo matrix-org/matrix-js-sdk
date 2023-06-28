@@ -237,6 +237,35 @@ export class RustVerificationRequest
     }
 
     /**
+     * Send an `m.key.verification.start` event to start verification via a particular method.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#startVerification}.
+     *
+     * @param method - the name of the verification method to use.
+     */
+    public async startVerification(method: string): Promise<Verifier> {
+        if (method !== "m.sas.v1") {
+            throw new Error(`Unsupported verification method ${method}`);
+        }
+
+        const res:
+            | [RustSdkCryptoJs.Sas, RustSdkCryptoJs.RoomMessageRequest | RustSdkCryptoJs.ToDeviceRequest]
+            | undefined = await this.inner.startSas();
+
+        if (res) {
+            const [, req] = res;
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+
+        // this should have triggered the onChange callback, and we should now have a verifier
+        if (!this._verifier) {
+            throw new Error("Still no verifier after startSas() call");
+        }
+
+        return this._verifier;
+    }
+
+    /**
      * The verifier which is doing the actual verification, once the method has been established.
      * Only defined when the `phase` is Started.
      */
