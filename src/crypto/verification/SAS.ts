@@ -83,7 +83,7 @@ const emojiMapping: EmojiMapping[] = [
     ["🍕", "pizza"], // 27
     ["🎂", "cake"], // 28
     ["❤️", "heart"], // 29
-    ["🙂", "smiley"], // 30
+    ["😀", "smiley"], // 30
     ["🤖", "robot"], // 31
     ["🎩", "hat"], // 32
     ["👓", "glasses"], // 33
