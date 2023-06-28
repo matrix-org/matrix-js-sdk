@@ -486,3 +486,48 @@ CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
 if (global.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
 }
+
+/** Creates a factory for promises which can be resolved/rejected externally.
+ *
+ * ```ts
+ * const factory = controllablePromiseFactory();
+ * const controllableGetUser = mock(getUser, (userId) => factory.makePromise(userId));
+ *
+ * const getUserPromise = getUser('@alice:example.org');
+ * expect(getUserPromise).toBePending();
+ *
+ * factory.getControls('@alice:example.org').resolve(exampleUser);
+ * expect(getUserPromise).resolves.toEqual(exampleUser);
+ * ```
+ *
+ * If you need just one promise, you can do something like:
+ * ```ts
+ * const factory = controllablePromiseFactory(() => {});
+ * const controllablePromise = {
+ *   promise: factory.makePromise(),
+ *   controls: factory.getControls(),
+ * };
+ *
+ * // or even
+ * Object.assign(controllablePromise.promise, { controls: controllablePromise.controls });
+ * ```
+ * */
+export function controllablePromiseFactory<T, Args extends any[]>(
+    keyFromArgs: (...args: Args) => string = (...args) => args.join(","),
+) {
+    const allControls: Map<string, { resolve: (x: T) => void; reject: (reason: any) => void }> = new Map();
+    const makePromise = (...args: Args) => {
+        return new Promise<T>((resolve, reject) => {
+            allControls.set(keyFromArgs(...args), { resolve, reject });
+        });
+    };
+    return {
+        makePromise,
+        getControls: (...args: Args) => {
+            return allControls.get(keyFromArgs(...args));
+        },
+        get length() {
+            return allControls.size;
+        },
+    };
+}
