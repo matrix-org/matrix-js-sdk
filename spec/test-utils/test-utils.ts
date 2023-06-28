@@ -488,7 +488,15 @@ if (global.Olm) {
 }
 
 /** Creates a factory for promises which can be resolved/rejected externally.
+ * This is useful for mocking promises when they are created outside of the
+ * normal control flow (e.g. in a fetchMock callback), such that getting a
+ * reference to the created promise is difficult.
  *
+ * Throws an error if a promise is created with the same key twice to avoid
+ * confusion, as this would cause overwriting of the previous promise. Use
+ * `clear()` if you need to do this.
+ *
+ * @example
  * ```ts
  * const factory = controllablePromiseFactory();
  * const controllableGetUser = mock(getUser, (userId) => factory.makePromise(userId));
