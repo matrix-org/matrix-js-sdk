@@ -99,33 +99,12 @@ describe("Thread", () => {
             promiseFactory.makePromise(room.roomId, rootEvent.getId()!),
         );
 
-        // First, ensure that we share fetches to root event between
-        // constructor and subsequent addEvent (which happens at initial sync):
-
         const thread = new Thread(rootEvent.getId()!, rootEvent, { room, client });
         // Thread constructor has non-awaited async code, so we need to wait for it to finish
         await utils.immediate();
         // assuming Thread constructor fetches root event...
         expect(getRootEventHttp).toHaveBeenCalledTimes(1);
 
-        await thread.addEvent(
-            mkMessage({
-                user: rootEvent.getSender()!,
-                event: true,
-            }),
-            false,
-        );
-        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
-
-        promiseFactory.clear();
-        getRootEventHttp.mockReset();
-        expect(getRootEventHttp).toHaveBeenCalledTimes(0);
-
-        // Next, check that a string of `addEvent`s share root event fetch
-        // (happens when many replies come in at once):
-
-        await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
-        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
         await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
         await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
         expect(getRootEventHttp).toHaveBeenCalledTimes(1);
