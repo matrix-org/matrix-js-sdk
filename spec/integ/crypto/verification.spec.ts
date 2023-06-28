@@ -235,13 +235,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
             const olmSAS = new global.Olm.SAS();
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.key",
-                content: {
-                    transaction_id: transactionId,
-                    key: olmSAS.get_pubkey(),
-                },
-            });
+            returnToDeviceMessageFromSync(buildSasKeyMessage(transactionId, olmSAS.get_pubkey()));
 
             // alice responds with a 'key' ...
             requestBody = await expectSendToDeviceMessage("m.key.verification.key");
@@ -265,32 +259,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
             // the dummy device also confirms that the emoji match, and sends a mac
-            const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${TEST_USER_ID}${aliceClient.deviceId}${transactionId}`;
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.mac",
-                content: {
-                    keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
-                    transaction_id: transactionId,
-                    mac: {
-                        [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
-                            olmSAS,
-                            TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
-                            `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
-                        ),
-                    },
-                },
-            });
+            returnToDeviceMessageFromSync(
+                buildSasMacMessage(transactionId, olmSAS, TEST_USER_ID, aliceClient.deviceId!),
+            );
 
             // that should satisfy Alice, who should reply with a 'done'
             await expectSendToDeviceMessage("m.key.verification.done");
 
             // the dummy device also confirms done-ness
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.done",
-                content: {
-                    transaction_id: transactionId,
-                },
-            });
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
 
             // ... and the whole thing should be done!
             await verificationPromise;
@@ -639,6 +616,52 @@ function buildSasStartMessage(transactionId: string): { type: string; content: o
             message_authentication_codes: ["hkdf-hmac-sha256.v2"],
             // we have to include "decimal" per the spec.
             short_authentication_string: ["decimal", "emoji"],
+        },
+    };
+}
+
+/** build an m.key.verification.key to-device message suitable for the SAS flow */
+function buildSasKeyMessage(transactionId: string, key: string): { type: string; content: object } {
+    return {
+        type: "m.key.verification.key",
+        content: {
+            transaction_id: transactionId,
+            key: key,
+        },
+    };
+}
+
+/** build an m.key.verification.mac to-device message suitable for the SAS flow, originating from the dummy device */
+function buildSasMacMessage(
+    transactionId: string,
+    olmSAS: Olm.SAS,
+    recipientUserId: string,
+    recipientDeviceId: string,
+): { type: string; content: object } {
+    const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${recipientUserId}${recipientDeviceId}${transactionId}`;
+
+    return {
+        type: "m.key.verification.mac",
+        content: {
+            keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
+            transaction_id: transactionId,
+            mac: {
+                [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
+                    olmSAS,
+                    TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+                    `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
+                ),
+            },
+        },
+    };
+}
+
+/** build an m.key.verification.done to-device message */
+function buildDoneMessage(transactionId: string) {
+    return {
+        type: "m.key.verification.done",
+        content: {
+            transaction_id: transactionId,
         },
     };
 }
