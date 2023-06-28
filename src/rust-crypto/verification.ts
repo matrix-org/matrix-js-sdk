@@ -41,6 +41,9 @@ export class RustVerificationRequest
     /** Are we in the process of sending an `m.key.verification.ready` event? */
     private _accepting = false;
 
+    /** Are we in the process of sending an `m.key.verification.cancellation` event? */
+    private _cancelling = false;
+
     private _verifier: Verifier | undefined;
 
     /**
@@ -158,7 +161,7 @@ export class RustVerificationRequest
      * the remote echo which causes a transition to {@link VerificationPhase.Cancelled}).
      */
     public get declining(): boolean {
-        throw new Error("not implemented");
+        return this._cancelling;
     }
 
     /**
@@ -244,9 +247,19 @@ export class RustVerificationRequest
      * @returns Promise which resolves when the event has been sent.
      */
     public async cancel(params?: { reason?: string; code?: string }): Promise<void> {
-        const req: undefined | OutgoingRequest = this.inner.cancel();
-        if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        if (this._cancelling) {
+            // already cancelling; do nothing
+            return;
+        }
+
+        this._cancelling = true;
+        try {
+            const req: undefined | OutgoingRequest = this.inner.cancel();
+            if (req) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            }
+        } finally {
+            this._cancelling = false;
         }
     }
 
