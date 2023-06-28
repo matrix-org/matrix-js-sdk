@@ -40,9 +40,17 @@ export class RustVerificationRequest
 {
     private _verifier: Verifier | undefined;
 
+    /**
+     * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
+     *
+     * @param inner - VerificationRequest from the Rust SDK
+     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests
+     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called
+     */
     public constructor(
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly supportedVerificationMethods: string[] | undefined,
     ) {
         super();
 
