@@ -15,21 +15,35 @@ limitations under the License.
 */
 
 import { mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
 import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
-import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
+import {
+    controllablePromiseFactory,
+    emitPromise,
+    mkEdit,
+    mkMessage,
+    mkReaction,
+    mock,
+} from "../../test-utils/test-utils";
 import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
 import { Feature, ServerSupport } from "../../../src/feature";
 import { eventMapperFor } from "../../../src/event-mapper";
+import * as utils from "../../../src/utils";
+import { ClientPrefix } from "../../../src";
 
 describe("Thread", () => {
+    beforeEach(() => {
+        fetchMock.reset();
+    });
+
     describe("constructor", () => {
         it("should explode for element-web#22141 logging", () => {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
@@ -75,6 +89,83 @@ describe("Thread", () => {
 
         await emitPromise(thread, ThreadEvent.Update);
         expect(thread.length).toBe(3);
+    });
+
+    it("avoids fetching thread root event on addEvent in parallel", async () => {
+        const promiseFactory = controllablePromiseFactory();
+        Thread.hasServerSideSupport = FeatureSupport.Stable;
+
+        const sender = "@bob:example.org";
+        const client = new MatrixClient({ baseUrl: "http://example.org" });
+        const room = new Room("threadRoom", client, sender);
+        jest.spyOn(client.store, "getRoom").mockReturnValue(room);
+        const rootEvent = mkMessage({
+            user: sender,
+            event: true,
+        });
+
+        const getRootEventHttp = fetchMock.get(
+            client.http
+                .getUrl(
+                    utils.encodeUri("/rooms/$roomId/event/$eventId", {
+                        $roomId: room.roomId,
+                        $eventId: rootEvent.getId()!,
+                    }),
+                    undefined,
+                    ClientPrefix.R0,
+                )
+                .toString(),
+            () => promiseFactory.makePromise(room.roomId, rootEvent.getId()!),
+        );
+
+        // First, ensure that we share fetches to root event between
+        // constructor and subsequent addEvent (which happens at initial sync):
+
+        const thread = new Thread(rootEvent.getId()!, rootEvent, { room, client });
+        // Thread constructor has non-awaited async code, so we need to wait for it to finish
+        await utils.immediate();
+        // assuming Thread constructor fetches root event...
+        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
+
+        await thread.addEvent(
+            mkMessage({
+                user: sender,
+                event: true,
+            }),
+            false,
+        );
+        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
+
+        promiseFactory.clear();
+        getRootEventHttp.mockReset();
+        expect(getRootEventHttp).toHaveBeenCalledTimes(0);
+
+        // Next, check that a string of `addEvent`s share root event fetch
+        // (happens when many replies come in at once):
+
+        await thread.addEvent(
+            mkMessage({
+                user: sender,
+                event: true,
+            }),
+            false,
+        );
+        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
+        await thread.addEvent(
+            mkMessage({
+                user: sender,
+                event: true,
+            }),
+            false,
+        );
+        await thread.addEvent(
+            mkMessage({
+                user: sender,
+                event: true,
+            }),
+            false,
+        );
+        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
     });
 
     describe("hasUserReadEvent", () => {
