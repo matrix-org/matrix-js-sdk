@@ -1494,9 +1494,9 @@
   dependencies:
     lodash "^4.17.21"
 
-"@matrix-org/matrix-dmls-wasm@https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.2.tgz":
-  version "0.0.2"
-  resolved "https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.2.tgz#163af905b909d049e44130de9d9f653744b0ac11"
+"@matrix-org/matrix-dmls-wasm@https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.3.tgz":
+  version "0.0.3"
+  resolved "https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.3.tgz#d39024095c008c6badcf341996d21fc2698fd5f7"
 
 "@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.3":
   version "0.1.0-alpha.4"

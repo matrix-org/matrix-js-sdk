@@ -18,7 +18,7 @@ limitations under the License.
  * Internal module. Defines the base classes of the encryption implementations
  */
 
-import type { IMegolmSessionData } from "../../@types/crypto";
+import type { IMlsSessionData } from "./dmls";
 import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
@@ -161,7 +161,7 @@ export abstract class DecryptionAlgorithm {
      *
      * @param opts - object
      */
-    public async importRoomKey(session: IMegolmSessionData, opts: object): Promise<void> {
+    public async importRoomKey(session: IMlsSessionData, opts: object): Promise<void> {
         // ignore by default
     }
 

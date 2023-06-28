@@ -20,7 +20,7 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
+import type { IEventDecryptionResult } from "../../@types/crypto";
 import { logger, PrefixedLogger } from "../../logger";
 import * as olmlib from "../olmlib";
 import {
@@ -555,7 +555,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         );
 
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key!, sessionId);
+        //this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key!, sessionId);
 
         return new OutboundSessionInfo(sessionId, sharedHistory);
     }
@@ -1806,7 +1806,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             }
 
             // don't wait for the keys to be backed up for the server
-            await this.crypto.backupManager.backupGroupSession(roomKey.senderKey, roomKey.sessionId);
+            //await this.crypto.backupManager.backupGroupSession(roomKey.senderKey, roomKey.sessionId);
         } catch (e) {
             this.prefixedLogger.error(`Error handling m.room_key_event: ${e}`);
         }
@@ -2054,7 +2054,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      * @param untrusted - whether the key should be considered as untrusted
      * @param source - where the key came from
      */
-    public importRoomKey(
+    /*public importRoomKey(
         session: IMegolmSessionData,
         { untrusted, source }: { untrusted?: boolean; source?: string } = {},
     ): Promise<void> {
@@ -2088,7 +2088,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 // have another go at decrypting events sent with this session.
                 this.retryDecryption(session.sender_key, session.session_id, !extraSessionData.untrusted);
             });
-    }
+    }*/
 
     /**
      * Have another go at decrypting events after we receive a key. Resolves once

@@ -18,6 +18,7 @@ import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
+import { IMlsSessionData } from "../algorithms/dmls";
 import { TrackingStatus } from "../DeviceList";
 import { IRoomEncryption } from "../RoomList";
 import { IDevice } from "../deviceinfo";
@@ -150,9 +151,10 @@ export interface CryptoStore {
 export type Mode = "readonly" | "readwrite";
 
 export interface ISession {
-    senderKey: string;
-    sessionId: string;
-    sessionData?: InboundGroupSessionData;
+    roomId: string;
+    epochNumber: number;
+    epochCreator: string;
+    sessionData?: IMlsSessionData;
 }
 
 export interface ISessionInfo {

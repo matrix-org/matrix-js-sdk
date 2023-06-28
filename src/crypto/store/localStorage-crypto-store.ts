@@ -206,7 +206,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
-        for (let i = 0; i < this.store.length; ++i) {
+        /* for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
             if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
                 // we can't use split, as the components we are trying to split out
@@ -220,7 +220,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
                     sessionData: getJsonItem(this.store, key)!,
                 });
             }
-        }
+        } */
         func(null);
     }
 
@@ -287,14 +287,11 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         for (const session in sessionsNeedingBackup) {
             if (Object.prototype.hasOwnProperty.call(sessionsNeedingBackup, session)) {
                 // see getAllEndToEndInboundGroupSessions for the magic number explanations
-                const senderKey = session.slice(0, 43);
-                const sessionId = session.slice(44);
-                this.getEndToEndInboundGroupSession(senderKey, sessionId, null, (sessionData) => {
-                    sessions.push({
-                        senderKey: senderKey,
-                        sessionId: sessionId,
-                        sessionData: sessionData!,
-                    });
+                const [roomId, epochNumber, epochCreator] = JSON.parse(session);
+                sessions.push({
+                    roomId,
+                    epochNumber,
+                    epochCreator,
                 });
                 if (limit && sessions.length >= limit) {
                     break;
@@ -315,7 +312,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
                 [senderKeySessionId: string]: string;
             }>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
-            delete sessionsNeedingBackup[session.senderKey + "/" + session.sessionId];
+            delete sessionsNeedingBackup[JSON.stringify([session.roomId, session.epochNumber, session.epochCreator])];
         }
         setJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup);
         return Promise.resolve();
@@ -327,7 +324,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
                 [senderKeySessionId: string]: boolean;
             }>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
-            sessionsNeedingBackup[session.senderKey + "/" + session.sessionId] = true;
+            sessionsNeedingBackup[JSON.stringify([session.roomId, session.epochNumber, session.epochCreator])] = true;
         }
         setJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup);
         return Promise.resolve();

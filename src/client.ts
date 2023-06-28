@@ -21,6 +21,7 @@ limitations under the License.
 import { Optional } from "matrix-events-sdk";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto";
+import type { IMlsSessionData } from "./crypto/algorithms/dmls";
 import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
@@ -3105,7 +3106,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns a promise which resolves when the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
+    public importRoomKeys(keys: IMlsSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3640,7 +3641,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let totalKeyCount = 0;
-        let keys: IMegolmSessionData[] = [];
+        let keys: IMlsSessionData[] = [];
 
         const path = this.makeKeyBackupPath(targetRoomId!, targetSessionId!, backupInfo.version);
 
@@ -3706,8 +3707,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const [key] = await algorithm.decryptSessions({
                         [targetSessionId!]: res as IKeyBackupSession,
                     });
-                    key.room_id = targetRoomId!;
-                    key.session_id = targetSessionId!;
+                    const [epochNum, epochCreator] = targetSessionId!.split("|");
+                    key.epoch = [parseInt(epochNum), epochCreator];
                     keys.push(key);
                 } catch (e) {
                     logger.log("Failed to decrypt megolm session from backup", e);

@@ -634,7 +634,7 @@ export class Backend implements CryptoStore {
     }
 
     public getAllEndToEndInboundGroupSessions(txn: IDBTransaction, func: (session: ISession | null) => void): void {
-        const objectStore = txn.objectStore("inbound_group_sessions");
+        /* const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function (): void {
             const cursor = getReq.result;
@@ -656,7 +656,8 @@ export class Backend implements CryptoStore {
                     abortWithException(txn, <Error>e);
                 }
             }
-        };
+            }; */
+        func(null);
     }
 
     public addEndToEndInboundGroupSession(
@@ -765,19 +766,20 @@ export class Backend implements CryptoStore {
                 resolve(sessions);
             };
             const objectStore = txn.objectStore("sessions_needing_backup");
-            const sessionStore = txn.objectStore("inbound_group_sessions");
+            //const sessionStore = txn.objectStore("inbound_group_sessions");
             const getReq = objectStore.openCursor();
             getReq.onsuccess = function (): void {
                 const cursor = getReq.result;
                 if (cursor) {
-                    const sessionGetReq = sessionStore.get(cursor.key);
+                    sessions.push(cursor.value);
+                    /*const sessionGetReq = sessionStore.get(cursor.key);
                     sessionGetReq.onsuccess = function (): void {
                         sessions.push({
                             senderKey: sessionGetReq.result.senderCurve25519Key,
                             sessionId: sessionGetReq.result.sessionId,
                             sessionData: sessionGetReq.result.session,
                         });
-                    };
+                    };*/
                     if (!limit || sessions.length < limit) {
                         cursor.continue();
                     }
@@ -806,7 +808,7 @@ export class Backend implements CryptoStore {
         await Promise.all(
             sessions.map((session) => {
                 return new Promise((resolve, reject) => {
-                    const req = objectStore.delete([session.senderKey, session.sessionId]);
+                    const req = objectStore.delete([session.roomId, session.epochNumber, session.epochCreator]);
                     req.onsuccess = resolve;
                     req.onerror = reject;
                 });
@@ -823,8 +825,9 @@ export class Backend implements CryptoStore {
             sessions.map((session) => {
                 return new Promise((resolve, reject) => {
                     const req = objectStore.put({
-                        senderCurve25519Key: session.senderKey,
-                        sessionId: session.sessionId,
+                        roomId: session.roomId,
+                        epochNumber: session.epochNumber,
+                        epochCreator: session.epochCreator,
                     });
                     req.onsuccess = resolve;
                     req.onerror = reject;

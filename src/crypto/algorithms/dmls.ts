@@ -24,6 +24,9 @@ import {
     EncryptionAlgorithm,
     registerAlgorithm,
 } from "./base";
+import type {
+    IImportRoomKeysOpts,
+} from "../api";
 import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
 import { Crypto, IEncryptedContent, IEventDecryptionResult } from "..";
@@ -44,6 +47,18 @@ export const WELCOME_PACKAGE = new UnstableValue(
     "org.matrix.msc2883.v0.mls.welcome.dhkemx25519-aes128gcm-sha256-ed25519",
 );
 
+/* eslint-disable camelcase */
+
+export interface IMlsSessionData {
+    room_id: string;
+    epoch: [number, string];
+    group_export: string;
+    algorithm?: string;
+    untrusted?: boolean;
+}
+
+/* eslint-enable camelcase */
+
 let textEncoder = new TextEncoder();
 let textDecoder = new TextDecoder("utf-8", {fatal: true});
 
@@ -51,10 +66,11 @@ class MlsEncryption extends EncryptionAlgorithm {
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IEncryptedContent> {
         const mlsProvider = this.crypto.mlsProvider;
         if (!this.roomId) {
+            console.error("MLS Error: No room ID")
             throw "No room ID";
         }
         let group = mlsProvider.getGroup(this.roomId);
-        if (!group) {
+        if (!group || !group.is_joined()) {
             const timeline = room.getLiveTimeline();
             const events = timeline.getEvents();
             events.reverse();
@@ -77,6 +93,7 @@ class MlsEncryption extends EncryptionAlgorithm {
                     publicGroupStateContents.public_group_state,
                     this.roomId,
                 );
+
                 const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
                 group = joinedGroup;
                 const publicGroupState = group.public_group_state(mlsProvider.backend!);
@@ -92,6 +109,7 @@ class MlsEncryption extends EncryptionAlgorithm {
             }
         }
         if (!group) {
+            console.error("MLS error: No group available");
             throw "No group available";
         }
 
@@ -114,6 +132,9 @@ class MlsEncryption extends EncryptionAlgorithm {
         if (group.has_changes() || group.needs_resolve()) {
             console.log("[MLS] has changes/needs resolve", group.has_changes(), group.needs_resolve());
             const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
+            const [epochNum, epochCreator] = group.epoch();
+            // don't wait for it to complete
+            this.crypto.backupManager.backupGroupSession(this.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
             const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
@@ -181,32 +202,68 @@ class MlsEncryption extends EncryptionAlgorithm {
 }
 
 class MlsDecryption extends DecryptionAlgorithm {
+    private pendingEvents = new Map<BigInt, Map<string, Set<MatrixEvent>>>();
+
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         const content = event.getWireContent();
         if (typeof(content.ciphertext) !== "string" || typeof(content.epoch_creator) !== "string") {
             throw new DecryptionError("MLS_MISSING_FIELDS", "Missing or invalid fields in input");
+        }
+        if (content.ciphertext === "") {
+            // probably the initial commit
+            return {
+                clearEvent: {
+                    type: "io.element.mls.internal",
+                    content: {"body": "This is an MLS handshake message, so there's nothing useful to see here."},
+                },
+            };
         }
         const mlsProvider = this.crypto.mlsProvider;
         if (!this.roomId) {
             throw "No room ID";
         }
         const group = mlsProvider.getGroup(this.roomId);
+        const mlsMessage = new matrixDmls.MlsMessageIn(olmlib.decodeBase64(content.ciphertext));
+        const isHandshake = mlsMessage.is_handshake_message;
+        const epochNumber = mlsMessage.epoch;
         if (!group) {
+            this.addEventToPendingList(event, epochNumber, content.epoch_creator);
+            if (isHandshake) {
+                return {
+                    clearEvent: {
+                        type: "io.element.mls.internal",
+                        content: {"body": "This is an MLS handshake message, so there's nothing useful to see here."},
+                    },
+                };
+            }
             throw "No group available";
         }
-        const ciphertext = olmlib.decodeBase64(content.ciphertext);
         const epochCreator = olmlib.decodeBase64(content.epoch_creator);
-        const unverifiedMessage = group.parse_message(
-            ciphertext,
-            epochCreator,
-            mlsProvider.backend!,
-        );
-        const epochNumber = unverifiedMessage.epoch;
+        let unverifiedMessage;
+        try {
+            unverifiedMessage = group.parse_message(
+                mlsMessage,
+                epochCreator,
+                mlsProvider.backend!,
+            );
+        } catch (e) {
+            this.addEventToPendingList(event, epochNumber, content.epoch_creator);
+            if (isHandshake) {
+                return {
+                    clearEvent: {
+                        type: "io.element.mls.internal",
+                        content: {"body": "This is an MLS handshake message, so there's nothing useful to see here."},
+                    },
+                };
+            }
+            throw e;
+        }
         const processedMessage = group.process_unverified_message(
             unverifiedMessage,
             epochCreator,
             mlsProvider.backend!,
         );
+        this.removeEventFromPendingList(event, epochNumber, content.epoch_creator);
         if (processedMessage.is_application_message()) {
             const messageArr = processedMessage.as_application_message();
             const clearEvent = JSON.parse(textDecoder.decode(Uint8Array.from(messageArr)));
@@ -227,20 +284,108 @@ class MlsDecryption extends DecryptionAlgorithm {
                 return [epochNum, olmlib.decodeBase64(creatorB64)];
             });
             const commit = processedMessage.as_staged_commit();
-            group.merge_staged_commit(
+            const [newEpochNum, newEpochCreator] = group.merge_staged_commit(
                 commit, epochNumber, epochCreator,
                 sender, resolves,
                 mlsProvider.backend!,
             );
+            // don't wait for it to complete
+            this.crypto.backupManager.backupGroupSession(this.roomId, newEpochNum, olmlib.encodeUnpaddedBase64(newEpochCreator));
             return {
                 clearEvent: {
                     type: "io.element.mls.internal",
-                    content: {"body": "This is an MLS commit message, so there's nothing useful to see here."},
-                }
-            }
+                    content: {"body": "This is an MLS handshake message, so there's nothing useful to see here."},
+                },
+            };
         } else {
             throw new DecryptionError("MLS_UNKNOWN_TYPE", "Unknown MLS message type");
         }
+    }
+
+    public async importRoomKey(key: IMlsSessionData, opts: IImportRoomKeysOpts): Promise<void> {
+        if (key.group_export) {
+            const mlsProvider = this.crypto.mlsProvider;
+            const [epochNumber, epochCreator] = key.epoch;
+            mlsProvider.importGroupData(this.roomId!, epochNumber, epochCreator, key.group_export);
+            this.retryDecryption(epochNumber, epochCreator);
+        }
+    }
+
+    /**
+     * Add an event to the list of those awaiting their session keys.
+     *
+     * @internal
+     *
+     */
+    private addEventToPendingList(
+        event: MatrixEvent,
+        epochNumber: BigInt,
+        epochCreator: string,
+    ): void {
+        if (!this.pendingEvents.has(epochNumber)) {
+            this.pendingEvents.set(epochNumber, new Map<string, Set<MatrixEvent>>());
+        }
+        const epochNumPendingEvents = this.pendingEvents.get(epochNumber)!;
+        if (!epochNumPendingEvents.has(epochCreator)) {
+            epochNumPendingEvents.set(epochCreator, new Set());
+        }
+        epochNumPendingEvents.get(epochCreator)!.add(event);
+    }
+
+    /**
+     * Remove an event from the list of those awaiting their session keys.
+     *
+     * @internal
+     *
+     */
+    private removeEventFromPendingList(
+        event: MatrixEvent,
+        epochNumber: BigInt,
+        epochCreator: string,
+    ): void {
+        const epochNumPendingEvents = this.pendingEvents.get(epochNumber);
+        const pendingEvents = epochNumPendingEvents?.get(epochCreator);
+        if (!pendingEvents) {
+            return;
+        }
+
+        pendingEvents.delete(event);
+        if (pendingEvents.size === 0) {
+            epochNumPendingEvents!.delete(epochCreator);
+        }
+        if (epochNumPendingEvents!.size === 0) {
+            this.pendingEvents.delete(epochNumber);
+        }
+    }
+
+    private async retryDecryption(
+        epochNumber: number,
+        epochCreator: string,
+    ): Promise<boolean> {
+        const pending = this.pendingEvents.get(BigInt(epochNumber))?.get(epochCreator);
+        if (!pending) {
+            return true;
+        }
+
+        const pendingList = [...pending];
+        console.debug(
+            "Retrying decryption on events:",
+            pendingList.map((e) => `${e.getId()}`),
+        );
+
+        await Promise.all(
+            pendingList.map(async (ev) => {
+                try {
+                    await ev.attemptDecryption(this.crypto, { isRetry: true });
+                } catch (e) {
+                    // don't die if something goes wrong
+                }
+            }),
+        );
+
+        // If decrypted successfully with trusted keys, they'll have
+        // been removed from pendingEvents
+        return !this.pendingEvents.get(BigInt(epochNumber))?.has(epochCreator);
     }
 }
 
@@ -312,17 +457,17 @@ export class MlsProvider {
         );
     }
 
-    static keyToString([groupIdArr, epoch, creatorArr]: [number[], number, number[]]): string {
+    static keyToString([groupIdArr, epoch, creatorArr, historical]: [number[], number, number[], boolean]): string {
         let groupId = new Uint8Array(groupIdArr);
         let creator = new Uint8Array(creatorArr);
-        return olmlib.encodeUnpaddedBase64(groupId) + "|" + epoch + "|" + olmlib.encodeUnpaddedBase64(creator);
+        return olmlib.encodeUnpaddedBase64(groupId) + "|" + epoch + "|" + olmlib.encodeUnpaddedBase64(creator) + "|" + historical;
     }
 
-    store(key: [number[], number, number[]], value: number[]): void {
+    store(key: [number[], number, number[], boolean], value: number[]): void {
         this.storage.set(MlsProvider.keyToString(key), value);
     }
 
-    read(key: [number[], number, number[]]): number[] | undefined {
+    read(key: [number[], number, number[], boolean]): number[] | undefined {
         return this.storage.get(MlsProvider.keyToString(key));
     }
 
@@ -361,6 +506,10 @@ export class MlsProvider {
         const group = new matrixDmls.DmlsGroup(this.backend!, this.credential!, textEncoder.encode(room.roomId))
         this.groups.set(room.roomId, group);
 
+        const [epochNum, epochCreator] = group.epoch();
+        // don't wait for it to complete
+        this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+
         const userId = baseApis.getUserId()!;
         const deviceMap = await this.crypto.deviceList.downloadKeys([userId].concat(invite), false);
         delete deviceMap[userId][baseApis.getDeviceId()!];
@@ -387,6 +536,10 @@ export class MlsProvider {
 
         if (addedMembers) {
             const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(this.backend!);
+
+            const [epochNum, epochCreator] = group.epoch();
+            // don't wait for it to complete
+            this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
 
@@ -442,6 +595,8 @@ export class MlsProvider {
 
             await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
                 algorithm: MLS_ALGORITHM.name,
+                ciphertext: "",
+                epoch_creator: senderB64,
                 sender: senderB64,
                 resolves: [],
                 public_group_state: publicGroupStateB64,
@@ -462,9 +617,29 @@ export class MlsProvider {
         const groupId = textDecoder.decode(groupIdArr);
         console.log("[MLS] Welcome message for", groupId);
         // FIXME: check that it's a valid room ID
-        if (this.groups.has(groupId)) {
-            const oldGroup = this.groups.get(groupId)!;
+
+        const [epochNum, epochCreator] = group.epoch();
+        // don't wait for it to complete
+        this.crypto.backupManager.backupGroupSession(groupId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+
+        const oldGroup = this.groups.get(groupId);
+
+        if (oldGroup) {
+            const joined = group.is_joined();
             oldGroup.add_epoch_from_new_group(this.backend!, group, resolves);
+
+            if (!joined) {
+                const members: Map<string, Set<string>> = new Map();
+                for (const member of group.members(this.backend!)) {
+                    const [userId, deviceId] = splitId(member);
+                    if (!members.has(userId)) {
+                        members.set(userId, new Set());
+                    }
+                    members.get(userId)!.add(deviceId);
+                }
+
+                this.members.set(groupId, members);
+            }
         } else {
             this.groups.set(groupId, group);
 
@@ -489,14 +664,24 @@ export class MlsProvider {
             this.credential!,
         );
         const joinMsg = joinResult.message;
-        const group = joinResult.group;
+        let group = joinResult.group;
         const groupIdArr = group.group_id();
         const groupId = textDecoder.decode(groupIdArr);
         if (groupId != roomId) {
             throw "Group ID mismatch";
         }
 
-        this.groups.set(groupId, group);
+        const oldGroup = this.groups.get(groupId);
+        if (oldGroup) {
+            oldGroup.add_epoch_from_new_group(this.backend!, group, []);
+            group = oldGroup;
+        } else {
+            this.groups.set(groupId, group);
+        }
+
+        const [epochNum, epochCreator] = group.epoch();
+        // don't wait for it to complete
+        this.crypto.backupManager.backupGroupSession(roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
 
         const members: Map<string, Set<string>> = new Map();
         for (const member of group.members(this.backend!)) {
@@ -593,6 +778,42 @@ export class MlsProvider {
                 }
             }
         }
+    }
+
+    exportGroupData(roomId: string, epochNumber: number, epochCreator: string): string {
+        const group = this.getGroup(roomId);
+        if (!group) {
+            throw new Error("No such group");
+        }
+        console.info(roomId, epochNumber, BigInt(epochNumber), epochCreator, olmlib.decodeBase64(epochCreator));
+        const groupExport = group.export_group(this.backend!, BigInt(epochNumber), olmlib.decodeBase64(epochCreator));
+        console.info("OK", roomId, epochNumber, BigInt(epochNumber), epochCreator, olmlib.decodeBase64(epochCreator));
+        return olmlib.encodeUnpaddedBase64(Uint8Array.from(groupExport));
+    }
+
+    importGroupData(roomId: string, epochNumber: number, epochCreator: string, groupExport: string): void {
+        console.log("Import group data for", roomId, epochNumber, epochCreator);
+        const groupExportBin = olmlib.decodeBase64(groupExport);
+        console.log("Decoded export");
+        let group = this.getGroup(roomId);
+        if (!group) {
+            console.log("Creating group");
+            const baseApis = this.crypto.baseApis;
+            group = matrixDmls.DmlsGroup.new_dummy_group(
+                this.backend!,
+                textEncoder.encode(roomId),
+                joinId(baseApis.getUserId()!, baseApis.getDeviceId()!),
+            );
+            this.groups.set(roomId, group);
+        }
+        console.log("Importing...");
+        try {
+            group.import_group(this.backend!, BigInt(epochNumber), olmlib.decodeBase64(epochCreator), groupExportBin);
+        } catch(e) {
+            console.error(e);
+            throw e;
+        }
+        console.log("Done");
     }
 }
 

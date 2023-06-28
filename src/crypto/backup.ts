@@ -18,10 +18,11 @@ limitations under the License.
  * Classes for dealing with key backup.
  */
 
-import type { IMegolmSessionData } from "../@types/crypto";
+// import type { IMegolmSessionData } from "../@types/crypto";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
-import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
+import { verifySignature } from "./olmlib";
+import { MLS_ALGORITHM, IMlsSessionData } from "./algorithms/dmls";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
@@ -32,13 +33,11 @@ import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./
 import {
     Curve25519SessionData,
     IAes256AuthData,
-    ICurve25519AuthData,
     IKeyBackupInfo,
     IKeyBackupSession,
 } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
-import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
@@ -93,7 +92,7 @@ interface BackupAlgorithmClass {
 interface BackupAlgorithm {
     untrusted: boolean;
     encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | IEncryptedPayload>;
-    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
+    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMlsSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
     free(): void;
@@ -496,30 +495,34 @@ export class BackupManager {
         this.baseApis.crypto!.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
 
         const rooms: IKeyBackup["rooms"] = {};
+        const mlsProvider = this.baseApis.crypto!.mlsProvider;
         for (const session of sessions) {
-            const roomId = session.sessionData!.room_id;
+            const roomId = session.roomId;
             if (rooms[roomId] === undefined) {
                 rooms[roomId] = { sessions: {} };
             }
 
-            const sessionData = this.baseApis.crypto!.olmDevice.exportInboundGroupSession(
-                session.senderKey,
-                session.sessionId,
-                session.sessionData!,
-            );
-            sessionData.algorithm = MEGOLM_ALGORITHM;
+            const groupExport = mlsProvider.exportGroupData(session.roomId, session.epochNumber, session.epochCreator);
+            const sessionData = {
+                algorithm: MLS_ALGORITHM.name,
+                group_export: groupExport,
+                room_id: roomId,
+                epoch: [session.epochNumber, session.epochCreator],
+            };
 
-            const forwardedCount = (sessionData.forwarding_curve25519_key_chain || []).length;
-
+            /*
             const userId = this.baseApis.crypto!.deviceList.getUserByIdentityKey(MEGOLM_ALGORITHM, session.senderKey);
             const device =
                 this.baseApis.crypto!.deviceList.getDeviceByIdentityKey(MEGOLM_ALGORITHM, session.senderKey) ??
                 undefined;
-            const verified = this.baseApis.crypto!.checkDeviceInfoTrust(userId!, device).isVerified();
+            */
+            const verified = false; //this.baseApis.crypto!.checkDeviceInfoTrust(userId!, device).isVerified();
 
-            rooms[roomId]["sessions"][session.sessionId] = {
-                first_message_index: sessionData.first_known_index,
-                forwarded_count: forwardedCount,
+            const sessionId = session.epochNumber + "|" + session.epochCreator;
+
+            rooms[roomId]["sessions"][sessionId] = {
+                first_message_index: 0,
+                forwarded_count: 0,
                 is_verified: verified,
                 session_data: await this.algorithm!.encryptSession(sessionData),
             };
@@ -534,11 +537,12 @@ export class BackupManager {
         return sessions.length;
     }
 
-    public async backupGroupSession(senderKey: string, sessionId: string): Promise<void> {
+    public async backupGroupSession(roomId: string, epochNumber: number, epochCreator: string): Promise<void> {
         await this.baseApis.crypto!.cryptoStore.markSessionsNeedingBackup([
             {
-                senderKey: senderKey,
-                sessionId: sessionId,
+                roomId,
+                epochNumber,
+                epochCreator,
             },
         ]);
 
@@ -595,6 +599,7 @@ export class BackupManager {
     }
 }
 
+/*
 export class Curve25519 implements BackupAlgorithm {
     public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
 
@@ -656,7 +661,7 @@ export class Curve25519 implements BackupAlgorithm {
 
     public async decryptSessions(
         sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
-    ): Promise<IMegolmSessionData[]> {
+    ): Promise<IMlsSessionData[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -666,7 +671,7 @@ export class Curve25519 implements BackupAlgorithm {
                 throw new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
             }
 
-            const keys: IMegolmSessionData[] = [];
+            const keys: IMlsSessionData[] = [];
 
             for (const [sessionId, sessionData] of Object.entries(sessions)) {
                 try {
@@ -705,6 +710,7 @@ export class Curve25519 implements BackupAlgorithm {
         this.publicKey.free();
     }
 }
+*/
 
 function randomBytes(size: number): Uint8Array {
     const buf = new Uint8Array(size);
@@ -712,6 +718,7 @@ function randomBytes(size: number): Uint8Array {
     return buf;
 }
 
+/*
 const UNSTABLE_MSC3270_NAME = new UnstableValue(
     "m.megolm_backup.v1.aes-hmac-sha2",
     "org.matrix.msc3270.v1.aes-hmac-sha2",
@@ -806,10 +813,106 @@ export class Aes256 implements BackupAlgorithm {
         this.key.fill(0);
     }
 }
+*/
+
+const UNSTABLE_MSC2883_NAME = new UnstableValue(
+    "m.mls_backup.v1.aes-hmac-sha2",
+    "org.matrix.msc2883.v0.aes-hmac-sha2",
+);
+
+export class MlsAes256 implements BackupAlgorithm {
+    public static algorithmName = UNSTABLE_MSC2883_NAME.name;
+
+    public constructor(public readonly authData: IAes256AuthData, private readonly key: Uint8Array) {}
+
+    public static async init(authData: IAes256AuthData, getKey: () => Promise<Uint8Array>): Promise<MlsAes256> {
+        if (!authData) {
+            throw new Error("auth_data missing");
+        }
+        const key = await getKey();
+        if (authData.mac) {
+            const { mac } = await calculateKeyCheck(key, authData.iv);
+            if (authData.mac.replace(/=+$/g, "") !== mac.replace(/=+/g, "")) {
+                throw new Error("Key does not match");
+            }
+        }
+        return new MlsAes256(authData, key);
+    }
+
+    public static async prepare(key?: string | Uint8Array | null): Promise<[Uint8Array, AuthData]> {
+        let outKey: Uint8Array;
+        const authData: Partial<IAes256AuthData> = {};
+        if (!key) {
+            outKey = randomBytes(32);
+        } else if (key instanceof Uint8Array) {
+            outKey = new Uint8Array(key);
+        } else {
+            const derivation = await keyFromPassphrase(key);
+            authData.private_key_salt = derivation.salt;
+            authData.private_key_iterations = derivation.iterations;
+            outKey = derivation.key;
+        }
+
+        const { iv, mac } = await calculateKeyCheck(outKey);
+        authData.iv = iv;
+        authData.mac = mac;
+
+        return [outKey, authData as AuthData];
+    }
+
+    public static checkBackupVersion(info: IKeyBackupInfo): void {
+        if (!("iv" in info.auth_data && "mac" in info.auth_data)) {
+            throw new Error("Invalid backup data returned");
+        }
+    }
+
+    public get untrusted(): boolean {
+        return false;
+    }
+
+    public encryptSession(data: Record<string, any>): Promise<IEncryptedPayload> {
+        const plainText: Record<string, any> = Object.assign({}, data);
+        delete plainText.session_id;
+        delete plainText.room_id;
+        delete plainText.first_known_index;
+        return encryptAES(JSON.stringify(plainText), this.key, data.epoch.join("|"));
+    }
+
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<IEncryptedPayload>>,
+    ): Promise<IMlsSessionData[]> {
+        const keys: IMlsSessionData[] = [];
+
+        for (const [sessionId, sessionData] of Object.entries(sessions)) {
+            try {
+                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
+                const [epochNum, epochCreator] = sessionId.split("|");
+                decrypted.epoch = [parseInt(epochNum), epochCreator];
+                keys.push(decrypted);
+            } catch (e) {
+                logger.log("Failed to decrypt MLS session from backup", e, sessionData);
+            }
+        }
+        return keys;
+    }
+
+    public async keyMatches(key: Uint8Array): Promise<boolean> {
+        if (this.authData.mac) {
+            const { mac } = await calculateKeyCheck(key, this.authData.iv);
+            return this.authData.mac.replace(/=+$/g, "") === mac.replace(/=+/g, "");
+        } else {
+            // if we have no information, we have to assume the key is right
+            return true;
+        }
+    }
+
+    public free(): void {
+        this.key.fill(0);
+    }
+}
 
 export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
-    [Curve25519.algorithmName]: Curve25519,
-    [Aes256.algorithmName]: Aes256,
+    [MlsAes256.algorithmName]: MlsAes256,
 };
 
-export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
+export const DefaultAlgorithm: BackupAlgorithmClass = MlsAes256;

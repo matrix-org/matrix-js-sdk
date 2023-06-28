@@ -399,7 +399,7 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
-        for (const key of Object.keys(this.inboundGroupSessions)) {
+        /* for (const key of Object.keys(this.inboundGroupSessions)) {
             // we can't use split, as the components we are trying to split out
             // might themselves contain '/' characters. We rely on the
             // senderKey being a (32-byte) curve25519 key, base64-encoded
@@ -410,7 +410,7 @@ export class MemoryCryptoStore implements CryptoStore {
                 sessionId: key.slice(44),
                 sessionData: this.inboundGroupSessions[key],
             });
-        }
+        } */
         func(null);
     }
 
@@ -467,7 +467,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
         const sessions: ISession[] = [];
-        for (const session in this.sessionsNeedingBackup) {
+        /* for (const session in this.sessionsNeedingBackup) {
             if (this.inboundGroupSessions[session]) {
                 sessions.push({
                     senderKey: session.slice(0, 43),
@@ -478,7 +478,7 @@ export class MemoryCryptoStore implements CryptoStore {
                     break;
                 }
             }
-        }
+        } */
         return Promise.resolve(sessions);
     }
 
@@ -487,18 +487,18 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
-        for (const session of sessions) {
+        /* for (const session of sessions) {
             const sessionKey = session.senderKey + "/" + session.sessionId;
             delete this.sessionsNeedingBackup[sessionKey];
-        }
+        } */
         return Promise.resolve();
     }
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
-        for (const session of sessions) {
+        /* for (const session of sessions) {
             const sessionKey = session.senderKey + "/" + session.sessionId;
             this.sessionsNeedingBackup[sessionKey] = true;
-        }
+        } */
         return Promise.resolve();
     }
 

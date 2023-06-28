@@ -2757,6 +2757,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         const exportedSessions: IMegolmSessionData[] = [];
+        /*
         await this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
             this.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
                 if (s === null) return;
@@ -2767,6 +2768,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 exportedSessions.push(sess);
             });
         });
+*/
 
         return exportedSessions;
     }
@@ -2777,7 +2779,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param keys - a list of session export objects
      * @returns a promise which resolves once the keys have been imported
      */
-    public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
+    public importRoomKeys(keys: dmls.IMlsSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
         let successes = 0;
         let failures = 0;
         const total = keys.length;
