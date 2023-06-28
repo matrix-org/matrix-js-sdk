@@ -518,7 +518,11 @@ export function controllablePromiseFactory<T, Args extends any[]>(
     const allControls: Map<string, { resolve: (x: T) => void; reject: (reason: any) => void }> = new Map();
     const makePromise = (...args: Args) => {
         return new Promise<T>((resolve, reject) => {
-            allControls.set(keyFromArgs(...args), { resolve, reject });
+            const key = keyFromArgs(...args);
+            if (allControls.has(key)) {
+                throw new Error("Promise already exists for " + key);
+            }
+            allControls.set(key, { resolve, reject });
         });
     };
     return {
@@ -526,6 +530,7 @@ export function controllablePromiseFactory<T, Args extends any[]>(
         getControls: (...args: Args) => {
             return allControls.get(keyFromArgs(...args));
         },
+        clear: () => allControls.clear(),
         get length() {
             return allControls.size;
         },
