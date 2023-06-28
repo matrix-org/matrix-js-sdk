@@ -110,6 +110,28 @@ describe("Thread", () => {
         expect(getRootEventHttp).toHaveBeenCalledTimes(1);
     });
 
+    it("avoids fetching thread root event when cached", async () => {
+        const { room, client, rootEvent, mockFetchRootEventHttp } = createRoomWithEventSituationUsingFetchMock();
+        const getRootEventHttp = mockFetchRootEventHttp(async () => rootEvent);
+
+        const thread = new Thread(rootEvent.getId()!, rootEvent, { room, client });
+        await utils.immediate();
+        expect(getRootEventHttp).toHaveBeenCalledTimes(1);
+        getRootEventHttp.mockReset();
+        expect(getRootEventHttp).toHaveBeenCalledTimes(0);
+
+        // I assure you we are cached
+        jest.spyOn(room, "findEventById").mockImplementation((eventId) => {
+            if (eventId !== rootEvent.getId()!) {
+                throw new Error("unhandled mock case");
+            }
+            return rootEvent;
+        });
+
+        await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
+        expect(getRootEventHttp).toHaveBeenCalledTimes(0);
+    });
+
     describe("hasUserReadEvent", () => {
         let myUserId: string;
         let client: MatrixClient;
