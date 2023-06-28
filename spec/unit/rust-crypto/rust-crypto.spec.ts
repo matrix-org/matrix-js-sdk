@@ -24,6 +24,7 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
+    CryptoEvent,
     HttpApiEvent,
     HttpApiEventHandlerMap,
     IHttpOpts,
@@ -37,7 +38,7 @@ import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 
 afterEach(() => {
@@ -148,6 +149,27 @@ describe("RustCrypto", () => {
 
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
+        });
+
+        it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
+            const toDeviceEvent = {
+                type: "m.key.verification.request",
+                content: {
+                    from_device: "testDeviceId",
+                    methods: ["m.sas.v1"],
+                    transaction_id: "testTxn",
+                    timestamp: Date.now() - 1000,
+                },
+                sender: "@user:id",
+            };
+
+            const onEvent = jest.fn();
+            rustCrypto.on(CryptoEvent.VerificationRequestReceived, onEvent);
+            await rustCrypto.preprocessToDeviceMessages([toDeviceEvent]);
+            expect(onEvent).toHaveBeenCalledTimes(1);
+
+            const [req]: [VerificationRequest] = onEvent.mock.lastCall;
+            expect(req.transactionId).toEqual("testTxn");
         });
     });
 
