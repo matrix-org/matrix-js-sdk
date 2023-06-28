@@ -29,6 +29,7 @@ import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
+import sharePendingResults from "../share-pending-results";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -144,20 +145,23 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.setEventMetadata(this.rootEvent);
     }
 
-    private async fetchRootEvent(): Promise<void> {
-        this.rootEvent = this.room.findEventById(this.id);
-        if (this.rootEvent == null) {
-            // If the rootEvent does not exist in the local stores, then fetch it from the server.
-            try {
-                const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
-                const mapper = this.client.getEventMapper();
-                this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
-            } catch (e) {
-                logger.error("Failed to fetch thread root to construct thread with", e);
+    private fetchRootEvent = sharePendingResults(
+        async (): Promise<void> => {
+            this.rootEvent = this.room.findEventById(this.id);
+            if (this.rootEvent == null) {
+                // If the rootEvent does not exist in the local stores, then fetch it from the server.
+                try {
+                    const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
+                    const mapper = this.client.getEventMapper();
+                    this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
+                } catch (e) {
+                    logger.error("Failed to fetch thread root to construct thread with", e);
+                }
             }
-        }
-        await this.processEvent(this.rootEvent);
-    }
+            await this.processEvent(this.rootEvent);
+        },
+        () => "",
+    );
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
@@ -389,22 +393,25 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    private async processRootEvent(): Promise<void> {
-        const bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport && bundledRelationship) {
-            this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
+    private processRootEvent = sharePendingResults(
+        async (): Promise<void> => {
+            const bundledRelationship = this.getRootEventBundledRelationship();
+            if (Thread.hasServerSideSupport && bundledRelationship) {
+                this.replyCount = bundledRelationship.count;
+                this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
-            const mapper = this.client.getEventMapper();
-            // re-insert roomId
-            this.lastEvent = mapper({
-                ...bundledRelationship.latest_event,
-                room_id: this.roomId,
-            });
-            this.updatePendingReplyCount();
-            await this.processEvent(this.lastEvent);
-        }
-    }
+                const mapper = this.client.getEventMapper();
+                // re-insert roomId
+                this.lastEvent = mapper({
+                    ...bundledRelationship.latest_event,
+                    room_id: this.roomId,
+                });
+                this.updatePendingReplyCount();
+                await this.processEvent(this.lastEvent);
+            }
+        },
+        () => "",
+    );
 
     private updatePendingReplyCount(): void {
         const unfilteredPendingEvents =
