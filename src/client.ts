@@ -9097,6 +9097,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param msisdnToken - The MSISDN token, as enetered by the user.
      * @param identityAccessToken - The `access_token` field of the Identity
      * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     * Some legacy identity servers had no authentication here.
      *
      * @returns Promise which resolves: Object, containing success boolean.
      * @returns Rejects: with an error response.
@@ -9106,7 +9107,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         sid: string,
         clientSecret: string,
         msisdnToken: string,
-        identityAccessToken: string,
+        identityAccessToken: string | null,
     ): Promise<{ success: boolean }> {
         const params = {
             sid: sid,
@@ -9119,7 +9120,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "/validate/msisdn/submitToken",
             params,
             IdentityPrefix.V2,
-            identityAccessToken,
+            identityAccessToken ?? undefined,
         );
     }
 
