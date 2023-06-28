@@ -92,30 +92,11 @@ describe("Thread", () => {
     });
 
     it("avoids fetching thread root event on addEvent in parallel", async () => {
-        const promiseFactory = controllablePromiseFactory();
-        Thread.hasServerSideSupport = FeatureSupport.Stable;
+        const promiseFactory = controllablePromiseFactory<MatrixEvent, [roomId: string, eventId: string]>();
+        const { room, client, rootEvent, mockFetchRootEventHttp } = createRoomWithEventSituationUsingFetchMock();
 
-        const sender = "@bob:example.org";
-        const client = new MatrixClient({ baseUrl: "http://example.org" });
-        const room = new Room("threadRoom", client, sender);
-        jest.spyOn(client.store, "getRoom").mockReturnValue(room);
-        const rootEvent = mkMessage({
-            user: sender,
-            event: true,
-        });
-
-        const getRootEventHttp = fetchMock.get(
-            client.http
-                .getUrl(
-                    utils.encodeUri("/rooms/$roomId/event/$eventId", {
-                        $roomId: room.roomId,
-                        $eventId: rootEvent.getId()!,
-                    }),
-                    undefined,
-                    ClientPrefix.R0,
-                )
-                .toString(),
-            () => promiseFactory.makePromise(room.roomId, rootEvent.getId()!),
+        const getRootEventHttp = mockFetchRootEventHttp(() =>
+            promiseFactory.makePromise(room.roomId, rootEvent.getId()!),
         );
 
         // First, ensure that we share fetches to root event between
@@ -129,7 +110,7 @@ describe("Thread", () => {
 
         await thread.addEvent(
             mkMessage({
-                user: sender,
+                user: rootEvent.getSender()!,
                 event: true,
             }),
             false,
@@ -143,28 +124,10 @@ describe("Thread", () => {
         // Next, check that a string of `addEvent`s share root event fetch
         // (happens when many replies come in at once):
 
-        await thread.addEvent(
-            mkMessage({
-                user: sender,
-                event: true,
-            }),
-            false,
-        );
+        await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
         expect(getRootEventHttp).toHaveBeenCalledTimes(1);
-        await thread.addEvent(
-            mkMessage({
-                user: sender,
-                event: true,
-            }),
-            false,
-        );
-        await thread.addEvent(
-            mkMessage({
-                user: sender,
-                event: true,
-            }),
-            false,
-        );
+        await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
+        await thread.addEvent(mkMessage({ user: rootEvent.getSender()!, event: true }), false);
         expect(getRootEventHttp).toHaveBeenCalledTimes(1);
     });
 
@@ -815,4 +778,37 @@ function createClient(canSupport = new Map()): MatrixClient {
     jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
 
     return client;
+}
+
+function createRoomWithEventSituationUsingFetchMock() {
+    Thread.hasServerSideSupport = FeatureSupport.Stable;
+
+    const sender = "@bob:example.org";
+    const client = new MatrixClient({ baseUrl: "http://example.org" });
+    const room = new Room("threadRoom", client, sender);
+    jest.spyOn(client.store, "getRoom").mockReturnValue(room);
+    const rootEvent = mkMessage({
+        user: sender,
+        event: true,
+    });
+
+    return {
+        client,
+        room,
+        rootEvent,
+        mockFetchRootEventHttp: (mockImpl: () => Promise<MatrixEvent>) =>
+            fetchMock.get(
+                client.http
+                    .getUrl(
+                        utils.encodeUri("/rooms/$roomId/event/$eventId", {
+                            $roomId: room.roomId,
+                            $eventId: rootEvent.getId()!,
+                        }),
+                        undefined,
+                        ClientPrefix.R0,
+                    )
+                    .toString(),
+                mockImpl,
+            ),
+    };
 }
