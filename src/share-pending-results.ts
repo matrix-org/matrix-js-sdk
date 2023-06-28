@@ -3,8 +3,7 @@
  *
  * @param performAsyncTask - The async function to wrap.
  * @param keyFromArgs - A function that returns a cache key derived from the
- * arguments to the async function. These keys can be any type, but note that
- * they are compared using `SameValueZero`: recommended to use string keys.
+ * arguments to the async function.
  *
  * @example
  * ```ts
@@ -13,24 +12,15 @@
  *   (...args) => args.join(","),
  * );
  *
- * // assuming the "get profile" async call takes some time
- * const profilePromise = getProfile("foo", true);
- *
- * // Same args return the same promise
- * assert(profilePromise === getProfile("foo", true));
- *
- * // Different args return different promises
- * assert(profilePromise !== getProfile("foo", false));
- *
- * // On any promise completion, a new call will return a new promise
- * assert(profilePromise !== getProfile("foo", false));
+ * // Now `getProfile` will only run one request at a time for each combination
+ * // of arguments.
  * ```
  */
-export function sharePendingResults<Args extends any[], Output extends Promise<any>, Key>(
+export function sharePendingResults<Args extends any[], Output extends Promise<any>>(
     performAsyncTask: (...args: Args) => Output,
-    keyFromArgs: (...args: Args) => Key,
+    keyFromArgs: (...args: Args) => string = (...args): string => args.join(","),
 ): (...args: Args) => Output {
-    const ongoing: Map<Key, Output> = new Map();
+    const ongoing: Map<string, Output> = new Map();
     return (...args: Args): Output => {
         const key = keyFromArgs(...args);
         const existing = ongoing.get(key);
