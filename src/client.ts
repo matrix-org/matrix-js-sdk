@@ -209,6 +209,7 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
+import sharePendingResults from "./share-pending-results";
 
 export type Store = IStore;
 
@@ -8089,13 +8090,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to an object containing the event.
      * @returns Rejects: with an error response.
      */
-    public fetchRoomEvent(roomId: string, eventId: string): Promise<Partial<IEvent>> {
-        const path = utils.encodeUri("/rooms/$roomId/event/$eventId", {
-            $roomId: roomId,
-            $eventId: eventId,
-        });
-        return this.http.authedRequest(Method.Get, path);
-    }
+    public fetchRoomEvent = sharePendingResults(
+        (roomId: string, eventId: string): Promise<Partial<IEvent>> => {
+            const path = utils.encodeUri("/rooms/$roomId/event/$eventId", {
+                $roomId: roomId,
+                $eventId: eventId,
+            });
+            return this.http.authedRequest(Method.Get, path);
+        },
+        (roomId: string, eventId: string) => [roomId, eventId].join("/"),
+    );
 
     /**
      * @param includeMembership - the membership type to include in the response
