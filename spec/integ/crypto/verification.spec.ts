@@ -541,12 +541,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     });
 
     describe("Incoming verification from another device", () => {
-        beforeEach(() => {
+        beforeEach(async () => {
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+
+            aliceClient = await startTestClient();
+            await waitForDeviceList();
         });
 
-        oldBackendOnly("Incoming verification: can accept", async () => {
-            aliceClient = await startTestClient();
+        it("Incoming verification: can accept", async () => {
             const TRANSACTION_ID = "abcd";
 
             // Initiate the request by sending a to-device message

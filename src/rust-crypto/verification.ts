@@ -38,6 +38,9 @@ export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
     implements VerificationRequest
 {
+    /** Are we in the process of sending an `m.key.verification.ready` event? */
+    private _accepting = false;
+
     private _verifier: Verifier | undefined;
 
     /**
@@ -121,7 +124,9 @@ export class RustVerificationRequest
             case RustSdkCryptoJs.VerificationRequestPhase.Requested:
                 return VerificationPhase.Requested;
             case RustSdkCryptoJs.VerificationRequestPhase.Ready:
-                return VerificationPhase.Ready;
+                // if we're still sending the `m.key.verification.ready`, that counts as "Requested" in the js-sdk's
+                // parlance.
+                return this._accepting ? VerificationPhase.Requested : VerificationPhase.Ready;
             case RustSdkCryptoJs.VerificationRequestPhase.Transitioned:
                 return VerificationPhase.Started;
             case RustSdkCryptoJs.VerificationRequestPhase.Done:
@@ -145,7 +150,7 @@ export class RustVerificationRequest
      * the remote echo which causes a transition to {@link VerificationPhase.Ready}.
      */
     public get accepting(): boolean {
-        throw new Error("not implemented");
+        return this._accepting;
     }
 
     /**
@@ -206,8 +211,28 @@ export class RustVerificationRequest
      *
      * @returns Promise which resolves when the event has been sent.
      */
-    public accept(): Promise<void> {
-        throw new Error("not implemented");
+    public async accept(): Promise<void> {
+        if (this.inner.phase() != RustSdkCryptoJs.VerificationRequestPhase.Requested || this._accepting) {
+            throw new Error(`Cannot accept a verification request in phase ${this.phase}`);
+        }
+
+        this._accepting = true;
+        try {
+            const req: undefined | OutgoingRequest =
+                this.supportedVerificationMethods === undefined
+                    ? this.inner.accept()
+                    : this.inner.acceptWithMethods(
+                          this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                      );
+            if (req) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            }
+        } finally {
+            this._accepting = false;
+        }
+
+        // phase may have changed, so emit a 'change' event
+        this.emit(VerificationRequestEvent.Change);
     }
 
     /**
