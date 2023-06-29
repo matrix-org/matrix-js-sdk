@@ -3,7 +3,7 @@
     "version": "26.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
-        "node": ">=16.0.0"
+        "node": ">=18.0.0"
     },
     "scripts": {
         "prepublishOnly": "yarn build",
