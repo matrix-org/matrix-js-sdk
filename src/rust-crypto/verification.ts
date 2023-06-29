@@ -145,7 +145,9 @@ export class RustVerificationRequest
      * (ie it is in phase `Requested`, `Ready` or `Started`).
      */
     public get pending(): boolean {
-        throw new Error("not implemented");
+        if (this.inner.isPassive()) return false;
+        const phase = this.phase;
+        return phase !== VerificationPhase.Done && phase !== VerificationPhase.Cancelled;
     }
 
     /**
