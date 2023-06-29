@@ -50,21 +50,7 @@ import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 // to ensure that we don't end up with dangling timeouts.
 jest.useFakeTimers();
 
-let previousCrypto: Crypto | undefined;
-
 beforeAll(async () => {
-    // Stub out global.crypto
-    previousCrypto = global["crypto"];
-
-    Object.defineProperty(global, "crypto", {
-        value: {
-            getRandomValues: function <T extends Uint8Array>(array: T): T {
-                array.fill(0x12);
-                return array;
-            },
-        },
-    });
-
     // we use the libolm primitives in the test, so init the Olm library
     await global.Olm.init();
 });
@@ -80,18 +66,6 @@ afterEach(() => {
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
-});
-
-// restore the original global.crypto
-afterAll(() => {
-    if (previousCrypto === undefined) {
-        // @ts-ignore deleting a non-optional property. It *is* optional really.
-        delete global.crypto;
-    } else {
-        Object.defineProperty(global, "crypto", {
-            value: previousCrypto,
-        });
-    }
 });
 
 /** The homeserver url that we give to the test client, and where we intercept /sync, /keys, etc requests. */
