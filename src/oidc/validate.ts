@@ -85,7 +85,7 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
 };
 
 /**
- * Validates issue `.well-known/openid-configuration`
+ * Validates issuer `.well-known/openid-configuration`
  * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
  * validates that OP is compatible with Element's OIDC flow
  * @param wellKnown - json object
@@ -169,19 +169,28 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
         if (claims.iss !== issuer) {
             throw new Error("Invalid issuer");
         }
-        // The Client MUST validate that the aud (audience) Claim contains its client_id value registered at the Issuer identified by the iss (issuer) Claim as an audience. The aud (audience) Claim MAY contain an array with more than one element. The ID Token MUST be rejected if the ID Token does not list the Client as a valid audience, or if it contains additional audiences not trusted by the Client.
-        // Don't accept tokens with other untrusted audiences
+        /**
+         * The Client MUST validate that the aud (audience) Claim contains its client_id value registered at the Issuer identified by the iss (issuer) Claim as an audience.
+         * The aud (audience) Claim MAY contain an array with more than one element.
+         * The ID Token MUST be rejected if the ID Token does not list the Client as a valid audience, or if it contains additional audiences not trusted by the Client.
+         * EW: Don't accept tokens with other untrusted audiences
+         * */
         if (claims.aud !== clientId) {
             throw new Error("Invalid audience");
         }
 
-        // If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked to verify that it is the same value as the one that was sent in the Authentication Request. The Client SHOULD check the nonce value for replay attacks. The precise method for detecting replay attacks is Client specific.
+        /**
+         * If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked
+         * to verify that it is the same value as the one that was sent in the Authentication Request.
+         */
         if (claims.nonce !== nonce) {
             throw new Error("Invalid nonce");
         }
 
-        // The current time MUST be before the time represented by the exp Claim.
-        // exp is an epoch timestamp in seconds
+        /**
+         * The current time MUST be before the time represented by the exp Claim.
+         *  exp is an epoch timestamp in seconds
+         * */
         if (!claims.exp || Date.now() > claims.exp * 1000) {
             throw new Error("Invalid expiry");
         }
