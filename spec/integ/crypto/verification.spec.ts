@@ -16,9 +16,11 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
+import anotherjson from "another-json";
 import { MockResponse } from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
+import { createHash } from "crypto";
 
 import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
 import {
@@ -209,13 +211,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
             const olmSAS = new global.Olm.SAS();
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.key",
-                content: {
-                    transaction_id: transactionId,
-                    key: olmSAS.get_pubkey(),
-                },
-            });
+            returnToDeviceMessageFromSync(buildSasKeyMessage(transactionId, olmSAS.get_pubkey()));
 
             // alice responds with a 'key' ...
             requestBody = await expectSendToDeviceMessage("m.key.verification.key");
@@ -239,32 +235,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
 
             // the dummy device also confirms that the emoji match, and sends a mac
-            const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${TEST_USER_ID}${aliceClient.deviceId}${transactionId}`;
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.mac",
-                content: {
-                    keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
-                    transaction_id: transactionId,
-                    mac: {
-                        [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
-                            olmSAS,
-                            TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
-                            `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
-                        ),
-                    },
-                },
-            });
+            returnToDeviceMessageFromSync(
+                buildSasMacMessage(transactionId, olmSAS, TEST_USER_ID, aliceClient.deviceId!),
+            );
 
             // that should satisfy Alice, who should reply with a 'done'
             await expectSendToDeviceMessage("m.key.verification.done");
 
             // the dummy device also confirms done-ness
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.done",
-                content: {
-                    transaction_id: transactionId,
-                },
-            });
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
 
             // ... and the whole thing should be done!
             await verificationPromise;
@@ -272,6 +251,102 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // at this point, cancelling should do nothing.
             await request.cancel();
+            expect(request.phase).toEqual(VerificationPhase.Done);
+
+            // we're done with the temporary keypair
+            olmSAS.free();
+        });
+
+        it("can initiate SAS verification ourselves", async () => {
+            aliceClient = await startTestClient();
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // And now Alice starts a SAS verification
+            let sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            await request.startVerification("m.sas.v1");
+            let requestBody = await sendToDevicePromise;
+
+            let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage).toEqual({
+                from_device: aliceClient.deviceId,
+                method: "m.sas.v1",
+                transaction_id: transactionId,
+                hashes: ["sha256"],
+                key_agreement_protocols: expect.arrayContaining(["curve25519-hkdf-sha256"]),
+                message_authentication_codes: expect.arrayContaining(["hkdf-hmac-sha256.v2"]),
+                short_authentication_string: ["decimal", "emoji"],
+            });
+
+            expect(request.chosenMethod).toEqual("m.sas.v1");
+
+            // There should now be a `verifier`
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(verifier.getShowSasCallbacks()).toBeNull();
+            const verificationPromise = verifier.verify();
+
+            // The dummy device makes up a curve25519 keypair and uses the hash in an 'm.key.verification.accept'
+            // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
+            const olmSAS = new global.Olm.SAS();
+            const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(toDeviceMessage);
+
+            sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.key");
+            returnToDeviceMessageFromSync(buildSasAcceptMessage(transactionId, commitmentStr));
+
+            // alice responds with a 'key' ...
+            requestBody = await sendToDevicePromise;
+
+            toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+            const aliceDevicePubKeyBase64 = toDeviceMessage.key;
+            olmSAS.set_their_key(aliceDevicePubKeyBase64);
+
+            // ... and the dummy device also sends a 'key'
+            returnToDeviceMessageFromSync(buildSasKeyMessage(transactionId, olmSAS.get_pubkey()));
+
+            // ... and the client is notified to show the emoji
+            const showSas = await new Promise<ShowSasCallbacks>((resolve) => {
+                verifier.once(VerifierEvent.ShowSas, resolve);
+            });
+
+            // `getShowSasCallbacks` is an alternative way to get the callbacks
+            expect(verifier.getShowSasCallbacks()).toBe(showSas);
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
+
+            // user confirms that the emoji match, and alice sends a 'mac'
+            [requestBody] = await Promise.all([expectSendToDeviceMessage("m.key.verification.mac"), showSas.confirm()]);
+            toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage.transaction_id).toEqual(transactionId);
+
+            // the dummy device also confirms that the emoji match, and sends a mac
+            returnToDeviceMessageFromSync(
+                buildSasMacMessage(transactionId, olmSAS, TEST_USER_ID, aliceClient.deviceId!),
+            );
+
+            // that should satisfy Alice, who should reply with a 'done'
+            await expectSendToDeviceMessage("m.key.verification.done");
+
+            // the dummy device also confirms done-ness
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
 
             // we're done with the temporary keypair
@@ -584,6 +659,11 @@ function calculateMAC(olmSAS: Olm.SAS, input: string, info: string): string {
     return mac;
 }
 
+/** Calculate the sha256 hash of a string, encoding as unpadded base64 */
+function sha256(commitmentStr: string): string {
+    return encodeUnpaddedBase64(createHash("sha256").update(commitmentStr, "utf8").digest());
+}
+
 function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
 }
@@ -613,6 +693,67 @@ function buildSasStartMessage(transactionId: string): { type: string; content: o
             message_authentication_codes: ["hkdf-hmac-sha256.v2"],
             // we have to include "decimal" per the spec.
             short_authentication_string: ["decimal", "emoji"],
+        },
+    };
+}
+
+/** build an m.key.verification.accept to-device message suitable for the SAS flow */
+function buildSasAcceptMessage(transactionId: string, commitmentStr: string) {
+    return {
+        type: "m.key.verification.accept",
+        content: {
+            transaction_id: transactionId,
+            commitment: sha256(commitmentStr),
+            hash: "sha256",
+            key_agreement_protocol: "curve25519-hkdf-sha256",
+            short_authentication_string: ["decimal", "emoji"],
+            message_authentication_code: "hkdf-hmac-sha256.v2",
+        },
+    };
+}
+
+/** build an m.key.verification.key to-device message suitable for the SAS flow */
+function buildSasKeyMessage(transactionId: string, key: string): { type: string; content: object } {
+    return {
+        type: "m.key.verification.key",
+        content: {
+            transaction_id: transactionId,
+            key: key,
+        },
+    };
+}
+
+/** build an m.key.verification.mac to-device message suitable for the SAS flow, originating from the dummy device */
+function buildSasMacMessage(
+    transactionId: string,
+    olmSAS: Olm.SAS,
+    recipientUserId: string,
+    recipientDeviceId: string,
+): { type: string; content: object } {
+    const macInfoBase = `MATRIX_KEY_VERIFICATION_MAC${TEST_USER_ID}${TEST_DEVICE_ID}${recipientUserId}${recipientDeviceId}${transactionId}`;
+
+    return {
+        type: "m.key.verification.mac",
+        content: {
+            keys: calculateMAC(olmSAS, `ed25519:${TEST_DEVICE_ID}`, `${macInfoBase}KEY_IDS`),
+            transaction_id: transactionId,
+            mac: {
+                [`ed25519:${TEST_DEVICE_ID}`]: calculateMAC(
+                    olmSAS,
+                    TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+                    `${macInfoBase}ed25519:${TEST_DEVICE_ID}`,
+                ),
+            },
+        },
+    };
+}
+
+/** build an m.key.verification.done to-device message */
+function buildDoneMessage(transactionId: string) {
+    return {
+        type: "m.key.verification.done",
+        content: {
+            transaction_id: transactionId,
         },
     };
 }
