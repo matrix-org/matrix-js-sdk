@@ -120,38 +120,24 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 };
 
 /**
- * Standard ID Token claims.
- *
- * @public
- * @see https://openid.net/specs/openid-connect-core-1_0.html#IDToken
- */
-export interface IdTokenClaims extends JwtClaims {
-    /** String value used to associate a Client session with an ID Token, and to mitigate replay attacks. The value is passed through unmodified from the Authentication Request to the ID Token. If present in the ID Token, Clients MUST verify that the nonce Claim Value is equal to the value of the nonce parameter sent in the Authentication Request. If present in the Authentication Request, Authorization Servers MUST include a nonce Claim in the ID Token with the Claim Value being the nonce value sent in the Authentication Request. Authorization Servers SHOULD perform no other processing on nonce values used. The nonce value is a case sensitive string. */
-    nonce?: string;
-}
-
-/**
  * Standard JWT claims.
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7519#section-4.1
  */
-export interface JwtClaims {
+interface JwtClaims {
     [claim: string]: unknown;
-
-    /** The "iss" (issuer) claim identifies the principal that issued the JWT. The processing of this claim is generally application specific. The "iss" value is a case-sensitive string containing a StringOrURI value. */
+    /** The "iss" (issuer) claim identifies the principal that issued the JWT. */
     iss?: string;
-    /** The "sub" (subject) claim identifies the principal that is the subject of the JWT. The claims in a JWT are normally statements about the subject. The subject value MUST either be scoped to be locally unique in the context of the issuer or be globally unique. The processing of this claim is generally application specific. The "sub" value is a case-sensitive string containing a StringOrURI value. */
+    /** The "sub" (subject) claim identifies the principal that is the subject of the JWT. */
     sub?: string;
-    /** The "aud" (audience) claim identifies the recipients that the JWT is intended for. Each principal intended to process the JWT MUST identify itself with a value in the audience claim. If the principal processing the claim does not identify itself with a value in the "aud" claim when this claim is present, then the JWT MUST be rejected. In the general case, the "aud" value is an array of case-sensitive strings, each containing a StringOrURI value. In the special case when the JWT has one audience, the "aud" value MAY be a single case-sensitive string containing a StringOrURI value. The interpretation of audience values is generally application specific. */
+    /** The "aud" (audience) claim identifies the recipients that the JWT is intended for. */
     aud?: string | string[];
-    /** The "exp" (expiration time) claim identifies the expiration time on or after which the JWT MUST NOT be accepted for processing. The processing of the "exp" claim requires that the current date/time MUST be before the expiration date/time listed in the "exp" claim. Implementers MAY provide for some small leeway, usually no more than a few minutes, to account for clock skew. Its value MUST be a number containing a NumericDate value. */
+    /** The "exp" (expiration time) claim identifies the expiration time on or after which the JWT MUST NOT be accepted for processing. */
     exp?: number;
-    /** The "nbf" (not before) claim identifies the time before which the JWT MUST NOT be accepted for processing. The processing of the "nbf" claim requires that the current date/time MUST be after or equal to the not-before date/time listed in the "nbf" claim. Implementers MAY provide for some small leeway, usually no more than a few minutes, to account for clock skew. Its value MUST be a number containing a NumericDate value. */
-    nbf?: number;
-    /** The "iat" (issued at) claim identifies the time at which the JWT was issued. This claim can be used to determine the age of the JWT. Its value MUST be a number containing a NumericDate value. */
-    iat?: number;
-    /** The "jti" (JWT ID) claim provides a unique identifier for the JWT. The identifier value MUST be assigned in a manner that ensures that there is a negligible probability that the same value will be accidentally assigned to a different data object; if the application uses multiple issuers, collisions MUST be prevented among values produced by different issuers as well. The "jti" claim can be used to prevent the JWT from being replayed. The "jti" value is a case-sensitive string. */
-    jti?: string;
+    // unused claims excluded
+}
+interface IdTokenClaims extends JwtClaims {
+    nonce?: string;
 }
 
 const decodeIdToken = (token: string): IdTokenClaims => {
@@ -164,6 +150,7 @@ const decodeIdToken = (token: string): IdTokenClaims => {
 };
 
 /**
+ * Validate idToken
  * https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
  * @param idToken - id token from token endpoint
  * @param issuer - issuer for the OP as found during discovery
