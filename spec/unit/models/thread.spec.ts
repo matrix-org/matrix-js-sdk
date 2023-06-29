@@ -22,14 +22,7 @@ import { Room, RoomEvent } from "../../../src/models/room";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, FeatureSupport } from "../../../src/models/thread";
 import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
-import {
-    controllablePromiseFactory,
-    emitPromise,
-    mkEdit,
-    mkMessage,
-    mkReaction,
-    mock,
-} from "../../test-utils/test-utils";
+import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
@@ -92,12 +85,9 @@ describe("Thread", () => {
     });
 
     it("avoids fetching thread root event on addEvent in parallel", async () => {
-        const promiseFactory = controllablePromiseFactory<MatrixEvent, [roomId: string, eventId: string]>();
         const { room, client, rootEvent, mockFetchRootEventHttp } = createRoomWithEventSituationUsingFetchMock();
 
-        const getRootEventHttp = mockFetchRootEventHttp(() =>
-            promiseFactory.makePromise(room.roomId, rootEvent.getId()!),
-        );
+        const getRootEventHttp = mockFetchRootEventHttp(() => new Promise(() => {}));
 
         const thread = new Thread(rootEvent.getId()!, rootEvent, { room, client });
         // Thread constructor has non-awaited async code, so we need to wait for it to finish
