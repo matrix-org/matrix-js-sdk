@@ -42,7 +42,7 @@ import {
     GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet, sharePendingResults } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -209,7 +209,6 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
-import sharePendingResults from "./share-pending-results";
 
 export type Store = IStore;
 

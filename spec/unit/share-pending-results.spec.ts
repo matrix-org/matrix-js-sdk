@@ -1,5 +1,4 @@
-import { sharePendingResults } from "../../src/share-pending-results";
-import { defer, IDeferred } from "../../src/utils";
+import { defer, IDeferred, sharePendingResults } from "../../src/utils";
 
 describe("sharePendingResults", () => {
     it("returns the same promise for the same arguments while pending", () => {

@@ -29,7 +29,7 @@ import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
-import sharePendingResults from "../share-pending-results";
+import { sharePendingResults } from "../utils";
 
 export enum ThreadEvent {
     New = "Thread.new",
