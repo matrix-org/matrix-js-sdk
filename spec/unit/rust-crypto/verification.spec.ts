@@ -50,6 +50,15 @@ describe("VerificationRequest", () => {
         });
     });
 
+    describe("timeout", () => {
+        it("passes through the result", () => {
+            const mockedInner = makeMockedInner();
+            const request = makeTestRequest(mockedInner);
+            mockedInner.timeRemainingMillis.mockReturnValue(10_000);
+            expect(request.timeout).toEqual(10_000);
+        });
+    });
+
     describe("startVerification", () => {
         let request: RustVerificationRequest;
 
@@ -88,5 +97,6 @@ function makeMockedInner(): Mocked<RustSdkCryptoJs.VerificationRequest> {
         startSas: jest.fn(),
         phase: jest.fn().mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Created),
         isPassive: jest.fn().mockReturnValue(false),
+        timeRemainingMillis: jest.fn(),
     } as unknown as Mocked<RustSdkCryptoJs.VerificationRequest>;
 }

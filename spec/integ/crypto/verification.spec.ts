@@ -154,6 +154,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.pending).toBe(true);
+            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
+            expect(request.timeout).toEqual(600_000);
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {

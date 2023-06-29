@@ -172,7 +172,7 @@ export class RustVerificationRequest
      * `null` indicates that there is no timeout
      */
     public get timeout(): number | null {
-        throw new Error("not implemented");
+        return this.inner.timeRemainingMillis();
     }
 
     /** once the phase is Started (and !initiatedByMe) or Ready: common methods supported by both sides */
