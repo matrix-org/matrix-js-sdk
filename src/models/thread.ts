@@ -145,19 +145,16 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.setEventMetadata(this.rootEvent);
     }
 
-    private fetchRootEvent = sharePendingResults(
-        async (): Promise<void> => {
-            this.rootEvent = this.room.findEventById(this.id);
-            if (this.rootEvent == null) {
-                // If the rootEvent does not exist in the local stores, then fetch it from the server.
-                const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
-                const mapper = this.client.getEventMapper();
-                this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
-            }
-            await this.processEvent(this.rootEvent);
-        },
-        () => "",
-    );
+    private fetchRootEvent = sharePendingResults(async (): Promise<void> => {
+        this.rootEvent = this.room.findEventById(this.id);
+        if (this.rootEvent == null) {
+            // If the rootEvent does not exist in the local stores, then fetch it from the server.
+            const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
+            const mapper = this.client.getEventMapper();
+            this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
+        }
+        await this.processEvent(this.rootEvent);
+    });
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
@@ -389,25 +386,22 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    private processRootEvent = sharePendingResults(
-        async (): Promise<void> => {
-            const bundledRelationship = this.getRootEventBundledRelationship();
-            if (Thread.hasServerSideSupport && bundledRelationship) {
-                this.replyCount = bundledRelationship.count;
-                this._currentUserParticipated = !!bundledRelationship.current_user_participated;
+    private processRootEvent = sharePendingResults(async (): Promise<void> => {
+        const bundledRelationship = this.getRootEventBundledRelationship();
+        if (Thread.hasServerSideSupport && bundledRelationship) {
+            this.replyCount = bundledRelationship.count;
+            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
-                const mapper = this.client.getEventMapper();
-                // re-insert roomId
-                this.lastEvent = mapper({
-                    ...bundledRelationship.latest_event,
-                    room_id: this.roomId,
-                });
-                this.updatePendingReplyCount();
-                await this.processEvent(this.lastEvent);
-            }
-        },
-        () => "",
-    );
+            const mapper = this.client.getEventMapper();
+            // re-insert roomId
+            this.lastEvent = mapper({
+                ...bundledRelationship.latest_event,
+                room_id: this.roomId,
+            });
+            this.updatePendingReplyCount();
+            await this.processEvent(this.lastEvent);
+        }
+    });
 
     private updatePendingReplyCount(): void {
         const unfilteredPendingEvents =

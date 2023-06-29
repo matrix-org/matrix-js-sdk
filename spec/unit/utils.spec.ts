@@ -771,14 +771,11 @@ describe("utils", function () {
             const cachedDeferreds: Record<string, IDeferred<any>> = {};
             const keyFromArgs = (...args: any[]) => args.join(",");
 
-            const getProfile = sharePendingResults(
-                (userId: string, includeAvatar: boolean) => {
-                    const deferred = defer();
-                    cachedDeferreds[keyFromArgs(userId, includeAvatar)] = deferred;
-                    return deferred.promise;
-                },
-                (...args) => args.join(","),
-            );
+            const getProfile = sharePendingResults((userId: string, includeAvatar: boolean) => {
+                const deferred = defer();
+                cachedDeferreds[keyFromArgs(userId, includeAvatar)] = deferred;
+                return deferred.promise;
+            });
 
             // assuming the "get profile" async call takes some time
             const profilePromise = getProfile("foo", true);
@@ -804,14 +801,11 @@ describe("utils", function () {
             const cachedDeferreds: Record<string, IDeferred<any>> = {};
             const keyFromArgs = (...args: any[]) => args.join(",");
 
-            const getProfile = sharePendingResults(
-                (userId: string, includeAvatar: boolean) => {
-                    const deferred = defer();
-                    cachedDeferreds[keyFromArgs(userId, includeAvatar)] = deferred;
-                    return deferred.promise;
-                },
-                (...args) => args.join(","),
-            );
+            const getProfile = sharePendingResults((userId: string, includeAvatar: boolean) => {
+                const deferred = defer();
+                cachedDeferreds[keyFromArgs(userId, includeAvatar)] = deferred;
+                return deferred.promise;
+            });
 
             // assuming the "get profile" async call takes some time
             const profilePromise = getProfile("foo", true);
