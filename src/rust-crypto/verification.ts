@@ -215,7 +215,7 @@ export class RustVerificationRequest
      * @returns Promise which resolves when the event has been sent.
      */
     public async accept(): Promise<void> {
-        if (this.inner.phase() != RustSdkCryptoJs.VerificationRequestPhase.Requested || this._accepting) {
+        if (this.inner.phase() !== RustSdkCryptoJs.VerificationRequestPhase.Requested || this._accepting) {
             throw new Error(`Cannot accept a verification request in phase ${this.phase}`);
         }
 
