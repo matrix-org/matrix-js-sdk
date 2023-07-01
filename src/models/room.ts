@@ -2256,6 +2256,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             client: this.client,
             pendingEventOrdering: this.opts.pendingEventOrdering,
             receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
+
+            // This is necessary to be able to jump to events in threads:
+            // If we jump to an event in a thread where neither the event, nor
+            // the root, nor any thread event are loaded yet, we'll load the
+            // event as well as the thread root, create the thread, and pass
+            // the event through this.
+            events,
         });
 
         // All read receipts should now come down from sync, we do not need to keep
@@ -2266,12 +2273,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // This has to happen before thread.addEvents, because that adds events to the eventtimeline, and the
         // eventtimeline sometimes looks up thread information via the room.
         this.threads.set(thread.id, thread);
-
-        // This is necessary to be able to jump to events in threads:
-        // If we jump to an event in a thread where neither the event, nor the root,
-        // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
-        // and pass the event through this.
-        thread.addEvents(events, false);
 
         this.reEmitter.reEmit(thread, [
             ThreadEvent.Delete,

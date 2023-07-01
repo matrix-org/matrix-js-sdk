@@ -58,6 +58,7 @@ interface IThreadOpts {
     client: MatrixClient;
     pendingEventOrdering?: PendingEventOrdering;
     receipts?: CachedReceiptStructure[];
+    events?: MatrixEvent[];
 }
 
 export enum FeatureSupport {
@@ -138,6 +139,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         this.processReceipts(opts.receipts);
+
+        this.replayEvents = opts.events ?? [];
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
@@ -310,6 +313,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         const lastReply = this.lastReply();
         const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 
+        if (isNewestReply) {
+            const mapper = this.client.getEventMapper();
+            this.lastEvent = mapper(event.getEffectiveEvent());
+        }
+
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -321,6 +329,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.client.decryptEventIfNeeded(event, {});
         } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
             this.addEventToTimeline(event, false);
+            // TODO: This is another async call without awaiting
             this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
             if (!this.initialEventsFetched) {
