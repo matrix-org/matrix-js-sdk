@@ -226,7 +226,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
-        logger.debug(`FetchHttpApi: ${method} --> ${url}`);
+        const urlForLogs = this.clearUrlParamsForLogs(url);
+        logger.debug(`FetchHttpApi: ${method} --> ${urlForLogs}`);
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -279,9 +280,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 keepalive: keepAlive,
             });
 
-            logger.debug(`FetchHttpApi:  <-- ${res.status} ${Date.now() - start}ms ${url}`);
+            logger.debug(`FetchHttpApi:  <-- ${res.status} ${Date.now() - start}ms ${urlForLogs}`);
         } catch (e) {
-            logger.debug(`FetchHttpApi:  <-- ${e} ${url}`);
+            logger.debug(`FetchHttpApi:  <-- ${e} ${Date.now() - start}ms ${urlForLogs}`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
@@ -300,6 +301,22 @@ export class FetchHttpApi<O extends IHttpOpts> {
         return res as ResponseType<T, O>;
     }
 
+    private clearUrlParamsForLogs(url: URL | string): string {
+        try {
+            let asUrl: URL;
+            if (typeof url === "string") {
+                asUrl = new URL(url);
+            } else {
+                asUrl = url;
+            }
+            // get just the path to remove any potential url param that could have
+            // some potential secrets
+            return asUrl.pathname.toString();
+        } catch (error) {
+            // defensive coding for malformed url
+            return "??";
+        }
+    }
     /**
      * Form and return a homeserver request URL based on the given path params and prefix.
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
