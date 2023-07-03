@@ -146,6 +146,13 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     }
 
     /**
+     * If the device keys have already been uploaded, return them. Else return null.
+     */
+    public getUploadedDeviceKeys(): IDeviceKeys | null {
+        return this.deviceKeys;
+    }
+
+    /**
      * If one-time keys have already been uploaded, return them. Otherwise,
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.

@@ -19,12 +19,14 @@ import fetchMock from "fetch-mock-jest";
 import { MapWithDefault } from "../../src/utils";
 import { IDownloadKeyResult } from "../../src";
 import { IDeviceKeys } from "../../src/@types/crypto";
+import { E2EKeyReceiver } from "./E2EKeyReceiver";
 
 /**
  * An object which intercepts `/keys/query` fetches via fetch-mock.
  */
 export class E2EKeyResponder {
     private deviceKeysByUserByDevice = new MapWithDefault<string, Map<string, any>>(() => new Map());
+    private e2eKeyReceiversByUser = new Map<string, E2EKeyReceiver>();
     private masterKeysByUser: Record<string, any> = {};
     private selfSigningKeysByUser: Record<string, any> = {};
     private userSigningKeysByUser: Record<string, any> = {};
@@ -61,6 +63,16 @@ export class E2EKeyResponder {
             if (userKeys !== undefined) {
                 response.device_keys[user] = Object.fromEntries(userKeys.entries());
             }
+
+            const e2eKeyReceiver = this.e2eKeyReceiversByUser.get(user);
+            if (e2eKeyReceiver !== undefined) {
+                const deviceKeys = e2eKeyReceiver.getUploadedDeviceKeys();
+                if (deviceKeys !== null) {
+                    response.device_keys[user] ??= {};
+                    response.device_keys[user][deviceKeys.device_id] = deviceKeys;
+                }
+            }
+
             if (this.masterKeysByUser.hasOwnProperty(user)) {
                 response.master_keys[user] = this.masterKeysByUser[user];
             }
@@ -95,5 +107,17 @@ export class E2EKeyResponder {
         Object.assign(this.masterKeysByUser, data.master_keys);
         Object.assign(this.selfSigningKeysByUser, data.self_signing_keys);
         Object.assign(this.userSigningKeysByUser, data.user_signing_keys);
+    }
+
+    /**
+     * Add an E2EKeyReceiver to poll for uploaded keys
+     *
+     * Any keys which have been uploaded to the given `E2EKeyReceiver` at the time of the `/keys/query` request will
+     * be added to the response.
+     *
+     * @param e2eKeyReceiver
+     */
+    public addKeyReceiver(userId: string, e2eKeyReceiver: E2EKeyReceiver) {
+        this.e2eKeyReceiversByUser.set(userId, e2eKeyReceiver);
     }
 }

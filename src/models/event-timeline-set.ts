@@ -721,13 +721,17 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 
+        const eventId = event.getId()!;
+        this.relations.aggregateParentEvent(event);
+        this.relations.aggregateChildEvent(event, this);
+
         // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
         // threaded message should not be in the main timeline).
         //
         // We can only run this check for timelines with a `room` because `canContain`
         // requires it
         if (this.room && !this.canContain(event)) {
-            let eventDebugString = `event=${event.getId()}`;
+            let eventDebugString = `event=${eventId}`;
             if (event.threadRootId) {
                 eventDebugString += `(belongs to thread=${event.threadRootId})`;
             }
@@ -738,16 +742,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
-        const eventId = event.getId()!;
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,
             timelineWasEmpty,
         });
         this._eventIdToTimeline.set(eventId, timeline);
-
-        this.relations.aggregateParentEvent(event);
-        this.relations.aggregateChildEvent(event, this);
 
         const data: IRoomTimelineData = {
             timeline: timeline,
@@ -782,13 +782,17 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 
+        const eventId = event.getId()!;
+        this.relations.aggregateParentEvent(event);
+        this.relations.aggregateChildEvent(event, this);
+
         // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
         // threaded message should not be in the main timeline).
         //
         // We can only run this check for timelines with a `room` because `canContain`
         // requires it
         if (this.room && !this.canContain(event)) {
-            let eventDebugString = `event=${event.getId()}`;
+            let eventDebugString = `event=${eventId}`;
             if (event.threadRootId) {
                 eventDebugString += `(belongs to thread=${event.threadRootId})`;
             }
@@ -830,12 +834,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // If we got to the end of the loop, insertIndex points at the end of
         // the list.
 
-        const eventId = event.getId()!;
         timeline.insertEvent(event, insertIndex, roomState);
         this._eventIdToTimeline.set(eventId, timeline);
-
-        this.relations.aggregateParentEvent(event);
-        this.relations.aggregateChildEvent(event, this);
 
         const data: IRoomTimelineData = {
             timeline: timeline,
