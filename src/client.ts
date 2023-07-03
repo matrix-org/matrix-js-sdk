@@ -185,6 +185,8 @@ import {
     SSOAction,
     LoginResponse,
     LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
 } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
@@ -724,18 +726,8 @@ interface IJoinedMembersResponse {
     };
 }
 
-export interface IRegisterRequestParams {
-    auth?: IAuthDict;
-    username?: string;
-    password?: string;
-    refresh_token?: boolean;
-    guest_access_token?: string;
-    x_show_msisdn?: boolean;
-    bind_msisdn?: boolean;
-    bind_email?: boolean;
-    inhibit_login?: boolean;
-    initial_device_display_name?: string;
-}
+// Re-export for backwards compatibility
+export type IRegisterRequestParams = RegisterRequest;
 
 export interface IPublicRoomsChunkRoom {
     room_id: string;
@@ -7660,7 +7652,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param bindThreepids - Set key 'email' to true to bind any email
      *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a RegisterResponse object
      * @returns Rejects: with an error response.
      */
     public register(
@@ -7671,7 +7663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         bindThreepids?: boolean | null | { email?: boolean; msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
-    ): Promise<IAuthData> {
+    ): Promise<RegisterResponse> {
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
@@ -7682,7 +7674,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             auth.session = sessionId;
         }
 
-        const params: IRegisterRequestParams = {
+        const params: RegisterRequest = {
             auth: auth,
             refresh_token: true, // always ask for a refresh token - does nothing if unsupported
         };
@@ -7738,8 +7730,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                   `{ user_id, device_id, access_token, home_server }`
      * @returns Rejects: with an error response.
      */
-    public registerGuest({ body }: { body?: any } = {}): Promise<any> {
-        // TODO: Types
+    public registerGuest({ body }: { body?: RegisterRequest } = {}): Promise<RegisterResponse> {
         return this.registerRequest(body || {}, "guest");
     }
 
@@ -7749,7 +7740,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to the /register response
      * @returns Rejects: with an error response.
      */
-    public registerRequest(data: IRegisterRequestParams, kind?: string): Promise<IAuthData> {
+    public registerRequest(data: RegisterRequest, kind?: string): Promise<RegisterResponse> {
         const params: { kind?: string } = {};
         if (kind) {
             params.kind = kind;
