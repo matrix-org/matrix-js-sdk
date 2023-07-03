@@ -9165,8 +9165,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param identityAccessToken - The access token for the identity server.
      * @returns The hashing information for the identity server.
      */
-    public getIdentityHashDetails(identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public getIdentityHashDetails(identityAccessToken: string): Promise<{
+        /**
+         * The algorithms the server supports. Must contain at least sha256.
+         */
+        algorithms: string[];
+        /**
+         * The pepper the client MUST use in hashing identifiers,
+         * and MUST supply to the /lookup endpoint when performing lookups.
+         */
+        lookup_pepper: string;
+    }> {
         return this.http.idServerRequest(
             Method.Get,
             "/hash_details",
@@ -9274,8 +9283,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                                 exists
      * @returns Rejects: with an error response.
      */
-    public async lookupThreePid(medium: string, address: string, identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public async lookupThreePid(
+        medium: string,
+        address: string,
+        identityAccessToken: string,
+    ): Promise<
+        | {
+              address: string;
+              medium: string;
+              mxid: string;
+          }
+        | {}
+    > {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
         // convert it manually.
@@ -9311,8 +9330,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Lookup results from IS.
      * @returns Rejects: with an error response.
      */
-    public async bulkLookupThreePids(query: [string, string][], identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public async bulkLookupThreePids(
+        query: [string, string][],
+        identityAccessToken: string,
+    ): Promise<{
+        threepids: [medium: string, address: string, mxid: string][];
+    }> {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
         // convert it manually.
@@ -9350,8 +9373,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an object with account info.
      * @returns Rejects: with an error response.
      */
-    public getIdentityAccount(identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public getIdentityAccount(identityAccessToken: string): Promise<{ user_id: string }> {
         return this.http.idServerRequest(Method.Get, "/account", undefined, IdentityPrefix.V2, identityAccessToken);
     }
 
@@ -9444,7 +9466,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to the result object
      */
     public getThirdpartyUser(protocol: string, params: any): Promise<IThirdPartyUser[]> {
-        // TODO: Types
         const path = utils.encodeUri("/thirdparty/user/$protocol", {
             $protocol: protocol,
         });
