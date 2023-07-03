@@ -541,24 +541,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     });
 
     describe("Incoming verification from another device", () => {
-        beforeEach(() => {
+        beforeEach(async () => {
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+
+            aliceClient = await startTestClient();
+            await waitForDeviceList();
         });
 
-        oldBackendOnly("Incoming verification: can accept", async () => {
-            aliceClient = await startTestClient();
+        it("Incoming verification: can accept", async () => {
             const TRANSACTION_ID = "abcd";
 
             // Initiate the request by sending a to-device message
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.request",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    methods: ["m.sas.v1"],
-                    transaction_id: TRANSACTION_ID,
-                    timestamp: Date.now() - 1000,
-                },
-            });
+            returnToDeviceMessageFromSync(buildRequestMessage(TRANSACTION_ID));
             const request: VerificationRequest = await emitPromise(
                 aliceClient,
                 CryptoEvent.VerificationRequestReceived,
@@ -583,6 +577,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.methods).toContain("m.sas.v1");
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
+            expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
+        });
+
+        it("Incoming verification: can refuse", async () => {
+            const TRANSACTION_ID = "abcd";
+
+            // Initiate the request by sending a to-device message
+            returnToDeviceMessageFromSync(buildRequestMessage(TRANSACTION_ID));
+            const request: VerificationRequest = await emitPromise(
+                aliceClient,
+                CryptoEvent.VerificationRequestReceived,
+            );
+            expect(request.transactionId).toEqual(TRANSACTION_ID);
+
+            // Alice declines, by sending a cancellation
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.cancel");
+            const cancelPromise = request.cancel();
+            expect(canAcceptVerificationRequest(request)).toBe(false);
+            expect(request.accepting).toBe(false);
+            expect(request.declining).toBe(true);
+            await cancelPromise;
+            const requestBody = await sendToDevicePromise;
+            expect(request.phase).toEqual(VerificationPhase.Cancelled);
+
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
         });
     });
@@ -666,6 +685,19 @@ function sha256(commitmentStr: string): string {
 
 function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
+}
+
+/** build an m.key.verification.request to-device message originating from the dummy device */
+function buildRequestMessage(transactionId: string): { type: string; content: object } {
+    return {
+        type: "m.key.verification.request",
+        content: {
+            from_device: TEST_DEVICE_ID,
+            methods: ["m.sas.v1"],
+            transaction_id: transactionId,
+            timestamp: Date.now() - 1000,
+        },
+    };
 }
 
 /** build an m.key.verification.ready to-device message originating from the dummy device */

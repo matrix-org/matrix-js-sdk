@@ -553,7 +553,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         );
         return requests
             .filter((request) => request.roomId === undefined)
-            .map((request) => new RustVerificationRequest(request, this.outgoingRequestProcessor));
+            .map(
+                (request) =>
+                    new RustVerificationRequest(
+                        request,
+                        this.outgoingRequestProcessor,
+                        this.supportedVerificationMethods,
+                    ),
+            );
     }
 
     /**
@@ -600,7 +607,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this.supportedVerificationMethods?.map(verificationMethodIdentifierToMethod),
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods);
     }
 
     /**
@@ -630,7 +637,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this.supportedVerificationMethods?.map(verificationMethodIdentifierToMethod),
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -784,7 +791,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (request) {
             this.emit(
                 CryptoEvent.VerificationRequestReceived,
-                new RustVerificationRequest(request, this.outgoingRequestProcessor),
+                new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods),
             );
         }
     }

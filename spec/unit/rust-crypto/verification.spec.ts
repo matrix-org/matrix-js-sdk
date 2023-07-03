@@ -32,7 +32,7 @@ describe("VerificationRequest", () => {
                 startSas: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.VerificationRequest>;
             mockedOutgoingRequestProcessor = {} as Mocked<OutgoingRequestProcessor>;
-            request = new RustVerificationRequest(mockedInner, mockedOutgoingRequestProcessor);
+            request = new RustVerificationRequest(mockedInner, mockedOutgoingRequestProcessor, undefined);
         });
 
         it("does not permit methods other than SAS", async () => {
