@@ -871,6 +871,7 @@ export interface TimestampToEventResponse {
 interface IWhoamiResponse {
     user_id: string;
     device_id?: string;
+    is_guest?: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -923,6 +924,7 @@ type CryptoEvents =
     | CryptoEvent.RoomKeyRequest
     | CryptoEvent.RoomKeyRequestCancellation
     | CryptoEvent.VerificationRequest
+    | CryptoEvent.VerificationRequestReceived
     | CryptoEvent.DeviceVerificationChanged
     | CryptoEvent.UserTrustStatusChanged
     | CryptoEvent.KeysChanged
@@ -2204,10 +2206,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @experimental
      *
+     * @param useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
      */
-    public async initRustCrypto(): Promise<void> {
+    public async initRustCrypto({ useIndexedDB = true }: { useIndexedDB?: boolean } = {}): Promise<void> {
         if (this.cryptoBackend) {
             logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
@@ -2237,11 +2241,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             deviceId,
             this.secretStorage,
             this.cryptoCallbacks,
+            useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
         );
+        rustCrypto.supportedVerificationMethods = this.verificationMethods;
+
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
+
+        // re-emit the events emitted by the crypto impl
+        this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);
     }
 
     /**
@@ -9093,6 +9103,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param msisdnToken - The MSISDN token, as enetered by the user.
      * @param identityAccessToken - The `access_token` field of the Identity
      * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     * Some legacy identity servers had no authentication here.
      *
      * @returns Promise which resolves: Object, containing success boolean.
      * @returns Rejects: with an error response.
@@ -9102,7 +9113,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         sid: string,
         clientSecret: string,
         msisdnToken: string,
-        identityAccessToken: string,
+        identityAccessToken: string | null,
     ): Promise<{ success: boolean }> {
         const params = {
             sid: sid,
@@ -9115,7 +9126,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "/validate/msisdn/submitToken",
             params,
             IdentityPrefix.V2,
-            identityAccessToken,
+            identityAccessToken ?? undefined,
         );
     }
 

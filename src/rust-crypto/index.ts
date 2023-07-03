@@ -18,7 +18,6 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import { RustCrypto } from "./rust-crypto";
 import { logger } from "../logger";
-import { RUST_SDK_STORE_PREFIX } from "./constants";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
@@ -32,6 +31,8 @@ import { ICryptoCallbacks } from "../crypto";
  * @param deviceId - The local user's Device ID.
  * @param secretStorage - Interface to server-side secret storage.
  * @param cryptoCallbacks - Crypto callbacks provided by the application
+ * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
+ *     If unset, a memory store will be used.
  */
 export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
@@ -39,6 +40,7 @@ export async function initRustCrypto(
     deviceId: string,
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
+    storePrefix: string | null,
 ): Promise<RustCrypto> {
     // initialise the rust matrix-sdk-crypto-js, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
@@ -51,7 +53,12 @@ export async function initRustCrypto(
     logger.info("Init OlmMachine");
 
     // TODO: use the pickle key for the passphrase
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, RUST_SDK_STORE_PREFIX, "test pass");
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
+        u,
+        d,
+        storePrefix ?? undefined,
+        (storePrefix && "test pass") ?? undefined,
+    );
     const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
