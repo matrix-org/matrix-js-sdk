@@ -101,7 +101,7 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
 import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
-import { IAuthData, IAuthDict } from "./interactive-auth";
+import { AuthDict } from "./interactive-auth";
 import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api";
 import { EventTimelineSet } from "./models/event-timeline-set";
@@ -7938,7 +7938,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public async requestLoginToken(auth?: IAuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
@@ -8578,7 +8578,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setPassword(authDict: IAuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
+    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
         const path = "/account/password";
         const data = {
             auth: authDict,
@@ -8636,7 +8636,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteDevice(deviceId: string, auth?: IAuthDict): Promise<IAuthData | {}> {
+    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<{}> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -8658,7 +8658,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteMultipleDevices(devices: string[], auth?: IAuthDict): Promise<IAuthData | {}> {
+    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
         const body: any = { devices };
 
         if (auth) {
@@ -8943,7 +8943,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: IAuthDict, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<{}> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });

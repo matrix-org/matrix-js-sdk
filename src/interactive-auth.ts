@@ -206,7 +206,7 @@ interface IOpts<T> {
      * The busyChanged callback should be used instead of the background flag.
      * Should return a promise which resolves to the successful response or rejects with a MatrixError.
      */
-    doRequest(auth: IAuthDict | null, background: boolean): Promise<UIAResponse<T>>;
+    doRequest(auth: AuthDict | null, background: boolean): Promise<T>;
     /**
      * Called when the status of the UI auth changes,
      * ie. when the state of an auth stage changes of when the auth flow moves to a new stage.
@@ -265,7 +265,7 @@ export class InteractiveAuth<T> {
     private data: IAuthData | MatrixError;
     private emailSid?: string;
     private requestingEmailToken = false;
-    private attemptAuthDeferred: IDeferred<UIAResponse<T>> | null = null;
+    private attemptAuthDeferred: IDeferred<T> | null = null;
     private chosenFlow: UIAFlow | null = null;
     private currentStage: string | null = null;
 
@@ -298,7 +298,7 @@ export class InteractiveAuth<T> {
      * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */
-    public async attemptAuth(): Promise<UIAResponse<T>> {
+    public async attemptAuth(): Promise<T> {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
         this.attemptAuthDeferred = defer();
@@ -602,7 +602,7 @@ export class InteractiveAuth<T> {
         if (this.data instanceof MatrixError) {
             this.stateUpdatedCallback(nextStage, {
                 errcode: this.data?.errcode || "",
-                error: this.data?.error || "",
+                error: this.data?.data.error || "",
             });
             return;
         }
