@@ -128,8 +128,19 @@ export interface VerificationRequest
      * @param targetDevice - details of where to send the request to.
      *
      * @returns The verifier which will do the actual verification.
+     *
+     * @deprecated Use {@link VerificationRequest#startVerification} instead.
      */
     beginKeyVerification(method: string, targetDevice?: { userId?: string; deviceId?: string }): Verifier;
+
+    /**
+     * Send an `m.key.verification.start` event to start verification via a particular method.
+     *
+     * @param method - the name of the verification method to use.
+     *
+     * @returns The verifier which will do the actual verification.
+     */
+    startVerification(method: string): Promise<Verifier>;
 
     /**
      * The verifier which is doing the actual verification, once the method has been established.
