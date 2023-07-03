@@ -311,7 +311,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
             // get just the path to remove any potential url param that could have
             // some potential secrets
-            return asUrl.pathname.toString();
+            return asUrl.pathname;
         } catch (error) {
             // defensive coding for malformed url
             return "??";
