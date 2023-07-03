@@ -16,7 +16,7 @@ limitations under the License.
 
 import { UnstableValue } from "../NamespacedValue";
 import { IClientWellKnown } from "../client";
-import { IAuthDict } from "../interactive-auth";
+import { AuthDict } from "../interactive-auth";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -115,9 +115,11 @@ type PhoneLoginIdentifier = {
     phone: string;
 };
 
-type SpecLoginIdentifier = UserLoginIdentifier | ThirdPartyLoginIdentifier | PhoneLoginIdentifier;
+type SpecUserIdentifier = UserLoginIdentifier | ThirdPartyLoginIdentifier | PhoneLoginIdentifier;
 
-type LoginIdentifier = SpecLoginIdentifier | { type: Exclude<string, SpecLoginIdentifier["type"]>; [key: string]: any };
+export type UserIdentifier =
+    | SpecUserIdentifier
+    | { type: Exclude<string, SpecUserIdentifier["type"]>; [key: string]: any };
 
 /**
  * Request body for POST /login request
@@ -143,7 +145,7 @@ export interface LoginRequest {
     /**
      * Identification information for a user
      */
-    identifier?: LoginIdentifier;
+    identifier?: UserIdentifier;
     /**
      * A display name to assign to the newly-created device.
      * Ignored if device_id corresponds to a known device.
@@ -254,7 +256,7 @@ export interface RegisterRequest {
      * Note that this information is not used to define how the registered user should be authenticated,
      * but is instead used to authenticate the register call itself.
      */
-    auth?: Pick<IAuthDict, "session" | "type">;
+    auth?: AuthDict;
     /**
      * The basis for the localpart of the desired Matrix ID.
      * If omitted, the homeserver MUST generate a Matrix ID local part.

@@ -38,6 +38,7 @@ export class HTTPError extends Error {
 export class MatrixError extends HTTPError {
     // The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
     public readonly errcode?: string;
+    public readonly error?: string;
     // The raw Matrix error JSON used to construct this object.
     public data: IErrorJson;
 
@@ -62,6 +63,7 @@ export class MatrixError extends HTTPError {
         }
         super(`MatrixError: ${message}`, httpStatus);
         this.errcode = errorJson.errcode;
+        this.error = errorJson.error;
         this.name = errorJson.errcode || "Unknown error code";
         this.data = errorJson;
     }
