@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { UnstableValue } from "../NamespacedValue";
+import { IClientWellKnown } from "../client";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -79,25 +80,146 @@ export interface IIdentityProvider {
     brand?: IdentityProviderBrand | string;
 }
 
-/**
- * Parameters to login request as per https://spec.matrix.org/v1.3/client-server-api/#login
- */
-/* eslint-disable camelcase */
-export interface ILoginParams {
-    identifier?: object;
-    password?: string;
-    token?: string;
-    device_id?: string;
-    initial_device_display_name?: string;
-}
-/* eslint-enable camelcase */
-
 export enum SSOAction {
     /** The user intends to login to an existing account */
     LOGIN = "login",
 
     /** The user intends to register for a new account */
     REGISTER = "register",
+}
+
+/**
+ * https://spec.matrix.org/v1.7/client-server-api/#matrix-user-id
+ */
+type UserLoginIdentifier = {
+    type: "m.id.user";
+    user: string;
+};
+
+/**
+ * https://spec.matrix.org/v1.7/client-server-api/#third-party-id
+ */
+type ThirdPartyLoginIdentifier = {
+    type: "m.id.thirdparty";
+    medium: string;
+    address: string;
+};
+
+/**
+ * https://spec.matrix.org/v1.7/client-server-api/#phone-number
+ */
+type PhoneLoginIdentifier = {
+    type: "m.id.phone";
+    country: string;
+    phone: string;
+};
+
+type SpecLoginIdentifier = UserLoginIdentifier | ThirdPartyLoginIdentifier | PhoneLoginIdentifier;
+
+type LoginIdentifier = SpecLoginIdentifier | { type: Exclude<string, SpecLoginIdentifier["type"]>; [key: string]: any };
+
+/**
+ * Request body for POST /login request
+ * See https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
+ */
+export interface LoginRequest {
+    /**
+     * The login type being used.
+     */
+    type: "m.login.password" | "m.login.token" | string;
+    /**
+     * Third-party identifier for the user.
+     * @deprecated in favour of `identifier`.
+     */
+    address?: string;
+    /**
+     * ID of the client device.
+     * If this does not correspond to a known client device, a new device will be created.
+     * The given device ID must not be the same as a cross-signing key ID.
+     * The server will auto-generate a device_id if this is not specified.
+     */
+    device_id?: string;
+    /**
+     * Identification information for a user
+     */
+    identifier?: LoginIdentifier;
+    /**
+     * A display name to assign to the newly-created device.
+     * Ignored if device_id corresponds to a known device.
+     */
+    initial_device_display_name?: string;
+    /**
+     * When logging in using a third-party identifier, the medium of the identifier.
+     * Must be `email`.
+     * @deprecated in favour of `identifier`.
+     */
+    medium?: "email";
+    /**
+     * Required when type is `m.login.password`. The user’s password.
+     */
+    password?: string;
+    /**
+     * If true, the client supports refresh tokens.
+     */
+    refresh_token?: boolean;
+    /**
+     * Required when type is `m.login.token`. Part of Token-based login.
+     */
+    token?: string;
+    /**
+     * The fully qualified user ID or just local part of the user ID, to log in.
+     * @deprecated in favour of identifier.
+     */
+    user?: string;
+    // Extensible
+    [key: string]: any;
+}
+
+// Export for backwards compatibility
+export type ILoginParams = LoginRequest;
+
+/**
+ * Response body for POST /login request
+ * See https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
+ */
+export interface LoginResponse {
+    /**
+     * An access token for the account.
+     * This access token can then be used to authorize other requests.
+     */
+    access_token: string;
+    /**
+     * ID of the logged-in device.
+     * Will be the same as the corresponding parameter in the request, if one was specified.
+     */
+    device_id: string;
+    /**
+     * The fully-qualified Matrix ID for the account.
+     */
+    user_id: string;
+    /**
+     * The lifetime of the access token, in milliseconds.
+     * Once the access token has expired a new access token can be obtained by using the provided refresh token.
+     * If no refresh token is provided, the client will need to re-log in to obtain a new access token.
+     * If not given, the client can assume that the access token will not expire.
+     */
+    expires_in_ms?: number;
+    /**
+     * A refresh token for the account.
+     * This token can be used to obtain a new access token when it expires by calling the /refresh endpoint.
+     */
+    refresh_token?: string;
+    /**
+     * Optional client configuration provided by the server.
+     * If present, clients SHOULD use the provided object to reconfigure themselves, optionally validating the URLs within.
+     * This object takes the same form as the one returned from .well-known autodiscovery.
+     */
+    well_known?: IClientWellKnown;
+    /**
+     * The server_name of the homeserver on which the account has been registered.
+     * @deprecated Clients should extract the server_name from user_id (by splitting at the first colon) if they require it.
+     */
+    home_server?: string;
 }
 
 /**

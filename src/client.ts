@@ -178,7 +178,14 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import {
+    LoginTokenPostResponse,
+    ILoginFlowsResponse,
+    IRefreshTokenResponse,
+    SSOAction,
+    LoginResponse,
+    LoginRequest,
+} from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -7795,23 +7802,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public login(loginType: string, data: any): Promise<any> {
-        // TODO: Types
-        const loginData = {
-            type: loginType,
-        };
-
-        // merge data into loginData
-        Object.assign(loginData, data);
-
+    public login(loginType: string, data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
         return this.http
-            .authedRequest<{
-                access_token?: string;
-                user_id?: string;
-            }>(Method.Post, "/login", undefined, loginData)
+            .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
+                ...data,
+                type: loginType,
+            })
             .then((response) => {
                 if (response.access_token && response.user_id) {
                     this.http.opts.accessToken = response.access_token;
@@ -7824,11 +7823,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: TODO
+     @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public loginWithPassword(user: string, password: string): Promise<any> {
-        // TODO: Types
+    public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         return this.login("m.login.password", {
             user: user,
             password: password,
@@ -7837,11 +7835,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param relayState - URL Callback after SAML2 Authentication
-     * @returns Promise which resolves: TODO
+     *      @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     * @deprecated this isn't in the Matrix spec anymore
      */
-    public loginWithSAML2(relayState: string): Promise<any> {
-        // TODO: Types
+    public loginWithSAML2(relayState: string): Promise<LoginResponse> {
         return this.login("m.login.saml2", {
             relay_state: relayState,
         });
@@ -7881,11 +7879,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param token - Login token previously received from homeserver
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public loginWithToken(token: string): Promise<any> {
-        // TODO: Types
+    public loginWithToken(token: string): Promise<LoginResponse> {
         return this.login("m.login.token", {
             token: token,
         });
