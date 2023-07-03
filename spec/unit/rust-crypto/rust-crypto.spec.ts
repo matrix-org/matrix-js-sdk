@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
@@ -40,13 +38,6 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-cry
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
-
-afterEach(() => {
-    // reset fake-indexeddb after each test, to make sure we don't leak connections
-    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
-    indexedDB = new IDBFactory();
-});
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -542,5 +533,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
 }

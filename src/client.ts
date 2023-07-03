@@ -2206,10 +2206,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @experimental
      *
+     * @param useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
      */
-    public async initRustCrypto(): Promise<void> {
+    public async initRustCrypto({ useIndexedDB = true }: { useIndexedDB?: boolean } = {}): Promise<void> {
         if (this.cryptoBackend) {
             logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
@@ -2239,6 +2241,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             deviceId,
             this.secretStorage,
             this.cryptoCallbacks,
+            useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
         );
         rustCrypto.supportedVerificationMethods = this.verificationMethods;
 
