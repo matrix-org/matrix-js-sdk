@@ -21,18 +21,49 @@ import { RustVerificationRequest } from "../../../src/rust-crypto/verification";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 
 describe("VerificationRequest", () => {
-    describe("startVerification", () => {
+    describe("pending", () => {
+        let request: RustVerificationRequest;
         let mockedInner: Mocked<RustSdkCryptoJs.VerificationRequest>;
-        let mockedOutgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
+
+        beforeEach(() => {
+            mockedInner = makeMockedInner();
+            request = makeTestRequest(mockedInner);
+        });
+
+        it("returns true for a created request", () => {
+            expect(request.pending).toBe(true);
+        });
+
+        it("returns false for passive requests", () => {
+            mockedInner.isPassive.mockReturnValue(true);
+            expect(request.pending).toBe(false);
+        });
+
+        it("returns false for completed requests", () => {
+            mockedInner.phase.mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Done);
+            expect(request.pending).toBe(false);
+        });
+
+        it("returns false for cancelled requests", () => {
+            mockedInner.phase.mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Cancelled);
+            expect(request.pending).toBe(false);
+        });
+    });
+
+    describe("timeout", () => {
+        it("passes through the result", () => {
+            const mockedInner = makeMockedInner();
+            const request = makeTestRequest(mockedInner);
+            mockedInner.timeRemainingMillis.mockReturnValue(10_000);
+            expect(request.timeout).toEqual(10_000);
+        });
+    });
+
+    describe("startVerification", () => {
         let request: RustVerificationRequest;
 
         beforeEach(() => {
-            mockedInner = {
-                registerChangesCallback: jest.fn(),
-                startSas: jest.fn(),
-            } as unknown as Mocked<RustSdkCryptoJs.VerificationRequest>;
-            mockedOutgoingRequestProcessor = {} as Mocked<OutgoingRequestProcessor>;
-            request = new RustVerificationRequest(mockedInner, mockedOutgoingRequestProcessor, undefined);
+            request = makeTestRequest();
         });
 
         it("does not permit methods other than SAS", async () => {
@@ -48,3 +79,24 @@ describe("VerificationRequest", () => {
         });
     });
 });
+
+/** build a RustVerificationRequest with default parameters */
+function makeTestRequest(
+    inner?: RustSdkCryptoJs.VerificationRequest,
+    outgoingRequestProcessor?: OutgoingRequestProcessor,
+): RustVerificationRequest {
+    inner ??= makeMockedInner();
+    outgoingRequestProcessor ??= {} as OutgoingRequestProcessor;
+    return new RustVerificationRequest(inner, outgoingRequestProcessor, undefined);
+}
+
+/** Mock up a rust-side VerificationRequest */
+function makeMockedInner(): Mocked<RustSdkCryptoJs.VerificationRequest> {
+    return {
+        registerChangesCallback: jest.fn(),
+        startSas: jest.fn(),
+        phase: jest.fn().mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Created),
+        isPassive: jest.fn().mockReturnValue(false),
+        timeRemainingMillis: jest.fn(),
+    } as unknown as Mocked<RustSdkCryptoJs.VerificationRequest>;
+}

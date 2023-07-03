@@ -153,6 +153,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.chosenMethod).toBe(null); // nothing chosen yet
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
+            expect(request.pending).toBe(true);
+            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
+            expect(request.timeout).toEqual(600_000);
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {
@@ -248,6 +251,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // ... and the whole thing should be done!
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
+            expect(request.pending).toBe(false);
 
             // at this point, cancelling should do nothing.
             await request.cancel();
@@ -564,6 +568,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.chosenMethod).toBe(null); // nothing chosen yet
             expect(canAcceptVerificationRequest(request)).toBe(true);
+            expect(request.pending).toBe(true);
 
             // Alice accepts, by sending a to-device message
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.ready");

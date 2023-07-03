@@ -145,7 +145,9 @@ export class RustVerificationRequest
      * (ie it is in phase `Requested`, `Ready` or `Started`).
      */
     public get pending(): boolean {
-        throw new Error("not implemented");
+        if (this.inner.isPassive()) return false;
+        const phase = this.phase;
+        return phase !== VerificationPhase.Done && phase !== VerificationPhase.Cancelled;
     }
 
     /**
@@ -170,7 +172,7 @@ export class RustVerificationRequest
      * `null` indicates that there is no timeout
      */
     public get timeout(): number | null {
-        throw new Error("not implemented");
+        return this.inner.timeRemainingMillis();
     }
 
     /** once the phase is Started (and !initiatedByMe) or Ready: common methods supported by both sides */
