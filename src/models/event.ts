@@ -1376,10 +1376,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const relation = this.getWireContent()?.["m.relates_to"];
         if (
             this.isState() &&
-            relation?.rel_type &&
+            !!relation?.rel_type &&
             ([RelationType.Replace, RelationType.Thread] as string[]).includes(relation.rel_type)
         ) {
-            // State events cannot be m.replace relations
+            // State events cannot be m.replace or m.thread relations
             return false;
         }
         return !!(relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true));
