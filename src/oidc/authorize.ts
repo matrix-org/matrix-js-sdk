@@ -20,7 +20,7 @@ import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
-import { ValidatedIssuerConfig } from "./validate";
+import { validateIdToken, ValidatedIssuerConfig } from "./validate";
 
 /**
  * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
@@ -173,11 +173,13 @@ export const completeAuthorizationCodeGrant = async (
         codeVerifier,
         redirectUri,
         delegatedAuthConfig,
+        nonce,
     }: {
         clientId: string;
         codeVerifier: string;
         redirectUri: string;
         delegatedAuthConfig: IDelegatedAuthConfig & ValidatedIssuerConfig;
+        nonce: string;
     },
 ): Promise<BearerTokenResponse> => {
     const params = new URLSearchParams();
@@ -203,6 +205,8 @@ export const completeAuthorizationCodeGrant = async (
     const token = await response.json();
 
     if (isValidBearerTokenResponse(token)) {
+        // throws when token is invalid
+        validateIdToken(token.id_token, delegatedAuthConfig.issuer, clientId, nonce);
         return normalizeBearerTokenResponseTokenType(token);
     }
 

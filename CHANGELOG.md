@@ -1,3 +1,29 @@
+Changes in [26.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.2.0) (2023-07-04)
+==================================================================================================
+
+## 🦖 Deprecations
+ * The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. ([\#3189](https://github.com/matrix-org/matrix-js-sdk/issues/3189)).
+ * ElementR: Add `CryptoApi#bootstrapSecretStorage` ([\#3483](https://github.com/matrix-org/matrix-js-sdk/pull/3483)). Contributed by @florianduros.
+ * Deprecate `MatrixClient.findVerificationRequestDMInProgress`, `MatrixClient.getVerificationRequestsToDeviceInProgress`, and `MatrixClient.requestVerification`, in favour of methods in `CryptoApi`. ([\#3474](https://github.com/matrix-org/matrix-js-sdk/pull/3474)).
+ * Introduce a new `Crypto.VerificationRequest` interface, and deprecate direct access to the old `VerificationRequest` class. Also deprecate some related classes that were exported from `src/crypto/verification/request/VerificationRequest` ([\#3449](https://github.com/matrix-org/matrix-js-sdk/pull/3449)).
+
+## ✨ Features
+ * OIDC: navigate to authorization endpoint ([\#3499](https://github.com/matrix-org/matrix-js-sdk/pull/3499)). Contributed by @kerryarchibald.
+ * Support for interactive device verification in Element-R. ([\#3505](https://github.com/matrix-org/matrix-js-sdk/pull/3505)).
+ * Support for interactive device verification in Element-R. ([\#3508](https://github.com/matrix-org/matrix-js-sdk/pull/3508)).
+ * Support for interactive device verification in Element-R. ([\#3490](https://github.com/matrix-org/matrix-js-sdk/pull/3490)). Fixes vector-im/element-web#25316.
+ * Element-R: Store cross signing keys in secret storage ([\#3498](https://github.com/matrix-org/matrix-js-sdk/pull/3498)). Contributed by @florianduros.
+ * OIDC: add dynamic client registration util function ([\#3481](https://github.com/matrix-org/matrix-js-sdk/pull/3481)). Contributed by @kerryarchibald.
+ * Add getLastUnthreadedReceiptFor utility to Thread delegating to the underlying Room ([\#3493](https://github.com/matrix-org/matrix-js-sdk/pull/3493)).
+ * ElementR: Add `rust-crypto#createRecoveryKeyFromPassphrase` implementation ([\#3472](https://github.com/matrix-org/matrix-js-sdk/pull/3472)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+ * Aggregate relations regardless of whether event fits into the timeline ([\#3496](https://github.com/matrix-org/matrix-js-sdk/pull/3496)). Fixes vector-im/element-web#25596.
+ * Fix bug where switching media caused media in subsequent calls to fail ([\#3489](https://github.com/matrix-org/matrix-js-sdk/pull/3489)).
+ * Fix: remove polls from room state on redaction ([\#3475](https://github.com/matrix-org/matrix-js-sdk/pull/3475)). Fixes vector-im/element-web#25573. Contributed by @kerryarchibald.
+ * Fix export type `GeneratedSecretStorageKey` ([\#3479](https://github.com/matrix-org/matrix-js-sdk/pull/3479)). Contributed by @florianduros.
+ * Close IDB database before deleting it to prevent spurious unexpected close errors ([\#3478](https://github.com/matrix-org/matrix-js-sdk/pull/3478)). Fixes vector-im/element-web#25597.
+
 Changes in [26.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v26.1.0) (2023-06-20)
 ==================================================================================================
 

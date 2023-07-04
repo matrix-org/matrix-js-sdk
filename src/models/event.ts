@@ -34,7 +34,7 @@ import {
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, ThreadEvent, ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
+import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread";
 import { IActionsObject } from "../pushprocessor";
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
@@ -576,6 +576,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the event ID of the thread head
      */
     public get threadRootId(): string | undefined {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return undefined;
+        }
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
@@ -597,6 +601,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * A helper to check if an event is a thread's head or not
      */
     public get isThreadRoot(): boolean {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return false;
+        }
+
         const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         // Bundled relationships only returned when the sync response is limited
@@ -1365,8 +1374,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const relation = this.getWireContent()?.["m.relates_to"];
-        if (this.isState() && relation?.rel_type === RelationType.Replace) {
-            // State events cannot be m.replace relations
+        if (
+            this.isState() &&
+            !!relation?.rel_type &&
+            ([RelationType.Replace, RelationType.Thread] as string[]).includes(relation.rel_type)
+        ) {
+            // State events cannot be m.replace or m.thread relations
             return false;
         }
         return !!(relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true));
@@ -1618,6 +1631,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param thread - the thread
      */
     public setThread(thread?: Thread): void {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return;
+        }
         if (this.thread) {
             this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
         }

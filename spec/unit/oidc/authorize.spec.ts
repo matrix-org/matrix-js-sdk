@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
+import { mocked } from "jest-mock";
+import jwtDecode from "jwt-decode";
 
 import { Method } from "../../../src";
 import * as crypto from "../../../src/crypto/crypto";
@@ -25,6 +27,8 @@ import {
     generateAuthorizationUrl,
 } from "../../../src/oidc/authorize";
 import { OidcError } from "../../../src/oidc/error";
+
+jest.mock("jwt-decode");
 
 // save for resetting mocks
 const realSubtleCrypto = crypto.subtleCrypto;
@@ -112,13 +116,26 @@ describe("oidc authorization", () => {
 
     describe("completeAuthorizationCodeGrant", () => {
         const codeVerifier = "abc123";
+        const nonce = "test-nonce";
         const redirectUri = baseUrl;
         const code = "auth_code_xyz";
         const validBearerTokenResponse = {
             token_type: "Bearer",
             access_token: "test_access_token",
             refresh_token: "test_refresh_token",
+            id_token: "valid.id.token",
             expires_in: 12345,
+        };
+
+        const validDecodedIdToken = {
+            // nonce matches
+            nonce,
+            // not expired
+            exp: Date.now() / 1000 + 100000,
+            // audience is this client
+            aud: clientId,
+            // issuer matches
+            iss: delegatedAuthConfig.issuer,
         };
 
         beforeEach(() => {
@@ -129,10 +146,18 @@ describe("oidc authorization", () => {
                 status: 200,
                 body: JSON.stringify(validBearerTokenResponse),
             });
+
+            mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
 
         it("should make correct request to the token endpoint", async () => {
-            await completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig });
+            await completeAuthorizationCodeGrant(code, {
+                clientId,
+                codeVerifier,
+                redirectUri,
+                delegatedAuthConfig,
+                nonce,
+            });
 
             expect(fetchMock).toHaveBeenCalledWith(tokenEndpoint, {
                 method: Method.Post,
@@ -147,6 +172,7 @@ describe("oidc authorization", () => {
                 codeVerifier,
                 redirectUri,
                 delegatedAuthConfig,
+                nonce,
             });
 
             expect(result).toEqual(validBearerTokenResponse);
@@ -171,6 +197,7 @@ describe("oidc authorization", () => {
                 codeVerifier,
                 redirectUri,
                 delegatedAuthConfig,
+                nonce,
             });
 
             // results in token that uses 'Bearer' token type
@@ -187,7 +214,13 @@ describe("oidc authorization", () => {
                 { overwriteRoutes: true },
             );
             await expect(() =>
-                completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig }),
+                completeAuthorizationCodeGrant(code, {
+                    clientId,
+                    codeVerifier,
+                    redirectUri,
+                    delegatedAuthConfig,
+                    nonce,
+                }),
             ).rejects.toThrow(new Error(OidcError.CodeExchangeFailed));
         });
 
@@ -202,8 +235,31 @@ describe("oidc authorization", () => {
                 { overwriteRoutes: true },
             );
             await expect(() =>
-                completeAuthorizationCodeGrant(code, { clientId, codeVerifier, redirectUri, delegatedAuthConfig }),
+                completeAuthorizationCodeGrant(code, {
+                    clientId,
+                    codeVerifier,
+                    redirectUri,
+                    delegatedAuthConfig,
+                    nonce,
+                }),
             ).rejects.toThrow(new Error(OidcError.InvalidBearerTokenResponse));
+        });
+
+        it("should throw invalid id token error when id_token is invalid", async () => {
+            mocked(jwtDecode).mockReturnValue({
+                ...validDecodedIdToken,
+                // invalid audience
+                aud: "something-else",
+            });
+            await expect(() =>
+                completeAuthorizationCodeGrant(code, {
+                    clientId,
+                    codeVerifier,
+                    redirectUri,
+                    delegatedAuthConfig,
+                    nonce,
+                }),
+            ).rejects.toThrow(new Error(OidcError.InvalidIdToken));
         });
     });
 });

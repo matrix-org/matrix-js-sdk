@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import jwtDecode from "jwt-decode";
+
 import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
@@ -83,7 +85,7 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
 };
 
 /**
- * Validates issue `.well-known/openid-configuration`
+ * Validates issuer `.well-known/openid-configuration`
  * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
  * validates that OP is compatible with Element's OIDC flow
  * @param wellKnown - json object
@@ -115,4 +117,85 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 
     logger.error("Issuer configuration not valid");
     throw new Error(OidcError.OpSupport);
+};
+
+/**
+ * Standard JWT claims.
+ *
+ * @see https://datatracker.ietf.org/doc/html/rfc7519#section-4.1
+ */
+interface JwtClaims {
+    [claim: string]: unknown;
+    /** The "iss" (issuer) claim identifies the principal that issued the JWT. */
+    iss?: string;
+    /** The "sub" (subject) claim identifies the principal that is the subject of the JWT. */
+    sub?: string;
+    /** The "aud" (audience) claim identifies the recipients that the JWT is intended for. */
+    aud?: string | string[];
+    /** The "exp" (expiration time) claim identifies the expiration time on or after which the JWT MUST NOT be accepted for processing. */
+    exp?: number;
+    // unused claims excluded
+}
+interface IdTokenClaims extends JwtClaims {
+    nonce?: string;
+}
+
+const decodeIdToken = (token: string): IdTokenClaims => {
+    try {
+        return jwtDecode<IdTokenClaims>(token);
+    } catch (error) {
+        logger.error("Could not decode id_token", error);
+        throw error;
+    }
+};
+
+/**
+ * Validate idToken
+ * https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+ * @param idToken - id token from token endpoint
+ * @param issuer - issuer for the OP as found during discovery
+ * @param clientId - this client's id as registered with the OP
+ * @param nonce - nonce used in the authentication request
+ * @throws when id token is invalid
+ */
+export const validateIdToken = (idToken: string | undefined, issuer: string, clientId: string, nonce: string): void => {
+    try {
+        if (!idToken) {
+            throw new Error("No ID token");
+        }
+        const claims = decodeIdToken(idToken);
+
+        // The Issuer Identifier for the OpenID Provider MUST exactly match the value of the iss (issuer) Claim.
+        if (claims.iss !== issuer) {
+            throw new Error("Invalid issuer");
+        }
+        /**
+         * The Client MUST validate that the aud (audience) Claim contains its client_id value registered at the Issuer identified by the iss (issuer) Claim as an audience.
+         * The aud (audience) Claim MAY contain an array with more than one element.
+         * The ID Token MUST be rejected if the ID Token does not list the Client as a valid audience, or if it contains additional audiences not trusted by the Client.
+         * EW: Don't accept tokens with other untrusted audiences
+         * */
+        if (claims.aud !== clientId) {
+            throw new Error("Invalid audience");
+        }
+
+        /**
+         * If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked
+         * to verify that it is the same value as the one that was sent in the Authentication Request.
+         */
+        if (claims.nonce !== nonce) {
+            throw new Error("Invalid nonce");
+        }
+
+        /**
+         * The current time MUST be before the time represented by the exp Claim.
+         *  exp is an epoch timestamp in seconds
+         * */
+        if (!claims.exp || Date.now() > claims.exp * 1000) {
+            throw new Error("Invalid expiry");
+        }
+    } catch (error) {
+        logger.error("Invalid ID token", error);
+        throw new Error(OidcError.InvalidIdToken);
+    }
 };
