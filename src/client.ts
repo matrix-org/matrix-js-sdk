@@ -7813,7 +7813,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     @returns Promise which resolves to a LoginResponse object
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
     public loginWithPassword(user: string, password: string): Promise<LoginResponse> {

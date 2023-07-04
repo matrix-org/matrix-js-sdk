@@ -17,7 +17,9 @@ limitations under the License.
 import { AuthDict } from "../interactive-auth";
 
 /**
- * The request body of a call to POST https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
+ * The request body of a call to `POST /_matrix/client/v3/register`
+ *
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
  */
 export interface RegisterRequest {
     /**
@@ -68,7 +70,9 @@ export interface RegisterRequest {
 }
 
 /**
- * The result of a successful call to POST https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
+ * The result of a successful call to `POST /_matrix/client/v3/register`
+ *
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
  */
 export interface RegisterResponse {
     /**

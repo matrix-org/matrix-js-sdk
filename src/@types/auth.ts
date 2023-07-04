@@ -130,8 +130,9 @@ type PhoneLoginIdentifier = {
 type SpecUserIdentifier = UserLoginIdentifier | ThirdPartyLoginIdentifier | PhoneLoginIdentifier;
 
 /**
- * User Identifiers usable for login & user-interactive authentication
- * Extensibly allows more than Matrix specified identifiers
+ * User Identifiers usable for login & user-interactive authentication.
+ *
+ * Extensibly allows more than Matrix specified identifiers.
  */
 export type UserIdentifier =
     | SpecUserIdentifier
