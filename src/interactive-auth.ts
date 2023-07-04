@@ -263,9 +263,8 @@ export class InteractiveAuth<T> {
     private readonly requestEmailTokenCallback: IOpts<T>["requestEmailToken"];
     private readonly supportedStages?: Set<string>;
 
-    // The current latest data as part of the interactive auth
-    // MatrixError can occur if the error from server is not a 401 UIA error
-    private data: IAuthData | MatrixError;
+    // The current latest data received from the server during the user interactive auth flow.
+    private data: IAuthData;
     private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<T> | null = null;
@@ -598,14 +597,6 @@ export class InteractiveAuth<T> {
         if (nextStage === AuthType.Dummy) {
             this.submitAuthDict({
                 type: "m.login.dummy",
-            });
-            return;
-        }
-
-        if (this.data instanceof MatrixError) {
-            this.stateUpdatedCallback(nextStage, {
-                errcode: this.data?.errcode || "",
-                error: this.data?.data.error || "",
             });
             return;
         }
