@@ -16,7 +16,6 @@ limitations under the License.
 
 import { UnstableValue } from "../NamespacedValue";
 import { IClientWellKnown } from "../client";
-import { AuthDict } from "../interactive-auth";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -90,7 +89,9 @@ export enum SSOAction {
 }
 
 /**
- * https://spec.matrix.org/v1.7/client-server-api/#matrix-user-id
+ * A client can identify a user using their Matrix ID.
+ * This can either be the fully qualified Matrix user ID, or just the localpart of the user ID.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#matrix-user-id
  */
 type UserLoginIdentifier = {
     type: "m.id.user";
@@ -98,7 +99,10 @@ type UserLoginIdentifier = {
 };
 
 /**
- * https://spec.matrix.org/v1.7/client-server-api/#third-party-id
+ * A client can identify a user using a 3PID associated with the user’s account on the homeserver,
+ * where the 3PID was previously associated using the /account/3pid API.
+ * See the 3PID Types Appendix for a list of Third-party ID media.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#third-party-id
  */
 type ThirdPartyLoginIdentifier = {
     type: "m.id.thirdparty";
@@ -107,7 +111,15 @@ type ThirdPartyLoginIdentifier = {
 };
 
 /**
- * https://spec.matrix.org/v1.7/client-server-api/#phone-number
+ * A client can identify a user using a phone number associated with the user’s account,
+ * where the phone number was previously associated using the /account/3pid API.
+ * The phone number can be passed in as entered by the user; the homeserver will be responsible for canonicalising it.
+ * If the client wishes to canonicalise the phone number,
+ * then it can use the m.id.thirdparty identifier type with a medium of msisdn instead.
+ *
+ * The country is the two-letter uppercase ISO-3166-1 alpha-2 country code that the number in phone should be parsed as if it were dialled from.
+ *
+ * @see https://spec.matrix.org/v1.7/client-server-api/#phone-number
  */
 type PhoneLoginIdentifier = {
     type: "m.id.phone";
@@ -117,13 +129,17 @@ type PhoneLoginIdentifier = {
 
 type SpecUserIdentifier = UserLoginIdentifier | ThirdPartyLoginIdentifier | PhoneLoginIdentifier;
 
+/**
+ * User Identifiers usable for login & user-interactive authentication
+ * Extensibly allows more than Matrix specified identifiers
+ */
 export type UserIdentifier =
     | SpecUserIdentifier
     | { type: Exclude<string, SpecUserIdentifier["type"]>; [key: string]: any };
 
 /**
  * Request body for POST /login request
- * See https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
  */
 export interface LoginRequest {
     /**
@@ -183,7 +199,7 @@ export type ILoginParams = LoginRequest;
 
 /**
  * Response body for POST /login request
- * See https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3login
  */
 export interface LoginResponse {
     /**
@@ -245,99 +261,4 @@ export interface LoginTokenPostResponse {
      * Expiration in milliseconds.
      */
     expires_in_ms: number;
-}
-
-/**
- *
- */
-export interface RegisterRequest {
-    /**
-     * Additional authentication information for the user-interactive authentication API.
-     * Note that this information is not used to define how the registered user should be authenticated,
-     * but is instead used to authenticate the register call itself.
-     */
-    auth?: AuthDict;
-    /**
-     * The basis for the localpart of the desired Matrix ID.
-     * If omitted, the homeserver MUST generate a Matrix ID local part.
-     */
-    username?: string;
-    /**
-     * The desired password for the account.
-     */
-    password?: string;
-    /**
-     * If true, the client supports refresh tokens.
-     */
-    refresh_token?: boolean;
-    /**
-     * If true, an access_token and device_id should not be returned from this call, therefore preventing an automatic login.
-     * Defaults to false.
-     */
-    inhibit_login?: boolean;
-    /**
-     * A display name to assign to the newly-created device.
-     * Ignored if device_id corresponds to a known device.
-     */
-    initial_device_display_name?: string;
-    /**
-     * @deprecated missing in the spec
-     */
-    guest_access_token?: string;
-    /**
-     * @deprecated missing in the spec
-     */
-    x_show_msisdn?: boolean;
-    /**
-     * @deprecated missing in the spec
-     */
-    bind_msisdn?: boolean;
-    /**
-     * @deprecated missing in the spec
-     */
-    bind_email?: boolean;
-}
-
-/**
- * The result of a successful call to POST https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
- */
-export interface RegisterResponse {
-    /**
-     * The fully-qualified Matrix user ID (MXID) that has been registered.
-     */
-    user_id: string;
-    /**
-     * An access token for the account.
-     * This access token can then be used to authorize other requests.
-     * Required if the inhibit_login option is false.
-     */
-    access_token?: string;
-    /**
-     * ID of the registered device.
-     * Will be the same as the corresponding parameter in the request, if one was specified.
-     * Required if the inhibit_login option is false.
-     */
-    device_id?: string;
-    /**
-     * The lifetime of the access token, in milliseconds.
-     * Once the access token has expired a new access token can be obtained by using the provided refresh token.
-     * If no refresh token is provided, the client will need to re-log in to obtain a new access token.
-     * If not given, the client can assume that the access token will not expire.
-     *
-     * Omitted if the inhibit_login option is true.
-     */
-    expires_in_ms?: number;
-    /**
-     * A refresh token for the account.
-     * This token can be used to obtain a new access token when it expires by calling the /refresh endpoint.
-     *
-     * Omitted if the inhibit_login option is true.
-     */
-    refresh_token?: string;
-    /**
-     * The server_name of the homeserver on which the account has been registered.
-     *
-     * @deprecated Clients should extract the server_name from user_id (by splitting at the first colon) if they require it.
-     */
-    home_server?: string;
 }

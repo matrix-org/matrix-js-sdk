@@ -251,6 +251,7 @@ interface IOpts<T> {
  * submitAuthDict.
  *
  * @param opts - options object
+ * @typeParam T - the return type of the request when it is successful
  */
 export class InteractiveAuth<T> {
     private readonly matrixClient: MatrixClient;
@@ -262,6 +263,8 @@ export class InteractiveAuth<T> {
     private readonly requestEmailTokenCallback: IOpts<T>["requestEmailToken"];
     private readonly supportedStages?: Set<string>;
 
+    // The current latest data as part of the interactive auth
+    // MatrixError can occur if the error from server is not a 401 UIA error
     private data: IAuthData | MatrixError;
     private emailSid?: string;
     private requestingEmailToken = false;

@@ -185,8 +185,6 @@ import {
     SSOAction,
     LoginResponse,
     LoginRequest,
-    RegisterRequest,
-    RegisterResponse,
 } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
@@ -218,6 +216,7 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
+import { RegisterRequest, RegisterResponse } from "./@types/registration";
 
 export type Store = IStore;
 
@@ -7796,7 +7795,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public login(loginType: string, data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
+    public login(loginType: LoginRequest["type"], data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
         return this.http
             .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
                 ...data,
@@ -7826,7 +7825,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param relayState - URL Callback after SAML2 Authentication
-     *      @returns Promise which resolves to a LoginResponse object
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      * @deprecated this isn't in the Matrix spec anymore
      */
