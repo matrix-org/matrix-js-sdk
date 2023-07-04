@@ -41,6 +41,7 @@ describe("oidc authorization", () => {
         issuer,
         registrationEndpoint: issuer + "registration",
         authorizationEndpoint: issuer + "auth",
+        revocationEndpoint: issuer + "revoke",
         tokenEndpoint,
     };
     const clientId = "xyz789";

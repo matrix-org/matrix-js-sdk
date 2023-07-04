@@ -132,6 +132,7 @@ describe("validateOIDCIssuerWellKnown", () => {
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
+        revocation_endpoint: "https://authorize.org/revoke",
     };
     beforeEach(() => {
         // stub to avoid console litter
@@ -166,6 +167,7 @@ describe("validateOIDCIssuerWellKnown", () => {
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: validWk.registration_endpoint,
+            revocationEndpoint: validWk.revocation_endpoint,
         });
     });
 
@@ -175,6 +177,7 @@ describe("validateOIDCIssuerWellKnown", () => {
         expect(validateOIDCIssuerWellKnown(wk)).toEqual({
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
+            revocationEndpoint: validWk.revocation_endpoint,
             registrationEndpoint: undefined,
         });
     });
@@ -185,6 +188,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         ["authorization_endpoint", { not: "a string" }],
         ["token_endpoint", undefined],
         ["token_endpoint", { not: "a string" }],
+        ["revocation_endpoint", undefined],
+        ["revocation_endpoint", { not: "a string" }],
         ["registration_endpoint", { not: "a string" }],
         ["response_types_supported", undefined],
         ["response_types_supported", "not an array"],

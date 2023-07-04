@@ -31,6 +31,7 @@ describe("registerOidcClient()", () => {
         registrationEndpoint,
         authorizationEndpoint: issuer + "auth",
         tokenEndpoint: issuer + "token",
+        revocationEndpoint: issuer + "token",
     };
     beforeEach(() => {
         fetchMockJest.mockClear();

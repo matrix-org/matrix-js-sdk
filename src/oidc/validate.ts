@@ -26,10 +26,14 @@ import { OidcError } from "./error";
  */
 export { OidcError as OidcDiscoveryError };
 
+/**
+ * @experimental
+ */
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;
     registrationEndpoint?: string;
+    revocationEndpoint: string;
 };
 
 /**
@@ -101,6 +105,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     const isInvalid = [
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
+        requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
@@ -112,6 +117,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
             authorizationEndpoint: wellKnown["authorization_endpoint"],
             tokenEndpoint: wellKnown["token_endpoint"],
             registrationEndpoint: wellKnown["registration_endpoint"],
+            revocationEndpoint: wellKnown["revocation_endpoint"],
         } as ValidatedIssuerConfig;
     }
 
