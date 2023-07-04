@@ -56,6 +56,8 @@ import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
+const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  */
@@ -558,7 +560,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     new RustVerificationRequest(
                         request,
                         this.outgoingRequestProcessor,
-                        this.supportedVerificationMethods,
+                        this._supportedVerificationMethods,
                     ),
             );
     }
@@ -580,10 +582,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     /**
      * The verification methods we offer to the other side during an interactive verification.
+     */
+    private _supportedVerificationMethods: string[] = ALL_VERIFICATION_METHODS;
+
+    /**
+     * Set the verification methods we offer to the other side during an interactive verification.
      *
      * If `undefined`, we will offer all the methods supported by the Rust SDK.
      */
-    public supportedVerificationMethods: string[] | undefined;
+    public setSupportedVerificationMethods(methods: string[] | undefined): void {
+        // by default, the Rust SDK does not offer `m.qr_code.scan.v1`, but we do want to offer that.
+        this._supportedVerificationMethods = methods ?? ALL_VERIFICATION_METHODS;
+    }
 
     /**
      * Send a verification request to our other devices.
@@ -604,10 +614,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
             await userIdentity.requestVerification(
-                this.supportedVerificationMethods?.map(verificationMethodIdentifierToMethod),
+                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
     }
 
     /**
@@ -634,10 +644,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
             await device.requestVerification(
-                this.supportedVerificationMethods?.map(verificationMethodIdentifierToMethod),
+                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -791,7 +801,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (request) {
             this.emit(
                 CryptoEvent.VerificationRequestReceived,
-                new RustVerificationRequest(request, this.outgoingRequestProcessor, this.supportedVerificationMethods),
+                new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods),
             );
         }
     }

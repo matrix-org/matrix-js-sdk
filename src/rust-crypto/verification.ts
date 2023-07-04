@@ -56,7 +56,7 @@ export class RustVerificationRequest
     public constructor(
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
-        private readonly supportedVerificationMethods: string[] | undefined,
+        private readonly supportedVerificationMethods: string[],
     ) {
         super();
 
@@ -223,12 +223,9 @@ export class RustVerificationRequest
 
         this._accepting = true;
         try {
-            const req: undefined | OutgoingRequest =
-                this.supportedVerificationMethods === undefined
-                    ? this.inner.accept()
-                    : this.inner.acceptWithMethods(
-                          this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
-                      );
+            const req: undefined | OutgoingRequest = this.inner.acceptWithMethods(
+                this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+            );
             if (req) {
                 await this.outgoingRequestProcessor.makeOutgoingRequest(req);
             }
