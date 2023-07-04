@@ -171,8 +171,7 @@ export interface IGroupCallRoomState {
     "dataChannelsEnabled"?: boolean;
     "dataChannelOptions"?: IGroupCallDataChannelOptions;
 
-    "io.element.livekit_server_url"?: string;
-    "io.element.livekit_jwt_service_url"?: string;
+    "io.element.livekit_service_url"?: string;
 }
 
 export interface IGroupCallRoomMemberFeed {
@@ -340,8 +339,7 @@ export class GroupCall extends TypedEventEmitter<
             "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
         };
         if (focus) {
-            groupCallState["io.element.livekit_server_url"] = focus.url;
-            groupCallState["io.element.livekit_jwt_service_url"] = focus.jwtServiceUrl;
+            groupCallState["io.element.livekit_service_url"] = focus.livekitServiceUrl;
         }
 
         await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallPrefix, groupCallState, this.groupCallId);

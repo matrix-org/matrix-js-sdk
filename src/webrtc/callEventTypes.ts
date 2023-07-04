@@ -90,8 +90,7 @@ export interface MCallHangupReject extends MCallBase {
 }
 
 export interface FocusInfo {
-    url: string;
-    jwtServiceUrl: string;
+    livekitServiceUrl: string;
 }
 
 /* eslint-enable camelcase */

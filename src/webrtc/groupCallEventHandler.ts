@@ -178,19 +178,16 @@ export class GroupCallEventHandler {
             dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
         }
 
-        const livekitServerUrl = content["io.element.livekit_server_url"];
-        const livekitJwtServiceUrl = content["io.element.livekit_jwt_service_url"];
+        const livekitServiceUrl = content["io.element.livekit_service_url"];
 
         let focus: FocusInfo | undefined;
-        if (livekitServerUrl && livekitJwtServiceUrl) {
+        if (livekitServiceUrl) {
             focus = {
-                url: livekitServerUrl,
-                jwtServiceUrl: livekitJwtServiceUrl,
+                livekitServiceUrl: livekitServiceUrl,
             };
         } else {
             focus = this.client.getFoci()[0]!;
-            content["io.element.livekit_server_url"] = focus.url;
-            content["io.element.livekit_jwt_service_url"] = focus.jwtServiceUrl;
+            content["io.element.livekit_service_url"] = focus.livekitServiceUrl;
             this.client.sendStateEvent(room.roomId, EventType.GroupCallPrefix, content, groupCallId);
         }
 
