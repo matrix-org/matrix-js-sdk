@@ -354,22 +354,26 @@ export class RustVerificationRequest
     }
 }
 
-export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> implements Verifier {
+/** Common base class for `Verifier` implementations which wrap rust classes.
+ *
+ * The generic parameter `InnerType` is the type of the rust Verification class which we wrap.
+ */
+class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
+    VerifierEvent,
+    VerifierEventHandlerMap
+> {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
-    private readonly completionPromise: Promise<void>;
-
-    private callbacks: ShowSasCallbacks | null = null;
+    protected readonly completionPromise: Promise<void>;
 
     public constructor(
-        private readonly inner: RustSdkCryptoJs.Sas,
-        _verificationRequest: RustVerificationRequest,
-        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        protected readonly inner: InnerType,
+        protected readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
 
         this.completionPromise = new Promise<void>((resolve, reject) => {
             const onChange = async (): Promise<void> => {
-                this.updateCallbacks();
+                this.onChange();
 
                 if (this.inner.isDone()) {
                     resolve(undefined);
@@ -390,8 +394,95 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
         this.completionPromise.catch(() => null);
     }
 
+    /**
+     * Hook which is called when the underlying rust class notifies us that there has been a change.
+     *
+     * Can be overridden by subclasses to see if we can notify the application about an update.
+     */
+    protected onChange(): void {}
+
+    /**
+     * Returns true if the verification has been cancelled, either by us or the other side.
+     */
+    public get hasBeenCancelled(): boolean {
+        return this.inner.isCancelled();
+    }
+
+    /**
+     * The ID of the other user in the verification process.
+     */
+    public get userId(): string {
+        return this.inner.otherUserId.toString();
+    }
+
+    /**
+     * Cancel a verification.
+     *
+     * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
+     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
+     *
+     * @param e - the reason for the cancellation.
+     */
+    public cancel(e: Error): void {
+        // TODO: something with `e`
+        const req: undefined | OutgoingRequest = this.inner.cancel();
+        if (req) {
+            this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+    }
+
+    /**
+     * Get the details for an SAS verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
+     * the SAS matches.
+     */
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return null;
+    }
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return null;
+    }
+}
+
+/** A Verifier instance which is used if we are exchanging emojis */
+export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implements Verifier {
+    private callbacks: ShowSasCallbacks | null = null;
+
+    public constructor(
+        inner: RustSdkCryptoJs.Sas,
+        _verificationRequest: RustVerificationRequest,
+        outgoingRequestProcessor: OutgoingRequestProcessor,
+    ) {
+        super(inner, outgoingRequestProcessor);
+    }
+
+    /**
+     * Start the key verification, if it has not already been started.
+     *
+     * This means sending a `m.key.verification.start` if we are the first responder, or a `m.key.verification.accept`
+     * if the other side has already sent a start event.
+     *
+     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
+     *    or times out.
+     */
+    public async verify(): Promise<void> {
+        const req: undefined | OutgoingRequest = this.inner.accept();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+        await this.completionPromise;
+    }
+
     /** if we can now show the callbacks, do so */
-    private updateCallbacks(): void {
+    protected onChange(): void {
         if (this.callbacks === null) {
             const emoji: Array<Emoji> | undefined = this.inner.emoji();
             const decimal = this.inner.decimals() as [number, number, number] | undefined;
@@ -423,53 +514,6 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
     }
 
     /**
-     * Returns true if the verification has been cancelled, either by us or the other side.
-     */
-    public get hasBeenCancelled(): boolean {
-        return this.inner.isCancelled();
-    }
-
-    /**
-     * The ID of the other user in the verification process.
-     */
-    public get userId(): string {
-        return this.inner.otherUserId.toString();
-    }
-
-    /**
-     * Start the key verification, if it has not already been started.
-     *
-     * This means sending a `m.key.verification.start` if we are the first responder, or a `m.key.verification.accept`
-     * if the other side has already sent a start event.
-     *
-     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
-     *    or times out.
-     */
-    public async verify(): Promise<void> {
-        const req: undefined | OutgoingRequest = this.inner.accept();
-        if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
-        }
-        await this.completionPromise;
-    }
-
-    /**
-     * Cancel a verification.
-     *
-     * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
-     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
-     *
-     * @param e - the reason for the cancellation.
-     */
-    public cancel(e: Error): void {
-        // TODO: something with `e`
-        const req: undefined | OutgoingRequest = this.inner.cancel();
-        if (req) {
-            this.outgoingRequestProcessor.makeOutgoingRequest(req);
-        }
-    }
-
-    /**
      * Get the details for an SAS verification, if one is in progress
      *
      * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
@@ -477,16 +521,6 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
      */
     public getShowSasCallbacks(): ShowSasCallbacks | null {
         return this.callbacks;
-    }
-
-    /**
-     * Get the details for reciprocating QR code verification, if one is in progress
-     *
-     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
-     * already scanned our QR code), and we are waiting for the user to confirm.
-     */
-    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
-        return null;
     }
 }
 
