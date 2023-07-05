@@ -570,7 +570,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // build our device keys: these will later be uploaded
         this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key!;
         this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key!;
-        this.deviceKeys["org.matrix.msc2883.v0.dmls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential!.tls_serialize());
+        this.deviceKeys["org.matrix.msc2883.v0.dmls.credential.ed25519:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential!.tls_serialize());
 
         logger.log("Crypto: fetching own devices...");
         let myDevices = this.deviceList.getRawStoredDevicesForUser(this.userId);
