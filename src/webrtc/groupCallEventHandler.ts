@@ -23,6 +23,7 @@ import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { EventType } from "../@types/event";
 import { SyncState } from "../sync";
+import { FocusInfo } from "./callEventTypes";
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -177,6 +178,19 @@ export class GroupCallEventHandler {
             dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
         }
 
+        const livekitServiceUrl = content["io.element.livekit_service_url"];
+
+        let focus: FocusInfo | undefined;
+        if (livekitServiceUrl) {
+            focus = {
+                livekitServiceUrl: livekitServiceUrl,
+            };
+        } else {
+            focus = this.client.getFoci()[0]!;
+            content["io.element.livekit_service_url"] = focus.livekitServiceUrl;
+            this.client.sendStateEvent(room.roomId, EventType.GroupCallPrefix, content, groupCallId);
+        }
+
         const groupCall = new GroupCall(
             this.client,
             room,
@@ -190,6 +204,7 @@ export class GroupCallEventHandler {
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
             this.client.useLivekitForGroupCalls,
+            focus ? [focus] : [],
         );
 
         this.groupCalls.set(room.roomId, groupCall);
