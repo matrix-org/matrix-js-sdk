@@ -206,6 +206,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
             this.lastEvent = this.rootEvent;
             this._currentUserParticipated = false;
+            // Clear the promise so the thread is re-fetched when we next see it
+            this.fetchRootEventPromise = undefined;
             this.emit(ThreadEvent.Delete, this);
         } else {
             await this.updateThreadMetadata();

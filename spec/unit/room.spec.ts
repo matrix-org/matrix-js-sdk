@@ -2794,27 +2794,12 @@ describe("Room", function () {
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse2.getId());
 
-            room.client.fetchRoomEvent = (eventId: string) =>
-                Promise.resolve({
-                    ...threadRoot.event,
-                    unsigned: {
-                        "age": 123,
-                        "m.relations": {
-                            "m.thread": {
-                                latest_event: threadResponse1.event,
-                                count: 1,
-                                current_user_participated: true,
-                            },
-                        },
-                    },
-                });
-
             prom = emitPromise(room, ThreadEvent.Update);
             const threadResponse2Redaction = mkRedaction(threadResponse2);
             await room.addLiveEvents([threadResponse2Redaction]);
             await prom;
             await emitPromise(room, ThreadEvent.Update);
-            expect(thread).toHaveLength(1);
+            expect(thread).toHaveLength(2);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());
 
             room.client.fetchRoomEvent = (eventId: string) =>
