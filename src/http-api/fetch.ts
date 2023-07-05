@@ -18,13 +18,12 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { checkObjectHasKeys, encodeParams } from "../utils";
+import { checkObjectHasKeys, encodeParams, QueryDict } from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { ConnectionError, MatrixError } from "./errors";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
-import { QueryDict } from "../utils";
 
 type Body = Record<string, any> | BodyInit;
 
@@ -40,6 +39,9 @@ export type ResponseType<T, O extends IHttpOpts> = O extends undefined
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
+    // We track in flight GET requests to de-duplicate them
+    // as semantically GET requests done at the same time should yield the same result.
+    private inFlight = new Map<string, Promise<ResponseType<any, O>>>();
 
     public constructor(
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
@@ -170,6 +172,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform a request to the homeserver without any credentials.
+     * De-duplicates simultaneous GET requests to the same URL to improve performance.
      * @param method - The HTTP method e.g. "GET".
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
@@ -202,7 +205,19 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts?: IRequestOpts,
     ): Promise<ResponseType<T, O>> {
         const fullUri = this.getUrl(path, queryParams, opts?.prefix, opts?.baseUrl);
-        return this.requestOtherUrl<T>(method, fullUri, body, opts);
+        const cacheKey = fullUri.toString();
+        if (method === Method.Get && this.inFlight.has(cacheKey)) {
+            return this.inFlight.get(cacheKey)!;
+        }
+
+        const prom = this.requestOtherUrl<T>(method, fullUri, body, opts);
+        if (method === Method.Get) {
+            this.inFlight.set(cacheKey, prom);
+            prom.finally(() => {
+                this.inFlight.delete(cacheKey);
+            });
+        }
+        return prom;
     }
 
     /**
