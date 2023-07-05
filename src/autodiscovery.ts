@@ -66,7 +66,7 @@ interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfi
 /**
  * @experimental
  */
-export interface OidcAuthorityConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig, AutoDiscoveryState {
+export interface OidcAuthorityConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
     metadata?: ValidatedIssuerMetadata;
     signingKeys?: SigningKey[];
 }
@@ -77,7 +77,7 @@ export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m
     /**
      * @experimental
      */
-    "m.authentication"?: OidcAuthorityConfig | AutoDiscoveryState;
+    "m.authentication"?: (OidcAuthorityConfig & AutoDiscoveryState) | AutoDiscoveryState;
 }
 
 /**
@@ -355,7 +355,7 @@ export class AutoDiscovery {
      */
     public static async discoverAndValidateAuthenticationConfig(
         wellKnown: IClientWellKnown,
-    ): Promise<OidcAuthorityConfig | AutoDiscoveryState> {
+    ): Promise<(OidcAuthorityConfig & AutoDiscoveryState) | AutoDiscoveryState> {
         try {
             const result = await discoverAndValidateAuthenticationConfig(wellKnown);
 
