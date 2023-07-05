@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { OidcClient, OidcClientSettings, WebStorageStateStore } from "oidc-client-ts";
+
 import { IDelegatedAuthConfig } from "../client";
 import { Method } from "../http-api";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
@@ -74,6 +76,7 @@ export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: stri
 });
 
 /**
+ * @deprecated use generateOidcAuthorizationUrl
  * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
  * @param authorizationUrl - endpoint to attempt authorization with the OP
@@ -99,6 +102,29 @@ export const generateAuthorizationUrl = async (
     url.searchParams.append("code_challenge", await generateCodeChallenge(codeVerifier));
 
     return url.toString();
+};
+
+/**
+ * @experimental
+ * Generate a URL to attempt authorization with the OP
+ * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
+ * @param oidcClientSettings - oidc configuration
+ * @param homeserverName - used as state
+ * @returns a Promise with the url as a string
+ */
+export const generateOidcAuthorizationUrl = async (
+    oidcClientSettings: OidcClientSettings,
+    homeserverName: string,
+): Promise<string> => {
+    const oidcClient = new OidcClient({
+        ...oidcClientSettings,
+        stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
+    });
+    const request = await oidcClient.createSigninRequest({
+        state: { host: homeserverName },
+    });
+
+    return request.url;
 };
 
 /**

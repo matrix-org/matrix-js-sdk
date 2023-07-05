@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MetadataService, OidcClientSettingsStore, SigningKey } from "oidc-client-ts";
 
-import { IClientWellKnown } from "../client";
+import { IClientWellKnown, IDelegatedAuthConfig } from "../client";
 import { isValidatedIssuerMetadata, ValidatedIssuerMetadata, validateWellKnownAuthentication } from "./validate";
 
 /**
@@ -33,10 +33,12 @@ import { isValidatedIssuerMetadata, ValidatedIssuerMetadata, validateWellKnownAu
  */
 export const discoverAndValidateAuthenticationConfig = async (
     wellKnown: IClientWellKnown,
-): Promise<{
-    metadata: ValidatedIssuerMetadata;
-    signingKeys?: SigningKey[];
-}> => {
+): Promise<
+    IDelegatedAuthConfig & {
+        metadata: ValidatedIssuerMetadata;
+        signingKeys?: SigningKey[];
+    }
+> => {
     const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
 
     // create a temporary settings store so we can use metadata service for discovery
@@ -52,6 +54,7 @@ export const discoverAndValidateAuthenticationConfig = async (
     isValidatedIssuerMetadata(metadata);
 
     return {
+        ...homeserverAuthenticationConfig,
         metadata,
         signingKeys,
     };
