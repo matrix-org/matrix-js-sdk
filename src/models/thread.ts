@@ -98,6 +98,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public readonly room: Room;
     public readonly client: MatrixClient;
     private readonly pendingEventOrdering: PendingEventOrdering;
+    private fetchRootEventPromise?: Promise<void>;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
     /**
@@ -145,14 +146,24 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     }
 
     private async fetchRootEvent(): Promise<void> {
+        if (!this.fetchRootEventPromise) {
+            this.fetchRootEventPromise = this.doFetchRootEvent();
+        }
+        return this.fetchRootEventPromise;
+    }
+
+    // Debounced by `fetchRootEvent` - do not call directly as it is prone to overlapping requests
+    private async doFetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
         // If the rootEvent does not exist in the local stores, then fetch it from the server.
-        try {
-            const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
-            const mapper = this.client.getEventMapper();
-            this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
-        } catch (e) {
-            logger.error("Failed to fetch thread root to construct thread with", e);
+        if (!this.rootEvent) {
+            try {
+                const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
+                const mapper = this.client.getEventMapper();
+                this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
+            } catch (e) {
+                logger.error("Failed to fetch thread root to construct thread with", e);
+            }
         }
         await this.processEvent(this.rootEvent);
     }
@@ -566,7 +577,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * Finds an event by ID in the current thread
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
-        return this.timelineSet.findEventById(eventId);
+        if (this.rootEvent?.getId() === eventId) return this.rootEvent;
+        return this.timelineSet.findEventById(eventId) ?? this.replayEvents?.find((event) => event.getId() === eventId);
     }
 
     /**
