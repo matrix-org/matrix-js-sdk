@@ -2787,10 +2787,10 @@ describe("Room", function () {
             let prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1]);
             const thread: Thread = await prom;
-            await emitPromise(room, ThreadEvent.Update);
 
             expect(thread.initialEventsFetched).toBeTruthy();
             await room.addLiveEvents([threadResponse2]);
+            await emitPromise(room, ThreadEvent.Update);
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse2.getId());
 
