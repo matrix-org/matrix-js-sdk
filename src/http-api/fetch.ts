@@ -210,10 +210,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
             return this.inFlight.get(cacheKey)!;
         }
 
-        const prom = this.requestOtherUrl<T>(method, fullUri, body, opts);
+        let prom = this.requestOtherUrl<T>(method, fullUri, body, opts);
         if (method === Method.Get) {
             this.inFlight.set(cacheKey, prom);
-            prom.finally(() => {
+            prom = prom.finally(() => {
                 this.inFlight.delete(cacheKey);
             });
         }
