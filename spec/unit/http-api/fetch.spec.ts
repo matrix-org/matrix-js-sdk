@@ -18,7 +18,7 @@ import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { ClientPrefix, HttpApiEvent, HttpApiEventHandlerMap, IdentityPrefix, IHttpOpts, Method } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { QueryDict } from "../../../src/utils";
+import { defer, QueryDict } from "../../../src/utils";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -289,5 +289,24 @@ describe("FetchHttpApi", () => {
         describe("when fetch.opts.baseUrl does have a trailing slash", () => {
             runTests(baseUrlWithTrailingSlash);
         });
+    });
+
+    it("should consolidate simultaneous GET requests to the same URL", () => {
+        const deferred = defer<Response>();
+        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            fetchFn,
+            accessToken: "token",
+        });
+
+        api.authedRequest(Method.Get, "/path");
+        api.authedRequest(Method.Get, "/path");
+        api.authedRequest(Method.Get, "/path");
+        api.authedRequest(Method.Get, "/path");
+        deferred.resolve({ ok: true, text: () => "foobar" } as unknown as Response);
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 });
