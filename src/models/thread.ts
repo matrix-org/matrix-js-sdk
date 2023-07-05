@@ -98,6 +98,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public readonly room: Room;
     public readonly client: MatrixClient;
     private readonly pendingEventOrdering: PendingEventOrdering;
+    private processRootEventPromise?: Promise<void>;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
     /**
@@ -197,6 +198,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this._currentUserParticipated = false;
             this.emit(ThreadEvent.Delete, this);
         } else {
+            if (this.lastEvent?.getId() === event.getAssociatedId()) {
+                // XXX: If our last event got redacted we query the server for the last event once again
+                this.processRootEventPromise = undefined;
+            }
             await this.updateThreadMetadata();
         }
     };
@@ -480,18 +485,26 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    private async updateThreadMetadata(): Promise<void> {
-        this.updatePendingReplyCount();
-
+    private async updateThreadFromRootEvent(): Promise<void> {
         if (Thread.hasServerSideSupport) {
             // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
             // don't want the thread preview to be empty if we can avoid it
-            if (!this.initialEventsFetched) {
+            if (!this.initialEventsFetched && !this.lastEvent) {
                 await this.processRootEvent();
             }
             await this.fetchRootEvent();
         }
         await this.processRootEvent();
+    }
+
+    private async updateThreadMetadata(): Promise<void> {
+        this.updatePendingReplyCount();
+
+        if (!this.processRootEventPromise) {
+            // We only want to do this once otherwise we end up rolling back to the last unsigned summary we have for the thread
+            this.processRootEventPromise = this.updateThreadFromRootEvent();
+        }
+        await this.processRootEventPromise;
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
