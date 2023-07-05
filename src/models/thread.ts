@@ -155,8 +155,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     // Debounced by `fetchRootEvent` - do not call directly as it is prone to overlapping requests
     private async doFetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
-        // If the rootEvent does not exist in the local stores, then fetch it from the server.
-        if (!this.rootEvent) {
+        // If the rootEvent does not exist in the local stores or it doesn't contain the unsigned m.thread data,
+        // then fetch it from the server.
+        if (!this.rootEvent || this.getRootEventBundledRelationship() === undefined) {
             try {
                 const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
                 const mapper = this.client.getEventMapper();
