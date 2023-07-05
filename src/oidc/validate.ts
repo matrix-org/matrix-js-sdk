@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import jwtDecode from "jwt-decode";
+import { OidcMetadata } from "oidc-client-ts";
 
 import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
 import { logger } from "../logger";
@@ -101,6 +102,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     const isInvalid = [
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
+        requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
@@ -118,6 +120,34 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     logger.error("Issuer configuration not valid");
     throw new Error(OidcError.OpSupport);
 };
+
+/**
+ * Metadata from OIDC authority discovery
+ * With validated properties required in type
+ */
+export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
+    Pick<
+        OidcMetadata,
+        | "authorization_endpoint"
+        | "token_endpoint"
+        | "registration_endpoint"
+        | "response_types_supported"
+        | "grant_types_supported"
+        | "code_challenge_methods_supported"
+    >;
+
+/**
+ * Wraps validateOIDCIssuerWellKnown in a type assertion
+ * that asserts expected properties are present
+ * (Typescript assertions cannot be arrow functions)
+ * @param metadata - issuer openid-configuration response
+ * @throws when metadata validation fails
+ */
+export function isValidatedIssuerMetadata(
+    metadata: Partial<OidcMetadata>,
+): asserts metadata is ValidatedIssuerMetadata {
+    validateOIDCIssuerWellKnown(metadata);
+}
 
 /**
  * Standard JWT claims.

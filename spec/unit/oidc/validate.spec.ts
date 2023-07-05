@@ -129,6 +129,7 @@ describe("validateOIDCIssuerWellKnown", () => {
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
         registration_endpoint: "https://authorize.org/regsiter",
+        revocation_endpoint: "https://authorize.org/regsiter",
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
