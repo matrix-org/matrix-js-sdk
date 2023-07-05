@@ -19,6 +19,9 @@ limitations under the License.
  */
 
 import {
+    EventType
+} from "../../@types/event";
+import {
     DecryptionAlgorithm,
     DecryptionError,
     EncryptionAlgorithm,
@@ -35,16 +38,16 @@ import * as matrixDmls from "@matrix-org/matrix-dmls-wasm";
 import * as olmlib from "../olmlib";
 
 export const MLS_ALGORITHM = new UnstableValue(
-    "m.mls.v1.dhkemx25519-aes128gcm-sha256-ed25519",
-    "org.matrix.msc2883.v0.mls.dhkemx25519-aes128gcm-sha256-ed25519",
+    "m.dmls.v1.dhkemx25519-aes128gcm-sha256-ed25519",
+    "org.matrix.msc2883.v0.dmls.dhkemx25519-aes128gcm-sha256-ed25519",
 );
 export const INIT_KEY_ALGORITHM = new UnstableValue(
-    "m.mls.v1.init_key.dhkemx25519",
-    "org.matrix.msc2883.v0.mls.init_key.dhkemx25519",
+    "m.dmls.v1.key_package.dhkemx25519-aes128gcm-sha256-ed25519",
+    "org.matrix.msc2883.v0.dmls.key_package.dhkemx25519-aes128gcm-sha256-ed25519",
 );
 export const WELCOME_PACKAGE = new UnstableValue(
-    "m.mls.v1.welcome.dhkemx25519-aes128gcm-sha256-ed25519",
-    "org.matrix.msc2883.v0.mls.welcome.dhkemx25519-aes128gcm-sha256-ed25519",
+    "m.dmls.v1.welcome.dhkemx25519-aes128gcm-sha256-ed25519",
+    "org.matrix.msc2883.v0.dmls.welcome.dhkemx25519-aes128gcm-sha256-ed25519",
 );
 
 /* eslint-disable camelcase */
@@ -74,38 +77,42 @@ class MlsEncryption extends EncryptionAlgorithm {
             const timeline = room.getLiveTimeline();
             const events = timeline.getEvents();
             events.reverse();
-            let publicGroupStateContents: IContent  | undefined;
+            let publicGroupStateEvent: MatrixEvent | undefined;
             for (const event of events) {
                 if (event.getWireType() == "m.room.encrypted") {
                     const contents = event.getWireContent();
                     if (contents.algorithm == MLS_ALGORITHM.name &&
                         "public_group_state" in contents &&
                         "sender" in contents) {
-                        publicGroupStateContents = contents;
+                        publicGroupStateEvent = event;
                         break;
                     }
                 }
             }
             // FIXME: search for more events if we still don't have public state
             // FIXME: search for public group state again if the join fails
-            if (publicGroupStateContents) {
+            if (publicGroupStateEvent) {
+                const publicGroupStateContents = publicGroupStateEvent.getWireContent();
                 const [joinedGroup, message] = mlsProvider.joinByExternalCommit(
                     publicGroupStateContents.public_group_state,
                     this.roomId,
+                    publicGroupStateEvent.getId()!,
                 );
 
                 const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
                 group = joinedGroup;
                 const publicGroupState = group.public_group_state(mlsProvider.backend!);
                 const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
-                await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
+                const {event_id: eventId} = await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
                     algorithm: MLS_ALGORITHM.name,
                     ciphertext: olmlib.encodeUnpaddedBase64(message),
                     epoch_creator: publicGroupStateContents.sender,
                     sender: senderB64,
                     resolves: [],
                     public_group_state: publicGroupStateB64,
+                    commit_event: publicGroupStateEvent.getId(),
                 });
+                mlsProvider.addEpochEvent(group, this.roomId, eventId);
             }
         }
         if (!group) {
@@ -131,13 +138,35 @@ class MlsEncryption extends EncryptionAlgorithm {
 
         if (group.has_changes() || group.needs_resolve()) {
             console.log("[MLS] has changes/needs resolve", group.has_changes(), group.needs_resolve());
-            const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
+            const [commit, baseEpochNum, baseEpochCreator, resolves, welcomeInfo] = await group.resolve(mlsProvider.backend!);
             const [epochNum, epochCreator] = group.epoch();
             // don't wait for it to complete
             this.crypto.backupManager.backupGroupSession(this.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
 
-            const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
+            const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(baseEpochCreator));
             const senderB64 = olmlib.encodeUnpaddedBase64(joinId(this.userId, this.deviceId));
+
+            // FIXME: check if external commits are allowed
+            const publicGroupState = group.public_group_state(mlsProvider.backend!);
+            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+            // FIXME: should we store public group state in media repo instead?
+
+            const baseEventId = mlsProvider.getEpochEvent(
+                this.roomId, BigInt(baseEpochNum), creatorB64,
+            );
+
+            const {event_id: eventId} = await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
+                algorithm: MLS_ALGORITHM.name,
+                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
+                epoch_creator: creatorB64,
+                sender: senderB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
+                public_group_state: publicGroupStateB64,
+                commit_event: baseEventId,
+            });
+            mlsProvider.addEpochEvent(group, this.roomId, eventId);
 
             if (welcomeInfo) {
                 const [welcome, adds] = welcomeInfo;
@@ -150,9 +179,11 @@ class MlsEncryption extends EncryptionAlgorithm {
                     algorithm: WELCOME_PACKAGE.name,
                     ciphertext: welcomeB64,
                     sender: senderB64,
+                    room_id: room.roomId,
                     resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
                         return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
                     }),
+                    commit_event: eventId,
                 }
 
                 for (const user of adds) {
@@ -169,22 +200,6 @@ class MlsEncryption extends EncryptionAlgorithm {
 
                 await this.baseApis.sendToDevice("m.room.encrypted", contentMap);
             }
-
-            // FIXME: check if external commits are allowed
-            const publicGroupState = group.public_group_state(mlsProvider.backend!);
-            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
-            // FIXME: should we store public group state in media repo instead?
-
-            await this.baseApis.sendEvent(this.roomId, "m.room.encrypted", {
-                algorithm: MLS_ALGORITHM.name,
-                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
-                epoch_creator: creatorB64,
-                sender: senderB64,
-                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
-                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
-                }),
-                public_group_state: publicGroupStateB64,
-            });
         }
 
         const payload = textEncoder.encode(JSON.stringify({
@@ -192,11 +207,18 @@ class MlsEncryption extends EncryptionAlgorithm {
             type: eventType,
             content: content,
         }));
-        const [ciphertext, _epoch, creator] = group.encrypt_message(mlsProvider.backend!, payload);
+        const [ciphertext, baseEpochNum, baseEpochCreator] = group.encrypt_message(mlsProvider.backend!, payload);
+        const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(baseEpochCreator));
+        console.log(this.roomId, baseEpochNum, creatorB64);
+        const baseEventId = mlsProvider.getEpochEvent(
+            this.roomId, BigInt(baseEpochNum), creatorB64,
+        )!;
+        console.log(baseEventId);
         return {
             algorithm: MLS_ALGORITHM.name,
             ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(ciphertext)),
-            epoch_creator: olmlib.encodeUnpaddedBase64(Uint8Array.from(creator)),
+            epoch_creator: creatorB64,
+            commit_event: baseEventId,
         }
     }
 }
@@ -401,11 +423,16 @@ class WelcomeDecryption extends DecryptionAlgorithm {
         console.log("[MLS] Got welcome", content);
         // FIXME: check that it's a to-device event
         if (typeof(content.ciphertext) !== "string" ||
-            typeof(content.sender) !== "string" ||
+            typeof(content.epoch_creator) !== "string" ||
             !Array.isArray(content.resolves)) {
             throw new DecryptionError("MLS_WELCOME_MISSING_FIELDS", "Missing or invalid fields in input");
         }
-        this.crypto.mlsProvider.processWelcome(content.ciphertext, content.sender, content.resolves);
+        this.crypto.mlsProvider.processWelcome(
+            content.ciphertext,
+            content.epoch_creator,
+            content.resolves,
+            content.commit_event,
+        );
         // welcome packages don't have any visible representation and don't get
         // processed further
         return {
@@ -431,6 +458,7 @@ export class MlsProvider {
     private readonly groups: Map<string, matrixDmls.DmlsGroup>;
     private readonly storage: Map<string, number[]>;
     private readonly members: Map<string, Map<string, Set<string>>>;
+    private readonly epochMap: Map<string, Map<BigInt, Map<string, string>>>;
     public backend?: matrixDmls.DmlsCryptoProvider;
     public credential?: matrixDmls.Credential;
 
@@ -441,6 +469,7 @@ export class MlsProvider {
         // FIXME: DmlsCryptoProvider should also use cryptostorage
         this.storage = new Map();
         this.members = new Map();
+        this.epochMap = new Map();
     }
 
     async init(): Promise<void> {
@@ -507,8 +536,9 @@ export class MlsProvider {
         this.groups.set(room.roomId, group);
 
         const [epochNum, epochCreator] = group.epoch();
+        const epochCreatorB64 = olmlib.encodeUnpaddedBase64(epochCreator);
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+        this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, epochCreatorB64);
 
         const userId = baseApis.getUserId()!;
         const deviceMap = await this.crypto.deviceList.downloadKeys([userId].concat(invite), false);
@@ -534,14 +564,38 @@ export class MlsProvider {
         const sender = joinId(baseApis.getUserId()!, baseApis.getDeviceId()!);
         const senderB64 = olmlib.encodeUnpaddedBase64(sender);
 
+        const createEvent = room.currentState.getStateEvents(EventType.RoomCreate, "")!;
+
         if (addedMembers) {
             const [commit, _mlsEpoch, creator, resolves, welcomeInfo] = await group.resolve(this.backend!);
 
             const [epochNum, epochCreator] = group.epoch();
+            const epochCreatorB64 = olmlib.encodeUnpaddedBase64(epochCreator);
             // don't wait for it to complete
-            this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+            this.crypto.backupManager.backupGroupSession(room.roomId, epochNum, epochCreatorB64);
 
             const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(creator));
+
+            // FIXME: check if external commits are allowed
+            const publicGroupState = group.public_group_state(this.backend!);
+            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
+
+            const {event_id: eventId} = await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
+                algorithm: MLS_ALGORITHM.name,
+                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
+                epoch_creator: creatorB64,
+                sender: senderB64,
+                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
+                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
+                }),
+                public_group_state: publicGroupStateB64,
+                commit_event: createEvent.getId(),
+            });
+
+            const roomEpochMap = new Map<BigInt, Map<string, string>>();
+            roomEpochMap.set(BigInt(epochNum), new Map<string, string>([[epochCreatorB64, eventId]]));
+            this.epochMap.set(room.roomId, roomEpochMap);
+            console.log("has welcomes", this.epochMap);
 
             if (welcomeInfo) {
                 const [welcome, adds] = welcomeInfo;
@@ -553,10 +607,12 @@ export class MlsProvider {
                 const payload = {
                     algorithm: WELCOME_PACKAGE.name,
                     ciphertext: welcomeB64,
-                    creator: creatorB64,
+                    sender: creatorB64,
+                    room_id: room.roomId,
                     resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
                         return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
                     }),
+                    commit_event: eventId,
                 }
 
                 for (const user of adds) {
@@ -573,40 +629,36 @@ export class MlsProvider {
 
                 await baseApis.sendToDevice("m.room.encrypted", contentMap);
             }
-
-            // FIXME: check if external commits are allowed
-            const publicGroupState = group.public_group_state(this.backend!);
-            const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
-
-            await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
-                algorithm: MLS_ALGORITHM.name,
-                ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(commit)),
-                epoch_creator: creatorB64,
-                sender: senderB64,
-                resolves: resolves.map(([epochNum, creator]: [number, number[]]) => {
-                    return [epochNum, olmlib.encodeUnpaddedBase64(Uint8Array.from(creator))];
-                }),
-                public_group_state: publicGroupStateB64,
-            });
         } else {
             // FIXME: check if external commits are allowed
             const publicGroupState = group.public_group_state(this.backend!);
             const publicGroupStateB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(publicGroupState));
 
-            await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
+            const {event_id: eventId} = await baseApis.sendEvent(room.roomId, "m.room.encrypted", {
                 algorithm: MLS_ALGORITHM.name,
                 ciphertext: "",
                 epoch_creator: senderB64,
                 sender: senderB64,
                 resolves: [],
                 public_group_state: publicGroupStateB64,
+                commit_event: createEvent.getId(),
             });
+
+            const roomEpochMap = new Map<BigInt, Map<string, string>>();
+            roomEpochMap.set(BigInt(epochNum), new Map<string, string>([[epochCreatorB64, eventId]]));
+            this.epochMap.set(room.roomId, roomEpochMap);
+            console.log("no welcomes", epochNum, this.epochMap);
         }
 
         return group;
     }
 
-    processWelcome(welcomeB64: string, creatorB64: string, resolvesB64: [number, string][]): void {
+    processWelcome(
+        welcomeB64: string,
+        creatorB64: string,
+        resolvesB64: [number, string][],
+        commitEvent: string,
+    ): void {
         const welcome = olmlib.decodeBase64(welcomeB64);
         const creator = olmlib.decodeBase64(creatorB64);
         const resolves = resolvesB64.map(([epochNum, creatorB64]) => {
@@ -619,8 +671,18 @@ export class MlsProvider {
         // FIXME: check that it's a valid room ID
 
         const [epochNum, epochCreator] = group.epoch();
+        const epochCreatorB64 = olmlib.encodeUnpaddedBase64(epochCreator);
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(groupId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+        this.crypto.backupManager.backupGroupSession(groupId, epochNum, epochCreatorB64);
+
+        if (!this.epochMap.has(groupId)) {
+            this.epochMap.set(groupId, new Map());
+        }
+        const roomEpochMap = this.epochMap.get(groupId)!;
+        if (!roomEpochMap.has(BigInt(epochNum))) {
+            this.epochMap.set(BigInt(epochNum), new Map());
+        }
+        roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, commitEvent);
 
         const oldGroup = this.groups.get(groupId);
 
@@ -656,7 +718,7 @@ export class MlsProvider {
         }
     }
 
-    joinByExternalCommit(publicGroupStateB64: string, roomId: string): [matrixDmls.DmlsGroup, Uint8Array] {
+    joinByExternalCommit(publicGroupStateB64: string, roomId: string, commitEvent: string): [matrixDmls.DmlsGroup, Uint8Array] {
         const publicGroupState = olmlib.decodeBase64(publicGroupStateB64);
         const joinResult = matrixDmls.DmlsGroup.join_by_external_commit(
             this.backend!,
@@ -680,8 +742,18 @@ export class MlsProvider {
         }
 
         const [epochNum, epochCreator] = group.epoch();
+        const epochCreatorB64 = olmlib.encodeUnpaddedBase64(epochCreator);
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(roomId, epochNum, olmlib.encodeUnpaddedBase64(epochCreator));
+        this.crypto.backupManager.backupGroupSession(roomId, epochNum, epochCreatorB64);
+
+        if (!this.epochMap.has(roomId)) {
+            this.epochMap.set(roomId, new Map());
+        }
+        const roomEpochMap = this.epochMap.get(roomId)!;
+        if (!roomEpochMap.has(BigInt(epochNum))) {
+            this.epochMap.set(BigInt(epochNum), new Map());
+        }
+        roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, commitEvent);
 
         const members: Map<string, Set<string>> = new Map();
         for (const member of group.members(this.backend!)) {
@@ -699,6 +771,26 @@ export class MlsProvider {
 
     getGroup(roomId: string): matrixDmls.DmlsGroup | undefined {
         return this.groups.get(roomId);
+    }
+
+    addEpochEvent(group: matrixDmls.DmlsGroup, roomId: string, eventId: string): void {
+        const [epochNum, epochCreator] = group.epoch();
+        const epochCreatorB64 = olmlib.encodeUnpaddedBase64(epochCreator);
+
+        if (!this.epochMap.has(roomId)) {
+            this.epochMap.set(roomId, new Map());
+        }
+        const roomEpochMap = this.epochMap.get(roomId)!;
+        if (!roomEpochMap.has(BigInt(epochNum))) {
+            this.epochMap.set(BigInt(epochNum), new Map());
+        }
+        roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, eventId);
+    }
+
+    getEpochEvent(roomId: string, epochNum: BigInt, epochCreator: string): string | undefined {
+        console.log(this.epochMap.get(roomId));
+        console.log(this.epochMap.get(roomId)?.get(epochNum));
+        return this.epochMap.get(roomId)?.get(epochNum)?.get(epochCreator);
     }
 
     syncMembers(roomId: string, members: Map<string, Set<string>>): void {

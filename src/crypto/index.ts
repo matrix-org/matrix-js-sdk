@@ -230,6 +230,7 @@ export interface IMlsEncryptedContent {
     algorithm: typeof dmls.MLS_ALGORITHM.name;
     ciphertext: string;
     epoch_creator: string;
+    commit_event: string;
 }
 /* eslint-enable camelcase */
 
@@ -569,7 +570,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // build our device keys: these will later be uploaded
         this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key!;
         this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key!;
-        this.deviceKeys["org.matrix.msc2883.v0.mls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential!.tls_serialize());
+        this.deviceKeys["org.matrix.msc2883.v0.dmls.credential:" + this.deviceId] = olmlib.encodeUnpaddedBase64(this.mlsProvider.credential!.tls_serialize());
 
         logger.log("Crypto: fetching own devices...");
         let myDevices = this.deviceList.getRawStoredDevicesForUser(this.userId);
@@ -2018,9 +2019,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         await Promise.all(promises);
 
+        const util = new global.Olm.Utility();
         for (const key of initKeys) {
-            oneTimeJson[dmls.INIT_KEY_ALGORITHM.name + ":" + key] = key;
+            oneTimeJson[dmls.INIT_KEY_ALGORITHM.name + ":" + util.sha256(key)] = key;
         }
+        util.free();
 
         const requestBody: Record<string, any> = {
             one_time_keys: oneTimeJson,
