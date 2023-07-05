@@ -2780,26 +2780,38 @@ describe("Room", function () {
                 opts: IRelationsRequestOpts = { dir: Direction.Backward },
             ) =>
                 Promise.resolve({
-                    chunk: [threadResponse1.event] as IEvent[],
+                    chunk: [threadResponse1.event, threadResponse2.event] as IEvent[],
                     next_batch: "start_token",
                 });
 
             let prom = emitPromise(room, ThreadEvent.New);
-            await room.addLiveEvents([threadRoot, threadResponse1]);
+            await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
             const thread: Thread = await prom;
             await emitPromise(room, ThreadEvent.Update);
 
             expect(thread.initialEventsFetched).toBeTruthy();
-            await room.addLiveEvents([threadResponse2]);
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse2.getId());
 
-            prom = emitPromise(room, ThreadEvent.Update);
+            room.client.fetchRoomEvent = (eventId: string) =>
+                Promise.resolve({
+                    ...threadRoot.event,
+                    unsigned: {
+                        "age": 123,
+                        "m.relations": {
+                            "m.thread": {
+                                latest_event: threadResponse1.event,
+                                count: 1,
+                                current_user_participated: true,
+                            },
+                        },
+                    },
+                });
+
             const threadResponse2Redaction = mkRedaction(threadResponse2);
             await room.addLiveEvents([threadResponse2Redaction]);
-            await prom;
             await emitPromise(room, ThreadEvent.Update);
-            expect(thread).toHaveLength(2);
+            expect(thread).toHaveLength(1);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());
 
             room.client.fetchRoomEvent = (eventId: string) =>

@@ -167,7 +167,8 @@ export abstract class ReadReceipt<
             );
         }
 
-        const preferSynthetic = ordering === null || ordering < 0;
+        // We only prefer the synthetic if it is the one we just added or if it points to a later event than the real
+        const preferSynthetic = (synthetic && ordering === null) || (ordering !== null && ordering < 0);
 
         // we don't bother caching just real receipts by event ID as there's nothing that would read it.
         // Take the current cached receipt before we overwrite the pair elements.

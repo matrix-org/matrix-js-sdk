@@ -98,7 +98,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public readonly room: Room;
     public readonly client: MatrixClient;
     private readonly pendingEventOrdering: PendingEventOrdering;
-    private fetchRootEventPromise?: Promise<void>;
+    private processRootEventPromise?: Promise<void>;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
     /**
@@ -146,14 +146,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     }
 
     private async fetchRootEvent(): Promise<void> {
-        if (!this.fetchRootEventPromise) {
-            this.fetchRootEventPromise = this.doFetchRootEvent();
-        }
-        return this.fetchRootEventPromise;
-    }
-
-    // Debounced by `fetchRootEvent` - do not call directly as it is prone to overlapping requests
-    private async doFetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
         // If the rootEvent does not exist in the local stores or it doesn't contain the unsigned m.thread data,
         // then fetch it from the server.
@@ -208,10 +200,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.lastEvent = this.rootEvent;
             this._currentUserParticipated = false;
             // Clear the promise so the thread is re-fetched when we next see it
-            this.fetchRootEventPromise = undefined;
+            this.processRootEventPromise = undefined;
             this.emit(ThreadEvent.Delete, this);
         } else {
-            await this.updateThreadMetadata();
+            await this.updateThreadMetadata(true);
         }
     };
 
@@ -489,18 +481,24 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    private async updateThreadMetadata(): Promise<void> {
+    private async updateThreadMetadata(forceUpdateRoot = false): Promise<void> {
         this.updatePendingReplyCount();
 
-        if (Thread.hasServerSideSupport) {
-            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
-            // don't want the thread preview to be empty if we can avoid it
-            if (!this.initialEventsFetched) {
-                await this.processRootEvent();
+        if (!this.processRootEventPromise || forceUpdateRoot) {
+            if (Thread.hasServerSideSupport) {
+                // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
+                // don't want the thread preview to be empty if we can avoid it
+                if (!this.initialEventsFetched) {
+                    this.processRootEventPromise = this.processRootEvent();
+                    await this.processRootEventPromise;
+                }
+
+                this.processRootEventPromise = this.fetchRootEvent();
+                await this.processRootEventPromise;
             }
-            await this.fetchRootEvent();
+            this.processRootEventPromise = this.processRootEvent();
         }
-        await this.processRootEvent();
+        await this.processRootEventPromise;
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
@@ -581,6 +579,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
         if (this.rootEvent?.getId() === eventId) return this.rootEvent;
+        if (this.lastEvent?.getId() === eventId) return this.lastEvent;
         return this.timelineSet.findEventById(eventId) ?? this.replayEvents?.find((event) => event.getId() === eventId);
     }
 

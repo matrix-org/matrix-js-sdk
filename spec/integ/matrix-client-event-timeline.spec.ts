@@ -1247,7 +1247,7 @@ describe("MatrixClient event timelines", function () {
                     encodeURIComponent(THREAD_RELATION_TYPE.name) +
                     buildRelationPaginationQuery({
                         dir: Direction.Backward,
-                        limit: 3,
+                        limit: 1,
                         recurse: true,
                     }),
             )
