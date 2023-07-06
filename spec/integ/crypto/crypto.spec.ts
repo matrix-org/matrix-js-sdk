@@ -628,6 +628,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         },
     };
 
+    /**
+     * Mocks the POST `/keys/query` request and returns the `device_keys` from the request payload.
+     * https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+     */
     function awaitKeyQueryRequest(): Promise<Record<string, []>> {
         return new Promise((resolve) => {
             const listener = (url: string, options: RequestInit) => {
@@ -2417,20 +2421,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         describe("checkOwnCrossSigningTrust", () => {
             /**
-             * TODO
-             * Send in the sync response the provided `secretStorageKey` into the account_data field
-             * The key is set for the `m.secret_storage.default_key` and `m.secret_storage.key.${secretStorageKey}` events
+             * Send in the sync response the provided encrypted keys into the account_data field
+             * The `m.cross_signing.master`, `m.cross_signing.self_signing`, `m.cross_signing.user_signing` events are set
              * https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
              * @param secretStorageKey
              * @param encryptedMasterKey
              * @param encryptedSelfSigningKey
-             * @param userSigningKey
+             * @param encryptedUserSigningKey
              */
             function sendCrossSigningKeySyncResponse(
                 secretStorageKey: string,
                 encryptedMasterKey: Record<string, any>,
                 encryptedSelfSigningKey: Record<string, any>,
-                userSigningKey: Record<string, any>,
+                encryptedUserSigningKey: Record<string, any>,
             ) {
                 syncResponder.sendOrQueueSyncResponse({
                     next_batch: 1,
@@ -2453,7 +2456,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                             {
                                 type: "m.cross_signing.user_signing",
                                 content: {
-                                    encrypted: userSigningKey,
+                                    encrypted: encryptedUserSigningKey,
                                     key: secretStorageKey,
                                 },
                             },
@@ -2462,10 +2465,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             }
 
-            function awaitSignatureUpload(): Promise<any> {
+            /**
+             * Create a mock response to the POST request `/_matrix/client/v3/keys/signatures/upload`
+             * https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keyssignaturesupload
+             *
+             * @returns the uploaded signatures
+             */
+            function awaitSignatureUpload(): Promise<Record<string, Record<string, any>>> {
                 return new Promise((resolve) => {
                     fetchMock.post(
-                        `express:/_matrix/client/r0/_matrix/client/v3/keys/signatures/upload`,
+                        `express:/_matrix/client/v3/keys/signatures/upload`,
                         (url: string, options: RequestInit) => {
                             const content = JSON.parse(options.body as string);
                             resolve(content);
@@ -2508,6 +2517,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const signatureUploadPromise = awaitSignatureUpload();
                 await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: true });
 
+                // Expect `keys/query` to have been called
                 expect(await keyQueryRequestPromise).toEqual({
                     [aliceClient.getUserId()!]: [],
                 });

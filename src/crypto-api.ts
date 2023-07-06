@@ -230,8 +230,11 @@ export interface CryptoApi {
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 
     /**
-     * Check the copy of our cross-signing key that we have in the device list and
-     * see if we can get the private key. If so, mark it as trusted.
+     * Check the cross signing trust of the current user
+     *
+     * - Download device keys
+     * - Import cross signing keys from the secret storage
+     * - Verify the current device
      *
      * @param opts - Options object.
      */
@@ -502,6 +505,9 @@ export interface GeneratedSecretStorageKey {
  * Options object for {@link CryptoApi#checkOwnCrossSigningTrust}.
  */
 export interface CheckOwnCrossSigningTrustOpts {
+    /**
+     * If true, will fetch the private cross singing keys from the secret storage
+     */
     allowPrivateKeyRequests?: boolean;
 }
 
