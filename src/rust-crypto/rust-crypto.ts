@@ -51,7 +51,7 @@ import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSec
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
-import { decodeRecoveryKey, encodeRecoveryKey } from "../crypto/recoverykey";
+// import { decodeRecoveryKey, encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
 import { EventType } from "../@types/event";
@@ -914,8 +914,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const { recoveryKeyBase58 } = await this.olmMachine.getBackupKeys();
-        return decodeRecoveryKey(recoveryKeyBase58);
+        // un comment when https://github.com/matrix-org/matrix-rust-sdk/pull/2196 is merged
+
+        // const { recoveryKeyBase58 } = await this.olmMachine.getBackupKeys();
+        // return decodeRecoveryKey(recoveryKeyBase58);
+        return null;
     }
 
     /**
@@ -924,16 +927,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @returns a promise so you can catch failures
      */
     public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
-        if (!(key instanceof Uint8Array)) {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string
-            throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
-        }
+        // un comment when https://github.com/matrix-org/matrix-rust-sdk/pull/2196 is merged
 
-        const base58Key = encodeRecoveryKey(key);
-        if (base58Key && typeof base58Key === "string") {
-            // TODO get version from backupManager
-            await this.olmMachine.saveBackupRecoveryKey(base58Key, "");
-        }
+        // if (!(key instanceof Uint8Array)) {
+        //     // eslint-disable-next-line @typescript-eslint/no-base-to-string
+        //     throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+        // }
+
+        // const base58Key = encodeRecoveryKey(key);
+        // if (base58Key && typeof base58Key === "string") {
+        //     // TODO get version from backupManager
+        //     await this.olmMachine.saveBackupRecoveryKey(base58Key, "");
+        // }
+        return;
     }
 
     public getBackupManager(): SecureKeyBackup {

@@ -17,7 +17,7 @@ limitations under the License.
 import { IKeyBackupCheck, KeyBackupStatus, SecureKeyBackup } from "../crypto-api/keybackup";
 
 export class RustBackupManager implements SecureKeyBackup {
-    stop(): void {
+    public stop(): void {
         throw new Error("Method not implemented.");
     }
 
