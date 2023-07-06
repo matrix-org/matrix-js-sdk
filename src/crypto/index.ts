@@ -1832,6 +1832,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.outgoingRoomKeyRequestManager.stop();
         this.deviceList.stop();
         this.dehydrationManager.stop();
+        this.backupManager.stop();
     }
 
     /**
