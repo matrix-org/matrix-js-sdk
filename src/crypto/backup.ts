@@ -124,7 +124,6 @@ export class BackupManager {
     public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
-        this.clientRunning = true;
     }
 
     /**
