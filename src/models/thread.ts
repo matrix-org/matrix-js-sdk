@@ -362,7 +362,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             return;
         }
 
-        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (event.getId() !== this.id && event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.replyCount++;
         }
 
