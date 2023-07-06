@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClient, OidcClientSettings, WebStorageStateStore } from "oidc-client-ts";
+import { OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
 import { IDelegatedAuthConfig } from "../client";
 import { Method } from "../http-api";
@@ -22,7 +22,7 @@ import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
-import { validateIdToken, ValidatedIssuerConfig } from "./validate";
+import { validateIdToken, ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate";
 
 /**
  * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
@@ -37,6 +37,11 @@ export type AuthorizationParams = {
     nonce: string;
 };
 
+/**
+ * @experimental
+ * Generate the scope used in authorization request with OIDC OP
+ * @returns scope
+ */
 const generateScope = (): string => {
     const deviceId = randomString(10);
     return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
@@ -112,16 +117,35 @@ export const generateAuthorizationUrl = async (
  * @param homeserverName - used as state
  * @returns a Promise with the url as a string
  */
-export const generateOidcAuthorizationUrl = async (
-    oidcClientSettings: OidcClientSettings,
-    homeserverName: string,
-): Promise<string> => {
+export const generateOidcAuthorizationUrl = async ({
+    metadata,
+    redirectUri,
+    clientId,
+    homeserverUrl,
+    nonce,
+}: {
+    clientId: string;
+    metadata: ValidatedIssuerMetadata;
+    homeserverUrl: string;
+    redirectUri: string;
+    nonce: string;
+}): Promise<string> => {
+    const scope = await generateScope();
     const oidcClient = new OidcClient({
-        ...oidcClientSettings,
-        stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
+        ...metadata,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        authority: metadata.issuer,
+        response_mode: "query",
+        response_type: "code",
+        extraQueryParams: {
+            nonce,
+        },
+        scope,
+        stateStore: new WebStorageStateStore({ prefix: "mx_", store: window.sessionStorage }),
     });
     const request = await oidcClient.createSigninRequest({
-        state: { host: homeserverName },
+        state: { host: homeserverUrl },
     });
 
     return request.url;

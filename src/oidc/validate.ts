@@ -128,9 +128,11 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
     Pick<
         OidcMetadata,
+        | "issuer"
         | "authorization_endpoint"
         | "token_endpoint"
         | "registration_endpoint"
+        | "revocation_endpoint"
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
