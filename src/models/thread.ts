@@ -362,9 +362,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             return;
         }
 
-        // If no thread support exists we want to count all thread relation
-        // added as a reply. We can't rely on the bundled relationships count
-        if ((!Thread.hasServerSideSupport || !this.rootEvent) && event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.replyCount++;
         }
 
