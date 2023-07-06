@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
-import "fake-indexeddb/auto";
 
 import { logger } from "../../../src/logger";
 import { decodeRecoveryKey } from "../../../src/crypto/recoverykey";
@@ -79,40 +78,16 @@ const CURVE25519_BACKUP_INFO: IKeyBackupInfo = {
     auth_data: {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
         // Will be updated with correct value on the fly
-        signatures: {
-            "@alice:localhost": {
-                "ed25519:BGVSTTXKZB":
-                    "RNUIJIcDrsyvKV4MReMzllZ6yx05803tR0/tdO8poS62wUsVNOgxglC2VPwGSxji/hxv7c7D8FTuQ3uQWcR1DQ",
-            },
-        },
+        signatures: {},
     },
 };
 
 const RECOVERY_KEY = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
 
-afterEach(() => {
-    // reset fake-indexeddb after each test, to make sure we don't leak connections
-    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
-    indexedDB = new IDBFactory();
-});
-
 const TEST_USER_ID = "@alice:localhost";
 const TEST_DEVICE_ID = "xzcvb";
 
 describe("megolm key backups", function () {
-    const syncResponse = {
-        next_batch: 1,
-        rooms: {
-            join: {
-                [ROOM_ID]: {
-                    timeline: {
-                        events: [ENCRYPTED_EVENT],
-                    },
-                },
-            },
-        },
-    };
 
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
@@ -162,13 +137,21 @@ describe("megolm key backups", function () {
     }
 
     it("Alice checks key backups when receiving a message she can't decrypt", async function () {
-        fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", CURVE25519_KEY_BACKUP_DATA);
-        fetchMock.post("express:/_matrix/client/r0/keys/upload", {
-            one_time_key_counts: {
-                curve25519: 100,
-                signed_curve25519: 100,
+        const syncResponse = {
+            next_batch: 1,
+            rooms: {
+                join: {
+                    [ROOM_ID]: {
+                        timeline: {
+                            events: [ENCRYPTED_EVENT],
+                        },
+                    },
+                },
             },
-        });
+        };
+
+        fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", CURVE25519_KEY_BACKUP_DATA);
+
         // mock for the outgoing key requests that will be sent
         fetchMock.put("express:/_matrix/client/r0/sendToDevice/m.room_key_request/:txid", {});
 
@@ -196,15 +179,13 @@ describe("megolm key backups", function () {
         const room = aliceClient.getRoom(ROOM_ID)!;
 
         const event = room.getLiveTimeline().getEvents()[0];
-        const decryptPromise: Promise<MatrixEvent> = new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
             event.once(MatrixEventEvent.Decrypted, (ev) => {
                 logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
                 resolve(ev);
             });
         });
 
-        const decryptedEvent = await decryptPromise;
-
-        expect(decryptedEvent.getContent()).toEqual("testytest");
+        expect(event.getContent()).toEqual("testytest");
     });
 });
