@@ -123,12 +123,14 @@ export const generateOidcAuthorizationUrl = async ({
     clientId,
     homeserverUrl,
     nonce,
+    state,
 }: {
     clientId: string;
     metadata: ValidatedIssuerMetadata;
     homeserverUrl: string;
     redirectUri: string;
     nonce: string;
+    state: string;
 }): Promise<string> => {
     const scope = await generateScope();
     const oidcClient = new OidcClient({
@@ -138,14 +140,12 @@ export const generateOidcAuthorizationUrl = async ({
         authority: metadata.issuer,
         response_mode: "query",
         response_type: "code",
-        extraQueryParams: {
-            nonce,
-        },
         scope,
-        stateStore: new WebStorageStateStore({ prefix: "mx_", store: window.sessionStorage }),
+        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
     });
     const request = await oidcClient.createSigninRequest({
-        state: { host: homeserverUrl },
+        state,
+        nonce,
     });
 
     return request.url;
