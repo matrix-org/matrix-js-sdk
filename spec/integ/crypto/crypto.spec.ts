@@ -2466,7 +2466,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             }
 
             /**
-             * Create a mock response to the POST request `/_matrix/client/v3/keys/signatures/upload`
+             * Create a mock response to the POST request `_matrix/client/r0/_matrix/client/v3/keys/signatures/upload`
              * https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keyssignaturesupload
              *
              * @returns the uploaded signatures
@@ -2474,7 +2474,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             function awaitSignatureUpload(): Promise<Record<string, Record<string, any>>> {
                 return new Promise((resolve) => {
                     fetchMock.post(
-                        `express:/_matrix/client/v3/keys/signatures/upload`,
+                        `express:/_matrix/client/r0/_matrix/client/v3/keys/signatures/upload`,
                         (url: string, options: RequestInit) => {
                             const content = JSON.parse(options.body as string);
                             resolve(content);
@@ -2515,7 +2515,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const keyQueryRequestPromise = awaitKeyQueryRequest();
                 const signatureUploadPromise = awaitSignatureUpload();
-                await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: true });
+                await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: false });
 
                 // Expect `keys/query` to have been called
                 expect(await keyQueryRequestPromise).toEqual({
