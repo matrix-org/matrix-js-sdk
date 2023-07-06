@@ -15,10 +15,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "fetch-mock-jest";
 import MockHttpBackend from "matrix-mock-request";
 
+import { M_AUTHENTICATION } from "../../src";
 import { AutoDiscovery } from "../../src/autodiscovery";
 import { OidcError } from "../../src/oidc/error";
+import { makeDelegatedAuthConfig } from "../test-utils/oidc";
+
+// keep to reset the fetch function after using MockHttpBackend
+// @ts-ignore private property
+const realAutoDiscoveryFetch: typeof global.fetch = AutoDiscovery.fetchFn;
 
 describe("AutoDiscovery", function () {
     const getHttpBackend = (): MockHttpBackend => {
@@ -26,6 +33,10 @@ describe("AutoDiscovery", function () {
         AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof global.fetch);
         return httpBackend;
     };
+
+    afterAll(() => {
+        AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
+    });
 
     it("should throw an error when no domain is specified", function () {
         getHttpBackend();
@@ -854,5 +865,76 @@ describe("AutoDiscovery", function () {
                 expect(conf).toEqual(expected);
             }),
         ]);
+    });
+
+    describe("m.authentication", () => {
+        const homeserverName = "example.org";
+        const homeserverUrl = "https://chat.example.org/";
+        const issuer = "https://auth.org/";
+
+        beforeAll(() => {
+            // make these tests independent from fetch mocking above
+            AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
+        });
+
+        beforeEach(() => {
+            fetchMock.resetBehavior();
+            fetchMock.get(`${homeserverUrl}_matrix/client/versions`, { versions: ["r0.0.1"] });
+
+            fetchMock.get("https://example.org/.well-known/matrix/client", {
+                "m.homeserver": {
+                    // Note: we also expect this test to trim the trailing slash
+                    base_url: "https://chat.example.org/",
+                },
+                "m.authentication": {
+                    issuer,
+                },
+            });
+        });
+
+        it("should return valid authentication configuration", async () => {
+            const config = makeDelegatedAuthConfig(issuer);
+
+            fetchMock.get(`${config.metadata.issuer}.well-known/openid-configuration`, config.metadata);
+            fetchMock.get(`${config.metadata.issuer}jwks`, {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                keys: [],
+            });
+
+            const result = await AutoDiscovery.findClientConfig(homeserverName);
+
+            expect(result[M_AUTHENTICATION.stable!]).toEqual({
+                state: AutoDiscovery.SUCCESS,
+                ...config,
+                signingKeys: [],
+                account: undefined,
+                error: null,
+            });
+        });
+
+        it("should set state to error for invalid authentication configuration", async () => {
+            const config = makeDelegatedAuthConfig(issuer);
+            // authorization_code is required
+            config.metadata.grant_types_supported = ["openid"];
+
+            fetchMock.get(`${config.metadata.issuer}.well-known/openid-configuration`, config.metadata);
+            fetchMock.get(`${config.metadata.issuer}jwks`, {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                keys: [],
+            });
+
+            const result = await AutoDiscovery.findClientConfig(homeserverName);
+
+            expect(result[M_AUTHENTICATION.stable!]).toEqual({
+                state: AutoDiscovery.FAIL_ERROR,
+                error: OidcError.OpSupport,
+            });
+        });
     });
 });
