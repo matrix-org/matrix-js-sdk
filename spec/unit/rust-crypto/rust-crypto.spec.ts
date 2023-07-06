@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
@@ -24,6 +22,7 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
+    CryptoEvent,
     HttpApiEvent,
     HttpApiEventHandlerMap,
     IHttpOpts,
@@ -37,15 +36,8 @@ import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { CryptoCallbacks, ImportRoomKeysOpts } from "../../../src/crypto-api";
+import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
-
-afterEach(() => {
-    // reset fake-indexeddb after each test, to make sure we don't leak connections
-    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
-    indexedDB = new IDBFactory();
-});
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -54,9 +46,13 @@ describe("RustCrypto", () => {
     describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
-        beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto();
-        });
+        beforeEach(
+            async () => {
+                rustCrypto = await makeTestRustCrypto();
+            },
+            /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+            10000,
+        );
 
         it("should import and export keys", async () => {
             const someRoomKeys = [
@@ -144,6 +140,27 @@ describe("RustCrypto", () => {
 
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
+        });
+
+        it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
+            const toDeviceEvent = {
+                type: "m.key.verification.request",
+                content: {
+                    from_device: "testDeviceId",
+                    methods: ["m.sas.v1"],
+                    transaction_id: "testTxn",
+                    timestamp: Date.now() - 1000,
+                },
+                sender: "@user:id",
+            };
+
+            const onEvent = jest.fn();
+            rustCrypto.on(CryptoEvent.VerificationRequestReceived, onEvent);
+            await rustCrypto.preprocessToDeviceMessages([toDeviceEvent]);
+            expect(onEvent).toHaveBeenCalledTimes(1);
+
+            const [req]: [VerificationRequest] = onEvent.mock.lastCall;
+            expect(req.transactionId).toEqual("testTxn");
         });
     });
 
@@ -516,5 +533,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
 }

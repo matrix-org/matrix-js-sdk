@@ -38,11 +38,25 @@ export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
     implements VerificationRequest
 {
+    /** Are we in the process of sending an `m.key.verification.ready` event? */
+    private _accepting = false;
+
+    /** Are we in the process of sending an `m.key.verification.cancellation` event? */
+    private _cancelling = false;
+
     private _verifier: Verifier | undefined;
 
+    /**
+     * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
+     *
+     * @param inner - VerificationRequest from the Rust SDK
+     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests
+     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called
+     */
     public constructor(
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
-        outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly supportedVerificationMethods: string[] | undefined,
     ) {
         super();
 
@@ -113,7 +127,9 @@ export class RustVerificationRequest
             case RustSdkCryptoJs.VerificationRequestPhase.Requested:
                 return VerificationPhase.Requested;
             case RustSdkCryptoJs.VerificationRequestPhase.Ready:
-                return VerificationPhase.Ready;
+                // if we're still sending the `m.key.verification.ready`, that counts as "Requested" in the js-sdk's
+                // parlance.
+                return this._accepting ? VerificationPhase.Requested : VerificationPhase.Ready;
             case RustSdkCryptoJs.VerificationRequestPhase.Transitioned:
                 return VerificationPhase.Started;
             case RustSdkCryptoJs.VerificationRequestPhase.Done:
@@ -129,7 +145,9 @@ export class RustVerificationRequest
      * (ie it is in phase `Requested`, `Ready` or `Started`).
      */
     public get pending(): boolean {
-        throw new Error("not implemented");
+        if (this.inner.isPassive()) return false;
+        const phase = this.phase;
+        return phase !== VerificationPhase.Done && phase !== VerificationPhase.Cancelled;
     }
 
     /**
@@ -137,7 +155,7 @@ export class RustVerificationRequest
      * the remote echo which causes a transition to {@link VerificationPhase.Ready}.
      */
     public get accepting(): boolean {
-        throw new Error("not implemented");
+        return this._accepting;
     }
 
     /**
@@ -145,7 +163,7 @@ export class RustVerificationRequest
      * the remote echo which causes a transition to {@link VerificationPhase.Cancelled}).
      */
     public get declining(): boolean {
-        throw new Error("not implemented");
+        return this._cancelling;
     }
 
     /**
@@ -154,7 +172,7 @@ export class RustVerificationRequest
      * `null` indicates that there is no timeout
      */
     public get timeout(): number | null {
-        throw new Error("not implemented");
+        return this.inner.timeRemainingMillis();
     }
 
     /** once the phase is Started (and !initiatedByMe) or Ready: common methods supported by both sides */
@@ -198,8 +216,28 @@ export class RustVerificationRequest
      *
      * @returns Promise which resolves when the event has been sent.
      */
-    public accept(): Promise<void> {
-        throw new Error("not implemented");
+    public async accept(): Promise<void> {
+        if (this.inner.phase() !== RustSdkCryptoJs.VerificationRequestPhase.Requested || this._accepting) {
+            throw new Error(`Cannot accept a verification request in phase ${this.phase}`);
+        }
+
+        this._accepting = true;
+        try {
+            const req: undefined | OutgoingRequest =
+                this.supportedVerificationMethods === undefined
+                    ? this.inner.accept()
+                    : this.inner.acceptWithMethods(
+                          this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                      );
+            if (req) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            }
+        } finally {
+            this._accepting = false;
+        }
+
+        // phase may have changed, so emit a 'change' event
+        this.emit(VerificationRequestEvent.Change);
     }
 
     /**
@@ -210,8 +248,21 @@ export class RustVerificationRequest
      *
      * @returns Promise which resolves when the event has been sent.
      */
-    public cancel(params?: { reason?: string; code?: string }): Promise<void> {
-        throw new Error("not implemented");
+    public async cancel(params?: { reason?: string; code?: string }): Promise<void> {
+        if (this._cancelling) {
+            // already cancelling; do nothing
+            return;
+        }
+
+        this._cancelling = true;
+        try {
+            const req: undefined | OutgoingRequest = this.inner.cancel();
+            if (req) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            }
+        } finally {
+            this._cancelling = false;
+        }
     }
 
     /**
@@ -231,6 +282,35 @@ export class RustVerificationRequest
      */
     public beginKeyVerification(method: string, targetDevice?: { userId?: string; deviceId?: string }): Verifier {
         throw new Error("not implemented");
+    }
+
+    /**
+     * Send an `m.key.verification.start` event to start verification via a particular method.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#startVerification}.
+     *
+     * @param method - the name of the verification method to use.
+     */
+    public async startVerification(method: string): Promise<Verifier> {
+        if (method !== "m.sas.v1") {
+            throw new Error(`Unsupported verification method ${method}`);
+        }
+
+        const res:
+            | [RustSdkCryptoJs.Sas, RustSdkCryptoJs.RoomMessageRequest | RustSdkCryptoJs.ToDeviceRequest]
+            | undefined = await this.inner.startSas();
+
+        if (res) {
+            const [, req] = res;
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+
+        // this should have triggered the onChange callback, and we should now have a verifier
+        if (!this._verifier) {
+            throw new Error("Still no verifier after startSas() call");
+        }
+
+        return this._verifier;
     }
 
     /**

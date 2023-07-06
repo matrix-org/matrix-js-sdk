@@ -108,7 +108,7 @@ export interface VerificationRequest
      * Cancels the request, sending a cancellation to the other party
      *
      * @param params - Details for the cancellation, including `reason` (defaults to "User declined"), and `code`
-     *    (defaults to `m.user`).
+     *    (defaults to `m.user`). **Deprecated**: this parameter is ignored by the Rust cryptography implementation.
      *
      * @returns Promise which resolves when the event has been sent.
      */
@@ -128,8 +128,19 @@ export interface VerificationRequest
      * @param targetDevice - details of where to send the request to.
      *
      * @returns The verifier which will do the actual verification.
+     *
+     * @deprecated Use {@link VerificationRequest#startVerification} instead.
      */
     beginKeyVerification(method: string, targetDevice?: { userId?: string; deviceId?: string }): Verifier;
+
+    /**
+     * Send an `m.key.verification.start` event to start verification via a particular method.
+     *
+     * @param method - the name of the verification method to use.
+     *
+     * @returns The verifier which will do the actual verification.
+     */
+    startVerification(method: string): Promise<Verifier>;
 
     /**
      * The verifier which is doing the actual verification, once the method has been established.
