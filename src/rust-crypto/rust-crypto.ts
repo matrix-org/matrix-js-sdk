@@ -32,7 +32,8 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import {
-    BootstrapCrossSigningOpts, CheckOwnCrossSigningTrustOpts,
+    BootstrapCrossSigningOpts,
+    CheckOwnCrossSigningTrustOpts,
     CreateSecretStorageOpts,
     CrossSigningKey,
     CrossSigningStatus,
