@@ -17,7 +17,7 @@ limitations under the License.
 import jwtDecode from "jwt-decode";
 import { OidcMetadata } from "oidc-client-ts";
 
-import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
+import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
 
@@ -40,9 +40,7 @@ export type ValidatedIssuerConfig = {
  * @returns config - when present and valid
  * @throws when config is not found or invalid
  */
-export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): IDelegatedAuthConfig => {
-    const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown);
-
+export const validateWellKnownAuthentication = (authentication?: IDelegatedAuthConfig): IDelegatedAuthConfig => {
     if (!authentication) {
         throw new Error(OidcError.NotSupported);
     }

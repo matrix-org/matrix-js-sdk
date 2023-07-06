@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MetadataService, OidcClientSettingsStore, SigningKey } from "oidc-client-ts";
 
-import { IClientWellKnown, IDelegatedAuthConfig } from "../client";
+import { IDelegatedAuthConfig } from "../client";
 import { isValidatedIssuerMetadata, ValidatedIssuerMetadata, validateWellKnownAuthentication } from "./validate";
 
 /**
@@ -32,14 +32,14 @@ import { isValidatedIssuerMetadata, ValidatedIssuerMetadata, validateWellKnownAu
  * @throws when delegated auth config is invalid or unreachable
  */
 export const discoverAndValidateAuthenticationConfig = async (
-    wellKnown: IClientWellKnown,
+    authenticationConfig?: IDelegatedAuthConfig,
 ): Promise<
     IDelegatedAuthConfig & {
         metadata: ValidatedIssuerMetadata;
         signingKeys?: SigningKey[];
     }
 > => {
-    const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
+    const homeserverAuthenticationConfig = validateWellKnownAuthentication(authenticationConfig);
 
     // create a temporary settings store so we can use metadata service for discovery
     const settings = new OidcClientSettingsStore({

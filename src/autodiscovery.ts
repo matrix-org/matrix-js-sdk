@@ -307,7 +307,8 @@ export class AutoDiscovery {
         wellKnown: IClientWellKnown,
     ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {
         try {
-            const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
+            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
+            const homeserverAuthenticationConfig = validateWellKnownAuthentication(authentication);
 
             const issuerOpenIdConfigUrl = `${this.sanitizeWellKnownUrl(
                 homeserverAuthenticationConfig.issuer,
@@ -357,7 +358,8 @@ export class AutoDiscovery {
         wellKnown: IClientWellKnown,
     ): Promise<(OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState> {
         try {
-            const result = await discoverAndValidateAuthenticationConfig(wellKnown);
+            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
+            const result = await discoverAndValidateAuthenticationConfig(authentication);
 
             // include this for backwards compatibility
             const validatedIssuerConfig = validateOIDCIssuerWellKnown(result.metadata);
