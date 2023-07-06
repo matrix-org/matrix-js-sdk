@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 /*
 Copyright 2023 The Matrix.org Foundation C.I.C.
 
@@ -25,8 +29,10 @@ import {
     completeAuthorizationCodeGrant,
     generateAuthorizationParams,
     generateAuthorizationUrl,
+    generateOidcAuthorizationUrl,
 } from "../../../src/oidc/authorize";
 import { OidcError } from "../../../src/oidc/error";
+import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
 
 jest.mock("jwt-decode");
 
@@ -34,20 +40,16 @@ jest.mock("jwt-decode");
 const realSubtleCrypto = crypto.subtleCrypto;
 
 describe("oidc authorization", () => {
-    const issuer = "https://auth.com/";
-    const authorizationEndpoint = "https://auth.com/authorization";
-    const tokenEndpoint = "https://auth.com/token";
-    const delegatedAuthConfig = {
-        issuer,
-        registrationEndpoint: issuer + "registration",
-        authorizationEndpoint: issuer + "auth",
-        tokenEndpoint,
-    };
+    const delegatedAuthConfig = makeDelegatedAuthConfig();
+    const authorizationEndpoint = delegatedAuthConfig.metadata.authorization_endpoint;
+    const tokenEndpoint = delegatedAuthConfig.metadata.token_endpoint;
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
     beforeAll(() => {
         jest.spyOn(logger, "warn");
+
+        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
     });
 
     afterEach(() => {
@@ -97,20 +99,36 @@ describe("oidc authorization", () => {
                 "A secure context is required to generate code challenge. Using plain text code challenge",
             );
         });
+    });
 
-        it("uses a s256 code challenge when crypto is available", async () => {
-            jest.spyOn(crypto.subtleCrypto, "digest");
-            const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
+    describe("generateOidcAuthorizationUrl()", () => {
+        it("should generate url with correct parameters", async () => {
+            const nonce = "abc123";
+
+            const metadata = delegatedAuthConfig.metadata;
+
             const authUrl = new URL(
-                await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
+                await generateOidcAuthorizationUrl({
+                    metadata,
+                    homeserverUrl: baseUrl,
+                    clientId,
+                    redirectUri: baseUrl,
+                    nonce,
+                }),
             );
 
-            const codeChallenge = authUrl.searchParams.get("code_challenge");
-            expect(crypto.subtleCrypto.digest).toHaveBeenCalledWith("SHA-256", expect.any(Object));
+            expect(authUrl.searchParams.get("response_mode")).toEqual("query");
+            expect(authUrl.searchParams.get("response_type")).toEqual("code");
+            expect(authUrl.searchParams.get("client_id")).toEqual(clientId);
+            expect(authUrl.searchParams.get("code_challenge_method")).toEqual("S256");
+            // scope minus the 10char random device id at the end
+            expect(authUrl.searchParams.get("scope")!.slice(0, -10)).toEqual(
+                "openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:",
+            );
+            expect(authUrl.searchParams.get("state")).toBeTruthy();
+            expect(authUrl.searchParams.get("nonce")).toEqual(nonce);
 
-            // didn't use plain text code challenge
-            expect(authorizationParams.codeVerifier).not.toEqual(codeChallenge);
-            expect(codeChallenge).toBeTruthy();
+            expect(authUrl.searchParams.get("code_challenge")).toBeTruthy();
         });
     });
 

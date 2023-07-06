@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcAuthorityConfig } from "../../src";
+import { OidcClientConfig } from "../../src";
 import { ValidatedIssuerMetadata } from "../../src/oidc/validate";
 
 /**
- * Makes a valid OidcAuthorityConfig with minimum valid values
+ * Makes a valid OidcClientConfig with minimum valid values
  * @param issuer used as the base for all other urls
- * @returns OidcAuthorityConfig
+ * @returns OidcClientConfig
  */
-export const makeDelegatedAuthConfig = (issuer = "https://auth.org/"): OidcAuthorityConfig => {
+export const makeDelegatedAuthConfig = (issuer = "https://auth.org/"): OidcClientConfig => {
     const metadata = mockOpenIdConfiguration(issuer);
 
     return {
