@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData, ISignableObject } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent } from "../models/event";
@@ -29,7 +30,7 @@ import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault } from "../utils";
+import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
     BootstrapCrossSigningOpts,
     CreateSecretStorageOpts,
@@ -40,6 +41,7 @@ import {
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
+    SecureKeyBackup,
     VerificationRequest,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
@@ -49,12 +51,13 @@ import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSec
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
-import { encodeRecoveryKey } from "../crypto/recoverykey";
+import { decodeRecoveryKey, encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
 import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { RustBackupManager } from "./rust-backup";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -76,6 +79,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
     private crossSigningIdentity: CrossSigningIdentity;
+    private backupManager: RustBackupManager;
 
     public constructor(
         /** The `OlmMachine` from the underlying rust crypto sdk. */
@@ -105,6 +109,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor);
+        this.backupManager = new RustBackupManager();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -463,6 +468,25 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretStorageKeyObject.keyInfo,
             secretStorageKey.privateKey,
         );
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#signObject}
+     */
+    public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+        const sigs = new Map(Object.entries(obj.signatures || {}));
+        const unsigned = obj.unsigned;
+
+        delete obj.signatures;
+        delete obj.unsigned;
+
+        const userSignatures = sigs.get(this.userId) || {};
+        sigs.set(this.userId, userSignatures);
+        userSignatures["ed25519:" + this.olmMachine.deviceId.toString()] = await this.olmMachine.sign(
+            anotherjson.stringify(obj),
+        );
+        obj.signatures = recursiveMapToObject(sigs);
+        if (unsigned !== undefined) obj.unsigned = unsigned;
     }
 
     /**
@@ -881,6 +905,39 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         } finally {
             this.outgoingRequestLoopRunning = false;
         }
+    }
+
+    // Backup
+
+    /**
+     * Fetches the backup private key, if cached
+     * @returns the key, if any, or null
+     */
+    public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
+        const { recoveryKeyBase58 } = await this.olmMachine.getBackupKeys();
+        return decodeRecoveryKey(recoveryKeyBase58);
+    }
+
+    /**
+     * Stores the session backup key to the cache
+     * @param key - the private key
+     * @returns a promise so you can catch failures
+     */
+    public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
+        if (!(key instanceof Uint8Array)) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
+        }
+
+        const base58Key = encodeRecoveryKey(key);
+        if (base58Key && typeof base58Key === "string") {
+            // TODO get version from backupManager
+            await this.olmMachine.saveBackupRecoveryKey(base58Key, "");
+        }
+    }
+
+    public getBackupManager(): SecureKeyBackup {
+        return this.backupManager;
     }
 }
 

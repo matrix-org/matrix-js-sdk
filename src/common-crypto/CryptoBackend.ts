@@ -17,7 +17,7 @@ limitations under the License.
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
-import { CryptoApi } from "../crypto-api";
+import { CryptoApi, SecureKeyBackup } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
@@ -88,6 +88,8 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns the cross signing information for the user.
      */
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
+
+    getBackupManager(): SecureKeyBackup;
 }
 
 /** The methods which crypto implementations should expose to the Sync api */

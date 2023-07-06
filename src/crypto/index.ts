@@ -20,7 +20,13 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
+import type {
+    IDeviceKeys,
+    IEventDecryptionResult,
+    IMegolmSessionData,
+    IOneTimeKey,
+    ISignableObject,
+} from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -71,7 +77,6 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
-import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
@@ -92,6 +97,7 @@ import {
     DeviceVerificationStatus,
     ImportRoomKeysOpts,
     VerificationRequest as CryptoApiVerificationRequest,
+    SecureKeyBackup,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -101,6 +107,9 @@ export type {
     BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
     CryptoCallbacks as ICryptoCallbacks,
 } from "../crypto-api";
+
+// re export for backward compatibility
+export type { ISignableObject } from "../@types/crypto";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -175,11 +184,6 @@ interface IUserOlmSession {
 export interface IRoomKeyRequestRecipient {
     userId: string;
     deviceId: string;
-}
-
-interface ISignableObject {
-    signatures?: ISignatures;
-    unsigned?: object;
 }
 
 export interface IRequestsMap {
@@ -345,6 +349,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return OlmDevice.getOlmVersion();
     }
 
+    /** @deprecated use `getBackupManager` */
     public readonly backupManager: BackupManager;
     public readonly crossSigningInfo: CrossSigningInfo;
     public readonly olmDevice: OlmDevice;
@@ -532,6 +537,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return CrossSigningInfo.getFromSecretStorage(type, this.secretStorage);
             };
         }
+    }
+
+    public getBackupManager(): SecureKeyBackup {
+        return this.backupManager;
     }
 
     /**
@@ -1832,6 +1841,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.outgoingRoomKeyRequestManager.stop();
         this.deviceList.stop();
         this.dehydrationManager.stop();
+        this.getBackupManager().stop();
     }
 
     /**

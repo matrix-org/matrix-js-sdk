@@ -14,14 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Account } from "@matrix-org/olm";
+import fetchMock from "fetch-mock-jest";
+import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
 import { logger } from "../../../src/logger";
 import { decodeRecoveryKey } from "../../../src/crypto/recoverykey";
 import { IKeyBackupInfo, IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { TestClient } from "../../TestClient";
-import { IEvent } from "../../../src";
+import { createClient, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { SyncResponder } from "../../test-utils/SyncResponder";
+import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -70,57 +76,102 @@ const CURVE25519_BACKUP_INFO: IKeyBackupInfo = {
     version: "1",
     auth_data: {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+        // Will be updated with correct value on the fly
+        signatures: {
+            "@alice:localhost": {
+                "ed25519:BGVSTTXKZB":
+                    "RNUIJIcDrsyvKV4MReMzllZ6yx05803tR0/tdO8poS62wUsVNOgxglC2VPwGSxji/hxv7c7D8FTuQ3uQWcR1DQ",
+            },
+        },
     },
 };
+/** The homeserver url that we give to the test client, and where we intercept /sync, /keys, etc requests. */
+const TEST_HOMESERVER_URL = "https://alice-server.com";
 
 const RECOVERY_KEY = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
 
+// jest.useFakeTimers();
+
+beforeAll(async () => {
+    // we use the libolm primitives in the test, so init the Olm library
+    await global.Olm.init();
+});
+
+// load the rust library. This can take a few seconds on a slow GH worker.
+beforeAll(async () => {
+    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-js");
+    await RustSdkCryptoJs.initAsync();
+}, 10000);
+
+afterEach(() => {
+    // reset fake-indexeddb after each test, to make sure we don't leak connections
+    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
+    // eslint-disable-next-line no-global-assign
+    indexedDB = new IDBFactory();
+});
+
+const TEST_USER_ID = "@alice:localhost";
+const TEST_DEVICE_ID = "xzcvb";
+
 /**
- * start an Olm session with a given recipient
+ * Integration tests for cross-signing functionality.
+ *
+ * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
+ * to provide the most effective integration tests possible.
  */
-function createOlmSession(olmAccount: Olm.Account, recipientTestClient: TestClient): Promise<Olm.Session> {
-    return recipientTestClient.awaitOneTimeKeyUpload().then((keys) => {
-        const otkId = Object.keys(keys)[0];
-        const otk = keys[otkId];
+describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
+    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
+    // Rust backend. Once we have full support in the rust sdk, it will go away.
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
 
-        const session = new global.Olm.Session();
-        session.create_outbound(olmAccount, recipientTestClient.getDeviceKey(), otk.key);
-        return session;
+    let aliceClient: MatrixClient;
+    /** an object which intercepts `/sync` requests on the test homeserver */
+    let syncResponder: SyncResponder;
+
+    /** an object which intercepts `/keys/upload` requests on the test homeserver */
+    let e2eKeyReceiver: E2EKeyReceiver;
+    /** an object which intercepts `/keys/query` requests on the test homeserver */
+    let e2eKeyResponder: E2EKeyResponder;
+
+    jest.useFakeTimers();
+
+    beforeEach(async () => {
+        // anything that we don't have a specific matcher for silently returns a 404
+        fetchMock.catch(404);
+        fetchMock.config.warnOnFallback = false;
+
+        mockInitialApiRequests(TEST_HOMESERVER_URL);
+        syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+        e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
+        e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
+        e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
     });
-}
 
-describe("megolm key backups", function () {
-    if (!global.Olm) {
-        logger.warn("not running megolm tests: Olm not present");
-        return;
+    afterEach(async () => {
+        if (aliceClient !== undefined) {
+            await aliceClient.stopClient();
+        }
+
+        // Allow in-flight things to complete before we tear down the test
+        await jest.runAllTimersAsync();
+
+        fetchMock.mockReset();
+    });
+
+    async function initTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
+        const client = createClient({
+            baseUrl: TEST_HOMESERVER_URL,
+            userId: TEST_USER_ID,
+            accessToken: "akjgkrgjs",
+            deviceId: TEST_DEVICE_ID,
+            ...opts,
+        });
+        await initCrypto(client);
+
+        return client;
     }
-    const Olm = global.Olm;
-    let testOlmAccount: Olm.Account;
-    let aliceTestClient: TestClient;
 
-    const setupTestClient = (): [Account, TestClient] => {
-        const aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
-        const testOlmAccount = new Olm.Account();
-        testOlmAccount!.create();
-
-        return [testOlmAccount, aliceTestClient];
-    };
-
-    beforeAll(function () {
-        return Olm.init();
-    });
-
-    beforeEach(async function () {
-        [testOlmAccount, aliceTestClient] = setupTestClient();
-        await aliceTestClient!.client.initCrypto();
-        aliceTestClient!.client.crypto!.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
-    });
-
-    afterEach(function () {
-        return aliceTestClient!.stop();
-    });
-
-    it("Alice checks key backups when receiving a message she can't decrypt", function () {
+    oldBackendOnly("Alice checks key backups when receiving a message she can't decrypt", async function () {
         const syncResponse = {
             next_batch: 1,
             rooms: {
@@ -134,37 +185,47 @@ describe("megolm key backups", function () {
             },
         };
 
-        return aliceTestClient!
-            .start()
-            .then(() => {
-                return createOlmSession(testOlmAccount, aliceTestClient);
-            })
-            .then(() => {
-                const privkey = decodeRecoveryKey(RECOVERY_KEY);
-                return aliceTestClient!.client!.crypto!.storeSessionBackupPrivateKey(privkey);
-            })
-            .then(() => {
-                aliceTestClient!.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-                aliceTestClient!.expectKeyBackupQuery(ROOM_ID, SESSION_ID, 200, CURVE25519_KEY_BACKUP_DATA);
-                return aliceTestClient!.httpBackend.flushAllExpected();
-            })
-            .then(function (): Promise<MatrixEvent> {
-                const room = aliceTestClient!.client.getRoom(ROOM_ID)!;
-                const event = room.getLiveTimeline().getEvents()[0];
+        fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", CURVE25519_KEY_BACKUP_DATA);
+        fetchMock.post("express:/_matrix/client/r0/keys/upload", {
+            one_time_key_counts: {
+                curve25519: 100,
+                signed_curve25519: 100,
+            },
+        });
+        // mock for the outgoing key requests that will be sent
+        fetchMock.put("express:/_matrix/client/r0/sendToDevice/m.room_key_request/:txid", {});
 
-                if (event.getContent()) {
-                    return Promise.resolve(event);
-                }
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", CURVE25519_BACKUP_INFO);
 
-                return new Promise((resolve, reject) => {
-                    event.once(MatrixEventEvent.Decrypted, (ev) => {
-                        logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-                        resolve(ev);
-                    });
-                });
-            })
-            .then((event) => {
-                expect(event.getContent()).toEqual("testytest");
+        aliceClient = await initTestClient();
+
+        // we need the backup to be trusted for the test to work
+        await aliceClient.getCrypto()?.signObject(CURVE25519_BACKUP_INFO.auth_data);
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", CURVE25519_BACKUP_INFO, {
+            overwriteRoutes: true,
+        });
+
+        await aliceClient.getCrypto()?.storeSessionBackupPrivateKey(decodeRecoveryKey(RECOVERY_KEY));
+        await aliceClient.getCrypto()?.getBackupManager()?.checkAndStart();
+
+        // start after saving the private key
+        await aliceClient.startClient();
+
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        const room = aliceClient.getRoom(ROOM_ID)!;
+
+        const event = room.getLiveTimeline().getEvents()[0];
+
+        const decryptPromise: Promise<MatrixEvent> = new Promise((resolve, reject) => {
+            event.once(MatrixEventEvent.Decrypted, (ev) => {
+                logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
+                resolve(ev);
             });
+        });
+        const decryptedEvent = await decryptPromise;
+
+        expect(decryptedEvent.getContent()).toEqual("testytest");
     });
 });

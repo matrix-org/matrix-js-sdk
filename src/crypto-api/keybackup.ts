@@ -15,6 +15,9 @@ limitations under the License.
 */
 
 import { ISigned } from "../@types/signed";
+import { DeviceTrustLevel } from "../crypto/CrossSigning";
+import { DeviceInfo } from "../crypto/deviceinfo";
+import { IKeyBackupInfo } from "../crypto/keybackup";
 
 export interface Curve25519AuthData {
     public_key: string;
@@ -39,4 +42,43 @@ export interface KeyBackupInfo {
     count?: number;
     etag?: string;
     version?: string; // number contained within
+}
+
+export interface KeyBackupStatus {
+    version: string;
+    enabled: boolean;
+}
+
+export type SigInfo = {
+    deviceId: string;
+    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device?: DeviceInfo | null;
+    crossSigningId?: boolean;
+    deviceTrust?: DeviceTrustLevel;
+};
+
+export type TrustInfo = {
+    usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+    sigs: SigInfo[];
+    // eslint-disable-next-line camelcase
+    trusted_locally?: boolean;
+};
+
+export interface IKeyBackupCheck {
+    backupInfo?: IKeyBackupInfo;
+    trustInfo: TrustInfo;
+}
+
+export interface SecureKeyBackup {
+    getKeyBackupStatus(): Promise<KeyBackupStatus | null>;
+
+    stop(): void;
+
+    /**
+     * Check the server for an active key backup and
+     * if one is present and has a valid signature from
+     * one of the user's verified devices, start backing up
+     * to it.
+     */
+    checkAndStart(): Promise<IKeyBackupCheck | null>;
 }

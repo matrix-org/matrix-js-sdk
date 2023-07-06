@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IMegolmSessionData } from "./@types/crypto";
+import type { IMegolmSessionData, ISignableObject } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { KeyBackupInfo, SecureKeyBackup } from "./crypto-api/keybackup";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -284,6 +284,28 @@ export interface CryptoApi {
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
     requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
+
+    /**
+     * Fetches the backup private key, if cached
+     * @returns the key, if any, or null
+     */
+    getSessionBackupPrivateKey(): Promise<Uint8Array | null>;
+
+    /**
+     * Stores the session backup key to the cache
+     * @param key - the private key
+     * @returns a promise so you can catch failures
+     */
+    storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void>;
+
+    /**
+     * sign the given object with our ed25519 key
+     *
+     * @param obj -  Object to which we will add a 'signatures' property
+     */
+    signObject<T extends ISignableObject & object>(obj: T): Promise<void>;
+
+    getBackupManager(): SecureKeyBackup;
 }
 
 /**

@@ -97,3 +97,8 @@ export interface IOneTimeKey {
     fallback?: boolean;
     signatures?: ISignatures;
 }
+
+export interface ISignableObject {
+    signatures?: ISignatures;
+    unsigned?: object;
+}

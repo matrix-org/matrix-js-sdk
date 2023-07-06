@@ -22,8 +22,6 @@ import type { IMegolmSessionData } from "../@types/crypto";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
-import { DeviceInfo } from "./deviceinfo";
-import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
 import { safeSet, sleep } from "../utils";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
@@ -36,6 +34,7 @@ import {
     IKeyBackupInfo,
     IKeyBackupSession,
 } from "./keybackup";
+import { IKeyBackupCheck, KeyBackupStatus, SecureKeyBackup, SigInfo, TrustInfo } from "../crypto-api";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
@@ -46,25 +45,8 @@ const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 type AuthData = IKeyBackupInfo["auth_data"];
 
-type SigInfo = {
-    deviceId: string;
-    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
-    device?: DeviceInfo | null;
-    crossSigningId?: boolean;
-    deviceTrust?: DeviceTrustLevel;
-};
-
-export type TrustInfo = {
-    usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
-    sigs: SigInfo[];
-    // eslint-disable-next-line camelcase
-    trusted_locally?: boolean;
-};
-
-export interface IKeyBackupCheck {
-    backupInfo?: IKeyBackupInfo;
-    trustInfo: TrustInfo;
-}
+// re-export for backward compatibility
+export type { TrustInfo, SigInfo, IKeyBackupCheck } from "../crypto-api/keybackup";
 
 /* eslint-disable camelcase */
 export interface IPreparedKeyBackupVersion {
@@ -112,16 +94,22 @@ export interface IKeyBackup {
 /**
  * Manages the key backup.
  */
-export class BackupManager {
+export class BackupManager implements SecureKeyBackup {
     private algorithm: BackupAlgorithm | undefined;
     public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+    private clientRunning: boolean;
 
     public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
+        this.clientRunning = true;
+    }
+
+    public stop(): void {
+        this.clientRunning = false;
     }
 
     public get version(): string | undefined {
@@ -183,11 +171,26 @@ export class BackupManager {
         this.baseApis.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
+    /* @deprecated use `getKeyBackupStatus` instead */
     public getKeyBackupEnabled(): boolean | null {
         if (!this.checkedForBackup) {
             return null;
         }
         return Boolean(this.algorithm);
+    }
+
+    public async getKeyBackupStatus(): Promise<KeyBackupStatus | null> {
+        if (!this.checkedForBackup) {
+            return null;
+        }
+        if (this.algorithm && this.version) {
+            return {
+                version: this.version,
+                enabled: true,
+            };
+        } else {
+            return null;
+        }
     }
 
     public async prepareKeyBackupVersion(
@@ -439,6 +442,11 @@ export class BackupManager {
             // the same time when a new key is sent
             const delay = Math.random() * maxDelay;
             await sleep(delay);
+            if (!this.clientRunning) {
+                logger.debug("Key backup send aborted, client stopped");
+                this.sendingBackups = false;
+                return;
+            }
             let numFailures = 0; // number of consecutive failures
             for (;;) {
                 if (!this.algorithm) {
@@ -472,6 +480,11 @@ export class BackupManager {
                 if (numFailures) {
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                }
+
+                if (!this.clientRunning) {
+                    logger.debug("Key backup send loop aborted, client stopped");
+                    return;
                 }
             }
         } finally {
