@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import { v4 as uuidv4 } from "uuid";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
@@ -41,6 +42,7 @@ import {
     VerificationRequest,
     CreateSecretStorageOpts,
     CryptoCallbacks,
+    CheckOwnCrossSigningTrustOpts,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -611,6 +613,43 @@ export class RustCrypto implements CryptoBackend {
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
         return new RustVerificationRequest(request, this.outgoingRequestProcessor);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#checkOwnCrossSigningTrust}
+     */
+    public async checkOwnCrossSigningTrust({ allowPrivateKeyRequests }: CheckOwnCrossSigningTrustOpts): Promise<void> {
+        // Download the device keys and add them into the olm machine
+        const queryResult = await this.downloadDeviceList(new Set([this.userId]));
+        await this.olmMachine.markRequestAsSent(
+            uuidv4(),
+            RustSdkCryptoJs.RequestType.KeysQuery,
+            JSON.stringify(queryResult),
+        );
+
+        if (allowPrivateKeyRequests) {
+            // Fetch cross signing keys from the secret storage and import them in the olm machine
+            const masterKey = await this.secretStorage.get("m.cross_signing.master");
+            const selfSigningKey = await this.secretStorage.get("m.cross_signing.self_signing");
+            const userSigningKey = await this.secretStorage.get("m.cross_signing.user_signing");
+
+            await this.olmMachine.importCrossSigningKeys(masterKey, selfSigningKey, userSigningKey);
+        }
+
+        // Get the current device
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+
+        // Verify the device and upload the cross signing signatures
+        const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+        await this.http.authedRequest(
+            Method.Post,
+            "/_matrix/client/v3/keys/signatures/upload",
+            undefined,
+            request.body,
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

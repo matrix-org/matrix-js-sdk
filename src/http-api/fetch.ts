@@ -261,6 +261,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         let res: Response;
         try {
+            console.log("url", method, url);
             res = await this.fetch(url, {
                 signal,
                 method,
