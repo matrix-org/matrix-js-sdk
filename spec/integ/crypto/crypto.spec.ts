@@ -2515,7 +2515,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const keyQueryRequestPromise = awaitKeyQueryRequest();
                 const signatureUploadPromise = awaitSignatureUpload();
-                await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: false });
+                await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: true });
 
                 // Expect `keys/query` to have been called
                 expect(await keyQueryRequestPromise).toEqual({
