@@ -118,10 +118,16 @@ export class BackupManager {
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+    private clientRunning: boolean;
 
     public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
+        this.clientRunning = true;
+    }
+
+    public stop(): void {
+        this.clientRunning = false;
     }
 
     public get version(): string | undefined {
@@ -439,6 +445,11 @@ export class BackupManager {
             // the same time when a new key is sent
             const delay = Math.random() * maxDelay;
             await sleep(delay);
+            if (!this.clientRunning) {
+                logger.debug("Key backup send aborted, client stopped");
+                this.sendingBackups = false;
+                return;
+            }
             let numFailures = 0; // number of consecutive failures
             for (;;) {
                 if (!this.algorithm) {
@@ -472,6 +483,11 @@ export class BackupManager {
                 if (numFailures) {
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                }
+
+                if (!this.clientRunning) {
+                    logger.debug("Key backup send loop aborted, client stopped");
+                    return;
                 }
             }
         } finally {
