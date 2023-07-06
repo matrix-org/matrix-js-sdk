@@ -200,6 +200,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         } else {
             if (this.lastEvent?.getId() === event.getAssociatedId()) {
                 // XXX: If our last event got redacted we query the server for the last event once again
+                await this.processRootEventPromise;
                 this.processRootEventPromise = undefined;
             }
             await this.updateThreadMetadata();
