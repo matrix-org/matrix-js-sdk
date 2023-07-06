@@ -20,7 +20,7 @@ import { logger } from "../../../src/logger";
 import { decodeRecoveryKey } from "../../../src/crypto/recoverykey";
 import { IKeyBackupInfo, IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
-import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { MatrixEventEvent } from "../../../src/models/event";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -88,7 +88,6 @@ const TEST_USER_ID = "@alice:localhost";
 const TEST_DEVICE_ID = "xzcvb";
 
 describe("megolm key backups", function () {
-
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
