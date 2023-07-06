@@ -1563,7 +1563,7 @@ describe("MatrixClient event timelines", function () {
                 await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
                 await prom;
-                expect(thread.length).toBe(1);
+                expect(thread.length).toBe(2);
                 // Test threads are in chronological order
                 expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD2_ROOT.event_id,
