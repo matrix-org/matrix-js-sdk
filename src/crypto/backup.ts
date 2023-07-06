@@ -100,14 +100,17 @@ export class BackupManager implements SecureKeyBackup {
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
-    private clientRunning: boolean;
+    // The backup manager will schedule backup of keys when active (`scheduleKeyBackupSend`), this allows cancel when client is stopped
+    private clientRunning = true;
 
     public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
-        this.clientRunning = true;
     }
 
+    /**
+     * Stop the backup manager from backing up keys and allow a clean shutdown.
+     */
     public stop(): void {
         this.clientRunning = false;
     }
@@ -444,7 +447,6 @@ export class BackupManager implements SecureKeyBackup {
             await sleep(delay);
             if (!this.clientRunning) {
                 logger.debug("Key backup send aborted, client stopped");
-                this.sendingBackups = false;
                 return;
             }
             let numFailures = 0; // number of consecutive failures
