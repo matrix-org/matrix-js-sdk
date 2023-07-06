@@ -2678,6 +2678,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
      * @param opts - ICheckOwnCrossSigningTrustOpts object
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.checkOwnCrossSigningTrust | `CryptoApi.checkOwnCrossSigningTrust`}
      */
     public checkOwnCrossSigningTrust(opts?: ICheckOwnCrossSigningTrustOpts): Promise<void> {
         if (!this.crypto) {
