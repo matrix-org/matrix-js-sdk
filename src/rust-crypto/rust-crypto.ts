@@ -51,7 +51,7 @@ import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSec
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
-// import { decodeRecoveryKey, encodeRecoveryKey } from "../crypto/recoverykey";
+import { /*decodeRecoveryKey,*/ encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
 import { EventType } from "../@types/event";
