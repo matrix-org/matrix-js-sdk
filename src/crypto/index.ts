@@ -132,10 +132,10 @@ export function isCryptoAvailable(): boolean {
 
 // minimum time between attempting to unwedge an Olm session, if we succeeded
 // in creating a new session
-const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 // minimum time between attempting to unwedge an Olm session, if we failed
 // to create a new session
-const FORCE_SESSION_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const FORCE_SESSION_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
@@ -3602,12 +3602,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const forceNewSessionRetryTime = forceNewSessionRetryTimeDevices.getOrCreate(deviceKey);
         if (forceNewSessionRetryTime > Date.now()) {
             logger.debug(
-                "New session already forced with device " +
-                    sender +
-                    ":" +
-                    deviceKey +
-                    ": not forcing another until at least ",
-                    forceNewSessionRetryTime
+                `New session already forced with device ${sender}:${deviceKey}: ` +
+                    `not forcing another until at least ${new Date(forceNewSessionRetryTime).toUTCString()}`,
             );
             await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
             retryDecryption();
