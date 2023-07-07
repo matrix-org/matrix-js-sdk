@@ -279,6 +279,8 @@ export type BearerTokenResponse = {
     scope: string;
     refresh_token?: string;
     expires_in?: number;
+    // from oidc-client-ts
+    expires_at?: number;
     id_token?: string;
 };
 
@@ -292,15 +294,15 @@ type ValidSignInResponse = SigninResponse &
 
 const isValidBearerTokenResponse = (response: unknown): response is ValidSignInResponse =>
     isRecord(response) &&
-    typeof response["token_type"] === "string" &&
+    requiredStringProperty(response, "token_type") &&
     // token_type is case insensitive, some OPs return `token_type: "bearer"`
-    response["token_type"].toLowerCase() === "bearer" &&
-    typeof response["access_token"] === "string" &&
-    (!("refresh_token" in response) || typeof response["refresh_token"] === "string") &&
+    (response["token_type"] as string).toLowerCase() === "bearer" &&
+    requiredStringProperty(response, "access_token") &&
+    requiredStringProperty(response, "refresh_token") &&
     (!("expires_in" in response) || typeof response["expires_in"] === "number");
 
 export function validateBearerTokenResponse(response: unknown): asserts response is ValidSignInResponse {
-    if (!isValidBearerTokenResponse) {
+    if (!isValidBearerTokenResponse(response)) {
         throw new Error(OidcError.InvalidBearerTokenResponse);
     }
 }
