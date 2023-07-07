@@ -210,6 +210,7 @@ export const completeAuthorizationCodeGrant = async (
     reconstructedUrl.searchParams.append("code", code);
     reconstructedUrl.searchParams.append("state", state);
 
+    // set oidc-client to use our logger
     Log.setLogger(logger);
     try {
         const response = new SigninResponse(reconstructedUrl.searchParams);
@@ -251,14 +252,13 @@ export const completeAuthorizationCodeGrant = async (
             identityServerUrl: userState.identityServerUrl,
         };
     } catch (error) {
+        logger.error("Oidc login failed", error);
         const errorType = (error as Error).message;
 
         // rethrow errors that we recognise
         if (Object.values(OidcError).includes(errorType as any)) {
             throw error;
         }
-        // @TODO(kerrya) translate oidclient errors into OidcError
-        logger.error("Oidc login failed", error);
         throw new Error(OidcError.CodeExchangeFailed);
     }
 };

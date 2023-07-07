@@ -185,8 +185,10 @@ describe("oidc authorization", () => {
         };
 
         /**
-         * Sets up state with storage
-         * Returns state string used to access storage
+         * These tests kind of integration test oidc auth, by using `generateOidcAuthorizationUrl` and mocked storage
+         * to mock the use case of initiating oidc auth, putting state in storage, redirecting to OP,
+         * then returning and using state to verfiy.
+         * Returns random state string used to access storage
          * @param params
          */
         const setupState = async (params = {}): Promise<string> => {
@@ -229,9 +231,6 @@ describe("oidc authorization", () => {
                 keys: [],
             });
 
-            // // @ts-ignore
-            // delete window.sessionStorage;
-            // window.sessionStorage = makeMockSessionStorage({});
             mockSessionStorage({});
 
             mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
@@ -329,6 +328,21 @@ describe("oidc authorization", () => {
             });
 
             expect(result.tokenResponse.token_type).toEqual("Bearer");
+        });
+
+        it("should throw when state is not found in storage", async () => {
+            // don't setup sessionStorage with expected state
+            const state = "abc123";
+            fetchMock.post(
+                metadata.token_endpoint,
+                {
+                    status: 500,
+                },
+                { overwriteRoutes: true },
+            );
+            await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
+                new Error(OidcError.MissingOrInvalidStoredState),
+            );
         });
 
         it("should throw with code exchange failed error when request fails", async () => {
