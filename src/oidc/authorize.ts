@@ -174,7 +174,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
     ({
         id_token: response.id_token,
         scope: response.scope,
-        expires_in: response.expires_in,
+        expires_at: response.expires_at,
         refresh_token: response.refresh_token,
         access_token: response.access_token,
         token_type: "Bearer",
@@ -258,7 +258,7 @@ export const completeAuthorizationCodeGrant = async (
             throw error;
         }
         // @TODO(kerrya) translate oidclient errors into OidcError
-        console.log("hhh error", { error });
-        throw error;
+        logger.error("Oidc login failed", error);
+        throw new Error(OidcError.CodeExchangeFailed);
     }
 };
