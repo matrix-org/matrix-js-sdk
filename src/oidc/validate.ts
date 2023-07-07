@@ -229,3 +229,19 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
         throw new Error(OidcError.InvalidIdToken);
     }
 };
+
+/**
+ * State we ask OidcClient to store when starting oidc authorization flow (in `generateOidcAuthorizationUrl`)
+ * so that we can access it on return from the OP and complete login
+ */
+export type UserState = {
+    /**
+     * Remember which server we were trying to login to
+     */
+    homeserverUrl: string;
+    identityServerUrl?: string;
+    /**
+     * Used to validate id token
+     */
+    nonce: string;
+};

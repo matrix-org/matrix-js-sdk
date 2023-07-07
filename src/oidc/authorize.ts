@@ -22,7 +22,7 @@ import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
-import { validateIdToken, ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate";
+import { validateIdToken, ValidatedIssuerConfig, ValidatedIssuerMetadata, UserState } from "./validate";
 
 /**
  * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
@@ -122,15 +122,15 @@ export const generateOidcAuthorizationUrl = async ({
     redirectUri,
     clientId,
     homeserverUrl,
+    identityServerUrl,
     nonce,
-    state,
 }: {
     clientId: string;
     metadata: ValidatedIssuerMetadata;
     homeserverUrl: string;
+    identityServerUrl?: string;
     redirectUri: string;
     nonce: string;
-    state: string;
 }): Promise<string> => {
     const scope = await generateScope();
     const oidcClient = new OidcClient({
@@ -143,8 +143,9 @@ export const generateOidcAuthorizationUrl = async ({
         scope,
         stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
     });
+    const userState: UserState = { homeserverUrl, nonce, identityServerUrl };
     const request = await oidcClient.createSigninRequest({
-        state,
+        state: userState,
         nonce,
     });
 
