@@ -151,6 +151,12 @@ export class RoomWidgetClient extends MatrixClient {
 
         // Open communication with the host
         widgetApi.start();
+        // Send a content loaded event now we've started the widget API
+        // Note that element-web currently does not use waitForIFrameLoad=false and so
+        // does *not* (yes, that is the right way around) wait for this event. Let's
+        // start sending this, then once this has rolled out, we can change element-web to
+        // use waitForIFrameLoad=false and have a widget API that's less racy.
+        widgetApi.sendContentLoaded();
     }
 
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
