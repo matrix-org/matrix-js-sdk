@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { KeyBackupInfo } from "../crypto-api/keybackup";
+import { IPreparedKeyBackupVersion, KeyBackupInfo } from "../crypto-api/keybackup";
 
 /**
  * Interface to server-side key backup
@@ -42,6 +42,24 @@ export interface SecureKeyBackup {
      *    (or lack thereof).
      */
     checkAndStart(): Promise<KeyBackupCheck | null>;
+
+    /**
+     * Set up the data required to create a new backup version.  The backup version
+     * will not be created and enabled until createKeyBackupVersion is called.
+     *
+     * @param password - Passphrase string that can be entered by the user
+     *     when restoring the backup as an alternative to entering the recovery key.
+     *     Optional. If null a random recovery key will be created
+     *
+     * @returns Object that can be passed to createKeyBackupVersion and
+     *     additionally has a 'recovery_key' member with the user-facing recovery key string. The backup data is not yet signed, the cryptoBackend will do it.
+     */
+    prepareUnsignedKeyBackupVersion(
+        key?: string | Uint8Array | null,
+        algorithm?: string | undefined,
+    ): Promise<IPreparedKeyBackupVersion>;
+
+    createKeyBackupVersion(info: KeyBackupInfo): Promise<void>;
 }
 
 /**

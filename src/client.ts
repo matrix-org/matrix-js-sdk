@@ -3354,13 +3354,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         password?: string | Uint8Array | null,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
-        if (!this.crypto) {
+        if (!this.getCrypto()) {
             throw new Error("End-to-end encryption disabled");
         }
 
         // eslint-disable-next-line camelcase
-        const { algorithm, auth_data, recovery_key, privateKey } =
-            await this.crypto.backupManager.prepareKeyBackupVersion(password);
+        const { algorithm, auth_data, recovery_key, privateKey } = await this.getCrypto()!.prepareKeyBackupVersion(
+            password,
+        );
 
         if (opts.secureSecretStorage) {
             await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
@@ -3394,35 +3395,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Object with 'version' param indicating the version created
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
-        if (!this.crypto) {
+        if (!this.getCrypto()) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.crypto.backupManager.createKeyBackupVersion(info);
+        await this.getCrypto()!.getBackupManager().createKeyBackupVersion(info);
 
         const data = {
             algorithm: info.algorithm,
             auth_data: info.auth_data,
         };
-
-        // Sign the backup auth data with the device key for backwards compat with
-        // older devices with cross-signing. This can probably go away very soon in
-        // favour of just signing with the cross-singing master key.
-        // XXX: Private member access
-        await this.crypto.signObject(data.auth_data);
-
-        if (
-            this.cryptoCallbacks.getCrossSigningKey &&
-            // XXX: Private member access
-            this.crypto.crossSigningInfo.getId()
-        ) {
-            // now also sign the auth data with the cross-signing master key
-            // we check for the callback explicitly here because we still want to be able
-            // to create an un-cross-signed key backup if there is a cross-signing key but
-            // no callback supplied.
-            // XXX: Private member access
-            await this.crypto.crossSigningInfo.signObject(data.auth_data, "master");
-        }
 
         const res = await this.http.authedRequest<IKeyBackupInfo>(Method.Post, "/room_keys/version", undefined, data, {
             prefix: ClientPrefix.V3,

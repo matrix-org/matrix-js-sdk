@@ -38,6 +38,7 @@ import {
     CryptoCallbacks,
     DeviceVerificationStatus,
     GeneratedSecretStorageKey,
+    IPreparedKeyBackupVersion,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
@@ -753,6 +754,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getActiveSessionBackupVersion(): Promise<string | null> {
         return await this.backupManager.getActiveBackupVersion();
+    }
+
+    public async prepareKeyBackupVersion(
+        key?: string | Uint8Array | null | undefined,
+        algorithm?: string | undefined,
+    ): Promise<IPreparedKeyBackupVersion> {
+        const preparedVersion = await this.backupManager.prepareUnsignedKeyBackupVersion(key, algorithm);
+
+        // sign the auth_data with existing device and cross signing keys if available
+        await this.signObject(preparedVersion.auth_data);
+
+        // return the now signed version
+        return preparedVersion;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

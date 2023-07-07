@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { KeyBackupCheck, SecureKeyBackup } from "../common-crypto/SecureKeyBackup";
+import { IPreparedKeyBackupVersion, KeyBackupInfo } from "../crypto-api/keybackup";
 
 export class RustBackupManager implements SecureKeyBackup {
     public async checkAndStart(): Promise<KeyBackupCheck | null> {
@@ -27,5 +28,17 @@ export class RustBackupManager implements SecureKeyBackup {
     public async getActiveBackupVersion(): Promise<string | null> {
         // TODO stub
         return null;
+    }
+
+    public async prepareUnsignedKeyBackupVersion(
+        key?: string | Uint8Array | null | undefined,
+        algorithm?: string | undefined,
+    ): Promise<IPreparedKeyBackupVersion> {
+        throw new Error("Method not implemented.");
+    }
+
+    public async createKeyBackupVersion(info: KeyBackupInfo): Promise<void> {
+        //TODO stub
+        return;
     }
 }

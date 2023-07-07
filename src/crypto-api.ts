@@ -21,6 +21,7 @@ import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { IPreparedKeyBackupVersion } from "./crypto/backup";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -331,6 +332,15 @@ export interface CryptoApi {
      * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
      */
     getActiveSessionBackupVersion(): Promise<string | null>;
+
+    /**
+     * Prepare a backup version, signed with current device and identity (if available).
+     * Can be used to upload a new backup.
+     */
+    prepareKeyBackupVersion(
+        key?: string | Uint8Array | null,
+        algorithm?: string | undefined,
+    ): Promise<IPreparedKeyBackupVersion>;
 }
 
 /**

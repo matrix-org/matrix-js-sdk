@@ -43,3 +43,18 @@ export interface KeyBackupInfo {
     etag?: string;
     version?: string; // number contained within
 }
+
+export type AuthData = KeyBackupInfo["auth_data"];
+
+/**
+ * Prepared backup data.
+ * Contains the data needed to create a new version.
+ */
+/* eslint-disable camelcase */
+export interface IPreparedKeyBackupVersion {
+    algorithm: string;
+    auth_data: AuthData;
+    recovery_key: string;
+    privateKey: Uint8Array;
+}
+/* eslint-enable camelcase */
