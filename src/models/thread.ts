@@ -135,6 +135,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);
+        this.room.on(RoomEvent.TimelineReset, this.onTimelineReset);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         this.processReceipts(opts.receipts);
@@ -144,6 +145,12 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.updateThreadMetadata();
         this.setEventMetadata(this.rootEvent);
     }
+
+    private onTimelineReset = async (): Promise<void> => {
+        // We hit a gappy sync, ask the server for an update
+        await this.processRootEventPromise;
+        this.processRootEventPromise = undefined;
+    };
 
     private async fetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
@@ -218,6 +225,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
                 room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
             }
+            if (event.getId() !== this.id && event.isRelation(THREAD_RELATION_TYPE.name)) {
+                this.replyCount++;
+            }
         }
         this.onEcho(event, toStartOfTimeline ?? false);
     };
@@ -251,6 +261,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         await this.updateThreadMetadata();
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return; // don't send a new reply event for reactions or edits
         if (toStartOfTimeline) return; // ignore messages added to the start of the timeline
+        // Clear the lastEvent and instead start tracking locally using lastReply
+        this.lastEvent = undefined;
         this.emit(ThreadEvent.NewReply, this, event);
     };
 
@@ -362,8 +374,14 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             return;
         }
 
-        if (event.getId() !== this.id && event.isRelation(THREAD_RELATION_TYPE.name)) {
-            this.replyCount++;
+        if (
+            event.getId() !== this.id &&
+            event.isRelation(THREAD_RELATION_TYPE.name) &&
+            !toStartOfTimeline &&
+            isNewestReply
+        ) {
+            // Clear the last event as we have the latest end of the timeline
+            this.lastEvent = undefined;
         }
 
         if (emit) {
@@ -589,7 +607,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     /**
      * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = (): boolean => true): MatrixEvent | null {
+    public lastReply(
+        matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isRelation(RelationType.Thread),
+    ): MatrixEvent | null {
         for (let i = this.timeline.length - 1; i >= 0; i--) {
             const event = this.timeline[i];
             if (matches(event)) {
