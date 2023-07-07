@@ -29,6 +29,7 @@ import {
     EventType,
     MsgType,
     RelationType,
+    ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { Crypto } from "../crypto";
@@ -517,16 +518,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * ```
      */
     public getDetails(): string {
-        let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
         const room = this.getRoomId();
         if (room) {
-            details += ` room=${room}`;
+            // in-room event
+            return `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()} room=${room} ts=${this.getDate()?.toISOString()}`;
+        } else {
+            // to-device event
+            const msgid = this.getContent()[ToDeviceMessageId];
+            return `msgid=${msgid} type=${this.getWireType()} sender=${this.getSender()}`;
         }
-        const date = this.getDate();
-        if (date) {
-            details += ` ts=${date.toISOString()}`;
-        }
-        return details;
     }
 
     /**
