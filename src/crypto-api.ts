@@ -506,7 +506,7 @@ export interface GeneratedSecretStorageKey {
  */
 export interface CheckOwnCrossSigningTrustOpts {
     /**
-     * If true, will fetch the private cross singing keys from the secret storage
+     * If true, will fetch the private cross signing keys from the secret storage
      */
     allowPrivateKeyRequests?: boolean;
 }
