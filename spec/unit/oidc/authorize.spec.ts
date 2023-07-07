@@ -46,8 +46,12 @@ describe("oidc authorization", () => {
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
+    // 14.03.2022 16:15
+    const now = 1647270879403;
+
     beforeAll(() => {
         jest.spyOn(logger, "warn");
+        jest.setSystemTime(now);
 
         fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
     });
@@ -133,7 +137,8 @@ describe("oidc authorization", () => {
     });
 
     describe("completeAuthorizationCodeGrant", () => {
-        const codeVerifier = "abc123";
+        const homeserverUrl = "https://server.org/";
+        const identityServerUrl = "https://id.org/";
         const nonce = "test-nonce";
         const redirectUri = baseUrl;
         const code = "auth_code_xyz";
@@ -142,8 +147,10 @@ describe("oidc authorization", () => {
             access_token: "test_access_token",
             refresh_token: "test_refresh_token",
             id_token: "valid.id.token",
-            expires_in: 12345,
+            expires_in: 300,
         };
+
+        const metadata = mockOpenIdConfiguration();
 
         const validDecodedIdToken = {
             // nonce matches
@@ -153,131 +160,222 @@ describe("oidc authorization", () => {
             // audience is this client
             aud: clientId,
             // issuer matches
-            iss: delegatedAuthConfig.issuer,
+            iss: metadata.issuer,
+            sub: "123",
+        };
+
+        const mockSessionStorage = (state: Record<string, unknown>): void => {
+            jest.spyOn(sessionStorage.__proto__, "getItem").mockImplementation((key: unknown) => {
+                return state[key as string] ?? null;
+            });
+            jest.spyOn(sessionStorage.__proto__, "setItem").mockImplementation(
+                // @ts-ignore mock type
+                (key: string, value: unknown) => (state[key] = value),
+            );
+            jest.spyOn(sessionStorage.__proto__, "removeItem").mockImplementation((key: unknown) => {
+                const { [key as string]: value, ...newState } = state;
+                state = newState;
+                return value;
+            });
+        };
+
+        const getValueFromStorage = <T = string>(state: string, key: string): T => {
+            const storedState = window.sessionStorage.getItem(`mx_oidc_${state}`)!;
+            return JSON.parse(storedState)[key] as unknown as T;
+        };
+
+        /**
+         * Sets up state with storage
+         * Returns state string used to access storage
+         * @param params
+         */
+        const setupState = async (params = {}): Promise<string> => {
+            const url = await generateOidcAuthorizationUrl({
+                metadata,
+                redirectUri,
+                clientId,
+                homeserverUrl,
+                identityServerUrl,
+                nonce,
+                ...params,
+            });
+
+            const state = new URL(url).searchParams.get("state")!;
+
+            // add the scope with correct deviceId to the mocked bearer token response
+            const scope = getValueFromStorage(state, "scope");
+            fetchMock.post(metadata.token_endpoint, {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                ...validBearerTokenResponse,
+                scope,
+            });
+
+            return state;
         };
 
         beforeEach(() => {
             fetchMock.mockClear();
             fetchMock.resetBehavior();
 
-            fetchMock.post(tokenEndpoint, {
+            fetchMock.get(`${metadata.issuer}.well-known/openid-configuration`, metadata);
+            fetchMock.get(`${metadata.issuer}jwks`, {
                 status: 200,
-                body: JSON.stringify(validBearerTokenResponse),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                keys: [],
             });
+
+            // // @ts-ignore
+            // delete window.sessionStorage;
+            // window.sessionStorage = makeMockSessionStorage({});
+            mockSessionStorage({});
 
             mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
 
         it("should make correct request to the token endpoint", async () => {
-            await completeAuthorizationCodeGrant(code, {
-                clientId,
-                codeVerifier,
-                redirectUri,
-                delegatedAuthConfig,
-                nonce,
-            });
+            const state = await setupState();
+            const codeVerifier = getValueFromStorage(state, "code_verifier");
+            await completeAuthorizationCodeGrant(code, state);
 
-            expect(fetchMock).toHaveBeenCalledWith(tokenEndpoint, {
-                method: Method.Post,
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `grant_type=authorization_code&client_id=${clientId}&code_verifier=${codeVerifier}&redirect_uri=https%3A%2F%2Ftest.com&code=${code}`,
-            });
+            expect(fetchMock).toHaveBeenCalledWith(
+                metadata.token_endpoint,
+                expect.objectContaining({
+                    method: Method.Post,
+                    credentials: "same-origin",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                }),
+            );
+
+            // check body is correctly formed
+            const queryParams = fetchMock.mock.calls.find(([endpoint]) => endpoint === metadata.token_endpoint)![1]!
+                .body as URLSearchParams;
+            expect(queryParams.get("grant_type")).toEqual("authorization_code");
+            expect(queryParams.get("client_id")).toEqual(clientId);
+            expect(queryParams.get("code_verifier")).toEqual(codeVerifier);
+            expect(queryParams.get("redirect_uri")).toEqual(redirectUri);
+            expect(queryParams.get("code")).toEqual(code);
         });
 
         it("should return with valid bearer token", async () => {
-            const result = await completeAuthorizationCodeGrant(code, {
-                clientId,
-                codeVerifier,
-                redirectUri,
-                delegatedAuthConfig,
-                nonce,
-            });
+            const state = await setupState();
+            const scope = getValueFromStorage(state, "scope");
+            const result = await completeAuthorizationCodeGrant(code, state);
 
-            expect(result).toEqual(validBearerTokenResponse);
+            expect(result).toEqual({
+                homeserverUrl,
+                identityServerUrl,
+                oidcClientSettings: {
+                    clientId,
+                    issuer: metadata.issuer,
+                },
+                tokenResponse: {
+                    access_token: validBearerTokenResponse.access_token,
+                    id_token: validBearerTokenResponse.id_token,
+                    refresh_token: validBearerTokenResponse.refresh_token,
+                    token_type: validBearerTokenResponse.token_type,
+                    // this value is slightly unstable because it uses the clock
+                    expires_at: result.tokenResponse.expires_at,
+                    scope,
+                },
+            });
         });
 
         it("should return with valid bearer token where token_type is lowercase", async () => {
+            const state = await setupState();
+            const scope = getValueFromStorage(state, "scope");
             const tokenResponse = {
                 ...validBearerTokenResponse,
+                scope,
                 token_type: "bearer",
             };
             fetchMock.post(
                 tokenEndpoint,
                 {
-                    status: 200,
-                    body: JSON.stringify(tokenResponse),
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    ...tokenResponse,
                 },
                 { overwriteRoutes: true },
             );
 
-            const result = await completeAuthorizationCodeGrant(code, {
-                clientId,
-                codeVerifier,
-                redirectUri,
-                delegatedAuthConfig,
-                nonce,
+            const result = await completeAuthorizationCodeGrant(code, state);
+
+            expect(result).toEqual({
+                homeserverUrl,
+                identityServerUrl,
+                oidcClientSettings: {
+                    clientId,
+                    issuer: metadata.issuer,
+                },
+                // results in token that uses 'Bearer' token type
+                tokenResponse: {
+                    access_token: validBearerTokenResponse.access_token,
+                    id_token: validBearerTokenResponse.id_token,
+                    refresh_token: validBearerTokenResponse.refresh_token,
+                    token_type: "Bearer",
+                    // this value is slightly unstable because it uses the clock
+                    expires_at: result.tokenResponse.expires_at,
+                    scope,
+                },
             });
 
-            // results in token that uses 'Bearer' token type
-            expect(result).toEqual(validBearerTokenResponse);
-            expect(result.token_type).toEqual("Bearer");
+            expect(result.tokenResponse.token_type).toEqual("Bearer");
         });
 
         it("should throw with code exchange failed error when request fails", async () => {
+            const state = await setupState();
             fetchMock.post(
-                tokenEndpoint,
+                metadata.token_endpoint,
                 {
                     status: 500,
                 },
                 { overwriteRoutes: true },
             );
-            await expect(() =>
-                completeAuthorizationCodeGrant(code, {
-                    clientId,
-                    codeVerifier,
-                    redirectUri,
-                    delegatedAuthConfig,
-                    nonce,
-                }),
-            ).rejects.toThrow(new Error(OidcError.CodeExchangeFailed));
+            await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
+                new Error(OidcError.CodeExchangeFailed),
+            );
         });
 
         it("should throw invalid token error when token is invalid", async () => {
+            const state = await setupState();
             const invalidBearerTokenResponse = {
                 ...validBearerTokenResponse,
                 access_token: null,
             };
             fetchMock.post(
-                tokenEndpoint,
-                { status: 200, body: JSON.stringify(invalidBearerTokenResponse) },
+                metadata.token_endpoint,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    ...invalidBearerTokenResponse,
+                },
                 { overwriteRoutes: true },
             );
-            await expect(() =>
-                completeAuthorizationCodeGrant(code, {
-                    clientId,
-                    codeVerifier,
-                    redirectUri,
-                    delegatedAuthConfig,
-                    nonce,
-                }),
-            ).rejects.toThrow(new Error(OidcError.InvalidBearerTokenResponse));
+            await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
+                new Error(OidcError.InvalidBearerTokenResponse),
+            );
         });
 
         it("should throw invalid id token error when id_token is invalid", async () => {
+            const state = await setupState();
             mocked(jwtDecode).mockReturnValue({
                 ...validDecodedIdToken,
                 // invalid audience
                 aud: "something-else",
             });
-            await expect(() =>
-                completeAuthorizationCodeGrant(code, {
-                    clientId,
-                    codeVerifier,
-                    redirectUri,
-                    delegatedAuthConfig,
-                    nonce,
-                }),
-            ).rejects.toThrow(new Error(OidcError.InvalidIdToken));
+            await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
+                new Error(OidcError.InvalidIdToken),
+            );
         });
     });
 });
