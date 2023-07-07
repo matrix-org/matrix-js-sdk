@@ -423,13 +423,13 @@ class WelcomeDecryption extends DecryptionAlgorithm {
         console.log("[MLS] Got welcome", content);
         // FIXME: check that it's a to-device event
         if (typeof(content.ciphertext) !== "string" ||
-            typeof(content.epoch_creator) !== "string" ||
+            typeof(content.sender) !== "string" ||
             !Array.isArray(content.resolves)) {
             throw new DecryptionError("MLS_WELCOME_MISSING_FIELDS", "Missing or invalid fields in input");
         }
         this.crypto.mlsProvider.processWelcome(
             content.ciphertext,
-            content.epoch_creator,
+            content.sender,
             content.resolves,
             content.commit_event,
         );
@@ -680,7 +680,7 @@ export class MlsProvider {
         }
         const roomEpochMap = this.epochMap.get(groupId)!;
         if (!roomEpochMap.has(BigInt(epochNum))) {
-            this.epochMap.set(BigInt(epochNum), new Map());
+            roomEpochMap.set(BigInt(epochNum), new Map());
         }
         roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, commitEvent);
 
@@ -751,7 +751,7 @@ export class MlsProvider {
         }
         const roomEpochMap = this.epochMap.get(roomId)!;
         if (!roomEpochMap.has(BigInt(epochNum))) {
-            this.epochMap.set(BigInt(epochNum), new Map());
+            roomEpochMap.set(BigInt(epochNum), new Map());
         }
         roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, commitEvent);
 
@@ -782,7 +782,7 @@ export class MlsProvider {
         }
         const roomEpochMap = this.epochMap.get(roomId)!;
         if (!roomEpochMap.has(BigInt(epochNum))) {
-            this.epochMap.set(BigInt(epochNum), new Map());
+            roomEpochMap.set(BigInt(epochNum), new Map());
         }
         roomEpochMap.get(BigInt(epochNum))!.set(epochCreatorB64, eventId);
     }
