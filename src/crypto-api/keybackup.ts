@@ -44,11 +44,20 @@ export interface KeyBackupInfo {
     version?: string; // number contained within
 }
 
+/**
+ * Status of the active key backup.
+ */
 export interface KeyBackupStatus {
+    /** The backup version */
     version: string;
+    /** True if the client is backing up keys to this backup */
     enabled: boolean;
 }
 
+/**
+ * Detailed signature information of a backup.
+ * This can be used to display what devices/identities are trusting a backup.
+ */
 export type SigInfo = {
     deviceId: string;
     valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
@@ -57,21 +66,40 @@ export type SigInfo = {
     deviceTrust?: DeviceTrustLevel;
 };
 
+/**
+ * Backup trust information.
+ * Client can upload and download from backup if `usable` is true.
+ */
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
     // eslint-disable-next-line camelcase
-    trusted_locally?: boolean;
+    trusted_locally?: boolean; // true if the private key is known. Notice that this is not enough to use the backup.
 };
 
+/**
+ * Active key backup info, if any.
+ * Returned as a result of `checkAndStart()`.
+ */
 export interface IKeyBackupCheck {
     backupInfo?: IKeyBackupInfo;
     trustInfo: TrustInfo;
 }
 
+/**
+ * Server side keys backup management.
+ * Devices may upload encrypted copies of keys to the server.
+ * When a device tries to read a message that it does not have keys for, it may request the key from the server and decrypt it.
+ */
 export interface SecureKeyBackup {
+    /**
+     * Gets the status of the current active key backup if any.
+     */
     getKeyBackupStatus(): Promise<KeyBackupStatus | null>;
 
+    /**
+     * Stop the SecureKeyBackup manager from backing up keys and allow a clean shutdown.
+     */
     stop(): void;
 
     /**
