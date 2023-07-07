@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import * as utils from "../test-utils/test-utils";
 import {
     DuplicateStrategy,
@@ -159,6 +161,33 @@ describe("EventTimelineSet", () => {
             expect(() => {
                 eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline, true, false);
             }).not.toThrow();
+        });
+
+        it("should aggregate relations which belong to unknown timeline without adding them to any timeline", () => {
+            // If threads are disabled all events go into the main timeline
+            mocked(client.supportsThreads).mockReturnValue(true);
+            const reactionEvent = utils.mkReaction(messageEvent, client, client.getSafeUserId(), roomId);
+
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+            eventTimelineSet.addEventToTimeline(reactionEvent, liveTimeline, {
+                toStartOfTimeline: true,
+            });
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+
+            eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline, {
+                toStartOfTimeline: true,
+            });
+            expect(liveTimeline.getEvents()).toHaveLength(1);
+            const [event] = liveTimeline.getEvents();
+            const reactions = eventTimelineSet.relations!.getChildEventsForEvent(
+                event.getId()!,
+                "m.annotation",
+                "m.reaction",
+            )!;
+            const relations = reactions.getRelations();
+            expect(relations).toHaveLength(1);
+            expect(relations[0].getId()).toBe(reactionEvent.getId());
         });
     });
 

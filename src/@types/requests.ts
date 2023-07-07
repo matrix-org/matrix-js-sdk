@@ -176,7 +176,8 @@ export interface IAddThreePidOnlyBody {
 export interface IBindThreePidBody {
     client_secret: string;
     id_server: string;
-    id_access_token: string;
+    // Some older identity servers have no auth enabled
+    id_access_token: string | null;
     sid: string;
 }
 

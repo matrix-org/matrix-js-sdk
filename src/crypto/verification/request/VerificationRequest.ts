@@ -30,6 +30,7 @@ import {
     VerificationRequest as IVerificationRequest,
     VerificationRequestEvent,
     VerificationRequestEventHandlerMap,
+    Verifier,
 } from "../../../crypto-api/verification";
 
 // backwards-compatibility exports
@@ -456,6 +457,13 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
             }
         }
         return this._verifier!;
+    }
+
+    public async startVerification(method: string): Promise<Verifier> {
+        const verifier = this.beginKeyVerification(method);
+        // kick off the verification in the background, but *don't* wait for to complete: we need to return the `Verifier`.
+        verifier.verify();
+        return verifier;
     }
 
     /**

@@ -2008,6 +2008,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 const poll = new Poll(event, this.client, this);
                 this.polls.set(event.getId()!, poll);
                 this.emit(PollEvent.New, poll);
+
+                // remove the poll when redacted
+                event.once(MatrixEventEvent.BeforeRedaction, (redactedEvent: MatrixEvent) => {
+                    this.polls.delete(redactedEvent.getId()!);
+                });
             } catch {}
             // poll creation can fail for malformed poll start events
             return;
