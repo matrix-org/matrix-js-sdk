@@ -63,10 +63,12 @@ export interface IContent {
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
 export interface IUnsigned {
+    [key: string]: any;
     "age"?: number;
     "prev_sender"?: string;
     "prev_content"?: IContent;
     "redacted_because"?: IEvent;
+    "replaces_state"?: string;
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
