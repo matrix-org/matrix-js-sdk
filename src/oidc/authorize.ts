@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { OidcClient, WebStorageStateStore } from "oidc-client-ts";
+
 import { IDelegatedAuthConfig } from "../client";
 import { Method } from "../http-api";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
-import { validateIdToken, ValidatedIssuerConfig } from "./validate";
+import { validateIdToken, ValidatedIssuerConfig, ValidatedIssuerMetadata, UserState } from "./validate";
 
 /**
  * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
@@ -35,6 +37,11 @@ export type AuthorizationParams = {
     nonce: string;
 };
 
+/**
+ * @experimental
+ * Generate the scope used in authorization request with OIDC OP
+ * @returns scope
+ */
 const generateScope = (): string => {
     const deviceId = randomString(10);
     return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
@@ -74,6 +81,7 @@ export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: stri
 });
 
 /**
+ * @deprecated use generateOidcAuthorizationUrl
  * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
  * @param authorizationUrl - endpoint to attempt authorization with the OP
@@ -99,6 +107,49 @@ export const generateAuthorizationUrl = async (
     url.searchParams.append("code_challenge", await generateCodeChallenge(codeVerifier));
 
     return url.toString();
+};
+
+/**
+ * @experimental
+ * Generate a URL to attempt authorization with the OP
+ * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
+ * @param oidcClientSettings - oidc configuration
+ * @param homeserverName - used as state
+ * @returns a Promise with the url as a string
+ */
+export const generateOidcAuthorizationUrl = async ({
+    metadata,
+    redirectUri,
+    clientId,
+    homeserverUrl,
+    identityServerUrl,
+    nonce,
+}: {
+    clientId: string;
+    metadata: ValidatedIssuerMetadata;
+    homeserverUrl: string;
+    identityServerUrl?: string;
+    redirectUri: string;
+    nonce: string;
+}): Promise<string> => {
+    const scope = await generateScope();
+    const oidcClient = new OidcClient({
+        ...metadata,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        authority: metadata.issuer,
+        response_mode: "query",
+        response_type: "code",
+        scope,
+        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+    });
+    const userState: UserState = { homeserverUrl, nonce, identityServerUrl };
+    const request = await oidcClient.createSigninRequest({
+        state: userState,
+        nonce,
+    });
+
+    return request.url;
 };
 
 /**
