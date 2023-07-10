@@ -1386,14 +1386,11 @@ describe("MatrixClient", function () {
                 expectation: {},
             },
         ])("should modify power levels of $userId correctly", async ({ userId, powerLevel, expectation }) => {
-            const event = {
-                getType: () => "m.room.power_levels",
-                getContent: () => ({
-                    users: {
-                        "alice@localhost": 50,
-                    },
-                }),
-            } as MatrixEvent;
+            httpBackend!.when("GET", "/state/m.room.power_levels/").respond(200, {
+                users: {
+                    "alice@localhost": 50,
+                },
+            });
 
             httpBackend!
                 .when("PUT", "/state/m.room.power_levels")
@@ -1402,7 +1399,7 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, {});
 
-            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel, event);
+            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel);
             await httpBackend!.flushAllExpected();
             await prom;
         });

@@ -4272,7 +4272,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         /**
          * @deprecated no longer needed, unused.
          */
-        event: MatrixEvent | null,
+        event?: MatrixEvent | null,
     ): Promise<ISendEventResponse> {
         let content: IPowerLevelsContent | undefined;
         if (this.clientRunning && this.isInitialSyncComplete()) {
