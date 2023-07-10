@@ -485,6 +485,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 
     public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
     public getRoom = jest.fn();
+    public getFoci = jest.fn();
 
     public supportsThreads(): boolean {
         return true;
