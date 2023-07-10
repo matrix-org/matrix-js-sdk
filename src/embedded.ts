@@ -255,7 +255,7 @@ export class RoomWidgetClient extends MatrixClient {
     public async getOpenIdToken(): Promise<IOpenIDToken> {
         const token = await this.widgetApi.requestOpenIDConnectToken();
         // the IOpenIDCredentials from the widget-api and IOpenIDToken form the matrix-js-sdk are compatible.
-        // we still recreate the token to make this transparent and cathcable by the linter in case the types change in the future.
+        // we still recreate the token to make this transparent and catch'able by the linter in case the types change in the future.
         return <IOpenIDToken>{
             access_token: token.access_token,
             expires_in: token.expires_in,
