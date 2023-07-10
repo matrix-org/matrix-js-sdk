@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ISigned } from "../@types/signed";
 import { IEncryptedPayload } from "./aes";
 
 export interface Curve25519SessionData {
@@ -35,27 +34,13 @@ export interface IKeyBackupRoomSessions {
     [sessionId: string]: IKeyBackupSession;
 }
 
-export interface ICurve25519AuthData {
-    public_key: string;
-    private_key_salt?: string;
-    private_key_iterations?: number;
-    private_key_bits?: number;
-}
+// Export for backward compatibility
+export type {
+    Curve25519AuthData as ICurve25519AuthData,
+    Aes256AuthData as IAes256AuthData,
+    KeyBackupInfo as IKeyBackupInfo,
+} from "../crypto-api/keybackup";
 
-export interface IAes256AuthData {
-    iv: string;
-    mac: string;
-    private_key_salt?: string;
-    private_key_iterations?: number;
-}
-
-export interface IKeyBackupInfo {
-    algorithm: string;
-    auth_data: ISigned & (ICurve25519AuthData | IAes256AuthData);
-    count?: number;
-    etag?: string;
-    version?: string; // number contained within
-}
 /* eslint-enable camelcase */
 
 export interface IKeyBackupPrepareOpts {

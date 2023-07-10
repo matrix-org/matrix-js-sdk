@@ -50,7 +50,9 @@ import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
+import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
+import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { CryptoCallbacks } from "../../../src/crypto-api";
 
 const ROOM_ID = "!room:id";
 
@@ -402,6 +404,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+    const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
     const Olm = global.Olm;
 
@@ -528,32 +531,58 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
     }
 
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+    /**
+     * Create the {@link CryptoCallbacks}
+     */
+    function createCryptoCallbacks(): CryptoCallbacks {
+        // Store the cached secret storage key and return it when `getSecretStorageKey` is called
+        let cachedKey: { keyId: string; key: Uint8Array };
+        const cacheSecretStorageKey = (keyId: string, keyInfo: AddSecretStorageKeyOpts, key: Uint8Array) => {
+            cachedKey = {
+                keyId,
+                key,
+            };
+        };
 
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: "@alice:localhost",
-            accessToken: "akjgkrgjs",
-            deviceId: "xzcvb",
-        });
+        const getSecretStorageKey = () => Promise.resolve<[string, Uint8Array]>([cachedKey.keyId, cachedKey.key]);
 
-        /* set up listeners for /keys/upload and /sync */
-        keyReceiver = new E2EKeyReceiver(homeserverUrl);
-        syncResponder = new SyncResponder(homeserverUrl);
+        return {
+            cacheSecretStorageKey,
+            getSecretStorageKey,
+        };
+    }
 
-        await initCrypto(aliceClient);
+    beforeEach(
+        async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
 
-        // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
-        await Olm.init();
-        testOlmAccount = new Olm.Account();
-        testOlmAccount.create();
-        const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
-        testSenderKey = testE2eKeys.curve25519;
-    });
+            const homeserverUrl = "https://alice-server.com";
+            aliceClient = createClient({
+                baseUrl: homeserverUrl,
+                userId: "@alice:localhost",
+                accessToken: "akjgkrgjs",
+                deviceId: "xzcvb",
+                cryptoCallbacks: createCryptoCallbacks(),
+            });
+
+            /* set up listeners for /keys/upload and /sync */
+            keyReceiver = new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl);
+
+            await initCrypto(aliceClient);
+
+            // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+            await Olm.init();
+            testOlmAccount = new Olm.Account();
+            testOlmAccount.create();
+            const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
+            testSenderKey = testE2eKeys.curve25519;
+        },
+        /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+        10000,
+    );
 
     afterEach(async () => {
         await aliceClient.stopClient();
@@ -2167,6 +2196,219 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(devicesInfo.get(user)!.get("EBMMPAFOPU")).toEqual(
                 downloadDeviceToJsDevice(queryResponseBody.device_keys[user]["EBMMPAFOPU"]),
             );
+        });
+    });
+
+    describe("bootstrapSecretStorage", () => {
+        /**
+         * Create a fake secret storage key
+         * Async because `bootstrapSecretStorage` expect an async method
+         */
+        const createSecretStorageKey = jest.fn().mockResolvedValue({
+            keyInfo: {}, // Returning undefined here used to cause a crash
+            privateKey: Uint8Array.of(32, 33),
+        });
+
+        /**
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)`
+         * Resolved when a key is uploaded (ie in `body.content.key`)
+         * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
+         */
+        function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
+            return new Promise((resolve) => {
+                // This url is called multiple times during the secret storage bootstrap process
+                // When we received the newly generated key, we return it
+                fetchMock.put(
+                    "express:/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)",
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+
+                        if (content.key) {
+                            resolve(content.key);
+                        }
+
+                        return {};
+                    },
+                    { overwriteRoutes: true },
+                );
+            });
+        }
+
+        /**
+         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`
+         * Resolved when the cross signing key is uploaded
+         * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
+         */
+        function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
+            return new Promise((resolve) => {
+                // Called when the cross signing key is uploaded
+                fetchMock.put(
+                    `express:/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`,
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+                        resolve(content.encrypted);
+                        return {};
+                    },
+                );
+            });
+        }
+
+        /**
+         * Send in the sync response the provided `secretStorageKey` into the account_data field
+         * The key is set for the `m.secret_storage.default_key` and `m.secret_storage.key.${secretStorageKey}` events
+         * https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
+         * @param secretStorageKey
+         */
+        function sendSyncResponse(secretStorageKey: string) {
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                account_data: {
+                    events: [
+                        {
+                            type: "m.secret_storage.default_key",
+                            content: {
+                                key: secretStorageKey,
+                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+                            },
+                        },
+                        // Needed for secretStorage.getKey or secretStorage.hasKey
+                        {
+                            type: `m.secret_storage.key.${secretStorageKey}`,
+                            content: {
+                                key: secretStorageKey,
+                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+                            },
+                        },
+                    ],
+                },
+            });
+        }
+
+        beforeEach(async () => {
+            createSecretStorageKey.mockClear();
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
+
+        newBackendOnly(
+            "should throw an error if we are unable to create a key because createSecretStorageKey is not set",
+            async () => {
+                await expect(
+                    aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true }),
+                ).rejects.toThrow("unable to create a new secret storage key, createSecretStorageKey is not set");
+            },
+        );
+
+        newBackendOnly("should create a new key", async () => {
+            const bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Finally, wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+
+            const defaultKeyId = await aliceClient.secretStorage.getDefaultKeyId();
+            // Check that the uploaded key in stored in the secret storage
+            expect(await aliceClient.secretStorage.hasKey(secretStorageKey)).toBeTruthy();
+            // Check that the uploaded key is the default key
+            expect(defaultKeyId).toBe(secretStorageKey);
+        });
+
+        newBackendOnly(
+            "should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set",
+            async () => {
+                const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // Call again bootstrapSecretStorage
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+
+                // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
+            },
+        );
+
+        newBackendOnly(
+            "should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage",
+            async () => {
+                let bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                let secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // Call again bootstrapSecretStorage
+                bootstrapPromise = aliceClient
+                    .getCrypto()!
+                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+                // Wait for the key to be uploaded in the account data
+                secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+                // Return the newly created key in the sync response
+                sendSyncResponse(secretStorageKey);
+
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
+
+                // createSecretStorageKey should have been called twice, one time every bootstrapSecretStorage call
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
+            },
+        );
+
+        newBackendOnly("should upload cross signing keys", async () => {
+            mockSetupCrossSigningRequests();
+
+            // Before setting up secret-storage, bootstrap cross-signing, so that the client has cross-signing keys.
+            await aliceClient.getCrypto()?.bootstrapCrossSigning({});
+
+            // Now, when we bootstrap secret-storage, the cross-signing keys should be uploaded.
+            const bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Wait for the cross signing keys to be uploaded
+            const [masterKey, userSigningKey, selfSigningKey] = await Promise.all([
+                awaitCrossSigningKeyUpload("master"),
+                awaitCrossSigningKeyUpload("user_signing"),
+                awaitCrossSigningKeyUpload("self_signing"),
+            ]);
+
+            // Finally, wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+
+            // Expect the cross signing master key to be uploaded and to be encrypted with `secretStorageKey`
+            expect(masterKey[secretStorageKey]).toBeDefined();
+            expect(userSigningKey[secretStorageKey]).toBeDefined();
+            expect(selfSigningKey[secretStorageKey]).toBeDefined();
         });
     });
 });
