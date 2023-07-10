@@ -29,13 +29,12 @@ import {
     EventType,
     MsgType,
     RelationType,
-    ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread";
+import { Thread, ThreadEvent, ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
 import { IActionsObject } from "../pushprocessor";
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
@@ -63,12 +62,10 @@ export interface IContent {
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
 export interface IUnsigned {
-    [key: string]: any;
     "age"?: number;
     "prev_sender"?: string;
     "prev_content"?: IContent;
     "redacted_because"?: IEvent;
-    "replaces_state"?: string;
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
@@ -520,15 +517,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * ```
      */
     public getDetails(): string {
+        let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
         const room = this.getRoomId();
         if (room) {
-            // in-room event
-            return `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()} room=${room} ts=${this.getDate()?.toISOString()}`;
-        } else {
-            // to-device event
-            const msgid = this.getContent()[ToDeviceMessageId];
-            return `msgid=${msgid} type=${this.getWireType()} sender=${this.getSender()}`;
+            details += ` room=${room}`;
         }
+        const date = this.getDate();
+        if (date) {
+            details += ` ts=${date.toISOString()}`;
+        }
+        return details;
     }
 
     /**
@@ -578,10 +576,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the event ID of the thread head
      */
     public get threadRootId(): string | undefined {
-        // don't allow state events to be threaded as per the spec
-        if (this.isState()) {
-            return undefined;
-        }
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
@@ -603,11 +597,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * A helper to check if an event is a thread's head or not
      */
     public get isThreadRoot(): boolean {
-        // don't allow state events to be threaded as per the spec
-        if (this.isState()) {
-            return false;
-        }
-
         const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         // Bundled relationships only returned when the sync response is limited
@@ -1376,12 +1365,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const relation = this.getWireContent()?.["m.relates_to"];
-        if (
-            this.isState() &&
-            !!relation?.rel_type &&
-            ([RelationType.Replace, RelationType.Thread] as string[]).includes(relation.rel_type)
-        ) {
-            // State events cannot be m.replace or m.thread relations
+        if (this.isState() && relation?.rel_type === RelationType.Replace) {
+            // State events cannot be m.replace relations
             return false;
         }
         return !!(relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true));
@@ -1633,10 +1618,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param thread - the thread
      */
     public setThread(thread?: Thread): void {
-        // don't allow state events to be threaded as per the spec
-        if (this.isState()) {
-            return;
-        }
         if (this.thread) {
             this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
         }

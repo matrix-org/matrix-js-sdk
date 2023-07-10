@@ -30,7 +30,6 @@ import {
     VerificationRequest as IVerificationRequest,
     VerificationRequestEvent,
     VerificationRequestEventHandlerMap,
-    Verifier,
 } from "../../../crypto-api/verification";
 
 // backwards-compatibility exports
@@ -268,7 +267,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
 
     /** Only set after a .ready if the other party can scan a QR code
      *
-     * @deprecated Prefer `generateQRCode`.
+     * @deprecated Prefer `getQRCodeBytes`.
      */
     public get qrCodeData(): QRCodeData | null {
         return this._qrCodeData;
@@ -278,21 +277,9 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
      * Get the data for a QR code allowing the other device to verify this one, if it supports it.
      *
      * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
-     *
-     * @deprecated Prefer `generateQRCode`.
      */
     public getQRCodeBytes(): Buffer | undefined {
         return this._qrCodeData?.getBuffer();
-    }
-
-    /**
-     * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
-     *
-     * Only returns data once `phase` is `Ready` and the other party can scan a QR code;
-     * otherwise returns `undefined`.
-     */
-    public async generateQRCode(): Promise<Buffer | undefined> {
-        return this.getQRCodeBytes();
     }
 
     /** Checks whether the other party supports a given verification method.
@@ -469,13 +456,6 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
             }
         }
         return this._verifier!;
-    }
-
-    public async startVerification(method: string): Promise<Verifier> {
-        const verifier = this.beginKeyVerification(method);
-        // kick off the verification in the background, but *don't* wait for to complete: we need to return the `Verifier`.
-        verifier.verify();
-        return verifier;
     }
 
     /**

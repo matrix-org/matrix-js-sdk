@@ -80,6 +80,7 @@ import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
     SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageCallbacks,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
@@ -91,16 +92,12 @@ import {
     CrossSigningStatus,
     DeviceVerificationStatus,
     ImportRoomKeysOpts,
-    VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 
 /* re-exports for backwards compatibility */
-export type {
-    BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
-    CryptoCallbacks as ICryptoCallbacks,
-} from "../crypto-api";
+export type { BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts } from "../crypto-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -130,16 +127,30 @@ export function isCryptoAvailable(): boolean {
     return Boolean(global.Olm);
 }
 
-// minimum time between attempting to unwedge an Olm session, if we succeeded
-// in creating a new session
-const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-// minimum time between attempting to unwedge an Olm session, if we failed
-// to create a new session
-const FORCE_SESSION_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
     pickleKey?: string;
+}
+
+export interface ICryptoCallbacks extends SecretStorageCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    onSecretRequested?: (
+        userId: string,
+        deviceId: string,
+        requestId: string,
+        secretName: string,
+        deviceTrust: DeviceTrustLevel,
+    ) => Promise<string | undefined>;
+    getDehydrationKey?: (
+        keyInfo: SecretStorageKeyDescription,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /* eslint-disable camelcase */
@@ -224,16 +235,7 @@ export enum CryptoEvent {
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
-    /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
-
-    /**
-     * Fires when a key verification request is received.
-     *
-     * The payload is a {@link Crypto.VerificationRequest}.
-     */
-    VerificationRequestReceived = "crypto.verificationRequestReceived",
-
     Warning = "crypto.warning",
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
@@ -295,16 +297,8 @@ export type CryptoEventHandlerMap = {
     ) => void;
     /**
      * Fires when a key verification is requested.
-     *
-     * Deprecated: use `CryptoEvent.VerificationRequestReceived`.
      */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
-
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: CryptoApiVerificationRequest) => void;
-
     /**
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
@@ -395,7 +389,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     // to avoid loading room members as long as possible.
     private roomDeviceTrackingState: { [roomId: string]: Promise<void> } = {};
 
-    // The timestamp of the minimum time at which we will retry forcing establishment
+    // The timestamp of the last time we forced establishment
     // of a new session for each device, in milliseconds.
     // {
     //     userId: {
@@ -403,7 +397,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     //     },
     // }
     // Map: user Id → device Id → timestamp
-    private forceNewSessionRetryTime: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
+    private lastNewSessionForced: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
         () => new MapWithDefault(() => 0),
     );
 
@@ -1837,7 +1831,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.outgoingRoomKeyRequestManager.stop();
         this.deviceList.stop();
         this.dehydrationManager.stop();
-        this.backupManager.stop();
     }
 
     /**
@@ -2363,7 +2356,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
-    /** @deprecated Use `requestOwnUserVerificationToDevice` or `requestDeviceVerification` */
     public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(userId));
@@ -2374,14 +2366,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         const channel = new ToDeviceChannel(this.baseApis, userId, devices, ToDeviceChannel.makeTransactionId());
         return this.requestVerificationWithChannel(userId, channel, this.toDeviceVerificationRequests);
-    }
-
-    public requestOwnUserVerification(): Promise<VerificationRequest> {
-        return this.requestVerification(this.userId);
-    }
-
-    public requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
-        return this.requestVerification(userId, [deviceId]);
     }
 
     private async requestVerificationWithChannel(
@@ -3565,7 +3549,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             !request.observeOnly;
         if (shouldEmit) {
             this.baseApis.emit(CryptoEvent.VerificationRequest, request);
-            this.baseApis.emit(CryptoEvent.VerificationRequestReceived, request);
         }
     }
 
@@ -3597,22 +3580,24 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return;
         }
 
-        // check when we can force a new session with this device: if we've already done so
+        // check when we last forced a new session with this device: if we've already done so
         // recently, don't do it again.
-        const forceNewSessionRetryTimeDevices = this.forceNewSessionRetryTime.getOrCreate(sender);
-        const forceNewSessionRetryTime = forceNewSessionRetryTimeDevices.getOrCreate(deviceKey);
-        if (forceNewSessionRetryTime > Date.now()) {
+        const lastNewSessionDevices = this.lastNewSessionForced.getOrCreate(sender);
+        const lastNewSessionForced = lastNewSessionDevices.getOrCreate(deviceKey);
+        if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
             logger.debug(
-                `New session already forced with device ${sender}:${deviceKey}: ` +
-                    `not forcing another until at least ${new Date(forceNewSessionRetryTime).toUTCString()}`,
+                "New session already forced with device " +
+                    sender +
+                    ":" +
+                    deviceKey +
+                    " at " +
+                    lastNewSessionForced +
+                    ": not forcing another",
             );
             await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
             retryDecryption();
             return;
         }
-
-        // make sure we don't retry to unwedge too soon even if we fail to create a new session
-        forceNewSessionRetryTimeDevices.set(deviceKey, Date.now() + FORCE_SESSION_RETRY_INTERVAL_MS);
 
         // establish a new olm session with this device since we're failing to decrypt messages
         // on a current session.
@@ -3634,7 +3619,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const devicesByUser = new Map([[sender, [device]]]);
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
-        forceNewSessionRetryTimeDevices.set(deviceKey, Date.now() + MIN_FORCE_SESSION_INTERVAL_MS);
+        lastNewSessionDevices.set(deviceKey, Date.now());
 
         // Now send a blank message on that session so the other side knows about it.
         // (The keyshare request is sent in the clear so that won't do)

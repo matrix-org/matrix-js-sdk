@@ -15,19 +15,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SigningKey } from "oidc-client-ts";
-
 import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions, M_AUTHENTICATION } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
-import { discoverAndValidateAuthenticationConfig } from "./oidc/discovery";
 import {
+    OidcDiscoveryError,
     ValidatedIssuerConfig,
-    ValidatedIssuerMetadata,
     validateOIDCIssuerWellKnown,
     validateWellKnownAuthentication,
 } from "./oidc/validate";
-import { OidcError } from "./oidc/error";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -58,26 +54,12 @@ interface AutoDiscoveryState {
 }
 interface WellKnownConfig extends Omit<IWellKnownConfig, "error">, AutoDiscoveryState {}
 
-/**
- * @deprecated in favour of OidcClientConfig
- */
 interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig, AutoDiscoveryState {}
-
-/**
- * @experimental
- */
-export interface OidcClientConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
-    metadata: ValidatedIssuerMetadata;
-    signingKeys?: SigningKey[];
-}
 
 export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
-    /**
-     * @experimental
-     */
-    "m.authentication"?: (OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState;
+    "m.authentication"?: DelegatedAuthConfig | AutoDiscoveryState;
 }
 
 /**
@@ -284,7 +266,7 @@ export class AutoDiscovery {
             }
         });
 
-        const authConfig = await this.discoverAndValidateAuthenticationConfig(wellknown);
+        const authConfig = await this.validateDiscoveryAuthenticationConfig(wellknown);
         clientConfig[M_AUTHENTICATION.stable!] = authConfig;
 
         // Step 8: Give the config to the caller (finally)
@@ -293,7 +275,6 @@ export class AutoDiscovery {
 
     /**
      * Validate delegated auth configuration
-     * @deprecated use discoverAndValidateAuthenticationConfig
      * - m.authentication config is present and valid
      * - delegated auth issuer openid-configuration is reachable
      * - delegated auth issuer openid-configuration is configured correctly for us
@@ -307,8 +288,7 @@ export class AutoDiscovery {
         wellKnown: IClientWellKnown,
     ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {
         try {
-            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
-            const homeserverAuthenticationConfig = validateWellKnownAuthentication(authentication);
+            const homeserverAuthenticationConfig = validateWellKnownAuthentication(wellKnown);
 
             const issuerOpenIdConfigUrl = `${this.sanitizeWellKnownUrl(
                 homeserverAuthenticationConfig.issuer,
@@ -317,7 +297,7 @@ export class AutoDiscovery {
 
             if (issuerWellKnown.action !== AutoDiscoveryAction.SUCCESS) {
                 logger.error("Failed to fetch issuer openid configuration");
-                throw new Error(OidcError.General);
+                throw new Error(OidcDiscoveryError.General);
             }
 
             const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown.raw);
@@ -330,53 +310,15 @@ export class AutoDiscovery {
             };
             return delegatedAuthConfig;
         } catch (error) {
-            const errorMessage = (error as Error).message as unknown as OidcError;
-            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
+            const errorMessage = (error as Error).message as unknown as OidcDiscoveryError;
+            const errorType = Object.values(OidcDiscoveryError).includes(errorMessage)
+                ? errorMessage
+                : OidcDiscoveryError.General;
 
             const state =
-                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
-
-            return {
-                state,
-                error: errorType,
-            };
-        }
-    }
-
-    /**
-     * Validate delegated auth configuration
-     * - m.authentication config is present and valid
-     * - delegated auth issuer openid-configuration is reachable
-     * - delegated auth issuer openid-configuration is configured correctly for us
-     * When successful, validated authentication metadata and optionally signing keys will be returned
-     * Any errors are caught, and AutoDiscoveryState returned with error
-     * @param wellKnown - configuration object as returned
-     * by the .well-known auto-discovery endpoint
-     * @returns Config or failure result
-     */
-    public static async discoverAndValidateAuthenticationConfig(
-        wellKnown: IClientWellKnown,
-    ): Promise<(OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState> {
-        try {
-            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
-            const result = await discoverAndValidateAuthenticationConfig(authentication);
-
-            // include this for backwards compatibility
-            const validatedIssuerConfig = validateOIDCIssuerWellKnown(result.metadata);
-
-            const response = {
-                state: AutoDiscoveryAction.SUCCESS,
-                error: null,
-                ...validatedIssuerConfig,
-                ...result,
-            };
-            return response;
-        } catch (error) {
-            const errorMessage = (error as Error).message as unknown as OidcError;
-            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
-
-            const state =
-                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
+                errorType === OidcDiscoveryError.NotSupported
+                    ? AutoDiscoveryAction.IGNORE
+                    : AutoDiscoveryAction.FAIL_ERROR;
 
             return {
                 state,
