@@ -62,17 +62,22 @@ export class RustVerificationRequest
 
         const onChange = async (): Promise<void> => {
             // if we now have a `Verification` where we lacked one before, wrap it.
-            // TODO: QR support
             if (this._verifier === undefined) {
                 const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
                 if (verification instanceof RustSdkCryptoJs.Sas) {
-                    this._verifier = new RustSASVerifier(verification, this, outgoingRequestProcessor);
+                    this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
+                } else if (verification instanceof RustSdkCryptoJs.Qr) {
+                    this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
                 }
             }
 
             this.emit(VerificationRequestEvent.Change);
         };
         inner.registerChangesCallback(onChange);
+    }
+
+    private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
+        this._verifier = verifier;
     }
 
     /**
@@ -186,6 +191,8 @@ export class RustVerificationRequest
         // TODO: this isn't quite right. The existence of a Verification doesn't prove that we have .started.
         if (verification instanceof RustSdkCryptoJs.Sas) {
             return "m.sas.v1";
+        } else if (verification instanceof RustSdkCryptoJs.Qr) {
+            return "m.reciprocate.v1";
         } else {
             return null;
         }
@@ -305,6 +312,32 @@ export class RustVerificationRequest
         // this should have triggered the onChange callback, and we should now have a verifier
         if (!this._verifier) {
             throw new Error("Still no verifier after startSas() call");
+        }
+
+        return this._verifier;
+    }
+
+    /**
+     * Start a QR code verification by providing a scanned QR code for this verification flow.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#scanQRCode}.
+     *
+     * @param qrCodeData - the decoded QR code.
+     * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
+     */
+    public async scanQRCode(uint8Array: Uint8Array): Promise<Verifier> {
+        const scan = RustSdkCryptoJs.QrCodeScan.fromBytes(new Uint8ClampedArray(uint8Array));
+        const verifier: RustSdkCryptoJs.Qr = await this.inner.scanQrCode(scan);
+
+        // this should have triggered the onChange callback, and we should now have a verifier
+        if (!this._verifier) {
+            throw new Error("Still no verifier after scanQrCode() call");
+        }
+
+        // we can immediately trigger the reciprocate request
+        const req: undefined | OutgoingRequest = verifier.reciprocate();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
         }
 
         return this._verifier;
@@ -449,6 +482,24 @@ class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas
      */
     public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
         return null;
+    }
+}
+
+/** A Verifier instance which is used to show and/or scan a QR code. */
+export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> implements Verifier {
+    public constructor(inner: RustSdkCryptoJs.Qr, outgoingRequestProcessor: OutgoingRequestProcessor) {
+        super(inner, outgoingRequestProcessor);
+    }
+
+    /**
+     * Start the key verification, if it has not already been started.
+     *
+     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
+     *    or times out.
+     */
+    public async verify(): Promise<void> {
+        // Nothing to do here but wait.
+        await this.completionPromise;
     }
 }
 
