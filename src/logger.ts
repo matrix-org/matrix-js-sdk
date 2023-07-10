@@ -38,7 +38,11 @@ log.methodFactory = function (methodName, logLevel, loggerName) {
         }
         /* eslint-enable @typescript-eslint/no-invalid-this */
         const supportedByConsole =
-            methodName === "error" || methodName === "warn" || methodName === "trace" || methodName === "info";
+            methodName === "error" ||
+            methodName === "warn" ||
+            methodName === "trace" ||
+            methodName === "info" ||
+            methodName === "debug";
         /* eslint-disable no-console */
         if (supportedByConsole) {
             return console[methodName](...args);
