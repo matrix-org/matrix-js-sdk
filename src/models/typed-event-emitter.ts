@@ -217,6 +217,10 @@ export class TypedEventEmitter<
      * @returns a reference to the `EventEmitter`, so that calls can be chained.
      */
     public removeAllListeners(event?: Events | EventEmitterEvents): this {
+        // EventEmitter::removeAllListeners uses `arguments.length` to determine undefined case
+        if (event === undefined) {
+            return super.removeAllListeners();
+        }
         return super.removeAllListeners(event);
     }
 
