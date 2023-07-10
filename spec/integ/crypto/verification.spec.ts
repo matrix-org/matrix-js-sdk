@@ -81,12 +81,8 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  */
 // we test with both crypto stacks...
 describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
-    // Rust backend. Once we have full support in the rust sdk, it will go away.
-    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-
     // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
-    // backend.
+    // backend. Once we drop support for legacy crypto, it will go away.
     const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
 
     /** the client under test */
@@ -391,12 +387,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
         });
 
-        oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
+        it("can verify another via QR code with an untrusted cross-signing key", async () => {
             aliceClient = await startTestClient();
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
-            expect(aliceClient.getStoredCrossSigningForUser(TEST_USER_ID)).toBeTruthy();
 
             // have alice initiate a verification. She should send a m.key.verification.request
             const [requestBody, request] = await Promise.all([
@@ -451,23 +446,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // there should now be a verifier
             const verifier: Verifier = request.verifier!;
             expect(verifier).toBeDefined();
-            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
             // ... which we call .verify on, which emits a ShowReciprocateQr event
-            const verificationPromise = verifier.verify();
-            const reciprocateQRCodeCallbacks = await new Promise<ShowQrCodeCallbacks>((resolve) => {
+            const reciprocatePromise = new Promise<ShowQrCodeCallbacks>((resolve) => {
                 verifier.once(VerifierEvent.ShowReciprocateQr, resolve);
             });
+            const verificationPromise = verifier.verify();
+            const reciprocateQRCodeCallbacks = await reciprocatePromise;
 
             // getReciprocateQrCodeCallbacks() is an alternative way to get the callbacks
             expect(verifier.getReciprocateQrCodeCallbacks()).toBe(reciprocateQRCodeCallbacks);
             expect(verifier.getShowSasCallbacks()).toBeNull();
 
-            // Alice confirms she is happy
+            // Alice confirms she is happy, which makes her reply with a 'done'
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.done");
             reciprocateQRCodeCallbacks.confirm();
+            await sendToDevicePromise;
 
-            // that should satisfy Alice, who should reply with a 'done'
-            await expectSendToDeviceMessage("m.key.verification.done");
+            // the dummy device replies with its own 'done'
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
 
             // ... and the whole thing should be done!
             await verificationPromise;
