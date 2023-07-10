@@ -391,7 +391,7 @@ export class RustVerificationRequest
  *
  * The generic parameter `InnerType` is the type of the rust Verification class which we wrap.
  */
-class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
+abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
     VerifierEvent,
     VerifierEventHandlerMap
 > {
