@@ -188,6 +188,9 @@ export class GroupCallEventHandler {
         } else {
             focus = this.client.getFoci()[0]!;
             content["io.element.livekit_service_url"] = focus.livekitServiceUrl;
+            // try to update the state event to add our livekit service url. We may not be able to
+            // as we don't currently have permission to send this event in embedded mode
+            // (although it doesn't actually appear to reject when it fails).
             this.client.sendStateEvent(room.roomId, EventType.GroupCallPrefix, content, groupCallId);
         }
 
