@@ -30,6 +30,7 @@ import {
 } from "../crypto-api/verification";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { TypedReEmitter } from "../ReEmitter";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -40,13 +41,16 @@ export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
     implements VerificationRequest
 {
+    /** a reëmitter which relays VerificationRequestEvent.Changed events emitted by the verifier */
+    private readonly _reEmitter: TypedReEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>;
+
     /** Are we in the process of sending an `m.key.verification.ready` event? */
     private _accepting = false;
 
     /** Are we in the process of sending an `m.key.verification.cancellation` event? */
     private _cancelling = false;
 
-    private _verifier: Verifier | undefined;
+    private _verifier: undefined | RustSASVerifier | RustQrCodeVerifier;
 
     /**
      * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
@@ -61,6 +65,8 @@ export class RustVerificationRequest
         private readonly supportedVerificationMethods: string[],
     ) {
         super();
+
+        this._reEmitter = new TypedReEmitter(this);
 
         const onChange = async (): Promise<void> => {
             // if we now have a `Verification` where we lacked one before, wrap it.
@@ -80,6 +86,7 @@ export class RustVerificationRequest
 
     private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
         this._verifier = verifier;
+        this._reEmitter.reEmit(this._verifier, [VerificationRequestEvent.Change]);
     }
 
     /**
@@ -395,8 +402,8 @@ export class RustVerificationRequest
  * @internal
  */
 abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
-    VerifierEvent,
-    VerifierEventHandlerMap
+    VerifierEvent | VerificationRequestEvent,
+    VerifierEventHandlerMap & VerificationRequestEventHandlerMap
 > {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
     protected readonly completionPromise: Promise<void>;
@@ -423,6 +430,8 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
                         ),
                     );
                 }
+
+                this.emit(VerificationRequestEvent.Change);
             };
             inner.registerChangesCallback(onChange);
         });
