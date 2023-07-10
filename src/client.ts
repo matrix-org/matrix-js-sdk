@@ -4279,8 +4279,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             content = this.getRoom(roomId)?.currentState?.getStateEvents(EventType.RoomPowerLevels, "")?.getContent();
         }
         if (!content) {
-            content = await this.getStateEvent(roomId, EventType.RoomPowerLevels, "");
+            try {
+                content = await this.getStateEvent(roomId, EventType.RoomPowerLevels, "");
+            } catch (e) {
+                // It is possible for a Matrix room to not have a power levels event
+                if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
+                    content = {};
+                } else {
+                    throw e;
+                }
+            }
         }
+
         // take a copy of the content to ensure we don't corrupt
         // existing client state with a failed power level change
         content = utils.deepCopy(content);
