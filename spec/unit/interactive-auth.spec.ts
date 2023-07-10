@@ -94,6 +94,7 @@ describe("InteractiveAuth", () => {
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Password] }],
+                errcode: "MockError0",
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
