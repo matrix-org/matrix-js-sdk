@@ -74,7 +74,7 @@ module.exports = {
         "jest/no-standalone-expect": [
             "error",
             {
-                additionalTestBlockFunctions: ["beforeAll", "beforeEach", "oldBackendOnly"],
+                additionalTestBlockFunctions: ["beforeAll", "beforeEach", "oldBackendOnly", "newBackendOnly"],
             },
         ],
     },

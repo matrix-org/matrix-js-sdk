@@ -101,7 +101,7 @@ import {
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
 import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
-import { IAuthData, IAuthDict } from "./interactive-auth";
+import { AuthDict } from "./interactive-auth";
 import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api";
 import { EventTimelineSet } from "./models/event-timeline-set";
@@ -178,7 +178,14 @@ import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import {
+    LoginTokenPostResponse,
+    ILoginFlowsResponse,
+    IRefreshTokenResponse,
+    SSOAction,
+    LoginResponse,
+    LoginRequest,
+} from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -210,6 +217,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { FocusInfo } from "./webrtc/callEventTypes";
+import { RegisterRequest, RegisterResponse } from "./@types/registration";
 
 export type Store = IStore;
 
@@ -337,6 +345,11 @@ export interface ICreateClientOpts {
      */
     pickleKey?: string;
 
+    /**
+     * Verification methods we should offer to the other side when performing an interactive verification.
+     * If unset, we will offer all known methods. Currently these are: showing a QR code, scanning a QR code, and SAS
+     * (aka "emojis").
+     */
     verificationMethods?: Array<VerificationMethod>;
 
     /**
@@ -370,6 +383,9 @@ export interface ICreateClientOpts {
 
     foci?: FocusInfo[];
 
+    /**
+     * Crypto callbacks provided by the application
+     */
     cryptoCallbacks?: ICryptoCallbacks;
 
     /**
@@ -718,18 +734,8 @@ interface IJoinedMembersResponse {
     };
 }
 
-export interface IRegisterRequestParams {
-    auth?: IAuthDict;
-    username?: string;
-    password?: string;
-    refresh_token?: boolean;
-    guest_access_token?: string;
-    x_show_msisdn?: boolean;
-    bind_msisdn?: boolean;
-    bind_email?: boolean;
-    inhibit_login?: boolean;
-    initial_device_display_name?: string;
-}
+// Re-export for backwards compatibility
+export type IRegisterRequestParams = RegisterRequest;
 
 export interface IPublicRoomsChunkRoom {
     room_id: string;
@@ -872,6 +878,7 @@ export interface TimestampToEventResponse {
 interface IWhoamiResponse {
     user_id: string;
     device_id?: string;
+    is_guest?: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -924,6 +931,7 @@ type CryptoEvents =
     | CryptoEvent.RoomKeyRequest
     | CryptoEvent.RoomKeyRequestCancellation
     | CryptoEvent.VerificationRequest
+    | CryptoEvent.VerificationRequestReceived
     | CryptoEvent.DeviceVerificationChanged
     | CryptoEvent.UserTrustStatusChanged
     | CryptoEvent.KeysChanged
@@ -2218,10 +2226,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @experimental
      *
+     * @param useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
      */
-    public async initRustCrypto(): Promise<void> {
+    public async initRustCrypto({ useIndexedDB = true }: { useIndexedDB?: boolean } = {}): Promise<void> {
         if (this.cryptoBackend) {
             logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
@@ -2245,11 +2255,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId, this.secretStorage);
+        const rustCrypto = await RustCrypto.initRustCrypto(
+            this.http,
+            userId,
+            deviceId,
+            this.secretStorage,
+            this.cryptoCallbacks,
+            useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
+        );
+        rustCrypto.supportedVerificationMethods = this.verificationMethods;
+
         this.cryptoBackend = rustCrypto;
 
         // attach the event listeners needed by RustCrypto
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
+
+        // re-emit the events emitted by the crypto impl
+        this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);
     }
 
     /**
@@ -2453,12 +2475,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomId - the room to use for verification
      *
      * @returns the VerificationRequest that is in progress, if any
+     * @deprecated Prefer {@link CryptoApi.findVerificationRequestDMInProgress}.
      */
     public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
         if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
+        } else if (!this.crypto) {
+            // Hack for element-R to avoid breaking the cypress tests. We can get rid of this once the react-sdk is
+            // updated to use CryptoApi.findVerificationRequestDMInProgress.
+            return undefined;
         }
-        return this.cryptoBackend.findVerificationRequestDMInProgress(roomId);
+        return this.crypto.findVerificationRequestDMInProgress(roomId);
     }
 
     /**
@@ -2467,6 +2494,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - the ID of the user to query
      *
      * @returns the VerificationRequests that are in progress
+     * @deprecated Prefer {@link CryptoApi.getVerificationRequestsToDeviceInProgress}.
      */
     public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
         if (!this.crypto) {
@@ -2484,6 +2512,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns resolves to a VerificationRequest
      *    when the request has been sent to the other party.
+     *
+     * @deprecated Prefer {@link CryptoApi#requestOwnUserVerification} or {@link CryptoApi#requestDeviceVerification}.
      */
     public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!this.crypto) {
@@ -2888,6 +2918,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
      *   algorithm is found
      *
+     * @deprecated Use {@link CryptoApi#bootstrapSecretStorage}.
      */
     public bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void> {
         if (!this.crypto) {
@@ -7642,7 +7673,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param bindThreepids - Set key 'email' to true to bind any email
      *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a RegisterResponse object
      * @returns Rejects: with an error response.
      */
     public register(
@@ -7653,7 +7684,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         bindThreepids?: boolean | null | { email?: boolean; msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
-    ): Promise<IAuthData> {
+    ): Promise<RegisterResponse> {
         // backwards compat
         if (bindThreepids === true) {
             bindThreepids = { email: true };
@@ -7664,7 +7695,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             auth.session = sessionId;
         }
 
-        const params: IRegisterRequestParams = {
+        const params: RegisterRequest = {
             auth: auth,
             refresh_token: true, // always ask for a refresh token - does nothing if unsupported
         };
@@ -7720,8 +7751,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                   `{ user_id, device_id, access_token, home_server }`
      * @returns Rejects: with an error response.
      */
-    public registerGuest({ body }: { body?: any } = {}): Promise<any> {
-        // TODO: Types
+    public registerGuest({ body }: { body?: RegisterRequest } = {}): Promise<RegisterResponse> {
         return this.registerRequest(body || {}, "guest");
     }
 
@@ -7731,7 +7761,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to the /register response
      * @returns Rejects: with an error response.
      */
-    public registerRequest(data: IRegisterRequestParams, kind?: string): Promise<IAuthData> {
+    public registerRequest(data: RegisterRequest, kind?: string): Promise<RegisterResponse> {
         const params: { kind?: string } = {};
         if (kind) {
             params.kind = kind;
@@ -7784,23 +7814,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public login(loginType: string, data: any): Promise<any> {
-        // TODO: Types
-        const loginData = {
-            type: loginType,
-        };
-
-        // merge data into loginData
-        Object.assign(loginData, data);
-
+    public login(loginType: LoginRequest["type"], data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
         return this.http
-            .authedRequest<{
-                access_token?: string;
-                user_id?: string;
-            }>(Method.Post, "/login", undefined, loginData)
+            .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
+                ...data,
+                type: loginType,
+            })
             .then((response) => {
                 if (response.access_token && response.user_id) {
                     this.http.opts.accessToken = response.access_token;
@@ -7813,11 +7835,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public loginWithPassword(user: string, password: string): Promise<any> {
-        // TODO: Types
+    public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         return this.login("m.login.password", {
             user: user,
             password: password,
@@ -7826,11 +7847,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param relayState - URL Callback after SAML2 Authentication
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     * @deprecated this isn't in the Matrix spec anymore
      */
-    public loginWithSAML2(relayState: string): Promise<any> {
-        // TODO: Types
+    public loginWithSAML2(relayState: string): Promise<LoginResponse> {
         return this.login("m.login.saml2", {
             relay_state: relayState,
         });
@@ -7870,11 +7891,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param token - Login token previously received from homeserver
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
      */
-    public loginWithToken(token: string): Promise<any> {
-        // TODO: Types
+    public loginWithToken(token: string): Promise<LoginResponse> {
         return this.login("m.login.token", {
             token: token,
         });
@@ -7918,7 +7938,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * to false.
      * @returns Promise which resolves: On success, the empty object
      */
-    public deactivateAccount(auth?: any, erase?: boolean): Promise<{}> {
+    public deactivateAccount(auth?: any, erase?: boolean): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const body: any = {};
         if (auth) {
             body.auth = auth;
@@ -7939,7 +7959,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public async requestLoginToken(auth?: IAuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
         // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
@@ -8579,7 +8599,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setPassword(authDict: IAuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
+    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
         const path = "/account/password";
         const data = {
             auth: authDict,
@@ -8637,7 +8657,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteDevice(deviceId: string, auth?: IAuthDict): Promise<IAuthData | {}> {
+    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<{}> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -8659,7 +8679,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteMultipleDevices(devices: string[], auth?: IAuthDict): Promise<IAuthData | {}> {
+    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
         const body: any = { devices };
 
         if (auth) {
@@ -8944,7 +8964,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: IAuthDict, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<{}> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
@@ -9092,6 +9112,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param msisdnToken - The MSISDN token, as enetered by the user.
      * @param identityAccessToken - The `access_token` field of the Identity
      * Server `/account/register` response (see {@link registerWithIdentityServer}).
+     * Some legacy identity servers had no authentication here.
      *
      * @returns Promise which resolves: Object, containing success boolean.
      * @returns Rejects: with an error response.
@@ -9101,7 +9122,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         sid: string,
         clientSecret: string,
         msisdnToken: string,
-        identityAccessToken: string,
+        identityAccessToken: string | null,
     ): Promise<{ success: boolean }> {
         const params = {
             sid: sid,
@@ -9114,7 +9135,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "/validate/msisdn/submitToken",
             params,
             IdentityPrefix.V2,
-            identityAccessToken,
+            identityAccessToken ?? undefined,
         );
     }
 
@@ -9156,8 +9177,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param identityAccessToken - The access token for the identity server.
      * @returns The hashing information for the identity server.
      */
-    public getIdentityHashDetails(identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public getIdentityHashDetails(identityAccessToken: string): Promise<{
+        /**
+         * The algorithms the server supports. Must contain at least sha256.
+         */
+        algorithms: string[];
+        /**
+         * The pepper the client MUST use in hashing identifiers,
+         * and MUST supply to the /lookup endpoint when performing lookups.
+         */
+        lookup_pepper: string;
+    }> {
         return this.http.idServerRequest(
             Method.Get,
             "/hash_details",
@@ -9265,8 +9295,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                                 exists
      * @returns Rejects: with an error response.
      */
-    public async lookupThreePid(medium: string, address: string, identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public async lookupThreePid(
+        medium: string,
+        address: string,
+        identityAccessToken: string,
+    ): Promise<
+        | {
+              address: string;
+              medium: string;
+              mxid: string;
+          }
+        | {}
+    > {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
         // convert it manually.
@@ -9302,8 +9342,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Lookup results from IS.
      * @returns Rejects: with an error response.
      */
-    public async bulkLookupThreePids(query: [string, string][], identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public async bulkLookupThreePids(
+        query: [string, string][],
+        identityAccessToken: string,
+    ): Promise<{
+        threepids: [medium: string, address: string, mxid: string][];
+    }> {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
         // convert it manually.
@@ -9341,8 +9385,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an object with account info.
      * @returns Rejects: with an error response.
      */
-    public getIdentityAccount(identityAccessToken: string): Promise<any> {
-        // TODO: Types
+    public getIdentityAccount(identityAccessToken: string): Promise<{ user_id: string }> {
         return this.http.idServerRequest(Method.Get, "/account", undefined, IdentityPrefix.V2, identityAccessToken);
     }
 
@@ -9435,7 +9478,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to the result object
      */
     public getThirdpartyUser(protocol: string, params: any): Promise<IThirdPartyUser[]> {
-        // TODO: Types
         const path = utils.encodeUri("/thirdparty/user/$protocol", {
             $protocol: protocol,
         });

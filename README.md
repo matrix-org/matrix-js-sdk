@@ -21,6 +21,8 @@ endpoints from before Matrix 1.1, for example.
 
 ## In a browser
 
+### Note, the browserify build has been deprecated. Please use a bundler like webpack or vite instead.
+
 Download the browser version from
 https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
 `<script>` to your page. There will be a global variable `matrixcs`

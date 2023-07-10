@@ -157,7 +157,7 @@ export const mkThread = ({
         room?.reEmitter.reEmit(evt, [MatrixEventEvent.BeforeRedaction]);
     }
 
-    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, events, true);
+    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, [rootEvent, ...events], true);
 
     return { thread, rootEvent, events };
 };
