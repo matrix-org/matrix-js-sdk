@@ -357,8 +357,7 @@ export class RustVerificationRequest
      * Stub implementation of {@link Crypto.VerificationRequest#getQRCodeBytes}.
      */
     public getQRCodeBytes(): Buffer | undefined {
-        // TODO
-        return undefined;
+        throw new Error("getQRCodeBytes() unsupported in Rust Crypto; use generateQRCode() instead.");
     }
 
     /**
@@ -367,8 +366,8 @@ export class RustVerificationRequest
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
     public async generateQRCode(): Promise<Buffer | undefined> {
-        // TODO
-        return undefined;
+        const innerVerifier: RustSdkCryptoJs.Qr = await this.inner.generateQrCode();
+        return Buffer.from(innerVerifier.toBytes());
     }
 
     /**
@@ -460,7 +459,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
      *
      * @param e - the reason for the cancellation.
      */
-    public cancel(e: Error): void {
+    public cancel(e?: Error): void {
         // TODO: something with `e`
         const req: undefined | OutgoingRequest = this.inner.cancel();
         if (req) {
@@ -491,8 +490,21 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
 
 /** A Verifier instance which is used to show and/or scan a QR code. */
 export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> implements Verifier {
+    private callbacks: ShowQrCodeCallbacks | null = null;
+
     public constructor(inner: RustSdkCryptoJs.Qr, outgoingRequestProcessor: OutgoingRequestProcessor) {
         super(inner, outgoingRequestProcessor);
+    }
+
+    protected onChange(): void {
+        // if the other side has scanned our QR code and sent us a "reciprocate" message, it is now time for the
+        // application to prompt the user to confirm their side.
+        if (this.callbacks === null && this.inner.hasBeenScanned()) {
+            this.callbacks = {
+                confirm: () => this.confirmScanning(),
+                cancel: () => this.cancel(),
+            };
+        }
     }
 
     /**
@@ -502,8 +514,30 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
      *    or times out.
      */
     public async verify(): Promise<void> {
+        // Some applications (hello, matrix-react-sdk) may not check if there is a `ShowQrCodeCallbacks` and instead
+        // register a `ShowReciprocateQr` listener which they expect to be called once `.verify` is called.
+        if (this.callbacks !== null) {
+            this.emit(VerifierEvent.ShowReciprocateQr, this.callbacks);
+        }
         // Nothing to do here but wait.
         await this.completionPromise;
+    }
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return this.callbacks;
+    }
+
+    private async confirmScanning(): Promise<void> {
+        const req: undefined | OutgoingRequest = this.inner.confirmScanning();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
     }
 }
 
