@@ -414,7 +414,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(VerificationPhase.Ready);
 
             // we should now have QR data we can display
-            const qrCodeBuffer = request.getQRCodeBytes()!;
+            const qrCodeBuffer = (await request.generateQRCode())!;
             expect(qrCodeBuffer).toBeTruthy();
 
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
