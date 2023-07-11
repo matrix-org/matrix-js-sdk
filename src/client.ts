@@ -111,7 +111,7 @@ import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
-import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
+import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,
@@ -4256,24 +4256,48 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Set a power level to one or multiple users.
+     * Will apply changes atop of current power level event from local state if running & synced, falling back
+     * to fetching latest from the `/state/` API.
+     * @param roomId - the room to update power levels in
+     * @param userId - the ID of the user or users to update power levels of
+     * @param powerLevel - the numeric power level to update given users to
+     * @param event - deprecated and no longer used.
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
      */
-    public setPowerLevel(
+    public async setPowerLevel(
         roomId: string,
         userId: string | string[],
         powerLevel: number | undefined,
-        event: MatrixEvent | null,
+        /**
+         * @deprecated no longer needed, unused.
+         */
+        event?: MatrixEvent | null,
     ): Promise<ISendEventResponse> {
-        let content = {
-            users: {} as Record<string, number>,
-        };
-        if (event?.getType() === EventType.RoomPowerLevels) {
-            // take a copy of the content to ensure we don't corrupt
-            // existing client state with a failed power level change
-            content = utils.deepCopy(event.getContent());
+        let content: IPowerLevelsContent | undefined;
+        if (this.clientRunning && this.isInitialSyncComplete()) {
+            content = this.getRoom(roomId)?.currentState?.getStateEvents(EventType.RoomPowerLevels, "")?.getContent();
+        }
+        if (!content) {
+            try {
+                content = await this.getStateEvent(roomId, EventType.RoomPowerLevels, "");
+            } catch (e) {
+                // It is possible for a Matrix room to not have a power levels event
+                if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
+                    content = {};
+                } else {
+                    throw e;
+                }
+            }
         }
 
+        // take a copy of the content to ensure we don't corrupt
+        // existing client state with a failed power level change
+        content = utils.deepCopy(content);
+
+        if (!content?.users) {
+            content.users = {};
+        }
         const users = Array.isArray(userId) ? userId : [userId];
         for (const user of users) {
             if (powerLevel == null) {
@@ -4283,10 +4307,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
-            $roomId: roomId,
-        });
-        return this.http.authedRequest(Method.Put, path, undefined, content);
+        return this.sendStateEvent(roomId, EventType.RoomPowerLevels, content, "");
     }
 
     /**
