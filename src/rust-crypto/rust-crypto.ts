@@ -60,6 +60,8 @@ const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.sh
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
+ *
+ * @internal
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;

@@ -21,6 +21,8 @@ import { ServerSideSecretStorage } from "../secret-storage";
  *
  * @param secretStorage - The secret store using account data
  * @returns True if the cross-signing keys are all stored and encrypted with the same secret storage key.
+ *
+ * @internal
  */
 export async function secretStorageContainsCrossSigningKeys(secretStorage: ServerSideSecretStorage): Promise<boolean> {
     // Check if the master cross-signing key is stored in secret storage

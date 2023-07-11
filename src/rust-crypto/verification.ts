@@ -33,6 +33,8 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
+ *
+ * @internal
  */
 export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
@@ -390,6 +392,8 @@ export class RustVerificationRequest
 /** Common base class for `Verifier` implementations which wrap rust classes.
  *
  * The generic parameter `InnerType` is the type of the rust Verification class which we wrap.
+ *
+ * @internal
  */
 abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
     VerifierEvent,
@@ -589,6 +593,8 @@ const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.Verificati
  * @param method - specced method identifier, for example `m.sas.v1`.
  * @returns Rust-side `VerificationMethod` corresponding to `method`.
  * @throws An error if the method is unknown.
+ *
+ * @internal
  */
 export function verificationMethodIdentifierToMethod(method: string): RustSdkCryptoJs.VerificationMethod {
     const meth = verificationMethodsByIdentifier[method];
