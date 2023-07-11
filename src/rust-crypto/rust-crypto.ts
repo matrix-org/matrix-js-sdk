@@ -58,6 +58,8 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
+ *
+ * @internal
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;

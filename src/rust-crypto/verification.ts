@@ -33,6 +33,8 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
+ *
+ * @internal
  */
 export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
@@ -357,6 +359,7 @@ export class RustVerificationRequest
     }
 }
 
+/** @internal */
 export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> implements Verifier {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
     private readonly completionPromise: Promise<void>;
@@ -507,6 +510,8 @@ const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.Verificati
  * @param method - specced method identifier, for example `m.sas.v1`.
  * @returns Rust-side `VerificationMethod` corresponding to `method`.
  * @throws An error if the method is unknown.
+ *
+ * @internal
  */
 export function verificationMethodIdentifierToMethod(method: string): RustSdkCryptoJs.VerificationMethod {
     const meth = verificationMethodsByIdentifier[method];

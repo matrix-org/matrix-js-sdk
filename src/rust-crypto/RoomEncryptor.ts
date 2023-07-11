@@ -26,6 +26,8 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
+ *
+ * @internal
  */
 export class RoomEncryptor {
     private readonly prefixedLogger: PrefixedLogger;

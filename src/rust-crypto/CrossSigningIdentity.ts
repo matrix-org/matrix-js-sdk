@@ -22,6 +22,8 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { UIAuthCallback } from "../interactive-auth";
 
 /** Manages the cross-signing keys for our own user.
+ *
+ * @internal
  */
 export class CrossSigningIdentity {
     public constructor(
