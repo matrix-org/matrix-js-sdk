@@ -87,7 +87,7 @@ function makeTestRequest(
 ): RustVerificationRequest {
     inner ??= makeMockedInner();
     outgoingRequestProcessor ??= {} as OutgoingRequestProcessor;
-    return new RustVerificationRequest(inner, outgoingRequestProcessor, undefined);
+    return new RustVerificationRequest(inner, outgoingRequestProcessor, []);
 }
 
 /** Mock up a rust-side VerificationRequest */
