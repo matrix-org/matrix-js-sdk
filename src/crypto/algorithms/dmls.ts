@@ -209,11 +209,9 @@ class MlsEncryption extends EncryptionAlgorithm {
         }));
         const [ciphertext, baseEpochNum, baseEpochCreator] = group.encrypt_message(mlsProvider.backend!, payload);
         const creatorB64 = olmlib.encodeUnpaddedBase64(Uint8Array.from(baseEpochCreator));
-        console.log(this.roomId, baseEpochNum, creatorB64);
         const baseEventId = mlsProvider.getEpochEvent(
             this.roomId, BigInt(baseEpochNum), creatorB64,
         )!;
-        console.log(baseEventId);
         return {
             algorithm: MLS_ALGORITHM.name,
             ciphertext: olmlib.encodeUnpaddedBase64(Uint8Array.from(ciphertext)),
@@ -225,6 +223,7 @@ class MlsEncryption extends EncryptionAlgorithm {
 
 class MlsDecryption extends DecryptionAlgorithm {
     private pendingEvents = new Map<BigInt, Map<string, Set<MatrixEvent>>>();
+    private pendingBackfills = new Map<string, Promise<void>>();
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         const content = event.getWireContent();
@@ -269,7 +268,14 @@ class MlsDecryption extends DecryptionAlgorithm {
                 mlsProvider.backend!,
             );
         } catch (e) {
+            console.log("Adding to pending:", epochNumber, content.epoch_creator);
             this.addEventToPendingList(event, epochNumber, content.epoch_creator);
+            if (e == "Epoch not found") {
+                const parentCommit = content.commit_event;
+                if (parentCommit) {
+                    this.backfillParent(parentCommit);
+                }
+            }
             if (isHandshake) {
                 return {
                     clearEvent: {
@@ -311,6 +317,7 @@ class MlsDecryption extends DecryptionAlgorithm {
                 sender, resolves,
                 mlsProvider.backend!,
             );
+            this.retryDecryption(newEpochNum, olmlib.encodeUnpaddedBase64(newEpochCreator));
             // don't wait for it to complete
             this.crypto.backupManager.backupGroupSession(this.roomId, newEpochNum, olmlib.encodeUnpaddedBase64(newEpochCreator));
             return {
@@ -331,6 +338,25 @@ class MlsDecryption extends DecryptionAlgorithm {
             mlsProvider.importGroupData(this.roomId!, epochNumber, epochCreator, key.group_export);
             this.retryDecryption(epochNumber, epochCreator);
         }
+    }
+
+    private async backfillParent(commitEventId: string): Promise<void> {
+        if (!this.pendingBackfills.has(commitEventId)) {
+            this.pendingBackfills.set(commitEventId, (async () => {
+                try {
+                    const event = await this.baseApis.fetchRoomEvent(this.roomId!, commitEventId);
+                    if (event.type != "m.room.encrypted") {
+                        return;
+                    }
+
+                    const matrixEvent = new MatrixEvent(event);
+                    await matrixEvent.attemptDecryption(this.crypto);
+                } finally {
+                    this.pendingBackfills.delete(commitEventId);
+                }
+            })());
+        }
+        return this.pendingBackfills.get(commitEventId)!;
     }
 
     /**
@@ -595,7 +621,6 @@ export class MlsProvider {
             const roomEpochMap = new Map<BigInt, Map<string, string>>();
             roomEpochMap.set(BigInt(epochNum), new Map<string, string>([[epochCreatorB64, eventId]]));
             this.epochMap.set(room.roomId, roomEpochMap);
-            console.log("has welcomes", this.epochMap);
 
             if (welcomeInfo) {
                 const [welcome, adds] = welcomeInfo;
@@ -647,7 +672,6 @@ export class MlsProvider {
             const roomEpochMap = new Map<BigInt, Map<string, string>>();
             roomEpochMap.set(BigInt(epochNum), new Map<string, string>([[epochCreatorB64, eventId]]));
             this.epochMap.set(room.roomId, roomEpochMap);
-            console.log("no welcomes", epochNum, this.epochMap);
         }
 
         return group;
@@ -788,8 +812,6 @@ export class MlsProvider {
     }
 
     getEpochEvent(roomId: string, epochNum: BigInt, epochCreator: string): string | undefined {
-        console.log(this.epochMap.get(roomId));
-        console.log(this.epochMap.get(roomId)?.get(epochNum));
         return this.epochMap.get(roomId)?.get(epochNum)?.get(epochCreator);
     }
 
