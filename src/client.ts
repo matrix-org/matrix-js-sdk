@@ -21,7 +21,7 @@ limitations under the License.
 import { Optional } from "matrix-events-sdk";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto";
-import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
+import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
     IContent,
@@ -5529,6 +5529,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         allowDirectLinks?: boolean,
     ): string | null {
         return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks);
+    }
+
+    /**
+     * Specify the set_presence value to be used for subsequent calls to the Sync API.
+     * This has an advantage over calls to the PUT /presence API in that it
+     * doesn't clobber status_msg set by other devices.
+     * @param presence - the presence to specify to set_presence of sync calls
+     */
+    public async setSyncPresence(presence?: SetPresence): Promise<void> {
+        this.syncApi?.setPresence(presence);
     }
 
     /**
