@@ -407,6 +407,10 @@ export class SyncApi {
         const client = this.client;
         this._peekRoom = this.createRoom(roomId);
         return this.client.roomInitialSync(roomId, 20).then((response) => {
+            if (this._peekRoom?.roomId !== roomId) {
+                throw new Error("Peeking aborted");
+            }
+
             // make sure things are init'd
             response.messages = response.messages || { chunk: [] };
             response.messages.chunk = response.messages.chunk || [];
@@ -438,31 +442,31 @@ export class SyncApi {
             // fire off pagination requests in response to the Room.timeline
             // events.
             if (response.messages.start) {
-                this._peekRoom!.oldState.paginationToken = response.messages.start;
+                this._peekRoom.oldState.paginationToken = response.messages.start;
             }
 
             // set the state of the room to as it was after the timeline executes
-            this._peekRoom!.oldState.setStateEvents(oldStateEvents);
-            this._peekRoom!.currentState.setStateEvents(stateEvents);
+            this._peekRoom.oldState.setStateEvents(oldStateEvents);
+            this._peekRoom.currentState.setStateEvents(stateEvents);
 
-            this.resolveInvites(this._peekRoom!);
-            this._peekRoom!.recalculate();
+            this.resolveInvites(this._peekRoom);
+            this._peekRoom.recalculate();
 
             // roll backwards to diverge old state. addEventsToTimeline
             // will overwrite the pagination token, so make sure it overwrites
             // it with the right thing.
-            this._peekRoom!.addEventsToTimeline(
+            this._peekRoom.addEventsToTimeline(
                 messages.reverse(),
                 true,
-                this._peekRoom!.getLiveTimeline(),
+                this._peekRoom.getLiveTimeline(),
                 response.messages.start,
             );
 
-            client.store.storeRoom(this._peekRoom!);
-            client.emit(ClientEvent.Room, this._peekRoom!);
+            client.store.storeRoom(this._peekRoom);
+            client.emit(ClientEvent.Room, this._peekRoom);
 
-            this.peekPoll(this._peekRoom!);
-            return this._peekRoom!;
+            this.peekPoll(this._peekRoom);
+            return this._peekRoom;
         });
     }
 
