@@ -172,7 +172,7 @@ describe("Rendezvous", function () {
 
         const cancelPromise = aliceRz.cancel(RendezvousFailureReason.UserDeclined);
         await httpBackend.flush("");
-        expect(cancelPromise).resolves.toBeUndefined();
+        await expect(cancelPromise).resolves.toBeUndefined();
         httpBackend.verifyNoOutstandingExpectation();
         httpBackend.verifyNoOutstandingRequests();
 
@@ -603,7 +603,7 @@ describe("Rendezvous", function () {
 
     it("device not online within timeout", async function () {
         const { aliceRz } = await completeLogin({});
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("device appears online within timeout", async function () {
@@ -627,7 +627,7 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "bbbb",
             };
         }, 1500);
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("mismatched device key", async function () {
@@ -636,6 +636,6 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "XXXX",
             },
         });
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow(/different key/);
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow(/different key/);
     });
 });
