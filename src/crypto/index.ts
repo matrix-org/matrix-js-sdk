@@ -130,7 +130,12 @@ export function isCryptoAvailable(): boolean {
     return Boolean(global.Olm);
 }
 
-const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
+// minimum time between attempting to unwedge an Olm session, if we succeeded
+// in creating a new session
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+// minimum time between attempting to unwedge an Olm session, if we failed
+// to create a new session
+const FORCE_SESSION_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface IInitOpts {
     exportedOlmDevice?: IExportedDevice;
@@ -390,7 +395,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     // to avoid loading room members as long as possible.
     private roomDeviceTrackingState: { [roomId: string]: Promise<void> } = {};
 
-    // The timestamp of the last time we forced establishment
+    // The timestamp of the minimum time at which we will retry forcing establishment
     // of a new session for each device, in milliseconds.
     // {
     //     userId: {
@@ -398,7 +403,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     //     },
     // }
     // Map: user Id → device Id → timestamp
-    private lastNewSessionForced: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
+    private forceNewSessionRetryTime: MapWithDefault<string, MapWithDefault<string, number>> = new MapWithDefault(
         () => new MapWithDefault(() => 0),
     );
 
@@ -1832,6 +1837,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.outgoingRoomKeyRequestManager.stop();
         this.deviceList.stop();
         this.dehydrationManager.stop();
+        this.backupManager.stop();
     }
 
     /**
@@ -3591,24 +3597,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return;
         }
 
-        // check when we last forced a new session with this device: if we've already done so
+        // check when we can force a new session with this device: if we've already done so
         // recently, don't do it again.
-        const lastNewSessionDevices = this.lastNewSessionForced.getOrCreate(sender);
-        const lastNewSessionForced = lastNewSessionDevices.getOrCreate(deviceKey);
-        if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
+        const forceNewSessionRetryTimeDevices = this.forceNewSessionRetryTime.getOrCreate(sender);
+        const forceNewSessionRetryTime = forceNewSessionRetryTimeDevices.getOrCreate(deviceKey);
+        if (forceNewSessionRetryTime > Date.now()) {
             logger.debug(
-                "New session already forced with device " +
-                    sender +
-                    ":" +
-                    deviceKey +
-                    " at " +
-                    lastNewSessionForced +
-                    ": not forcing another",
+                `New session already forced with device ${sender}:${deviceKey}: ` +
+                    `not forcing another until at least ${new Date(forceNewSessionRetryTime).toUTCString()}`,
             );
             await this.olmDevice.recordSessionProblem(deviceKey, "wedged", true);
             retryDecryption();
             return;
         }
+
+        // make sure we don't retry to unwedge too soon even if we fail to create a new session
+        forceNewSessionRetryTimeDevices.set(deviceKey, Date.now() + FORCE_SESSION_RETRY_INTERVAL_MS);
 
         // establish a new olm session with this device since we're failing to decrypt messages
         // on a current session.
@@ -3630,7 +3634,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const devicesByUser = new Map([[sender, [device]]]);
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser, true);
 
-        lastNewSessionDevices.set(deviceKey, Date.now());
+        forceNewSessionRetryTimeDevices.set(deviceKey, Date.now() + MIN_FORCE_SESSION_INTERVAL_MS);
 
         // Now send a blank message on that session so the other side knows about it.
         // (The keyshare request is sent in the clear so that won't do)

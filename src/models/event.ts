@@ -29,6 +29,7 @@ import {
     EventType,
     MsgType,
     RelationType,
+    ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { Crypto } from "../crypto";
@@ -62,10 +63,12 @@ export interface IContent {
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
 export interface IUnsigned {
+    [key: string]: any;
     "age"?: number;
     "prev_sender"?: string;
     "prev_content"?: IContent;
     "redacted_because"?: IEvent;
+    "replaces_state"?: string;
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
@@ -517,16 +520,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * ```
      */
     public getDetails(): string {
-        let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
         const room = this.getRoomId();
         if (room) {
-            details += ` room=${room}`;
+            // in-room event
+            return `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()} room=${room} ts=${this.getDate()?.toISOString()}`;
+        } else {
+            // to-device event
+            const msgid = this.getContent()[ToDeviceMessageId];
+            return `msgid=${msgid} type=${this.getWireType()} sender=${this.getSender()}`;
         }
-        const date = this.getDate();
-        if (date) {
-            details += ` ts=${date.toISOString()}`;
-        }
-        return details;
     }
 
     /**

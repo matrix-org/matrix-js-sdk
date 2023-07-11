@@ -33,6 +33,8 @@ import { ICryptoCallbacks } from "../crypto";
  * @param cryptoCallbacks - Crypto callbacks provided by the application
  * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
  *     If unset, a memory store will be used.
+ *
+ * @internal
  */
 export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,

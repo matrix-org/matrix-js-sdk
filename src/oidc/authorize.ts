@@ -14,13 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
+
 import { IDelegatedAuthConfig } from "../client";
-import { Method } from "../http-api";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
-import { validateIdToken, ValidatedIssuerConfig } from "./validate";
+import {
+    validateIdToken,
+    ValidatedIssuerMetadata,
+    validateStoredUserState,
+    UserState,
+    BearerTokenResponse,
+    validateBearerTokenResponse,
+} from "./validate";
+
+// reexport for backwards compatibility
+export type { BearerTokenResponse };
 
 /**
  * Authorization parameters which are used in the authentication request of an OIDC auth code flow.
@@ -35,6 +46,11 @@ export type AuthorizationParams = {
     nonce: string;
 };
 
+/**
+ * @experimental
+ * Generate the scope used in authorization request with OIDC OP
+ * @returns scope
+ */
 const generateScope = (): string => {
     const deviceId = randomString(10);
     return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
@@ -74,6 +90,7 @@ export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: stri
 });
 
 /**
+ * @deprecated use generateOidcAuthorizationUrl
  * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
  * @param authorizationUrl - endpoint to attempt authorization with the OP
@@ -102,35 +119,47 @@ export const generateAuthorizationUrl = async (
 };
 
 /**
- * The expected response type from the token endpoint during authorization code flow
- * Normalized to always use capitalized 'Bearer' for token_type
- *
- * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
- * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
+ * @experimental
+ * Generate a URL to attempt authorization with the OP
+ * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
+ * @param oidcClientSettings - oidc configuration
+ * @param homeserverName - used as state
+ * @returns a Promise with the url as a string
  */
-export type BearerTokenResponse = {
-    token_type: "Bearer";
-    access_token: string;
-    scope: string;
-    refresh_token?: string;
-    expires_in?: number;
-    id_token?: string;
-};
+export const generateOidcAuthorizationUrl = async ({
+    metadata,
+    redirectUri,
+    clientId,
+    homeserverUrl,
+    identityServerUrl,
+    nonce,
+}: {
+    clientId: string;
+    metadata: ValidatedIssuerMetadata;
+    homeserverUrl: string;
+    identityServerUrl?: string;
+    redirectUri: string;
+    nonce: string;
+}): Promise<string> => {
+    const scope = await generateScope();
+    const oidcClient = new OidcClient({
+        ...metadata,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        authority: metadata.issuer,
+        response_mode: "query",
+        response_type: "code",
+        scope,
+        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+    });
+    const userState: UserState = { homeserverUrl, nonce, identityServerUrl };
+    const request = await oidcClient.createSigninRequest({
+        state: userState,
+        nonce,
+    });
 
-/**
- * Expected response type from the token endpoint during authorization code flow
- * as it comes over the wire.
- * Should be normalized to use capital case 'Bearer' for token_type property
- *
- * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
- * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
- */
-type WireBearerTokenResponse = BearerTokenResponse & {
-    token_type: "Bearer" | "bearer";
+    return request.url;
 };
-
-const isResponseObject = (response: unknown): response is Record<string, unknown> =>
-    !!response && typeof response === "object";
 
 /**
  * Normalize token_type to use capital case to make consuming the token response easier
@@ -141,21 +170,18 @@ const isResponseObject = (response: unknown): response is Record<string, unknown
  * @param response - validated token response
  * @returns response with token_type set to 'Bearer'
  */
-const normalizeBearerTokenResponseTokenType = (response: WireBearerTokenResponse): BearerTokenResponse => ({
-    ...response,
-    token_type: "Bearer",
-});
-
-const isValidBearerTokenResponse = (response: unknown): response is WireBearerTokenResponse =>
-    isResponseObject(response) &&
-    typeof response["token_type"] === "string" &&
-    // token_type is case insensitive, some OPs return `token_type: "bearer"`
-    response["token_type"].toLowerCase() === "bearer" &&
-    typeof response["access_token"] === "string" &&
-    (!("refresh_token" in response) || typeof response["refresh_token"] === "string") &&
-    (!("expires_in" in response) || typeof response["expires_in"] === "number");
+const normalizeBearerTokenResponseTokenType = (response: SigninResponse): BearerTokenResponse =>
+    ({
+        id_token: response.id_token,
+        scope: response.scope,
+        expires_at: response.expires_at,
+        refresh_token: response.refresh_token,
+        access_token: response.access_token,
+        token_type: "Bearer",
+    } as BearerTokenResponse);
 
 /**
+ * @experimental
  * Attempt to exchange authorization code for bearer token.
  *
  * Takes the authorization code returned by the OpenID Provider via the authorization URL, and makes a
@@ -168,47 +194,71 @@ const isValidBearerTokenResponse = (response: unknown): response is WireBearerTo
  */
 export const completeAuthorizationCodeGrant = async (
     code: string,
-    {
-        clientId,
-        codeVerifier,
-        redirectUri,
-        delegatedAuthConfig,
-        nonce,
-    }: {
-        clientId: string;
-        codeVerifier: string;
-        redirectUri: string;
-        delegatedAuthConfig: IDelegatedAuthConfig & ValidatedIssuerConfig;
-        nonce: string;
-    },
-): Promise<BearerTokenResponse> => {
-    const params = new URLSearchParams();
-    params.append("grant_type", "authorization_code");
-    params.append("client_id", clientId);
-    params.append("code_verifier", codeVerifier);
-    params.append("redirect_uri", redirectUri);
-    params.append("code", code);
-    const metadata = params.toString();
+    state: string,
+): Promise<{
+    oidcClientSettings: IDelegatedAuthConfig & { clientId: string };
+    tokenResponse: BearerTokenResponse;
+    homeserverUrl: string;
+    identityServerUrl?: string;
+}> => {
+    /**
+     * Element Web strips and changes the url on starting the app
+     * Use the code and state from query params to rebuild a url
+     * so that oidc-client can parse it
+     */
+    const reconstructedUrl = new URL(window.location.origin);
+    reconstructedUrl.searchParams.append("code", code);
+    reconstructedUrl.searchParams.append("state", state);
 
-    const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+    // set oidc-client to use our logger
+    Log.setLogger(logger);
+    try {
+        const response = new SigninResponse(reconstructedUrl.searchParams);
 
-    const response = await fetch(delegatedAuthConfig.tokenEndpoint, {
-        method: Method.Post,
-        headers,
-        body: metadata,
-    });
+        const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
 
-    if (response.status >= 400) {
+        // retrieve the state we put in storage at the start of oidc auth flow
+        const stateString = await stateStore.get(response.state!);
+        if (!stateString) {
+            throw new Error(OidcError.MissingOrInvalidStoredState);
+        }
+
+        // hydrate the sign in state and create a client
+        // the stored sign in state includes oidc configuration we set at the start of the oidc login flow
+        const signInState = SigninState.fromStorageString(stateString);
+        const client = new OidcClient({ ...signInState, stateStore });
+
+        // validate the code and state, and attempt to swap the code for tokens
+        const signinResponse = await client.processSigninResponse(reconstructedUrl.href);
+
+        // extra values we stored at the start of the login flow
+        // used to complete login in the client
+        const userState = signinResponse.userState;
+        validateStoredUserState(userState);
+
+        // throws when response is invalid
+        validateBearerTokenResponse(signinResponse);
+        // throws when token is invalid
+        validateIdToken(signinResponse.id_token, client.settings.authority, client.settings.client_id, userState.nonce);
+        const normalizedTokenResponse = normalizeBearerTokenResponseTokenType(signinResponse);
+
+        return {
+            oidcClientSettings: {
+                clientId: client.settings.client_id,
+                issuer: client.settings.authority,
+            },
+            tokenResponse: normalizedTokenResponse,
+            homeserverUrl: userState.homeserverUrl,
+            identityServerUrl: userState.identityServerUrl,
+        };
+    } catch (error) {
+        logger.error("Oidc login failed", error);
+        const errorType = (error as Error).message;
+
+        // rethrow errors that we recognise
+        if (Object.values(OidcError).includes(errorType as any)) {
+            throw error;
+        }
         throw new Error(OidcError.CodeExchangeFailed);
     }
-
-    const token = await response.json();
-
-    if (isValidBearerTokenResponse(token)) {
-        // throws when token is invalid
-        validateIdToken(token.id_token, delegatedAuthConfig.issuer, clientId, nonce);
-        return normalizeBearerTokenResponseTokenType(token);
-    }
-
-    throw new Error(OidcError.InvalidBearerTokenResponse);
 };
