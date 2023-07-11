@@ -26,6 +26,7 @@ import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { SetPresence } from "../../src/sync";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -1386,14 +1387,11 @@ describe("MatrixClient", function () {
                 expectation: {},
             },
         ])("should modify power levels of $userId correctly", async ({ userId, powerLevel, expectation }) => {
-            const event = {
-                getType: () => "m.room.power_levels",
-                getContent: () => ({
-                    users: {
-                        "alice@localhost": 50,
-                    },
-                }),
-            } as MatrixEvent;
+            httpBackend!.when("GET", "/state/m.room.power_levels/").respond(200, {
+                users: {
+                    "alice@localhost": 50,
+                },
+            });
 
             httpBackend!
                 .when("PUT", "/state/m.room.power_levels")
@@ -1402,7 +1400,76 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, {});
 
-            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel, event);
+            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel);
+            await httpBackend!.flushAllExpected();
+            await prom;
+        });
+
+        it("should use power level from room state if available", async () => {
+            client!.clientRunning = true;
+            client!.isInitialSyncComplete = () => true;
+            const room = new Room("!room_id:server", client!, client!.getUserId()!);
+            room.currentState.events.set("m.room.power_levels", new Map());
+            room.currentState.events.get("m.room.power_levels")!.set(
+                "",
+                new MatrixEvent({
+                    type: "m.room.power_levels",
+                    state_key: "",
+                    content: {
+                        users: {
+                            "@bob:localhost": 50,
+                        },
+                    },
+                }),
+            );
+            client!.getRoom = () => room;
+
+            httpBackend!
+                .when("PUT", "/state/m.room.power_levels")
+                .check((req) => {
+                    expect(req.data).toStrictEqual({
+                        users: {
+                            "@bob:localhost": 50,
+                            [userId]: 42,
+                        },
+                    });
+                })
+                .respond(200, {});
+
+            const prom = client!.setPowerLevel("!room_id:server", userId, 42);
+            await httpBackend!.flushAllExpected();
+            await prom;
+        });
+
+        it("should throw error if state API errors", async () => {
+            httpBackend!.when("GET", "/state/m.room.power_levels/").respond(500, {
+                errcode: "ERR_DERP",
+            });
+
+            const prom = client!.setPowerLevel("!room_id:server", userId, 42);
+            await Promise.all([
+                expect(prom).rejects.toMatchInlineSnapshot(`[ERR_DERP: MatrixError: [500] Unknown message]`),
+                httpBackend!.flushAllExpected(),
+            ]);
+        });
+
+        it("should not throw error if /state/ API returns M_NOT_FOUND", async () => {
+            httpBackend!.when("GET", "/state/m.room.power_levels/").respond(404, {
+                errcode: "M_NOT_FOUND",
+            });
+
+            httpBackend!
+                .when("PUT", "/state/m.room.power_levels")
+                .check((req) => {
+                    expect(req.data).toStrictEqual({
+                        users: {
+                            [userId]: 42,
+                        },
+                    });
+                })
+                .respond(200, {});
+
+            const prom = client!.setPowerLevel("!room_id:server", userId, 42);
             await httpBackend!.flushAllExpected();
             await prom;
         });
@@ -1448,6 +1515,16 @@ describe("MatrixClient", function () {
 
             client!.setCryptoTrustCrossSignedDevices(false);
             expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
+        });
+    });
+
+    describe("setSyncPresence", () => {
+        it("should pass calls through to the underlying sync api", () => {
+            const setPresence = jest.fn();
+            // @ts-ignore
+            client.syncApi = { setPresence };
+            client?.setSyncPresence(SetPresence.Unavailable);
+            expect(setPresence).toHaveBeenCalledWith(SetPresence.Unavailable);
         });
     });
 });

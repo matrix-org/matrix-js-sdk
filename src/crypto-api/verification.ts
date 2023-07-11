@@ -152,8 +152,18 @@ export interface VerificationRequest
      * Get the data for a QR code allowing the other device to verify this one, if it supports it.
      *
      * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     *
+     * @deprecated Not supported in Rust Crypto. Use {@link VerificationRequest#generateQRCode} instead.
      */
     getQRCodeBytes(): Buffer | undefined;
+
+    /**
+     * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Only returns data once `phase` is {@link VerificationPhase.Ready} and the other party can scan a QR code;
+     * otherwise returns `undefined`.
+     */
+    generateQRCode(): Promise<Buffer | undefined>;
 
     /**
      * If this request has been cancelled, the cancellation code (e.g `m.user`) which is responsible for cancelling

@@ -35,7 +35,7 @@ describe("validateWellKnownAuthentication()", () => {
         },
     };
     it("should throw not supported error when wellKnown has no m.authentication section", () => {
-        expect(() => validateWellKnownAuthentication(baseWk)).toThrow(OidcError.NotSupported);
+        expect(() => validateWellKnownAuthentication(undefined)).toThrow(OidcError.NotSupported);
     });
 
     it("should throw misconfigured error when authentication issuer is not a string", () => {
@@ -45,7 +45,9 @@ describe("validateWellKnownAuthentication()", () => {
                 issuer: { url: "test.com" },
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
+            OidcError.Misconfigured,
+        );
     });
 
     it("should throw misconfigured error when authentication account is not a string", () => {
@@ -56,7 +58,9 @@ describe("validateWellKnownAuthentication()", () => {
                 account: { url: "test" },
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
+            OidcError.Misconfigured,
+        );
     });
 
     it("should throw misconfigured error when authentication account is false", () => {
@@ -67,7 +71,9 @@ describe("validateWellKnownAuthentication()", () => {
                 account: false,
             },
         };
-        expect(() => validateWellKnownAuthentication(wk)).toThrow(OidcError.Misconfigured);
+        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
+            OidcError.Misconfigured,
+        );
     });
 
     it("should return valid config when wk uses stable m.authentication", () => {
@@ -78,7 +84,7 @@ describe("validateWellKnownAuthentication()", () => {
                 account: "account.com",
             },
         };
-        expect(validateWellKnownAuthentication(wk)).toEqual({
+        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
             issuer: "test.com",
             account: "account.com",
         });
@@ -91,7 +97,7 @@ describe("validateWellKnownAuthentication()", () => {
                 issuer: "test.com",
             },
         };
-        expect(validateWellKnownAuthentication(wk)).toEqual({
+        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
             issuer: "test.com",
         });
     });
@@ -104,22 +110,8 @@ describe("validateWellKnownAuthentication()", () => {
                 somethingElse: "test",
             },
         };
-        expect(validateWellKnownAuthentication(wk)).toEqual({
+        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
             issuer: "test.com",
-        });
-    });
-
-    it("should return valid config when wk uses unstable prefix for m.authentication", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.unstable!]: {
-                issuer: "test.com",
-                account: "account.com",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk)).toEqual({
-            issuer: "test.com",
-            account: "account.com",
         });
     });
 });
@@ -129,6 +121,7 @@ describe("validateOIDCIssuerWellKnown", () => {
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
         registration_endpoint: "https://authorize.org/regsiter",
+        revocation_endpoint: "https://authorize.org/regsiter",
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
@@ -155,10 +148,8 @@ describe("validateOIDCIssuerWellKnown", () => {
                 response_types_supported: [],
             });
         }).toThrow(OidcError.OpSupport);
-        expect(logger.error).toHaveBeenCalledWith("OIDC issuer configuration: authorization_endpoint is invalid");
-        expect(logger.error).toHaveBeenCalledWith(
-            "OIDC issuer configuration: response_types_supported is invalid. code is required.",
-        );
+        expect(logger.error).toHaveBeenCalledWith("Missing or invalid property: authorization_endpoint");
+        expect(logger.error).toHaveBeenCalledWith("Invalid property: response_types_supported. code is required.");
     });
 
     it("should return validated issuer config", () => {

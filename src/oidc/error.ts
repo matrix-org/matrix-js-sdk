@@ -25,4 +25,5 @@ export enum OidcError {
     CodeExchangeFailed = "Failed to exchange code for token",
     InvalidBearerTokenResponse = "Invalid bearer token response",
     InvalidIdToken = "Invalid ID token",
+    MissingOrInvalidStoredState = "State required to finish logging in is not found in storage.",
 }
