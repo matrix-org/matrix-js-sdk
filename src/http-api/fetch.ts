@@ -227,7 +227,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.clearUrlParamsForLogs(url);
-        logger.debug(`FetchHttpApi: ${method} --> ${urlForLogs}`);
+        logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -280,9 +280,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 keepalive: keepAlive,
             });
 
-            logger.debug(`FetchHttpApi:  <-- ${res.status} ${Date.now() - start}ms ${urlForLogs}`);
+            logger.debug(`FetchHttpApi: <-- ${res.status} ${Date.now() - start}ms ${method} ${urlForLogs}`);
         } catch (e) {
-            logger.debug(`FetchHttpApi:  <-- ${e} ${Date.now() - start}ms ${urlForLogs}`);
+            logger.debug(`FetchHttpApi: <-- ${e} ${Date.now() - start}ms ${method} ${urlForLogs}`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
@@ -311,7 +311,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
             // get just the path to remove any potential url param that could have
             // some potential secrets
-            return asUrl.pathname;
+            return asUrl.origin + asUrl.pathname;
         } catch (error) {
             // defensive coding for malformed url
             return "??";
