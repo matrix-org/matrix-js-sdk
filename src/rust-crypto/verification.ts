@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import { Emoji } from "@matrix-org/matrix-sdk-crypto-js";
+import { Emoji, QrState } from "@matrix-org/matrix-sdk-crypto-js";
 
 import {
     ShowQrCodeCallbacks,
@@ -69,14 +69,16 @@ export class RustVerificationRequest
         this._reEmitter = new TypedReEmitter(this);
 
         const onChange = async (): Promise<void> => {
-            // if we now have a `Verification` where we lacked one before, wrap it.
-            if (this._verifier === undefined) {
-                const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
-                if (verification instanceof RustSdkCryptoJs.Sas) {
+            const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
+
+            // If we now have a `Verification` where we lacked one before, or we have transitioned from QR to SAS,
+            // wrap the new rust Verification as a js-sdk Verifier.
+            if (verification instanceof RustSdkCryptoJs.Sas) {
+                if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
                     this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
-                } else if (verification instanceof RustSdkCryptoJs.Qr) {
-                    this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
                 }
+            } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
+                this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
             }
 
             this.emit(VerificationRequestEvent.Change);
@@ -85,6 +87,10 @@ export class RustVerificationRequest
     }
 
     private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
+        // if we already have a verifier, unsubscribe from its events
+        if (this._verifier) {
+            this._reEmitter.stopReEmitting(this._verifier, [VerificationRequestEvent.Change]);
+        }
         this._verifier = verifier;
         this._reEmitter.reEmit(this._verifier, [VerificationRequestEvent.Change]);
     }
@@ -145,7 +151,11 @@ export class RustVerificationRequest
                 // parlance.
                 return this._accepting ? VerificationPhase.Requested : VerificationPhase.Ready;
             case RustSdkCryptoJs.VerificationRequestPhase.Transitioned:
-                return VerificationPhase.Started;
+                if (!this._verifier) {
+                    // this shouldn't happen, because the onChange handler should have created a _verifier.
+                    throw new Error("VerificationRequest: inner phase == Transitioned but no verifier!");
+                }
+                return this._verifier.verificationPhase;
             case RustSdkCryptoJs.VerificationRequestPhase.Done:
                 return VerificationPhase.Done;
             case RustSdkCryptoJs.VerificationRequestPhase.Cancelled:
@@ -196,8 +206,9 @@ export class RustVerificationRequest
 
     /** the method picked in the .start event */
     public get chosenMethod(): string | null {
+        if (this.phase !== VerificationPhase.Started) return null;
+
         const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
-        // TODO: this isn't quite right. The existence of a Verification doesn't prove that we have .started.
         if (verification instanceof RustSdkCryptoJs.Sas) {
             return "m.sas.v1";
         } else if (verification instanceof RustSdkCryptoJs.Qr) {
@@ -357,7 +368,13 @@ export class RustVerificationRequest
      * Only defined when the `phase` is Started.
      */
     public get verifier(): Verifier | undefined {
-        return this._verifier;
+        // It's possible for us to have a Verifier before a method has been chosen (in particular,
+        // if we are showing a QR code which the other device has not yet scanned. At that point, we could
+        // still switch to SAS).
+        //
+        // In that case, we should not return it to the application yet, since the application will not expect the
+        // Verifier to be replaced during the lifetime of the VerificationRequest.
+        return this.phase === VerificationPhase.Started ? this._verifier : undefined;
     }
 
     /**
@@ -533,6 +550,36 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
     }
 
     /**
+     * Calculate an appropriate VerificationPhase for a VerificationRequest where this is the verifier.
+     *
+     * This is abnormally complicated because a rust-side QR Code verifier can span several verification phases.
+     */
+    public get verificationPhase(): VerificationPhase {
+        switch (this.inner.state()) {
+            case QrState.Created:
+                // we have created a QR for display; neither side has yet sent an `m.key.verification.start`.
+                return VerificationPhase.Ready;
+            case QrState.Scanned:
+                // other side has scanned our QR and sent an `m.key.verification.start` with `m.reciprocate.v1`
+                return VerificationPhase.Started;
+            case QrState.Confirmed:
+                // we have confirmed the other side's scan and sent an `m.key.verification.done`.
+                return VerificationPhase.Done;
+            case QrState.Reciprocated:
+                // although the rust SDK doesn't immediately send the `m.key.verification.start` on transition into this
+                // state, `RustVerificationRequest.scanQrCode` immediately calls `reciprocate()` and does so, so in practice
+                // we can treat the two the same.
+                return VerificationPhase.Started;
+            case QrState.Done:
+                return VerificationPhase.Done;
+            case QrState.Cancelled:
+                return VerificationPhase.Cancelled;
+            default:
+                throw new Error(`Unknown qr code state ${this.inner.state()}`);
+        }
+    }
+
+    /**
      * Get the details for reciprocating QR code verification, if one is in progress
      *
      * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
@@ -609,6 +656,13 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
             };
             this.emit(VerifierEvent.ShowSas, this.callbacks);
         }
+    }
+
+    /**
+     * Calculate an appropriate VerificationPhase for a VerificationRequest where this is the verifier.
+     */
+    public get verificationPhase(): VerificationPhase {
+        return VerificationPhase.Started;
     }
 
     /**

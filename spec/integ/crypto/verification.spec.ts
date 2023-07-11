@@ -429,6 +429,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             );
             const sharedSecret = qrCodeBuffer.subarray(74 + txnIdLen);
 
+            // we should still be "Ready" and have no verifier
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
             // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
             returnToDeviceMessageFromSync({
                 type: "m.key.verification.start",
@@ -527,6 +531,95 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // ... and the whole thing should be done!
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
+        });
+
+        it("can send an SAS start after QR code display", async () => {
+            aliceClient = await startTestClient();
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan a QR code
+            // or do the emoji dance
+            returnToDeviceMessageFromSync(
+                buildReadyMessage(transactionId, ["m.qr_code.scan.v1", "m.sas.v1", "m.reciprocate.v1"]),
+            );
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice displays the QR code
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // ... but Alice wants to do an SAS verification
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            await request.startVerification("m.sas.v1");
+            await sendToDevicePromise;
+
+            // There should now be a `verifier`
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(request.chosenMethod).toEqual("m.sas.v1");
+
+            // clean up the test
+            expectSendToDeviceMessage("m.key.verification.cancel");
+            request.cancel();
+            await expect(verifier.verify()).rejects.toBeTruthy();
+        });
+
+        it("can receive an SAS start after QR code display", async () => {
+            aliceClient = await startTestClient();
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan a QR code
+            // or do the emoji dance
+            returnToDeviceMessageFromSync(
+                buildReadyMessage(transactionId, ["m.qr_code.scan.v1", "m.sas.v1", "m.reciprocate.v1"]),
+            );
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice displays the QR code
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // ... but the dummy device wants to do an SAS verification
+            returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
+            await emitPromise(request, VerificationRequestEvent.Change);
+
+            // Alice should now have a `verifier`
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(request.chosenMethod).toEqual("m.sas.v1");
+
+            // clean up the test
+            expectSendToDeviceMessage("m.key.verification.cancel");
+            request.cancel();
+            await expect(verifier.verify()).rejects.toBeTruthy();
         });
     });
 
