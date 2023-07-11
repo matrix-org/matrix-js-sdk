@@ -310,12 +310,12 @@ describe("FetchHttpApi", () => {
         expect(logger.debug).toHaveBeenCalledTimes(2);
         expect(mocked(logger.debug).mock.calls[0]).toMatchInlineSnapshot(`
             [
-              "FetchHttpApi: GET --> /some/path",
+              "FetchHttpApi: --> GET https://server:1234/some/path",
             ]
         `);
         expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
             [
-              "FetchHttpApi:  <-- undefined 1234ms /some/path",
+              "FetchHttpApi: <-- undefined 1234ms GET https://server:1234/some/path",
             ]
         `);
     });
