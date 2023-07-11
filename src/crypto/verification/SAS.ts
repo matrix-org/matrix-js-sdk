@@ -52,17 +52,22 @@ const newMismatchedSASError = errorFactory("m.mismatched_sas", "Mismatched short
 
 const newMismatchedCommitmentError = errorFactory("m.mismatched_commitment", "Mismatched commitment");
 
+// This list was generated from the data in the Matrix specification [1] with the following command:
+//
+//    jq  -r '.[] |  "    [\"" + .emoji + "\", \"" + (.description|ascii_downcase) + "\"], // " + (.number|tostring)' sas-emoji.json
+//
+// [1]: https://github.com/matrix-org/matrix-spec/blob/main/data-definitions/sas-emoji.json
 const emojiMapping: EmojiMapping[] = [
-    ["🐶", "dog"], //  0
-    ["🐱", "cat"], //  1
-    ["🦁", "lion"], //  2
-    ["🐎", "horse"], //  3
-    ["🦄", "unicorn"], //  4
-    ["🐷", "pig"], //  5
-    ["🐘", "elephant"], //  6
-    ["🐰", "rabbit"], //  7
-    ["🐼", "panda"], //  8
-    ["🐓", "rooster"], //  9
+    ["🐶", "dog"], // 0
+    ["🐱", "cat"], // 1
+    ["🦁", "lion"], // 2
+    ["🐎", "horse"], // 3
+    ["🦄", "unicorn"], // 4
+    ["🐷", "pig"], // 5
+    ["🐘", "elephant"], // 6
+    ["🐰", "rabbit"], // 7
+    ["🐼", "panda"], // 8
+    ["🐓", "rooster"], // 9
     ["🐧", "penguin"], // 10
     ["🐢", "turtle"], // 11
     ["🐟", "fish"], // 12
@@ -83,7 +88,7 @@ const emojiMapping: EmojiMapping[] = [
     ["🍕", "pizza"], // 27
     ["🎂", "cake"], // 28
     ["❤️", "heart"], // 29
-    ["🙂", "smiley"], // 30
+    ["😀", "smiley"], // 30
     ["🤖", "robot"], // 31
     ["🎩", "hat"], // 32
     ["👓", "glasses"], // 33
@@ -113,7 +118,7 @@ const emojiMapping: EmojiMapping[] = [
     ["🎸", "guitar"], // 57
     ["🎺", "trumpet"], // 58
     ["🔔", "bell"], // 59
-    ["⚓️", "anchor"], // 60
+    ["⚓", "anchor"], // 60
     ["🎧", "headphones"], // 61
     ["📁", "folder"], // 62
     ["📌", "pin"], // 63

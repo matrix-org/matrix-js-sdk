@@ -14,28 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
-import { IHttpOpts, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import {
+    CryptoEvent,
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    IHttpOpts,
+    IToDeviceEvent,
+    MatrixClient,
+    MatrixHttpApi,
+    TypedEventEmitter,
+} from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { ImportRoomKeysOpts } from "../../../src/crypto-api";
-
-afterEach(() => {
-    // reset fake-indexeddb after each test, to make sure we don't leak connections
-    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
-    indexedDB = new IDBFactory();
-});
+import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
+import * as testData from "../../test-utils/test-data";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -44,9 +46,13 @@ describe("RustCrypto", () => {
     describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
-        beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto();
-        });
+        beforeEach(
+            async () => {
+                rustCrypto = await makeTestRustCrypto();
+            },
+            /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+            10000,
+        );
 
         it("should import and export keys", async () => {
             const someRoomKeys = [
@@ -135,6 +141,27 @@ describe("RustCrypto", () => {
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
             expect(res).toEqual(inputs);
         });
+
+        it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
+            const toDeviceEvent = {
+                type: "m.key.verification.request",
+                content: {
+                    from_device: "testDeviceId",
+                    methods: ["m.sas.v1"],
+                    transaction_id: "testTxn",
+                    timestamp: Date.now() - 1000,
+                },
+                sender: "@user:id",
+            };
+
+            const onEvent = jest.fn();
+            rustCrypto.on(CryptoEvent.VerificationRequestReceived, onEvent);
+            await rustCrypto.preprocessToDeviceMessages([toDeviceEvent]);
+            expect(onEvent).toHaveBeenCalledTimes(1);
+
+            const [req]: [VerificationRequest] = onEvent.mock.lastCall;
+            expect(req.transactionId).toEqual("testTxn");
+        });
     });
 
     it("getCrossSigningKeyId", async () => {
@@ -211,6 +238,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -333,6 +361,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
             );
         });
 
@@ -356,6 +385,141 @@ describe("RustCrypto", () => {
             expect(res).toBe(null);
         });
     });
+
+    describe("userHasCrossSigningKeys", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("returns false initially", async () => {
+            jest.useFakeTimers();
+            const prom = rustCrypto.userHasCrossSigningKeys();
+            // the getIdentity() request should wait for a /keys/query request to complete, but times out after 1500ms
+            await jest.advanceTimersByTimeAsync(2000);
+            await expect(prom).resolves.toBe(false);
+        });
+
+        it("returns false if there is no cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the device keys but *no* cross-signing keys.
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify({
+                    device_keys: {
+                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                    },
+                }),
+            );
+
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
+        });
+
+        it("returns true if OlmMachine has a cross-signing identity", async () => {
+            // @ts-ignore private field
+            const olmMachine = rustCrypto.olmMachine;
+
+            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
+            // pick out the KeysQueryRequest, and respond to it with the cross-signing keys
+            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
+            await olmMachine.markRequestAsSent(
+                req.id!,
+                req.type,
+                JSON.stringify({
+                    device_keys: {
+                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                    },
+                    ...testData.SIGNED_CROSS_SIGNING_KEYS_DATA,
+                }),
+            );
+
+            // ... and we should now have cross-signing keys.
+            await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
+        });
+    });
+
+    describe("createRecoveryKeyFromPassphrase", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto();
+        });
+
+        it("should create a recovery key without password", async () => {
+            const recoveryKey = await rustCrypto.createRecoveryKeyFromPassphrase();
+
+            // Expected the encoded private key to have 59 chars
+            expect(recoveryKey.encodedPrivateKey?.length).toBe(59);
+            // Expect the private key to be an Uint8Array with a length of 32
+            expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
+            expect(recoveryKey.privateKey.length).toBe(32);
+            // Expect keyInfo to be empty
+            expect(Object.keys(recoveryKey.keyInfo!).length).toBe(0);
+        });
+
+        it("should create a recovery key with password", async () => {
+            const recoveryKey = await rustCrypto.createRecoveryKeyFromPassphrase("my password");
+
+            // Expected the encoded private key to have 59 chars
+            expect(recoveryKey.encodedPrivateKey?.length).toBe(59);
+            // Expect the private key to be an Uint8Array with a length of 32
+            expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
+            expect(recoveryKey.privateKey.length).toBe(32);
+            // Expect keyInfo.passphrase to be filled
+            expect(recoveryKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
+            expect(recoveryKey.keyInfo?.passphrase?.iterations).toBe(500000);
+        });
+    });
+
+    it("should wait for a keys/query before returning devices", async () => {
+        jest.useFakeTimers();
+
+        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+            baseUrl: "http://server/",
+            prefix: "",
+            onlyData: true,
+        });
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+
+        // an attempt to fetch the device list should block
+        const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
+        // ... until a /sync completes, and we trigger the outgoingRequests.
+        rustCrypto.onSyncCompleted({});
+
+        const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
+        expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
+        expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
+    });
+
+    describe("requestDeviceVerification", () => {
+        it("throws an error if the device is unknown", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() => rustCrypto.requestDeviceVerification(TEST_USER, "unknown")).rejects.toThrow(
+                "Not a known device",
+            );
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
@@ -367,6 +531,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
 }

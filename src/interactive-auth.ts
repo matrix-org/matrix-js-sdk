@@ -21,6 +21,7 @@ import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
 import { MatrixError } from "./http-api";
 import { UIAResponse } from "./@types/uia";
+import { UserIdentifier } from "./@types/auth";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -51,22 +52,25 @@ export interface IStageStatus {
  * @see https://spec.matrix.org/v1.6/client-server-api/#user-interactive-api-in-the-rest-api
  */
 export interface IAuthData {
-    // XXX: many of the fields here (`type`, `available_flows`, `required_stages`, etc) look like they
-    // shouldn't be here. They aren't in the spec and it's unclear what they are supposed to do. Be wary of using them.
+    /**
+     * This is a session identifier that the client must pass back to the home server,
+     * if one is provided, in subsequent attempts to authenticate in the same API call.
+     */
     session?: string;
-    type?: string;
+    /**
+     * A list of the stages the client has completed successfully
+     */
     completed?: string[];
+    /**
+     * A list of the login flows supported by the server for this API.
+     */
     flows?: UIAFlow[];
-    available_flows?: UIAFlow[];
-    stages?: string[];
-    required_stages?: AuthType[];
+    /**
+     * Contains any information that the client will need to know in order to use a given type of authentication.
+     * For each login type presented, that type may be present as a key in this dictionary.
+     * For example, the public part of an OAuth client ID could be given here.
+     */
     params?: Record<string, Record<string, any>>;
-    data?: Record<string, string>;
-    errcode?: string;
-    error?: string;
-    user_id?: string;
-    device_id?: string;
-    access_token?: string;
 }
 
 export enum AuthType {
@@ -86,29 +90,61 @@ export enum AuthType {
 }
 
 /**
+ * https://spec.matrix.org/v1.7/client-server-api/#password-based
+ */
+type PasswordDict = {
+    type: AuthType.Password;
+    identifier: UserIdentifier;
+    password: string;
+    session: string;
+};
+
+/**
+ * https://spec.matrix.org/v1.7/client-server-api/#google-recaptcha
+ */
+type RecaptchaDict = {
+    type: AuthType.Recaptcha;
+    response: string;
+    session: string;
+};
+
+interface ThreepidCreds {
+    sid: string;
+    client_secret: string;
+    id_server: string;
+    id_access_token: string;
+}
+
+/**
+ * https://spec.matrix.org/v1.7/client-server-api/#email-based-identity--homeserver
+ */
+type EmailIdentityDict = {
+    type: AuthType.Email;
+    threepid_creds: ThreepidCreds;
+    /**
+     * @deprecated in favour of `threepid_creds` - kept for backwards compatibility
+     */
+    threepidCreds?: ThreepidCreds;
+    session: string;
+};
+
+/**
  * The parameters which are submitted as the `auth` dict in a UIA request
  *
  * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
  */
-export interface IAuthDict {
-    // [key: string]: any;
-    type?: string;
-    session?: string;
-    // TODO: Remove `user` once servers support proper UIA
-    // See https://github.com/vector-im/element-web/issues/10312
-    user?: string;
-    identifier?: any;
-    password?: string;
-    response?: string;
-    // TODO: Remove `threepid_creds` once servers support proper UIA
-    // See https://github.com/vector-im/element-web/issues/10312
-    // See https://github.com/matrix-org/matrix-doc/issues/2220
-    // eslint-disable-next-line camelcase
-    threepid_creds?: any;
-    threepidCreds?: any;
-    // For m.login.registration_token type
-    token?: string;
-}
+export type AuthDict =
+    | PasswordDict
+    | RecaptchaDict
+    | EmailIdentityDict
+    | { type: Exclude<string, AuthType>; [key: string]: any }
+    | {};
+
+/**
+ * Backwards compatible export
+ * @deprecated in favour of AuthDict
+ */
+export type IAuthDict = AuthDict;
 
 export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
@@ -129,7 +165,7 @@ export class NoAuthFlowFoundError extends Error {
  */
 export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict) => Promise<UIAResponse<T>>) => Promise<T>;
 
-interface IOpts {
+interface IOpts<T> {
     /**
      * A matrix client to use for the auth process
      */
@@ -170,7 +206,7 @@ interface IOpts {
      * The busyChanged callback should be used instead of the background flag.
      * Should return a promise which resolves to the successful response or rejects with a MatrixError.
      */
-    doRequest(auth: IAuthDict | null, background: boolean): Promise<IAuthData>;
+    doRequest(auth: AuthDict | null, background: boolean): Promise<T>;
     /**
      * Called when the status of the UI auth changes,
      * ie. when the state of an auth stage changes of when the auth flow moves to a new stage.
@@ -215,21 +251,23 @@ interface IOpts {
  * submitAuthDict.
  *
  * @param opts - options object
+ * @typeParam T - the return type of the request when it is successful
  */
-export class InteractiveAuth {
+export class InteractiveAuth<T> {
     private readonly matrixClient: MatrixClient;
     private readonly inputs: IInputs;
     private readonly clientSecret: string;
-    private readonly requestCallback: IOpts["doRequest"];
-    private readonly busyChangedCallback?: IOpts["busyChanged"];
-    private readonly stateUpdatedCallback: IOpts["stateUpdated"];
-    private readonly requestEmailTokenCallback: IOpts["requestEmailToken"];
+    private readonly requestCallback: IOpts<T>["doRequest"];
+    private readonly busyChangedCallback?: IOpts<T>["busyChanged"];
+    private readonly stateUpdatedCallback: IOpts<T>["stateUpdated"];
+    private readonly requestEmailTokenCallback: IOpts<T>["requestEmailToken"];
     private readonly supportedStages?: Set<string>;
 
+    // The current latest data received from the server during the user interactive auth flow.
     private data: IAuthData;
     private emailSid?: string;
     private requestingEmailToken = false;
-    private attemptAuthDeferred: IDeferred<IAuthData> | null = null;
+    private attemptAuthDeferred: IDeferred<T> | null = null;
     private chosenFlow: UIAFlow | null = null;
     private currentStage: string | null = null;
 
@@ -239,9 +277,9 @@ export class InteractiveAuth {
     // the promise the will resolve/reject when it completes
     private submitPromise: Promise<void> | null = null;
 
-    public constructor(opts: IOpts) {
+    public constructor(opts: IOpts<T>) {
         this.matrixClient = opts.matrixClient;
-        this.data = opts.authData || {};
+        this.data = opts.authData || { flows: [] };
         this.requestCallback = opts.doRequest;
         this.busyChangedCallback = opts.busyChanged;
         // startAuthStage included for backwards compat
@@ -262,7 +300,7 @@ export class InteractiveAuth {
      * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */
-    public attemptAuth(): Promise<IAuthData> {
+    public async attemptAuth(): Promise<T> {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
         this.attemptAuthDeferred = defer();
@@ -270,10 +308,10 @@ export class InteractiveAuth {
         const promise = this.attemptAuthDeferred.promise;
 
         // if we have no flows, try a request to acquire the flows
-        if (!this.data?.flows) {
+        if (!(this.data as IAuthData)?.flows?.length) {
             this.busyChangedCallback?.(true);
             // use the existing sessionId, if one is present.
-            const auth = this.data.session ? { session: this.data.session } : null;
+            const auth = (this.data as IAuthData).session ? { session: (this.data as IAuthData).session } : null;
             this.doRequest(auth).finally(() => {
                 this.busyChangedCallback?.(false);
             });
@@ -290,7 +328,7 @@ export class InteractiveAuth {
      * be resolved.
      */
     public async poll(): Promise<void> {
-        if (!this.data.session) return;
+        if (!(this.data as IAuthData).session) return;
         // likewise don't poll if there is no auth session in progress
         if (!this.attemptAuthDeferred) return;
         // if we currently have a request in flight, there's no point making
@@ -330,7 +368,7 @@ export class InteractiveAuth {
      * @returns session id
      */
     public getSessionId(): string | undefined {
-        return this.data?.session;
+        return (this.data as IAuthData)?.session;
     }
 
     /**
@@ -350,7 +388,7 @@ export class InteractiveAuth {
      * @returns any parameters from the server for this stage
      */
     public getStageParams(loginType: string): Record<string, any> | undefined {
-        return this.data.params?.[loginType];
+        return (this.data as IAuthData)?.params?.[loginType];
     }
 
     public getChosenFlow(): UIAFlow | null {
@@ -391,9 +429,9 @@ export class InteractiveAuth {
 
         // use the sessionid from the last request, if one is present.
         let auth: IAuthDict;
-        if (this.data.session) {
+        if ((this.data as IAuthData)?.session) {
             auth = {
-                session: this.data.session,
+                session: (this.data as IAuthData).session,
             };
             Object.assign(auth, authData);
         } else {
@@ -451,7 +489,7 @@ export class InteractiveAuth {
                     this.inputs.emailAddress!,
                     this.clientSecret,
                     this.emailAttempt++,
-                    this.data.session!,
+                    (this.data as IAuthData).session!,
                 );
                 this.emailSid = requestTokenResult.sid;
                 logger.trace("Email token request succeeded");
@@ -480,10 +518,12 @@ export class InteractiveAuth {
             this.attemptAuthDeferred!.resolve(result);
             this.attemptAuthDeferred = null;
         } catch (error) {
+            const matrixError = error instanceof MatrixError ? error : null;
+
             // sometimes UI auth errors don't come with flows
-            const errorFlows = (<MatrixError>error).data?.flows ?? null;
-            const haveFlows = this.data.flows || Boolean(errorFlows);
-            if ((<MatrixError>error).httpStatus !== 401 || !(<MatrixError>error).data || !haveFlows) {
+            const errorFlows = matrixError?.data?.flows ?? null;
+            const haveFlows = (this.data as IAuthData)?.flows || Boolean(errorFlows);
+            if (!matrixError || matrixError.httpStatus !== 401 || !matrixError.data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
                     this.attemptAuthDeferred?.reject(error);
@@ -494,24 +534,22 @@ export class InteractiveAuth {
                     logger.log("Background poll request failed doing UI auth: ignoring", error);
                 }
             }
-            if (!(<MatrixError>error).data) {
-                (<MatrixError>error).data = {};
+            if (matrixError && !matrixError.data) {
+                matrixError.data = {};
             }
             // if the error didn't come with flows, completed flows or session ID,
             // copy over the ones we have. Synapse sometimes sends responses without
             // any UI auth data (eg. when polling for email validation, if the email
             // has not yet been validated). This appears to be a Synapse bug, which
             // we workaround here.
-            if (
-                !(<MatrixError>error).data.flows &&
-                !(<MatrixError>error).data.completed &&
-                !(<MatrixError>error).data.session
-            ) {
-                (<MatrixError>error).data.flows = this.data.flows;
-                (<MatrixError>error).data.completed = this.data.completed;
-                (<MatrixError>error).data.session = this.data.session;
+            if (matrixError && !matrixError.data.flows && !matrixError.data.completed && !matrixError.data.session) {
+                matrixError.data.flows = (this.data as IAuthData).flows;
+                matrixError.data.completed = (this.data as IAuthData).completed;
+                matrixError.data.session = (this.data as IAuthData).session;
             }
-            this.data = (<MatrixError>error).data;
+            if (matrixError) {
+                this.data = matrixError.data as IAuthData;
+            }
             try {
                 this.startNextAuthStage();
             } catch (e) {
@@ -563,14 +601,6 @@ export class InteractiveAuth {
             return;
         }
 
-        if (this.data?.errcode || this.data?.error) {
-            this.stateUpdatedCallback(nextStage, {
-                errcode: this.data?.errcode || "",
-                error: this.data?.error || "",
-            });
-            return;
-        }
-
         this.stateUpdatedCallback(nextStage, nextStage === EMAIL_STAGE_TYPE ? { emailSid: this.emailSid } : {});
     }
 
@@ -618,7 +648,7 @@ export class InteractiveAuth {
      * @throws {@link NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     private chooseFlow(): UIAFlow {
-        const flows = this.data.flows || [];
+        const flows = (this.data as IAuthData)?.flows || [];
 
         // we've been given an email or we've already done an email part
         const haveEmail = Boolean(this.inputs.emailAddress) || Boolean(this.emailSid);
@@ -659,7 +689,7 @@ export class InteractiveAuth {
      * @returns login type
      */
     private firstUncompletedStage(flow: UIAFlow): AuthType | string | undefined {
-        const completed = this.data.completed || [];
+        const completed = (this.data as IAuthData)?.completed || [];
         return flow.stages.find((stageType) => !completed.includes(stageType));
     }
 }

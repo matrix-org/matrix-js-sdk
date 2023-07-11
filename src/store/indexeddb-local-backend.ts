@@ -338,12 +338,16 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Clear the entire database. This should be used when logging out of a client
-     * to prevent mixing data between accounts.
+     * to prevent mixing data between accounts. Closes the database.
      * @returns Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
         return new Promise((resolve) => {
             logger.log(`Removing indexeddb instance: ${this.dbName}`);
+
+            // Close the database first to avoid firing unexpected close events
+            this.db?.close();
+
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
             req.onblocked = (): void => {
