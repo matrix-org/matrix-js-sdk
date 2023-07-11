@@ -26,6 +26,7 @@ import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { SetPresence } from "../../src/sync";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -1514,6 +1515,16 @@ describe("MatrixClient", function () {
 
             client!.setCryptoTrustCrossSignedDevices(false);
             expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
+        });
+    });
+
+    describe("setSyncPresence", () => {
+        it("should pass calls through to the underlying sync api", () => {
+            const setPresence = jest.fn();
+            // @ts-ignore
+            client.syncApi = { setPresence };
+            client?.setSyncPresence(SetPresence.Unavailable);
+            expect(setPresence).toHaveBeenCalledWith(SetPresence.Unavailable);
         });
     });
 });
