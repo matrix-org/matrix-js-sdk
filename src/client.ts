@@ -2854,12 +2854,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
+     *
+     * @deprecated Prefer {@link CryptoApi.createRecoveryKeyFromPassphrase | `CryptoApi.createRecoveryKeyFromPassphrase`}.
      */
     public createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.createRecoveryKeyFromPassphrase(password);
+        return this.cryptoBackend.createRecoveryKeyFromPassphrase(password);
     }
 
     /**
@@ -2874,7 +2876,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * return true.
      *
      * @returns True if secret storage is ready to be used on this device
-     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}:
+     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}.
      */
     public isSecretStorageReady(): Promise<boolean> {
         if (!this.cryptoBackend) {
@@ -2899,10 +2901,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @deprecated Use {@link CryptoApi#bootstrapSecretStorage}.
      */
     public bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.bootstrapSecretStorage(opts);
+        return this.cryptoBackend.bootstrapSecretStorage(opts);
     }
 
     /**
