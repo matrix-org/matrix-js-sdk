@@ -29,7 +29,14 @@ import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
 import { ISendEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
-import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts, SendToDeviceContentMap } from "./client";
+import {
+    MatrixClient,
+    ClientEvent,
+    IMatrixClientCreateOpts,
+    IStartClientOpts,
+    SendToDeviceContentMap,
+    IOpenIDToken,
+} from "./client";
 import { SyncApi, SyncState } from "./sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { User } from "./models/user";
@@ -243,6 +250,18 @@ export class RoomWidgetClient extends MatrixClient {
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {
         await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
         return {};
+    }
+
+    public async getOpenIdToken(): Promise<IOpenIDToken> {
+        const token = await this.widgetApi.requestOpenIDConnectToken();
+        // the IOpenIDCredentials from the widget-api and IOpenIDToken form the matrix-js-sdk are compatible.
+        // we still recreate the token to make this transparent and catch'able by the linter in case the types change in the future.
+        return <IOpenIDToken>{
+            access_token: token.access_token,
+            expires_in: token.expires_in,
+            matrix_server_name: token.matrix_server_name,
+            token_type: token.token_type,
+        };
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
