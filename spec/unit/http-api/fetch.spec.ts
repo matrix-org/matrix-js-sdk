@@ -300,9 +300,9 @@ describe("FetchHttpApi", () => {
         const fetchFn = jest.fn().mockReturnValue(deferred.promise);
         jest.spyOn(logger, "debug").mockImplementation(() => {});
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
-        const prom = api.requestOtherUrl(Method.Get, "https://server:1234/some/path#fragment?query=param");
+        const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path#fragment?query=param");
         jest.advanceTimersByTime(1234);
-        deferred.resolve({ ok: true, text: () => Promise.resolve("RESPONSE") } as Response);
+        deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(logger.debug).not.toHaveBeenCalledWith("fragment");
         expect(logger.debug).not.toHaveBeenCalledWith("query");
@@ -310,12 +310,12 @@ describe("FetchHttpApi", () => {
         expect(logger.debug).toHaveBeenCalledTimes(2);
         expect(mocked(logger.debug).mock.calls[0]).toMatchInlineSnapshot(`
             [
-              "FetchHttpApi: --> GET https://server:1234/some/path",
+              "FetchHttpApi: --> GET https://server:8448/some/path",
             ]
         `);
         expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
             [
-              "FetchHttpApi: <-- GET https://server:1234/some/path [1234ms undefined]",
+              "FetchHttpApi: <-- GET https://server:8448/some/path [1234ms undefined]",
             ]
         `);
     });
