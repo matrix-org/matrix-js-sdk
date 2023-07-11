@@ -232,9 +232,13 @@ export interface CryptoApi {
     /**
      * Check the cross signing trust of the current user
      *
-     * - Import cross signing keys from the secret storage
+     * - Import cross signing keys from the secret storage (if `opts.allowPrivateKeyRequests` is set)
      * - Verify the current device
      * - Upload the device signatures after verification (`/_matrix/client/v3/keys/signatures/upload`)
+     *
+     * Can fail if
+     *  - the cross signing keys can't be imported
+     *  - the device can't be locally verified (the device signatures will not be uploaded)
      *
      * @param opts - Options object.
      */
