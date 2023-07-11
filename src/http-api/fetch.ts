@@ -280,9 +280,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 keepalive: keepAlive,
             });
 
-            logger.debug(`FetchHttpApi: <-- ${res.status} ${Date.now() - start}ms ${method} ${urlForLogs}`);
+            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
         } catch (e) {
-            logger.debug(`FetchHttpApi: <-- ${e} ${Date.now() - start}ms ${method} ${urlForLogs}`);
+            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }

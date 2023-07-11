@@ -315,7 +315,7 @@ describe("FetchHttpApi", () => {
         `);
         expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
             [
-              "FetchHttpApi: <-- undefined 1234ms GET https://server:1234/some/path",
+              "FetchHttpApi: <-- GET https://server:1234/some/path [1234ms undefined]",
             ]
         `);
     });
