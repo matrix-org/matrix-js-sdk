@@ -232,9 +232,9 @@ export interface CryptoApi {
     /**
      * Check the cross signing trust of the current user
      *
-     * - Download device keys
      * - Import cross signing keys from the secret storage
      * - Verify the current device
+     * - Upload the device signatures after verification (`/_matrix/client/v3/keys/signatures/upload`)
      *
      * @param opts - Options object.
      */
@@ -506,7 +506,8 @@ export interface GeneratedSecretStorageKey {
  */
 export interface CheckOwnCrossSigningTrustOpts {
     /**
-     * If true, will fetch the private cross signing keys from the secret storage
+     * If true, will fetch the private cross signing keys from the secret storage.
+     * If not, the cross signing keys are not imported
      */
     allowPrivateKeyRequests?: boolean;
 }

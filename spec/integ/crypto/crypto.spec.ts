@@ -552,103 +552,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
     }
 
-    // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
-    // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
-    const queryResponseBody = {
-        device_keys: {
-            "@testing_florian1:matrix.org": {
-                EBMMPAFOPU: {
-                    algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
-                    device_id: "EBMMPAFOPU",
-                    keys: {
-                        "curve25519:EBMMPAFOPU": "HyhQD4mXwNViqns0noABW9NxHbCAOkriQ4QKGGndk3w",
-                        "ed25519:EBMMPAFOPU": "xSQaxrFOTXH+7Zjo+iwb445hlNPFjnx1O3KaV3Am55k",
-                    },
-                    signatures: {
-                        "@testing_florian1:matrix.org": {
-                            "ed25519:EBMMPAFOPU":
-                                "XFJVq9HmO5lfJN7l6muaUt887aUHg0/poR3p9XHGXBrLUqzfG7Qllq7jjtUjtcTc5CMD7/mpsXfuC2eV+X1uAw",
-                        },
-                    },
-                    user_id: "@testing_florian1:matrix.org",
-                    unsigned: {
-                        device_display_name: "display name",
-                    },
-                },
-            },
-        },
-        failures: {},
-        master_keys: {
-            "@testing_florian1:matrix.org": {
-                user_id: "@testing_florian1:matrix.org",
-                usage: ["master"],
-                keys: {
-                    "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
-                        "O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0",
-                },
-                signatures: {
-                    "@testing_florian1:matrix.org": {
-                        "ed25519:UKAQMJSJZC":
-                            "q4GuzzuhZfTpwrlqnJ9+AEUtEfEQ0um1PO3puwp/+vidzFicw0xEPjedpJoASYQIJ8XJAAWX8Q235EKeCzEXCA",
-                    },
-                },
-            },
-        },
-        self_signing_keys: {
-            "@testing_florian1:matrix.org": {
-                user_id: "@testing_florian1:matrix.org",
-                usage: ["self_signing"],
-                keys: {
-                    "ed25519:YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo":
-                        "YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo",
-                },
-                signatures: {
-                    "@testing_florian1:matrix.org": {
-                        "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
-                            "yckmxgQ3JA5bb205/RunJipnpZ37ycGNf4OFzDwAad++chd71aGHqAMQ1f6D2GVfl8XdHmiRaohZf4mGnDL0AA",
-                    },
-                },
-            },
-        },
-        user_signing_keys: {
-            "@testing_florian1:matrix.org": {
-                user_id: "@testing_florian1:matrix.org",
-                usage: ["user_signing"],
-                keys: {
-                    "ed25519:Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs":
-                        "Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs",
-                },
-                signatures: {
-                    "@testing_florian1:matrix.org": {
-                        "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
-                            "WxNNXb13yCrBwXUQzdDWDvWSQ/qWCfwpvssOudlAgbtMzRESMbCTDkeA8sS1awaAtUmu7FrPtDb5LYfK/EE2CQ",
-                    },
-                },
-            },
-        },
-    };
-
-    /**
-     * Mocks the POST `/keys/query` request and returns the `device_keys` from the request payload.
-     * https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
-     */
-    function awaitKeyQueryRequest(): Promise<Record<string, []>> {
-        return new Promise((resolve) => {
-            const listener = (url: string, options: RequestInit) => {
-                const content = JSON.parse(options.body as string);
-                // Resolve with request payload
-                resolve(content.device_keys);
-
-                // Return response of `/keys/query`
-                return queryResponseBody;
-            };
-
-            for (const path of ["/_matrix/client/r0/keys/query", "/_matrix/client/v3/keys/query"]) {
-                fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
-            }
-        });
-    }
-
     beforeEach(
         async () => {
             // anything that we don't have a specific matcher for silently returns a 404
@@ -2127,6 +2030,103 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             jest.useRealTimers();
         });
 
+        // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+        // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
+        const queryResponseBody = {
+            device_keys: {
+                "@testing_florian1:matrix.org": {
+                    EBMMPAFOPU: {
+                        algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+                        device_id: "EBMMPAFOPU",
+                        keys: {
+                            "curve25519:EBMMPAFOPU": "HyhQD4mXwNViqns0noABW9NxHbCAOkriQ4QKGGndk3w",
+                            "ed25519:EBMMPAFOPU": "xSQaxrFOTXH+7Zjo+iwb445hlNPFjnx1O3KaV3Am55k",
+                        },
+                        signatures: {
+                            "@testing_florian1:matrix.org": {
+                                "ed25519:EBMMPAFOPU":
+                                    "XFJVq9HmO5lfJN7l6muaUt887aUHg0/poR3p9XHGXBrLUqzfG7Qllq7jjtUjtcTc5CMD7/mpsXfuC2eV+X1uAw",
+                            },
+                        },
+                        user_id: "@testing_florian1:matrix.org",
+                        unsigned: {
+                            device_display_name: "display name",
+                        },
+                    },
+                },
+            },
+            failures: {},
+            master_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["master"],
+                    keys: {
+                        "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                            "O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:UKAQMJSJZC":
+                                "q4GuzzuhZfTpwrlqnJ9+AEUtEfEQ0um1PO3puwp/+vidzFicw0xEPjedpJoASYQIJ8XJAAWX8Q235EKeCzEXCA",
+                        },
+                    },
+                },
+            },
+            self_signing_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["self_signing"],
+                    keys: {
+                        "ed25519:YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo":
+                            "YYWIHBCuKGEy9CXiVrfBVR0N1I60JtiJTNCWjiLAFzo",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                                "yckmxgQ3JA5bb205/RunJipnpZ37ycGNf4OFzDwAad++chd71aGHqAMQ1f6D2GVfl8XdHmiRaohZf4mGnDL0AA",
+                        },
+                    },
+                },
+            },
+            user_signing_keys: {
+                "@testing_florian1:matrix.org": {
+                    user_id: "@testing_florian1:matrix.org",
+                    usage: ["user_signing"],
+                    keys: {
+                        "ed25519:Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs":
+                            "Maa77okgZxnABGqaiChEUnV4rVsAI61WXWeL5TSEUhs",
+                    },
+                    signatures: {
+                        "@testing_florian1:matrix.org": {
+                            "ed25519:O5s5RoLaz93Bjf/pg55oJeCVeYYoruQhqEd0Mda6lq0":
+                                "WxNNXb13yCrBwXUQzdDWDvWSQ/qWCfwpvssOudlAgbtMzRESMbCTDkeA8sS1awaAtUmu7FrPtDb5LYfK/EE2CQ",
+                        },
+                    },
+                },
+            },
+        };
+
+        /**
+         * Mocks the POST `/keys/query` request and returns the `device_keys` from the request payload.
+         * https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+         */
+        function awaitKeyQueryRequest(): Promise<Record<string, []>> {
+            return new Promise((resolve) => {
+                const listener = (url: string, options: RequestInit) => {
+                    const content = JSON.parse(options.body as string);
+                    // Resolve with request payload
+                    resolve(content.device_keys);
+
+                    // Return response of `/keys/query`
+                    return queryResponseBody;
+                };
+
+                for (const path of ["/_matrix/client/r0/keys/query", "/_matrix/client/v3/keys/query"]) {
+                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
+                }
+            });
+        }
+
         it("Download uncached keys for known user", async () => {
             const queryPromise = awaitKeyQueryRequest();
 
@@ -2513,14 +2513,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Finally, wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
-                const keyQueryRequestPromise = awaitKeyQueryRequest();
                 const signatureUploadPromise = awaitSignatureUpload();
                 await aliceClient.getCrypto()!.checkOwnCrossSigningTrust({ allowPrivateKeyRequests: true });
-
-                // Expect `keys/query` to have been called
-                expect(await keyQueryRequestPromise).toEqual({
-                    [aliceClient.getUserId()!]: [],
-                });
 
                 const signatureUploadRes = await signatureUploadPromise;
                 // Expect the device keys to have been uploaded

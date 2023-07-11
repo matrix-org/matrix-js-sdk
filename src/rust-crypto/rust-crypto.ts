@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import { v4 as uuidv4 } from "uuid";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
@@ -646,14 +645,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#checkOwnCrossSigningTrust}
      */
     public async checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void> {
-        // Download the device keys and add them into the olm machine
-        const queryResult = await this.downloadDeviceList(new Set([this.userId]));
-        await this.olmMachine.markRequestAsSent(
-            uuidv4(),
-            RustSdkCryptoJs.RequestType.KeysQuery,
-            JSON.stringify(queryResult),
-        );
-
         if (opts?.allowPrivateKeyRequests) {
             // Fetch cross signing keys from the secret storage and import them in the olm machine
             const masterKey = await this.secretStorage.get("m.cross_signing.master");
