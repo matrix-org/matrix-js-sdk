@@ -2682,10 +2682,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @deprecated Use {@link Crypto.CryptoApi.checkOwnCrossSigningTrust | `CryptoApi.checkOwnCrossSigningTrust`}
      */
     public checkOwnCrossSigningTrust(opts?: ICheckOwnCrossSigningTrustOpts): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkOwnCrossSigningTrust(opts);
+        return this.cryptoBackend.checkOwnCrossSigningTrust(opts);
     }
 
     /**

@@ -238,7 +238,7 @@ export interface CryptoApi {
      *
      * @param opts - Options object.
      */
-    checkOwnCrossSigningTrust(opts: CheckOwnCrossSigningTrustOpts): Promise<void>;
+    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
