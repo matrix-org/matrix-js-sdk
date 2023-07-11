@@ -399,8 +399,12 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 }
 
-const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
+
+// This is intentionally broad to include things which resemble MXIDs, rather than only considering valid MXIDs
+function looksLikeMxid(str: string): boolean {
+    return str.startsWith("@") && str.includes(":");
+}
 
 function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?: RoomState): boolean {
     if (!displayName || displayName === selfUserId) return false;
@@ -414,7 +418,7 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
     // Next check if the name contains something that look like a mxid
     // If it does, it may be someone trying to impersonate someone else
     // Show full mxid in this case
-    if (MXID_PATTERN.test(displayName)) return true;
+    if (looksLikeMxid(displayName)) return true;
 
     // Also show mxid if the display name contains any LTR/RTL characters as these
     // make it very difficult for us to find similar *looking* display names
