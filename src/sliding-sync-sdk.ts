@@ -469,7 +469,7 @@ export class SlidingSyncSdk {
      * @param presence - the presence to specify to set_presence of sync calls
      */
     public setPresence(presence?: SetPresence): void {
-        // TODO
+        // TODO not possible in sliding sync yet
     }
 
     /**
