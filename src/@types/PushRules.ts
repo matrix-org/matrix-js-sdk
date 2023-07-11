@@ -137,8 +137,8 @@ export enum PushRuleKind {
 
 export enum RuleId {
     Master = ".m.rule.master",
-    IsUserMention = ".org.matrix.msc3952.is_user_mention",
-    IsRoomMention = ".org.matrix.msc3952.is_room_mention",
+    IsUserMention = ".m.rule.is_user_mention",
+    IsRoomMention = ".m.rule.is_room_mention",
     ContainsDisplayName = ".m.rule.contains_display_name",
     ContainsUserName = ".m.rule.contains_user_name",
     AtRoomNotification = ".m.rule.roomnotif",
