@@ -168,7 +168,7 @@ export interface ISyncStateData {
     fromCache?: boolean;
 }
 
-enum SetPresence {
+export enum SetPresence {
     Offline = "offline",
     Online = "online",
     Unavailable = "unavailable",
@@ -225,6 +225,7 @@ export class SyncApi {
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
+    private presence?: SetPresence;
 
     /**
      * Construct an entity which is able to sync with a homeserver.
@@ -1005,6 +1006,8 @@ export class SyncApi {
 
         if (this.opts.disablePresence) {
             qps.set_presence = SetPresence.Offline;
+        } else if (this.presence !== undefined) {
+            qps.set_presence = this.presence;
         }
 
         if (syncToken) {
@@ -1025,6 +1028,14 @@ export class SyncApi {
         }
 
         return qps;
+    }
+
+    /**
+     * Specify the set_presence value to be used for subsequent calls to the Sync API.
+     * @param presence - the presence to specify to set_presence of sync calls
+     */
+    public setPresence(presence?: SetPresence): void {
+        this.presence = presence;
     }
 
     private async onSyncError(err: MatrixError): Promise<boolean> {

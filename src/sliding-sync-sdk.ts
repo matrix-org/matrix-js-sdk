@@ -27,6 +27,7 @@ import {
     SyncApiOptions,
     defaultClientOpts,
     defaultSyncApiOpts,
+    SetPresence,
 } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
@@ -460,6 +461,14 @@ export class SlidingSyncSdk {
      * peeked.
      */
     public stopPeeking(): void {
+        // TODO
+    }
+
+    /**
+     * Specify the set_presence value to be used for subsequent calls to the Sync API.
+     * @param presence - the presence to specify to set_presence of sync calls
+     */
+    public setPresence(presence?: SetPresence): void {
         // TODO
     }
 
