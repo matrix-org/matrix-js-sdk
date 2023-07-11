@@ -148,10 +148,8 @@ describe("validateOIDCIssuerWellKnown", () => {
                 response_types_supported: [],
             });
         }).toThrow(OidcError.OpSupport);
-        expect(logger.error).toHaveBeenCalledWith("OIDC issuer configuration: authorization_endpoint is invalid");
-        expect(logger.error).toHaveBeenCalledWith(
-            "OIDC issuer configuration: response_types_supported is invalid. code is required.",
-        );
+        expect(logger.error).toHaveBeenCalledWith("Missing or invalid property: authorization_endpoint");
+        expect(logger.error).toHaveBeenCalledWith("Invalid property: response_types_supported. code is required.");
     });
 
     it("should return validated issuer config", () => {

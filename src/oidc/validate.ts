@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import jwtDecode from "jwt-decode";
-import { OidcMetadata } from "oidc-client-ts";
+import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
 import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
@@ -62,14 +62,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
 const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!wellKnown[key] || !optionalStringProperty(wellKnown, key)) {
-        logger.error(`OIDC issuer configuration: ${key} is invalid`);
+        logger.error(`Missing or invalid property: ${key}`);
         return false;
     }
     return true;
 };
 const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!!wellKnown[key] && typeof wellKnown[key] !== "string") {
-        logger.error(`OIDC issuer configuration: ${key} is invalid`);
+        logger.error(`Invalid property: ${key}`);
         return false;
     }
     return true;
@@ -77,7 +77,7 @@ const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string)
 const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, value: any): boolean => {
     const array = wellKnown[key];
     if (!array || !Array.isArray(array) || !array.includes(value)) {
-        logger.error(`OIDC issuer configuration: ${key} is invalid. ${value} is required.`);
+        logger.error(`Invalid property: ${key}. ${value} is required.`);
         return false;
     }
     return true;
@@ -245,3 +245,64 @@ export type UserState = {
      */
     nonce: string;
 };
+/**
+ * Validate stored user state exists and is valid
+ * @param userState - userState returned by oidcClient.processSigninResponse
+ * @throws when userState is invalid
+ */
+export function validateStoredUserState(userState: unknown): asserts userState is UserState {
+    if (!isRecord(userState)) {
+        logger.error("Stored user state not found");
+        throw new Error(OidcError.MissingOrInvalidStoredState);
+    }
+    const isInvalid = [
+        requiredStringProperty(userState, "homeserverUrl"),
+        requiredStringProperty(userState, "nonce"),
+        optionalStringProperty(userState, "identityServerUrl"),
+    ].some((isValid) => !isValid);
+
+    if (isInvalid) {
+        throw new Error(OidcError.MissingOrInvalidStoredState);
+    }
+}
+
+/**
+ * The expected response type from the token endpoint during authorization code flow
+ * Normalized to always use capitalized 'Bearer' for token_type
+ *
+ * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
+ * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
+ */
+export type BearerTokenResponse = {
+    token_type: "Bearer";
+    access_token: string;
+    scope: string;
+    refresh_token?: string;
+    expires_in?: number;
+    // from oidc-client-ts
+    expires_at?: number;
+    id_token?: string;
+};
+
+/**
+ * Make required properties required in type
+ */
+type ValidSignInResponse = SigninResponse &
+    BearerTokenResponse & {
+        token_type: "Bearer" | "bearer";
+    };
+
+const isValidBearerTokenResponse = (response: unknown): response is ValidSignInResponse =>
+    isRecord(response) &&
+    requiredStringProperty(response, "token_type") &&
+    // token_type is case insensitive, some OPs return `token_type: "bearer"`
+    (response["token_type"] as string).toLowerCase() === "bearer" &&
+    requiredStringProperty(response, "access_token") &&
+    requiredStringProperty(response, "refresh_token") &&
+    (!("expires_in" in response) || typeof response["expires_in"] === "number");
+
+export function validateBearerTokenResponse(response: unknown): asserts response is ValidSignInResponse {
+    if (!isValidBearerTokenResponse(response)) {
+        throw new Error(OidcError.InvalidBearerTokenResponse);
+    }
+}
