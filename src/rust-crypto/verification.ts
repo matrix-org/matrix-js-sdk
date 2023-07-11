@@ -322,11 +322,19 @@ export class RustVerificationRequest
     }
 
     /**
-     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
-     *
-     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     * Stub implementation of {@link Crypto.VerificationRequest#getQRCodeBytes}.
      */
     public getQRCodeBytes(): Buffer | undefined {
+        // TODO
+        return undefined;
+    }
+
+    /**
+     * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
+     */
+    public async generateQRCode(): Promise<Buffer | undefined> {
         // TODO
         return undefined;
     }

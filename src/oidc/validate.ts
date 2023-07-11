@@ -15,8 +15,9 @@ limitations under the License.
 */
 
 import jwtDecode from "jwt-decode";
+import { OidcMetadata } from "oidc-client-ts";
 
-import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
+import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
 
@@ -39,9 +40,7 @@ export type ValidatedIssuerConfig = {
  * @returns config - when present and valid
  * @throws when config is not found or invalid
  */
-export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): IDelegatedAuthConfig => {
-    const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown);
-
+export const validateWellKnownAuthentication = (authentication?: IDelegatedAuthConfig): IDelegatedAuthConfig => {
     if (!authentication) {
         throw new Error(OidcError.NotSupported);
     }
@@ -101,6 +100,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     const isInvalid = [
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
+        requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
@@ -118,6 +118,36 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     logger.error("Issuer configuration not valid");
     throw new Error(OidcError.OpSupport);
 };
+
+/**
+ * Metadata from OIDC authority discovery
+ * With validated properties required in type
+ */
+export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
+    Pick<
+        OidcMetadata,
+        | "issuer"
+        | "authorization_endpoint"
+        | "token_endpoint"
+        | "registration_endpoint"
+        | "revocation_endpoint"
+        | "response_types_supported"
+        | "grant_types_supported"
+        | "code_challenge_methods_supported"
+    >;
+
+/**
+ * Wraps validateOIDCIssuerWellKnown in a type assertion
+ * that asserts expected properties are present
+ * (Typescript assertions cannot be arrow functions)
+ * @param metadata - issuer openid-configuration response
+ * @throws when metadata validation fails
+ */
+export function isValidatedIssuerMetadata(
+    metadata: Partial<OidcMetadata>,
+): asserts metadata is ValidatedIssuerMetadata {
+    validateOIDCIssuerWellKnown(metadata);
+}
 
 /**
  * Standard JWT claims.
@@ -198,4 +228,20 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
         logger.error("Invalid ID token", error);
         throw new Error(OidcError.InvalidIdToken);
     }
+};
+
+/**
+ * State we ask OidcClient to store when starting oidc authorization flow (in `generateOidcAuthorizationUrl`)
+ * so that we can access it on return from the OP and complete login
+ */
+export type UserState = {
+    /**
+     * Remember which server we were trying to login to
+     */
+    homeserverUrl: string;
+    identityServerUrl?: string;
+    /**
+     * Used to validate id token
+     */
+    nonce: string;
 };

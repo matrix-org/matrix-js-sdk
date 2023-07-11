@@ -15,7 +15,7 @@ concurrency:
 jobs:
     cypress:
         name: Cypress
-        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@v3.74.0
+        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@v3.75.0
         permissions:
             actions: read
             issues: read
