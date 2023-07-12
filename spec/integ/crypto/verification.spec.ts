@@ -434,15 +434,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.verifier).toBeUndefined();
 
             // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.start",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    method: "m.reciprocate.v1",
-                    transaction_id: transactionId,
-                    secret: encodeUnpaddedBase64(sharedSecret),
-                },
-            });
+            returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
             await waitForVerificationRequestChanged(request);
             expect(request.phase).toEqual(VerificationPhase.Started);
             expect(request.chosenMethod).toEqual("m.reciprocate.v1");
@@ -627,6 +619,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             // pretend that we have another device, which we will start verifying
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             aliceClient = await startTestClient();
             await waitForDeviceList();
@@ -691,6 +684,50 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // ... which should cancel the verifier
             await expect(verificationPromise).rejects.toThrow();
+            expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(verifier.hasBeenCancelled).toBe(true);
+        });
+
+        it("can cancel in the ShowQrCodeCallbacks", async () => {
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan the QR code
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.qr_code.scan.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // we should now have QR data we can display
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            const sharedSecret = qrCodeBuffer.subarray(74 + transactionId.length);
+
+            // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
+            returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Started);
+            expect(request.chosenMethod).toEqual("m.reciprocate.v1");
+
+            // there should now be a verifier
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+
+            // ... which we call .verify on, which emits a ShowReciprocateQr event
+            const reciprocatePromise = emitPromise(verifier, VerifierEvent.ShowReciprocateQr);
+            const verificationPromise = verifier.verify();
+            const reciprocateQRCodeCallbacks: ShowQrCodeCallbacks = await reciprocatePromise;
+
+            // Alice complains that she didn't see the dummy device scan her code
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.cancel");
+            reciprocateQRCodeCallbacks.cancel();
+            await sendToDevicePromise;
+
+            // ... which should cancel the verifier
+            await expect(verificationPromise).rejects.toBeTruthy();
             expect(request.phase).toEqual(VerificationPhase.Cancelled);
             expect(verifier.hasBeenCancelled).toBe(true);
         });
@@ -865,6 +902,19 @@ function buildReadyMessage(transactionId: string, methods: string[]): { type: st
             from_device: TEST_DEVICE_ID,
             methods: methods,
             transaction_id: transactionId,
+        },
+    };
+}
+
+/** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: Uint8Array) {
+    return {
+        type: "m.key.verification.start",
+        content: {
+            from_device: TEST_DEVICE_ID,
+            method: "m.reciprocate.v1",
+            transaction_id: transactionId,
+            secret: encodeUnpaddedBase64(sharedSecret),
         },
     };
 }
