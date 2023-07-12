@@ -29,7 +29,7 @@ import {
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
-import { IAuthDict, UIAuthCallback } from "../interactive-auth";
+import { AuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 
 /**
@@ -116,7 +116,11 @@ export class OutgoingRequestProcessor {
         }
 
         const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: IAuthDict): Promise<UIAResponse<T>> => {
+        const makeRequest = async (auth: AuthDict): Promise<UIAResponse<T>> => {
+            // Auth dicts must have a 'type', contrary to what the type of 'AuthDict' would have you believe
+            if (!auth || !(auth as any).type) {
+                throw new Error("UIA callback returned invalid data");
+            }
             const newBody = {
                 ...parsedBody,
                 auth,

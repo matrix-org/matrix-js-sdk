@@ -29,7 +29,7 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-js";
 
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, UIAuthCallback } from "../../../src";
+import { AuthDict, HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, UIAuthCallback } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 
 describe("OutgoingRequestProcessor", () => {
@@ -210,6 +210,22 @@ describe("OutgoingRequestProcessor", () => {
         await Promise.all([reqProm, markSentCallPromise]);
         expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
         httpBackend.verifyNoOutstandingRequests();
+    });
+
+    it.each([null, {}])("should reject UIA Requests with invalid auth %s", async (auth) => {
+        // first, mock up a request as we might expect to receive it from the Rust layer ...
+        const testReq = { foo: "bar" };
+        const outgoingRequest = new SigningKeysUploadRequest("1234", JSON.stringify(testReq));
+
+        // A *broken* UIA callback which returns a 'null' auth
+        const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
+            return await makeRequest(auth as any as AuthDict);
+        };
+
+        // ... then poke the request into the OutgoingRequestProcessor under test
+        await expect(processor.makeOutgoingRequest(outgoingRequest, authCallback)).rejects.toThrow(
+            "UIA callback returned invalid data",
+        );
     });
 
     it("does not explode with unknown requests", async () => {
