@@ -59,6 +59,7 @@
         "another-json": "^0.2.0",
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
+        "@types/content-type": "^1.1.5",
         "jwt-decode": "^3.1.2",
         "loglevel": "^1.7.1",
         "matrix-events-sdk": "0.0.1",
@@ -67,7 +68,8 @@
         "p-retry": "4",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",
-        "uuid": "9"
+        "uuid": "9",
+        "@types/uuid": "9"
     },
     "devDependencies": {
         "@babel/cli": "^7.12.10",
@@ -85,13 +87,11 @@
         "@casualbot/jest-sonar-reporter": "^2.2.5",
         "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz",
         "@types/bs58": "^4.0.1",
-        "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
         "@types/domexception": "^4.0.0",
         "@types/jest": "^29.0.0",
         "@types/node": "18",
         "@types/sdp-transform": "^2.4.5",
-        "@types/uuid": "9",
         "@typescript-eslint/eslint-plugin": "^5.45.0",
         "@typescript-eslint/parser": "^5.45.0",
         "allchange": "^1.0.6",
