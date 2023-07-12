@@ -133,6 +133,7 @@ import {
     IFilterResponse,
     ITagsResponse,
     IStatusResponse,
+    IAddThreePidBody,
 } from "./@types/requests";
 import {
     EventType,
@@ -8519,7 +8520,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: on success
      * @returns Rejects: with an error response.
      */
-    public addThreePid(creds: IBindThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
+    public addThreePid(creds: IAddThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
         const path = "/account/3pid";
         const data = {
             threePidCreds: creds,

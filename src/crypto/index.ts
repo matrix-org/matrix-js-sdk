@@ -1242,20 +1242,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        let key = await new Promise<Uint8Array | IEncryptedPayload | null>((resolve) => {
+        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
             this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
             });
         });
 
+        let key: Uint8Array | null = null;
+
         // make sure we have a Uint8Array, rather than a string
-        if (key && typeof key === "string") {
-            key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
+        if (typeof encodedKey === "string") {
+            key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(encodedKey) || encodedKey));
             await this.storeSessionBackupPrivateKey(key);
         }
-        if (key && typeof key === "object" && "ciphertext" in key) {
+        if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(key, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = olmlib.decodeBase64(decrypted);
         }
         return key;
