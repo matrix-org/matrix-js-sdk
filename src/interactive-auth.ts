@@ -159,7 +159,8 @@ export class NoAuthFlowFoundError extends Error {
  * The type of an application callback to perform the user-interactive bit of UIA.
  *
  * It is called with a single parameter, `makeRequest`, which is a function which takes the UIA parameters and
- * makes the HTTP request.
+ * makes the HTTP request. The `authData` parameter in `makeRequest` can be set to null to omit the `auth` field
+ * from the UIA request.
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
