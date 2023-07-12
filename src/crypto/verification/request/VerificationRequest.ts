@@ -478,6 +478,10 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return verifier;
     }
 
+    public scanQRCode(qrCodeData: Uint8Array): Promise<Verifier> {
+        throw new Error("QR code scanning not supported by legacy crypto");
+    }
+
     /**
      * sends the initial .request event.
      * @returns resolves when the event has been sent.

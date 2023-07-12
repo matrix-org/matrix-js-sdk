@@ -24,6 +24,8 @@ import { IEventDecryptionResult } from "../@types/crypto";
 
 /**
  * Common interface for the crypto implementations
+ *
+ * @internal
  */
 export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
@@ -90,7 +92,10 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 }
 
-/** The methods which crypto implementations should expose to the Sync api */
+/** The methods which crypto implementations should expose to the Sync api
+ *
+ * @internal
+ */
 export interface SyncCryptoCallbacks {
     /**
      * Called by the /sync loop whenever there are incoming to-device messages.
@@ -146,6 +151,9 @@ export interface SyncCryptoCallbacks {
     onSyncCompleted(syncState: OnSyncCompletedData): void;
 }
 
+/**
+ * @internal
+ */
 export interface OnSyncCompletedData {
     /**
      * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.

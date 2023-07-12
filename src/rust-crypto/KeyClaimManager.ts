@@ -22,6 +22,8 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
  * KeyClaimManager: linearises calls to OlmMachine.getMissingSessions to avoid races
  *
  * We have one of these per `RustCrypto` (and hence per `MatrixClient`).
+ *
+ * @internal
  */
 export class KeyClaimManager {
     private currentClaimPromise: Promise<void>;

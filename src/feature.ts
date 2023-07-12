@@ -63,6 +63,7 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.IntentionalMentions]: {
         unstablePrefixes: ["org.matrix.msc3952_intentional_mentions"],
+        matrixVersion: "v1.7",
     },
 };
 

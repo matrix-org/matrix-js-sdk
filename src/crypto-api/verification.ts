@@ -136,11 +136,26 @@ export interface VerificationRequest
     /**
      * Send an `m.key.verification.start` event to start verification via a particular method.
      *
+     * This is normally used when starting a verification via emojis (ie, `method` is set to `m.sas.v1`).
+     *
      * @param method - the name of the verification method to use.
      *
      * @returns The verifier which will do the actual verification.
      */
     startVerification(method: string): Promise<Verifier>;
+
+    /**
+     * Start a QR code verification by providing a scanned QR code for this verification flow.
+     *
+     * Validates the QR code, and if it is ok, sends an `m.key.verification.start` event with `method` set to
+     * `m.reciprocate.v1`, to tell the other side the scan was successful.
+     *
+     * See also {@link VerificationRequest#startVerification} which can be used to start other verification methods.
+     *
+     * @param qrCodeData - the decoded QR code.
+     * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
+     */
+    scanQRCode(qrCodeData: Uint8Array): Promise<Verifier>;
 
     /**
      * The verifier which is doing the actual verification, once the method has been established.

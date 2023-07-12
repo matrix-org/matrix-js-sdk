@@ -21,7 +21,7 @@ limitations under the License.
 import { Optional } from "matrix-events-sdk";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto";
-import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
+import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
     IContent,
@@ -2241,7 +2241,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.cryptoCallbacks,
             useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
         );
-        rustCrypto.supportedVerificationMethods = this.verificationMethods;
+        rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;
 
@@ -2854,12 +2854,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
+     *
+     * @deprecated Prefer {@link CryptoApi.createRecoveryKeyFromPassphrase | `CryptoApi.createRecoveryKeyFromPassphrase`}.
      */
     public createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.createRecoveryKeyFromPassphrase(password);
+        return this.cryptoBackend.createRecoveryKeyFromPassphrase(password);
     }
 
     /**
@@ -2874,7 +2876,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * return true.
      *
      * @returns True if secret storage is ready to be used on this device
-     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}:
+     * @deprecated Prefer {@link CryptoApi.isSecretStorageReady | `CryptoApi.isSecretStorageReady`}.
      */
     public isSecretStorageReady(): Promise<boolean> {
         if (!this.cryptoBackend) {
@@ -2896,13 +2898,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
      *   algorithm is found
      *
-     * @deprecated Use {@link CryptoApi#bootstrapSecretStorage}.
+     * @deprecated Use {@link CryptoApi.bootstrapSecretStorage | `CryptoApi.bootstrapSecretStorage`}.
      */
     public bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.bootstrapSecretStorage(opts);
+        return this.cryptoBackend.bootstrapSecretStorage(opts);
     }
 
     /**
@@ -5529,6 +5531,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         allowDirectLinks?: boolean,
     ): string | null {
         return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks);
+    }
+
+    /**
+     * Specify the set_presence value to be used for subsequent calls to the Sync API.
+     * This has an advantage over calls to the PUT /presence API in that it
+     * doesn't clobber status_msg set by other devices.
+     * @param presence - the presence to specify to set_presence of sync calls
+     */
+    public async setSyncPresence(presence?: SetPresence): Promise<void> {
+        this.syncApi?.setPresence(presence);
     }
 
     /**
