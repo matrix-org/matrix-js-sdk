@@ -71,6 +71,7 @@ import {
     UploadResponse,
     HTTPError,
     IRequestOpts,
+    Body,
 } from "./http-api";
 import {
     Crypto,
@@ -2012,12 +2013,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set whether this client is a guest account. <b>This method is experimental
      * and may change without warning.</b>
      * @param guest - True if this is a guest account.
+     * @experimental if the token is a macaroon, it should be encoded in it that it is a 'guest'
+     * access token, which means that the SDK can determine this entirely without
+     * the dev manually flipping this flag.
      */
     public setGuest(guest: boolean): void {
-        // EXPERIMENTAL:
-        // If the token is a macaroon, it should be encoded in it that it is a 'guest'
-        // access token, which means that the SDK can determine this entirely without
-        // the dev manually flipping this flag.
         this.isGuestAccount = guest;
     }
 
@@ -4405,7 +4405,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private sendCompleteEvent(
         roomId: string,
         threadId: string | null,
-        eventObject: any,
+        eventObject: Partial<IEvent>,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (!txnId) {
@@ -4982,7 +4982,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async sendReceipt(event: MatrixEvent, receiptType: ReceiptType, body: any, unthreaded = false): Promise<{}> {
+    public async sendReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        body?: Record<string, any>,
+        unthreaded = false,
+    ): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
         }
@@ -5140,7 +5145,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
             $userId: this.getUserId()!,
         });
-        const data: any = {
+        const data: QueryDict = {
             typing: isTyping,
         };
         if (isTyping) {
@@ -5332,7 +5337,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const populationResults: { [roomId: string]: Error } = {};
-        const promises: Promise<any>[] = [];
+        const promises: Promise<unknown>[] = [];
 
         const doLeave = (roomId: string): Promise<void> => {
             return this.leave(roomId)
@@ -5935,7 +5940,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("getLatestTimeline only supports room timelines");
         }
 
-        let event;
+        let event: IRoomEvent | undefined;
         if (timelineSet.threadListType !== null) {
             const res = await this.createThreadListMessagesRequest(
                 timelineSet.room.roomId,
@@ -6394,7 +6399,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "",
         );
 
-        let readPromise: Promise<any> = Promise.resolve<any>(undefined);
+        let readPromise: Promise<unknown> = Promise.resolve();
         if (opts.allowRead) {
             readPromise = this.sendStateEvent(
                 roomId,
@@ -6599,7 +6604,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     private async requestTokenFromEndpoint<T extends IRequestTokenResponse>(
         endpoint: string,
-        params: Record<string, any>,
+        params: QueryDict,
     ): Promise<T> {
         const postParams = Object.assign({}, params);
 
@@ -7949,8 +7954,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * to false.
      * @returns Promise which resolves: On success, the empty object
      */
-    public deactivateAccount(auth?: any, erase?: boolean): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
-        const body: any = {};
+    public deactivateAccount(
+        auth?: AuthDict,
+        erase?: boolean,
+    ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
+        const body: Body = {};
         if (auth) {
             body.auth = auth;
         }
@@ -8188,7 +8196,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendStateEvent(
         roomId: string,
         eventType: string,
-        content: any,
+        content: IContent,
         stateKey = "",
         opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
@@ -8406,13 +8414,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                 it invisible.
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
+     * @deprecated missing from the spec
      */
     public setRoomDirectoryVisibilityAppService(
         networkId: string,
         roomId: string,
         visibility: "public" | "private",
     ): Promise<any> {
-        // TODO: Types
         const path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
             $networkId: networkId,
             $roomId: roomId,
@@ -8428,7 +8436,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an array of results.
      */
     public searchUserDirectory({ term, limit }: { term: string; limit?: number }): Promise<IUserDirectoryResponse> {
-        const body: any = {
+        const body: Body = {
             search_term: term,
         };
 
@@ -8506,14 +8514,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Add a 3PID to your homeserver account and optionally bind it to an identity
      * server as well. An identity server is required as part of the `creds` object.
      *
-     * This API is deprecated, and you should instead use `addThreePidOnly`
-     * for homeservers that support it.
+     * @deprecated this API is deprecated, and you should instead use `addThreePidOnly` for homeservers that support it.
      *
      * @returns Promise which resolves: on success
      * @returns Rejects: with an error response.
      */
-    public addThreePid(creds: any, bind: boolean): Promise<any> {
-        // TODO: Types
+    public addThreePid(creds: IBindThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
         const path = "/account/3pid";
         const data = {
             threePidCreds: creds,
@@ -8673,7 +8679,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $device_id: deviceId,
         });
 
-        const body: any = {};
+        const body: Body = {};
 
         if (auth) {
             body.auth = auth;
@@ -8691,7 +8697,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
-        const body: any = { devices };
+        const body: Body = { devices };
 
         if (auth) {
             body.auth = auth;
@@ -8868,7 +8874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         { body, next_batch: nextBatch }: { body: ISearchRequestBody; next_batch?: string },
         abortSignal?: AbortSignal,
     ): Promise<ISearchResponse> {
-        const queryParams: any = {};
+        const queryParams: QueryDict = {};
         if (nextBatch) {
             queryParams.next_batch = nextBatch;
         }
@@ -9488,7 +9494,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                        response to getThirdpartyProtocols()
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyUser(protocol: string, params: any): Promise<IThirdPartyUser[]> {
+    public getThirdpartyUser(protocol: string, params?: QueryDict): Promise<IThirdPartyUser[]> {
         const path = utils.encodeUri("/thirdparty/user/$protocol", {
             $protocol: protocol,
         });
@@ -9664,7 +9670,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         proxyBaseUrl?: string,
         abortSignal?: AbortSignal,
     ): Promise<MSC3575SlidingSyncResponse> {
-        const qps: Record<string, any> = {};
+        const qps: QueryDict = {};
         if (req.pos) {
             qps.pos = req.pos;
             delete req.pos;

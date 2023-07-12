@@ -22,12 +22,10 @@ import { checkObjectHasKeys, encodeParams } from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { ConnectionError, MatrixError } from "./errors";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
 import { logger } from "../logger";
-
-type Body = Record<string, any> | BodyInit;
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;

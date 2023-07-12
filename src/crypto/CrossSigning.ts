@@ -18,8 +18,7 @@ limitations under the License.
  * Cross signing methods
  */
 
-import { PkSigning } from "@matrix-org/olm";
-
+import type { PkSigning } from "@matrix-org/olm";
 import { decodeBase64, encodeBase64, IObject, pkSign, pkVerify } from "./olmlib";
 import { logger } from "../logger";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
@@ -245,7 +244,7 @@ export class CrossSigningInfo {
      * @returns A map from key type (string) to private key (Uint8Array)
      */
     public async getCrossSigningKeysFromCache(): Promise<Map<string, Uint8Array>> {
-        const keys = new Map();
+        const keys = new Map<string, Uint8Array>();
         const cacheCallbacks = this.cacheCallbacks;
         if (!cacheCallbacks) return keys;
         for (const type of ["master", "self_signing", "user_signing"]) {
@@ -294,8 +293,8 @@ export class CrossSigningInfo {
 
         const privateKeys: Record<string, Uint8Array> = {};
         const keys: Record<string, ICrossSigningKey> = {};
-        let masterSigning;
-        let masterPub;
+        let masterSigning: PkSigning | undefined;
+        let masterPub: string | undefined;
 
         try {
             if (level & CrossSigningLevel.MASTER) {
