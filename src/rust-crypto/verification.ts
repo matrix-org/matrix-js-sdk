@@ -42,7 +42,7 @@ export class RustVerificationRequest
     implements VerificationRequest
 {
     /** a reëmitter which relays VerificationRequestEvent.Changed events emitted by the verifier */
-    private readonly _reEmitter: TypedReEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>;
+    private readonly reEmitter: TypedReEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>;
 
     /** Are we in the process of sending an `m.key.verification.ready` event? */
     private _accepting = false;
@@ -66,7 +66,7 @@ export class RustVerificationRequest
     ) {
         super();
 
-        this._reEmitter = new TypedReEmitter(this);
+        this.reEmitter = new TypedReEmitter(this);
 
         const onChange = async (): Promise<void> => {
             const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
@@ -89,10 +89,10 @@ export class RustVerificationRequest
     private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
         // if we already have a verifier, unsubscribe from its events
         if (this._verifier) {
-            this._reEmitter.stopReEmitting(this._verifier, [VerificationRequestEvent.Change]);
+            this.reEmitter.stopReEmitting(this._verifier, [VerificationRequestEvent.Change]);
         }
         this._verifier = verifier;
-        this._reEmitter.reEmit(this._verifier, [VerificationRequestEvent.Change]);
+        this.reEmitter.reEmit(this._verifier, [VerificationRequestEvent.Change]);
     }
 
     /**
