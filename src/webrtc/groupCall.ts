@@ -17,7 +17,7 @@ import { Room } from "../models/room";
 import { RoomStateEvent } from "../models/room-state";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
-import { FocusInfo, SDPStreamMetadataPurpose } from "./callEventTypes";
+import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
@@ -252,6 +252,7 @@ export class GroupCall extends TypedEventEmitter<
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
+    private _livekitServiceURL?: string;
 
     private stats: GroupCallStats | undefined;
     /**
@@ -274,12 +275,12 @@ export class GroupCall extends TypedEventEmitter<
         // create the group call signaling events, with the intention that the actual media will be
         // handled using livekit. The js-sdk doesn't contain any code to do the actual livekit call though.
         private useLivekit = false,
-        foci?: FocusInfo[],
+        livekitServiceURL?: string,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId ?? genCallID();
-        this._foci = foci ?? [];
+        this._livekitServiceURL = livekitServiceURL;
         this.creationTs =
             room.currentState.getStateEvents(EventType.GroupCallPrefix, this.groupCallId)?.getTs() ?? null;
         this.updateParticipants();
@@ -328,8 +329,12 @@ export class GroupCall extends TypedEventEmitter<
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
         this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
-        const focus = this._foci[0];
+        await this.sendCallStateEvent();
 
+        return this;
+    }
+
+    private async sendCallStateEvent(): Promise<void> {
         const groupCallState: IGroupCallRoomState = {
             "m.intent": this.intent,
             "m.type": this.type,
@@ -338,19 +343,20 @@ export class GroupCall extends TypedEventEmitter<
             "dataChannelsEnabled": this.dataChannelsEnabled,
             "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
         };
-        if (focus) {
-            groupCallState["io.element.livekit_service_url"] = focus.livekitServiceUrl;
+        if (this.livekitServiceURL) {
+            groupCallState["io.element.livekit_service_url"] = this.livekitServiceURL;
         }
 
         await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallPrefix, groupCallState, this.groupCallId);
-
-        return this;
     }
 
-    private _foci: FocusInfo[] = [];
+    public get livekitServiceURL(): string | undefined {
+        return this._livekitServiceURL;
+    }
 
-    public get foci(): FocusInfo[] {
-        return this._foci;
+    public updateLivekitServiceURL(newURL: string): Promise<void> {
+        this._livekitServiceURL = newURL;
+        return this.sendCallStateEvent();
     }
 
     private _state = GroupCallState.LocalCallFeedUninitialized;

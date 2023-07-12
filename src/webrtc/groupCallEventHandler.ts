@@ -23,7 +23,6 @@ import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { EventType } from "../@types/event";
 import { SyncState } from "../sync";
-import { FocusInfo } from "./callEventTypes";
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -178,22 +177,6 @@ export class GroupCallEventHandler {
             dataChannelOptions = { ordered, maxPacketLifeTime, maxRetransmits, protocol };
         }
 
-        const livekitServiceUrl = content["io.element.livekit_service_url"];
-
-        let focus: FocusInfo | undefined;
-        if (livekitServiceUrl) {
-            focus = {
-                livekitServiceUrl: livekitServiceUrl,
-            };
-        } else {
-            focus = this.client.getFoci()[0]!;
-            content["io.element.livekit_service_url"] = focus.livekitServiceUrl;
-            // try to update the state event to add our livekit service url. We may not be able to
-            // as we don't currently have permission to send this event in embedded mode
-            // (although it doesn't actually appear to reject when it fails).
-            this.client.sendStateEvent(room.roomId, EventType.GroupCallPrefix, content, groupCallId);
-        }
-
         const groupCall = new GroupCall(
             this.client,
             room,
@@ -207,7 +190,7 @@ export class GroupCallEventHandler {
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
             this.client.useLivekitForGroupCalls,
-            focus ? [focus] : [],
+            content["io.element.livekit_service_url"],
         );
 
         this.groupCalls.set(room.roomId, groupCall);
