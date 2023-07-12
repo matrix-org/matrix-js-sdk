@@ -314,7 +314,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
             for (const key of asUrl.searchParams.keys()) {
                 sanitizedQs.append(key, "xxx");
             }
-            const sanitizedQsUrlPiece = sanitizedQs.toString() ? `?${sanitizedQs.toString()}` : "";
+            const sanitizedQsString = sanitizedQs.toString();
+            const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
 
             return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
         } catch (error) {
