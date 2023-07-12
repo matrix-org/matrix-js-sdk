@@ -1270,7 +1270,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
-    private livekitServiceURL?: string;
+    public livekitServiceURL?: string;
 
     private _secretStorage: ServerSideSecretStorageImpl;
 
@@ -1961,6 +1961,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public getLivekitServiceURL(): string | undefined {
         return this.livekitServiceURL;
+    }
+
+    // This shouldn't need to exist, but the widget API has startup ordering problems that
+    // mean it doesn't know the livekit URL fast enough: remove this once this is fixed.
+    public setLivekitServiceURL(newURL: string): void {
+        this.livekitServiceURL = newURL;
     }
 
     /**
