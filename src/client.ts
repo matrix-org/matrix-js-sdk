@@ -216,7 +216,6 @@ import {
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
-import { FocusInfo } from "./webrtc/callEventTypes";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 
 export type Store = IStore;
@@ -381,7 +380,7 @@ export interface ICreateClientOpts {
      */
     useE2eForGroupCall?: boolean;
 
-    foci?: FocusInfo[];
+    livekitServiceURL?: string;
 
     /**
      * Crypto callbacks provided by the application
@@ -1271,7 +1270,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
-    private foci: FocusInfo[] = [];
+    private livekitServiceURL?: string;
 
     private _secretStorage: ServerSideSecretStorageImpl;
 
@@ -1376,7 +1375,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
-        this.foci = opts.foci ?? [];
+        this.livekitServiceURL = opts.livekitServiceURL;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1956,12 +1955,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             dataChannelOptions,
             this.isVoipWithNoMediaAllowed,
             this.useLivekitForGroupCalls,
-            this.foci,
+            this.livekitServiceURL,
         ).create();
     }
 
-    public getFoci(): FocusInfo[] {
-        return this.foci;
+    public getLivekitServiceURL(): string | undefined {
+        return this.livekitServiceURL;
     }
 
     /**
