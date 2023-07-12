@@ -116,11 +116,13 @@ export class OutgoingRequestProcessor {
         }
 
         const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: IAuthDict): Promise<UIAResponse<T>> => {
-            const newBody = {
+        const makeRequest = async (auth: IAuthDict | null): Promise<UIAResponse<T>> => {
+            const newBody: Record<string, any> = {
                 ...parsedBody,
-                auth,
             };
+            if (auth !== null) {
+                newBody.auth = auth;
+            }
             const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
             return JSON.parse(resp) as T;
         };
