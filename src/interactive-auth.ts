@@ -163,7 +163,7 @@ export class NoAuthFlowFoundError extends Error {
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
-export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict) => Promise<UIAResponse<T>>) => Promise<T>;
+export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
 
 interface IOpts<T> {
     /**
