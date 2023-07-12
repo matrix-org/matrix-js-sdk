@@ -248,7 +248,7 @@ describe("getEventTimeline support", function () {
         return startClient(httpBackend, client).then(function () {
             const room = client.getRoom(roomId)!;
             const timelineSet = room!.getTimelineSets()[0];
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
+            return expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -260,7 +260,18 @@ describe("getEventTimeline support", function () {
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId)!;
             const timelineSet = room!.getTimelineSets()[0];
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeFalsy();
+            httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/context/event`).respond(200, () => ({
+                event: {
+                    event_id: "event",
+                },
+                events_after: [],
+                events_before: [],
+                state: [],
+            }));
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, "event")).resolves.toBeTruthy(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
     });
 
@@ -271,7 +282,7 @@ describe("getEventTimeline support", function () {
 
         return startClient(httpBackend, client).then(function () {
             const timelineSet = new EventTimelineSet(undefined);
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
+            return expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -778,7 +789,18 @@ describe("MatrixClient event timelines", function () {
             return startClient(httpBackend, client).then(() => {
                 const room = client.getRoom(roomId)!;
                 const timelineSet = room.getTimelineSets()[0];
-                expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
+                httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/context/event`).respond(200, () => ({
+                    event: {
+                        event_id: "event",
+                    },
+                    events_after: [],
+                    events_before: [],
+                    state: [],
+                }));
+                return Promise.all([
+                    expect(client.getEventTimeline(timelineSet, "event")).resolves.toBeTruthy(),
+                    httpBackend.flushAllExpected(),
+                ]);
             });
         });
 

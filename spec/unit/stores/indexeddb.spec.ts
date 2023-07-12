@@ -278,7 +278,7 @@ describe("IndexedDBStore", () => {
             workerFactory: () => worker,
         });
         await store.startup();
-        await expect(store.destroy()).resolves;
+        await store.destroy();
         expect(terminate).toHaveBeenCalled();
     });
 });
