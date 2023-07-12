@@ -5000,7 +5000,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
 
         if (!unthreaded) {
-            const isThread = !!event.threadRootId;
+            // A thread cannot be just a thread root and a thread root can only be read in the main timeline
+            const isThread = !!event.threadRootId && !event.isThreadRoot;
             body = {
                 ...body,
                 thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
