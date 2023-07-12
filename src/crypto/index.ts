@@ -1242,14 +1242,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        let key = await new Promise<Uint8Array | IEncryptedPayload | null>((resolve) => {
+        let key = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
             this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
             });
         });
 
         // make sure we have a Uint8Array, rather than a string
-        if (key && typeof key === "string") {
+        if (typeof key === "string") {
             key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
             await this.storeSessionBackupPrivateKey(key);
         }
