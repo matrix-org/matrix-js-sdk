@@ -596,7 +596,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 return new RustVerificationRequest(
                     request,
                     this.outgoingRequestProcessor,
-                    this.supportedVerificationMethods,
+                    this._supportedVerificationMethods,
                 );
             }
         }

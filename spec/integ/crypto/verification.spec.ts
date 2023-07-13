@@ -91,7 +91,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-    const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
     // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
     // backend.

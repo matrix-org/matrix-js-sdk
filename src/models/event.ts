@@ -856,7 +856,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         while (true) {
             this.retryDecryption = false;
 
-            let res: IEventDecryptionResult;
+            let res: IEventDecryptionResult | undefined;
             let err: Error | undefined = undefined;
             try {
                 if (!crypto) {
@@ -914,7 +914,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             //
             this.decryptionPromise = null;
             this.retryDecryption = false;
-            this.setClearData(res);
+            if (res) this.setClearData(res);
 
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
