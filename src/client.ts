@@ -35,14 +35,14 @@ import {
 import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
-import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
+import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import {
     GroupCallEventHandler,
     GroupCallEventHandlerEvent,
     GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils";
+import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -55,33 +55,34 @@ import { IRoomEncryption, RoomList } from "./crypto/RoomList";
 import { logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
-    ClientPrefix,
-    FileType,
     HttpApiEvent,
     HttpApiEventHandlerMap,
-    HTTPError,
-    IdentityPrefix,
-    IHttpOpts,
-    IRequestOpts,
-    MatrixError,
-    MatrixHttpApi,
-    MediaPrefix,
-    Method,
-    retryNetworkOperation,
     Upload,
     UploadOpts,
+    MatrixError,
+    MatrixHttpApi,
+    Method,
+    retryNetworkOperation,
+    ClientPrefix,
+    MediaPrefix,
+    IdentityPrefix,
+    IHttpOpts,
+    FileType,
     UploadResponse,
+    HTTPError,
+    IRequestOpts,
+    Body,
 } from "./http-api";
 import {
     Crypto,
     CryptoEvent,
     CryptoEventHandlerMap,
     fixBackupKey,
-    ICheckOwnCrossSigningTrustOpts,
     ICryptoCallbacks,
-    IRoomKeyRequestBody,
+    ICheckOwnCrossSigningTrustOpts,
     isCryptoAvailable,
     VerificationMethod,
+    IRoomKeyRequestBody,
 } from "./crypto";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
@@ -109,7 +110,7 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
+import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
@@ -118,10 +119,8 @@ import {
     IContextResponse,
     ICreateRoomOpts,
     IEventSearchOpts,
-    IFilterResponse,
     IGuestAccessOpts,
     IJoinRoomOpts,
-    INotificationsResponse,
     IPaginateOpts,
     IPresenceOpts,
     IRedactOpts,
@@ -130,13 +129,15 @@ import {
     IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
-    IStatusResponse,
+    INotificationsResponse,
+    IFilterResponse,
     ITagsResponse,
+    IStatusResponse,
+    IAddThreePidBody,
 } from "./@types/requests";
 import {
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
-    MSC3912_RELATION_BASED_REDACTIONS_PROP,
     MsgType,
     PUSHER_ENABLED,
     RelationType,
@@ -145,6 +146,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -176,29 +178,29 @@ import {
 } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall";
+import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import {
+    LoginTokenPostResponse,
     ILoginFlowsResponse,
     IRefreshTokenResponse,
-    LoginRequest,
-    LoginResponse,
-    LoginTokenPostResponse,
     SSOAction,
+    LoginResponse,
+    LoginRequest,
 } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import {
-    determineFeatureSupport,
     FeatureSupport,
     Thread,
     THREAD_RELATION_TYPE,
+    determineFeatureSupport,
     ThreadFilterType,
     threadFilterTypeToFilter,
 } from "./models/thread";
-import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon";
+import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
@@ -2012,12 +2014,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set whether this client is a guest account. <b>This method is experimental
      * and may change without warning.</b>
      * @param guest - True if this is a guest account.
+     * @experimental if the token is a macaroon, it should be encoded in it that it is a 'guest'
+     * access token, which means that the SDK can determine this entirely without
+     * the dev manually flipping this flag.
      */
     public setGuest(guest: boolean): void {
-        // EXPERIMENTAL:
-        // If the token is a macaroon, it should be encoded in it that it is a 'guest'
-        // access token, which means that the SDK can determine this entirely without
-        // the dev manually flipping this flag.
         this.isGuestAccount = guest;
     }
 
@@ -2242,7 +2243,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
             this.store,
         );
-        rustCrypto.supportedVerificationMethods = this.verificationMethods;
+        rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;
 
@@ -4407,7 +4408,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private sendCompleteEvent(
         roomId: string,
         threadId: string | null,
-        eventObject: any,
+        eventObject: Partial<IEvent>,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (!txnId) {
@@ -4984,7 +4985,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async sendReceipt(event: MatrixEvent, receiptType: ReceiptType, body: any, unthreaded = false): Promise<{}> {
+    public async sendReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        body?: Record<string, any>,
+        unthreaded = false,
+    ): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
         }
@@ -4996,9 +5002,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
 
         if (!unthreaded) {
-            const isThread = !!event.threadRootId;
+            // A thread cannot be just a thread root and a thread root can only be read in the main timeline
+            const isThread = !!event.threadRootId && !event.isThreadRoot;
             body = {
                 ...body,
+                // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
                 thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
             };
         }
@@ -5142,7 +5150,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
             $userId: this.getUserId()!,
         });
-        const data: any = {
+        const data: QueryDict = {
             typing: isTyping,
         };
         if (isTyping) {
@@ -5334,7 +5342,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const populationResults: { [roomId: string]: Error } = {};
-        const promises: Promise<any>[] = [];
+        const promises: Promise<unknown>[] = [];
 
         const doLeave = (roomId: string): Promise<void> => {
             return this.leave(roomId)
@@ -5937,7 +5945,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("getLatestTimeline only supports room timelines");
         }
 
-        let event;
+        let event: IRoomEvent | undefined;
         if (timelineSet.threadListType !== null) {
             const res = await this.createThreadListMessagesRequest(
                 timelineSet.room.roomId,
@@ -6396,7 +6404,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "",
         );
 
-        let readPromise: Promise<any> = Promise.resolve<any>(undefined);
+        let readPromise: Promise<unknown> = Promise.resolve();
         if (opts.allowRead) {
             readPromise = this.sendStateEvent(
                 roomId,
@@ -6601,7 +6609,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     private async requestTokenFromEndpoint<T extends IRequestTokenResponse>(
         endpoint: string,
-        params: Record<string, any>,
+        params: QueryDict,
     ): Promise<T> {
         const postParams = Object.assign({}, params);
 
@@ -7951,8 +7959,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * to false.
      * @returns Promise which resolves: On success, the empty object
      */
-    public deactivateAccount(auth?: any, erase?: boolean): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
-        const body: any = {};
+    public deactivateAccount(
+        auth?: AuthDict,
+        erase?: boolean,
+    ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
+        const body: Body = {};
         if (auth) {
             body.auth = auth;
         }
@@ -8190,7 +8201,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendStateEvent(
         roomId: string,
         eventType: string,
-        content: any,
+        content: IContent,
         stateKey = "",
         opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
@@ -8408,13 +8419,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                 it invisible.
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
+     * @deprecated missing from the spec
      */
     public setRoomDirectoryVisibilityAppService(
         networkId: string,
         roomId: string,
         visibility: "public" | "private",
     ): Promise<any> {
-        // TODO: Types
         const path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
             $networkId: networkId,
             $roomId: roomId,
@@ -8430,7 +8441,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an array of results.
      */
     public searchUserDirectory({ term, limit }: { term: string; limit?: number }): Promise<IUserDirectoryResponse> {
-        const body: any = {
+        const body: Body = {
             search_term: term,
         };
 
@@ -8508,14 +8519,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Add a 3PID to your homeserver account and optionally bind it to an identity
      * server as well. An identity server is required as part of the `creds` object.
      *
-     * This API is deprecated, and you should instead use `addThreePidOnly`
-     * for homeservers that support it.
+     * @deprecated this API is deprecated, and you should instead use `addThreePidOnly` for homeservers that support it.
      *
      * @returns Promise which resolves: on success
      * @returns Rejects: with an error response.
      */
-    public addThreePid(creds: any, bind: boolean): Promise<any> {
-        // TODO: Types
+    public addThreePid(creds: IAddThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
         const path = "/account/3pid";
         const data = {
             threePidCreds: creds,
@@ -8675,7 +8684,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $device_id: deviceId,
         });
 
-        const body: any = {};
+        const body: Body = {};
 
         if (auth) {
             body.auth = auth;
@@ -8693,7 +8702,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
-        const body: any = { devices };
+        const body: Body = { devices };
 
         if (auth) {
             body.auth = auth;
@@ -8870,7 +8879,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         { body, next_batch: nextBatch }: { body: ISearchRequestBody; next_batch?: string },
         abortSignal?: AbortSignal,
     ): Promise<ISearchResponse> {
-        const queryParams: any = {};
+        const queryParams: QueryDict = {};
         if (nextBatch) {
             queryParams.next_batch = nextBatch;
         }
@@ -9490,7 +9499,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                        response to getThirdpartyProtocols()
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyUser(protocol: string, params: any): Promise<IThirdPartyUser[]> {
+    public getThirdpartyUser(protocol: string, params?: QueryDict): Promise<IThirdPartyUser[]> {
         const path = utils.encodeUri("/thirdparty/user/$protocol", {
             $protocol: protocol,
         });
@@ -9666,7 +9675,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         proxyBaseUrl?: string,
         abortSignal?: AbortSignal,
     ): Promise<MSC3575SlidingSyncResponse> {
-        const qps: Record<string, any> = {};
+        const qps: QueryDict = {};
         if (req.pos) {
             qps.pos = req.pos;
             delete req.pos;

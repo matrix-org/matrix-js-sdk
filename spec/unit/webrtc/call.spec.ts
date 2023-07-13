@@ -1607,7 +1607,7 @@ describe("Call", function () {
     it("throws when there is no error listener", async () => {
         call.off(CallEvent.Error, errorListener);
 
-        expect(call.placeVoiceCall()).rejects.toThrow();
+        await expect(call.placeVoiceCall()).rejects.toThrow();
     });
 
     describe("hasPeerConnection()", () => {

@@ -121,7 +121,7 @@ describe("refreshToken", () => {
             body: { errcode: "M_UNRECOGNIZED" },
         });
 
-        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ errcode: "M_UNRECOGNIZED" });
+        await expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ errcode: "M_UNRECOGNIZED" });
     });
 
     it("re-raises non-M_UNRECOGNIZED exceptions from /v3", async () => {
@@ -132,7 +132,7 @@ describe("refreshToken", () => {
             throw new Error("/v1/refresh unexpectedly called");
         });
 
-        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
+        await expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
     });
 
     it("re-raises non-M_UNRECOGNIZED exceptions from /v1", async () => {
@@ -144,6 +144,6 @@ describe("refreshToken", () => {
         });
         fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), 429);
 
-        expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
+        await expect(client.refreshToken("initial_refresh_token")).rejects.toMatchObject({ httpStatus: 429 });
     });
 });

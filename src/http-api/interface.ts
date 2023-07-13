@@ -16,6 +16,8 @@ limitations under the License.
 
 import { MatrixError } from "./errors";
 
+export type Body = Record<string, any> | BodyInit;
+
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 

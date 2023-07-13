@@ -95,10 +95,10 @@ describe("SimpleHttpRendezvousTransport", function () {
             httpBackend.verifyNoOutstandingExpectation();
         }
     }
-    it("should throw an error when no server available", function () {
+    it("should throw an error when no server available", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
-        expect(simpleHttpTransport.send({})).rejects.toThrow("Invalid rendezvous URI");
+        await expect(simpleHttpTransport.send({})).rejects.toThrow("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function () {
@@ -130,7 +130,6 @@ describe("SimpleHttpRendezvousTransport", function () {
             fetchFn,
         });
         const prom = simpleHttpTransport.send({});
-        expect(prom).rejects.toThrow();
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -138,7 +137,7 @@ describe("SimpleHttpRendezvousTransport", function () {
                 headers: {},
             },
         };
-        await httpBackend.flush("");
+        await Promise.all([expect(prom).rejects.toThrow(), httpBackend.flush("")]);
     });
 
     it("POST with absolute path response", async function () {
@@ -364,7 +363,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        expect(simpleHttpTransport.details()).rejects.toThrow();
+        await expect(simpleHttpTransport.details()).rejects.toThrow();
     });
 
     it("send after cancelled", async function () {
@@ -375,7 +374,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fetchFn,
         });
         await simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
-        expect(simpleHttpTransport.send({})).resolves.toBeUndefined();
+        await expect(simpleHttpTransport.send({})).resolves.toBeUndefined();
     });
 
     it("receive before ready", async function () {
@@ -385,7 +384,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        expect(simpleHttpTransport.receive()).rejects.toThrow();
+        await expect(simpleHttpTransport.receive()).rejects.toThrow();
     });
 
     it("404 failure callback", async function () {
@@ -398,7 +397,6 @@ describe("SimpleHttpRendezvousTransport", function () {
             onFailure,
         });
 
-        expect(simpleHttpTransport.send({ foo: "baa" })).resolves.toBeUndefined();
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -406,7 +404,10 @@ describe("SimpleHttpRendezvousTransport", function () {
                 headers: {},
             },
         };
-        await httpBackend.flush("", 1);
+        await Promise.all([
+            expect(simpleHttpTransport.send({ foo: "baa" })).resolves.toBeUndefined(),
+            httpBackend.flush("", 1),
+        ]);
         expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Unknown);
     });
 
@@ -438,7 +439,6 @@ describe("SimpleHttpRendezvousTransport", function () {
         }
         {
             // GET with 404 to simulate expiry
-            expect(simpleHttpTransport.receive()).resolves.toBeUndefined();
             httpBackend.when("GET", "https://fallbackserver/rz/123").response = {
                 body: { foo: "baa" },
                 response: {
@@ -446,7 +446,7 @@ describe("SimpleHttpRendezvousTransport", function () {
                     headers: {},
                 },
             };
-            await httpBackend.flush("");
+            await Promise.all([expect(simpleHttpTransport.receive()).resolves.toBeUndefined(), httpBackend.flush("")]);
             expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Expired);
         }
     });

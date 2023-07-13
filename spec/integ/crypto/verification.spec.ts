@@ -93,6 +93,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
     const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
+    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
+    // backend.
+    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
+
     /** the client under test */
     let aliceClient: MatrixClient;
 
@@ -471,6 +475,64 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             reciprocateQRCodeCallbacks.confirm();
 
             // that should satisfy Alice, who should reply with a 'done'
+            await expectSendToDeviceMessage("m.key.verification.done");
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
+            expect(request.phase).toEqual(VerificationPhase.Done);
+        });
+
+        newBackendOnly("can verify another by scanning their QR code", async () => {
+            aliceClient = await startTestClient();
+            // we need cross-signing keys for a QR code verification
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can show a QR code
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.qr_code.show.v1", "m.reciprocate.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.otherPartySupportsMethod("m.qr_code.show.v1")).toBe(true);
+
+            // the dummy device shows a QR code
+            const sharedSecret = "SUPERSEKRET";
+            const qrCodeBuffer = buildQRCode(
+                transactionId,
+                TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+                MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+                sharedSecret,
+            );
+
+            // Alice scans the QR code
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            const verifier = await request.scanQRCode(qrCodeBuffer);
+
+            const requestBody = await sendToDevicePromise;
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage).toEqual({
+                from_device: aliceClient.deviceId,
+                method: "m.reciprocate.v1",
+                transaction_id: transactionId,
+                secret: encodeUnpaddedBase64(Buffer.from(sharedSecret)),
+            });
+
+            expect(request.phase).toEqual(VerificationPhase.Started);
+            expect(request.chosenMethod).toEqual("m.reciprocate.v1");
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
+
+            const verificationPromise = verifier.verify();
+
+            // the dummy device confirms that Alice scanned the QR code, by replying with a done
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
+
+            // Alice also replies with a 'done'
             await expectSendToDeviceMessage("m.key.verification.done");
 
             // ... and the whole thing should be done!
@@ -858,4 +920,23 @@ function buildDoneMessage(transactionId: string) {
             transaction_id: transactionId,
         },
     };
+}
+
+function buildQRCode(transactionId: string, key1Base64: string, key2Base64: string, sharedSecret: string): Uint8Array {
+    // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
+
+    const qrCodeBuffer = Buffer.alloc(150); // oversize
+    let idx = 0;
+    idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
+    idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
+    idx = qrCodeBuffer.writeUInt8(0x02, idx); // mode
+    idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
+    idx += qrCodeBuffer.write(transactionId, idx, "ascii");
+
+    idx += Buffer.from(key1Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += Buffer.from(key2Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += qrCodeBuffer.write(sharedSecret, idx);
+
+    // truncate to the right length
+    return qrCodeBuffer.subarray(0, idx);
 }
