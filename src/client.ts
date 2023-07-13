@@ -35,14 +35,14 @@ import {
 import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
-import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
+import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import {
     GroupCallEventHandler,
     GroupCallEventHandlerEvent,
     GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
+import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -55,33 +55,33 @@ import { IRoomEncryption, RoomList } from "./crypto/RoomList";
 import { logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
+    ClientPrefix,
+    FileType,
     HttpApiEvent,
     HttpApiEventHandlerMap,
-    Upload,
-    UploadOpts,
-    MatrixError,
-    MatrixHttpApi,
-    Method,
-    retryNetworkOperation,
-    ClientPrefix,
-    MediaPrefix,
+    HTTPError,
     IdentityPrefix,
     IHttpOpts,
-    FileType,
-    UploadResponse,
-    HTTPError,
     IRequestOpts,
+    MatrixError,
+    MatrixHttpApi,
+    MediaPrefix,
+    Method,
+    retryNetworkOperation,
+    Upload,
+    UploadOpts,
+    UploadResponse,
 } from "./http-api";
 import {
     Crypto,
     CryptoEvent,
     CryptoEventHandlerMap,
     fixBackupKey,
-    ICryptoCallbacks,
     ICheckOwnCrossSigningTrustOpts,
+    ICryptoCallbacks,
+    IRoomKeyRequestBody,
     isCryptoAvailable,
     VerificationMethod,
-    IRoomKeyRequestBody,
 } from "./crypto";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
@@ -109,7 +109,7 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
+import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
@@ -118,8 +118,10 @@ import {
     IContextResponse,
     ICreateRoomOpts,
     IEventSearchOpts,
+    IFilterResponse,
     IGuestAccessOpts,
     IJoinRoomOpts,
+    INotificationsResponse,
     IPaginateOpts,
     IPresenceOpts,
     IRedactOpts,
@@ -128,14 +130,13 @@ import {
     IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
-    INotificationsResponse,
-    IFilterResponse,
-    ITagsResponse,
     IStatusResponse,
+    ITagsResponse,
 } from "./@types/requests";
 import {
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
     MsgType,
     PUSHER_ENABLED,
     RelationType,
@@ -144,7 +145,6 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
-    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -176,29 +176,29 @@ import {
 } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
-import { GroupCall, IGroupCallDataChannelOptions, GroupCallIntent, GroupCallType } from "./webrtc/groupCall";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import {
-    LoginTokenPostResponse,
     ILoginFlowsResponse,
     IRefreshTokenResponse,
-    SSOAction,
-    LoginResponse,
     LoginRequest,
+    LoginResponse,
+    LoginTokenPostResponse,
+    SSOAction,
 } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import {
+    determineFeatureSupport,
     FeatureSupport,
     Thread,
     THREAD_RELATION_TYPE,
-    determineFeatureSupport,
     ThreadFilterType,
     threadFilterTypeToFilter,
 } from "./models/thread";
-import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
@@ -2240,6 +2240,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.secretStorage,
             this.cryptoCallbacks,
             useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
+            this.store,
         );
         rustCrypto.supportedVerificationMethods = this.verificationMethods;
 
@@ -2247,6 +2248,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // attach the event listeners needed by RustCrypto
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
+        this.on(RoomEvent.Timeline, rustCrypto.decryptEvent.bind(rustCrypto));
 
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);

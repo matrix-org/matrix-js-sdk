@@ -71,7 +71,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns a promise which resolves once we have finished decrypting.
      * Rejects with an error if there is a problem decrypting the event.
      */
-    decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+    decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult | undefined>;
 
     /**
      * Get information about the encryption of an event

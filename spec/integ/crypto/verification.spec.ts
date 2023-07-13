@@ -22,7 +22,7 @@ import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 
-import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
+import { Category, createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
 import {
     canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
@@ -34,7 +34,14 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
+import {
+    CRYPTO_BACKENDS,
+    emitPromise,
+    getSyncResponse,
+    InitCrypto,
+    ROOM_ID,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
@@ -84,6 +91,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+    const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
     /** the client under test */
     let aliceClient: MatrixClient;
@@ -608,6 +616,63 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
+        });
+    });
+
+    describe("Incoming verification in a DM", () => {
+        beforeEach(async () => {
+            aliceClient = await startTestClient();
+        });
+
+        it("Verification request from Bob to Alice", async () => {
+            // Tell alice she is sharing a room with bob
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+
+            // Add verification request from Bob to Alice in the DM between them
+            syncResponse.rooms[Category.Join][ROOM_ID].timeline.events.push({
+                content: {
+                    body: "Verification request from Bob to Alice",
+                    from_device: "BobDevice",
+                    methods: ["m.sas.v1"],
+                    msgtype: "m.key.verification.request",
+                    to: aliceClient.getUserId()!,
+                },
+                event_id: "$143273582443PhrSn:example.org",
+                origin_server_ts: Date.now(),
+                room_id: ROOM_ID,
+                sender: "@bob:xyz",
+                type: "m.room.message",
+                unsigned: {
+                    age: 1234,
+                },
+            });
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID);
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+        });
+
+        // Only the rust-crypto raises an error when the room id is unknown
+        newBackendOnly("Unknown RoomId", () => {
+            expect(() => aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID)).toThrow(
+                `unknown roomId ${ROOM_ID}`,
+            );
+        });
+
+        it("Verification request unfound", async () => {
+            // Tell alice she is sharing a room with bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            // Expect to not find any verification request
+            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID);
+            expect(request).not.toBeDefined();
         });
     });
 

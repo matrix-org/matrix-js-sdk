@@ -23,7 +23,7 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 
 import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, ROOM_ID, syncPromise } from "../../test-utils/test-utils";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
@@ -32,10 +32,8 @@ import {
     IContent,
     IDownloadKeyResult,
     IEvent,
-    IJoinedRoom,
     IndexedDBCryptoStore,
     IStartClientOpts,
-    ISyncResponse,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -53,8 +51,6 @@ import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { CryptoCallbacks } from "../../../src/crypto-api";
-
-const ROOM_ID = "!room:id";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -211,55 +207,6 @@ function encryptGroupSessionKey(opts: {
         },
         plaintype: "m.room_key",
     });
-}
-
-// get a /sync response which contains a single room (ROOM_ID), with the members given
-function getSyncResponse(roomMembers: string[]): ISyncResponse {
-    const roomResponse: IJoinedRoom = {
-        summary: {
-            "m.heroes": [],
-            "m.joined_member_count": roomMembers.length,
-            "m.invited_member_count": roomMembers.length,
-        },
-        state: {
-            events: [
-                testUtils.mkEventCustom({
-                    sender: roomMembers[0],
-                    type: "m.room.encryption",
-                    state_key: "",
-                    content: {
-                        algorithm: "m.megolm.v1.aes-sha2",
-                    },
-                }),
-            ],
-        },
-        timeline: {
-            events: [],
-            prev_batch: "",
-        },
-        ephemeral: { events: [] },
-        account_data: { events: [] },
-        unread_notifications: {},
-    };
-
-    for (let i = 0; i < roomMembers.length; i++) {
-        roomResponse.state.events.push(
-            testUtils.mkMembershipCustom({
-                membership: "join",
-                sender: roomMembers[i],
-            }),
-        );
-    }
-
-    return {
-        next_batch: "1",
-        rooms: {
-            join: { [ROOM_ID]: roomResponse },
-            invite: {},
-            leave: {},
-        },
-        account_data: { events: [] },
-    };
 }
 
 /**

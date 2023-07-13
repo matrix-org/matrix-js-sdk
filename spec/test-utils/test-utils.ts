@@ -6,7 +6,16 @@ import "../olm-loader";
 
 import { logger } from "../../src/logger";
 import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, IPusher, MatrixClient, MsgType, RelationType } from "../../src";
+import {
+    ClientEvent,
+    EventType,
+    IJoinedRoom,
+    IPusher,
+    ISyncResponse,
+    MatrixClient,
+    MsgType,
+    RelationType,
+} from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -37,6 +46,64 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
     return p.then(() => {
         return syncPromise(client, count - 1);
     });
+}
+
+// Shared roomID across the test
+export const ROOM_ID = "!room:id";
+
+/**
+ * Return a sync response which contains a single room (by default ROOM_ID), with the members given
+ * @param roomMembers
+ * @param roomId
+ *
+ * @returns the sync response
+ */
+export function getSyncResponse(roomMembers: string[], roomId = ROOM_ID): ISyncResponse {
+    const roomResponse: IJoinedRoom = {
+        summary: {
+            "m.heroes": [],
+            "m.joined_member_count": roomMembers.length,
+            "m.invited_member_count": roomMembers.length,
+        },
+        state: {
+            events: [
+                mkEventCustom({
+                    sender: roomMembers[0],
+                    type: "m.room.encryption",
+                    state_key: "",
+                    content: {
+                        algorithm: "m.megolm.v1.aes-sha2",
+                    },
+                }),
+            ],
+        },
+        timeline: {
+            events: [],
+            prev_batch: "",
+        },
+        ephemeral: { events: [] },
+        account_data: { events: [] },
+        unread_notifications: {},
+    };
+
+    for (let i = 0; i < roomMembers.length; i++) {
+        roomResponse.state.events.push(
+            mkMembershipCustom({
+                membership: "join",
+                sender: roomMembers[i],
+            }),
+        );
+    }
+
+    return {
+        next_batch: "1",
+        rooms: {
+            join: { [roomId]: roomResponse },
+            invite: {},
+            leave: {},
+        },
+        account_data: { events: [] },
+    };
 }
 
 /**

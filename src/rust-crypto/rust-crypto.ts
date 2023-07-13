@@ -52,9 +52,10 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { IStore } from "../store";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -92,15 +93,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         /** The local user's User ID. */
         private readonly userId: string,
-
         /** The local user's Device ID. */
         _deviceId: string,
-
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
-
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
+        /** Stored data of js-sdk */
+        private readonly store: IStore,
     ) {
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
@@ -142,7 +142,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         await encryptor.encryptEvent(event);
     }
 
-    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
+    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult | undefined> {
         const roomId = event.getRoomId();
         if (!roomId) {
             // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
@@ -152,7 +152,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        return await this.eventDecryptor.attemptEventDecryption(event);
+        return this.eventDecryptor.attemptEventDecryption(event);
     }
 
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
@@ -575,9 +575,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @returns the VerificationRequest that is in progress, if any
      *
      */
-    public findVerificationRequestDMInProgress(roomId: string): undefined {
-        // TODO
-        return;
+    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
+        const room = this.store.getRoom(roomId);
+
+        if (!room) throw new Error(`unknown roomId ${roomId}`);
+
+        const members = room.getMembers();
+
+        for (const member of members) {
+            const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
+                new RustSdkCryptoJs.UserId(member.userId),
+            );
+
+            // Search for the verification request for the given room id
+            const request = requests.find((request) => request.roomId?.toString() === roomId);
+
+            if (request) {
+                return new RustVerificationRequest(
+                    request,
+                    this.outgoingRequestProcessor,
+                    this.supportedVerificationMethods,
+                );
+            }
+        }
     }
 
     /**
@@ -898,13 +918,32 @@ class EventDecryptor {
 
     public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine) {}
 
-    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
+    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult | undefined> {
         logger.info("Attempting decryption of event", event);
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
+
+        const strEvent = JSON.stringify({
+            event_id: event.getId(),
+            type: event.getWireType(),
+            sender: event.getSender(),
+            state_key: event.getStateKey(),
+            content: event.getWireContent(),
+            origin_server_ts: event.getTs(),
+        });
+        const roomId = new RustSdkCryptoJs.RoomId(event.getRoomId()!);
+
+        // In case of `m.key.verification.request` in `m.room.message`
+        // We need to call `OlmMachine::receiveVerificationEvent`
+        if (
+            event.getType() === EventType.RoomMessage &&
+            event.getContent().msgtype === MsgType.KeyVerificationRequest
+        ) {
+            return this.olmMachine.receiveVerificationEvent(strEvent, roomId);
+        }
 
         const res = (await this.olmMachine.decryptRoomEvent(
             JSON.stringify({
