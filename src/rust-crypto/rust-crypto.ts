@@ -946,37 +946,41 @@ class EventDecryptor {
         });
         const roomId = new RustSdkCryptoJs.RoomId(event.getRoomId()!);
 
+        let res: RustSdkCryptoJs.DecryptedRoomEvent | undefined;
+
         // In case of `m.key.verification.request` in `m.room.message`
         // We need to call `OlmMachine::receiveVerificationEvent`
         if (
             event.getType() === EventType.RoomMessage &&
             event.getContent().msgtype === MsgType.KeyVerificationRequest
         ) {
-            return this.olmMachine.receiveVerificationEvent(strEvent, roomId);
+            await this.olmMachine.receiveVerificationEvent(strEvent, roomId);
+        } else {
+            res = await this.olmMachine.decryptRoomEvent(
+                JSON.stringify({
+                    event_id: event.getId(),
+                    type: event.getWireType(),
+                    sender: event.getSender(),
+                    state_key: event.getStateKey(),
+                    content: event.getWireContent(),
+                    origin_server_ts: event.getTs(),
+                }),
+                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+            );
         }
-
-        const res = (await this.olmMachine.decryptRoomEvent(
-            JSON.stringify({
-                event_id: event.getId(),
-                type: event.getWireType(),
-                sender: event.getSender(),
-                state_key: event.getStateKey(),
-                content: event.getWireContent(),
-                origin_server_ts: event.getTs(),
-            }),
-            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-        )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
         // Success. We can remove the event from the pending list, if
         // that hasn't already happened.
         this.removeEventFromPendingList(event);
 
-        return {
-            clearEvent: JSON.parse(res.event),
-            claimedEd25519Key: res.senderClaimedEd25519Key,
-            senderCurve25519Key: res.senderCurve25519Key,
-            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
-        };
+        if (res) {
+            return {
+                clearEvent: JSON.parse(res.event),
+                claimedEd25519Key: res.senderClaimedEd25519Key,
+                senderCurve25519Key: res.senderCurve25519Key,
+                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+            };
+        }
     }
 
     /**
