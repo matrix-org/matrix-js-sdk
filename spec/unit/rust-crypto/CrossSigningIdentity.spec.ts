@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { Mocked } from "jest-mock";
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
