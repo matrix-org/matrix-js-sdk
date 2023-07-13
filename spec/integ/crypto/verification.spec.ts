@@ -34,14 +34,7 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import {
-    CRYPTO_BACKENDS,
-    emitPromise,
-    getSyncResponse,
-    InitCrypto,
-    ROOM_ID,
-    syncPromise,
-} from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, emitPromise, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
@@ -49,6 +42,7 @@ import {
     SIGNED_TEST_DEVICE_DATA,
     TEST_DEVICE_ID,
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+    TEST_ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
@@ -690,7 +684,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
             // Add verification request from Bob to Alice in the DM between them
-            syncResponse.rooms[Category.Join][ROOM_ID].timeline.events.push({
+            syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push({
                 content: {
                     body: "Verification request from Bob to Alice",
                     from_device: "BobDevice",
@@ -700,7 +694,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 },
                 event_id: "$143273582443PhrSn:example.org",
                 origin_server_ts: Date.now(),
-                room_id: ROOM_ID,
+                room_id: TEST_ROOM_ID,
                 sender: "@bob:xyz",
                 type: "m.room.message",
                 unsigned: {
@@ -711,17 +705,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
 
-            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID);
+            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
             // Expect to find the verification request received during the sync
-            expect(request?.roomId).toBe(ROOM_ID);
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
             expect(request?.isSelfVerification).toBe(false);
             expect(request?.otherUserId).toBe("@bob:xyz");
         });
 
         // Only the rust-crypto raises an error when the room id is unknown
         newBackendOnly("Unknown RoomId", () => {
-            expect(() => aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID)).toThrow(
-                `unknown roomId ${ROOM_ID}`,
+            expect(() => aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID)).toThrow(
+                `unknown roomId ${TEST_ROOM_ID}`,
             );
         });
 
@@ -732,7 +726,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await syncPromise(aliceClient);
 
             // Expect to not find any verification request
-            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(ROOM_ID);
+            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
             expect(request).not.toBeDefined();
         });
     });

@@ -23,7 +23,8 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 
 import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, ROOM_ID, syncPromise } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/test-data";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {

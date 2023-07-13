@@ -18,6 +18,7 @@ import {
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
+import { TEST_ROOM_ID } from "./test-data";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -48,17 +49,14 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
     });
 }
 
-// Shared roomID across the test
-export const ROOM_ID = "!room:id";
-
 /**
- * Return a sync response which contains a single room (by default ROOM_ID), with the members given
+ * Return a sync response which contains a single room (by default TEST_ROOM_ID), with the members given
  * @param roomMembers
  * @param roomId
  *
  * @returns the sync response
  */
-export function getSyncResponse(roomMembers: string[], roomId = ROOM_ID): ISyncResponse {
+export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): ISyncResponse {
     const roomResponse: IJoinedRoom = {
         summary: {
             "m.heroes": [],
