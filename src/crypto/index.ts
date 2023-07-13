@@ -48,7 +48,7 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { DehydrationManager } from "./dehydration";
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
@@ -1242,21 +1242,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        let key = await new Promise<any>((resolve) => {
-            // TODO types
+        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
             this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
             });
         });
 
+        let key: Uint8Array | null = null;
+
         // make sure we have a Uint8Array, rather than a string
-        if (key && typeof key === "string") {
-            key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(key) || key));
+        if (typeof encodedKey === "string") {
+            key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(encodedKey) || encodedKey));
             await this.storeSessionBackupPrivateKey(key);
         }
-        if (key && key.ciphertext) {
+        if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(key, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = olmlib.decodeBase64(decrypted);
         }
         return key;
@@ -2202,12 +2203,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         blocked: boolean | null = null,
         known: boolean | null = null,
         keys?: Record<string, string>,
-    ): Promise<DeviceInfo | CrossSigningInfo> {
+    ): Promise<DeviceInfo | CrossSigningInfo | ICrossSigningKey | undefined> {
         // Check if the 'device' is actually a cross signing key
         // The js-sdk's verification treats cross-signing keys as devices
         // and so uses this method to mark them verified.
         const xsk = this.deviceList.getStoredCrossSigningForUser(userId);
-        if (xsk && xsk.getId() === deviceId) {
+        if (xsk?.getId() === deviceId) {
             if (blocked !== null || known !== null) {
                 throw new Error("Cannot set blocked or known for a cross-signing key");
             }
@@ -2257,7 +2258,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     // This will emit events when it comes back down the sync
                     // (we could do local echo to speed things up)
                 }
-                return device as any; // TODO types
+                return device!;
             } else {
                 return xsk;
             }

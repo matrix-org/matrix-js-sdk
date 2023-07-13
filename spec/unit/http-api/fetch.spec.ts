@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { ClientPrefix, HttpApiEvent, HttpApiEventHandlerMap, IdentityPrefix, IHttpOpts, Method } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { QueryDict } from "../../../src/utils";
+import { defer, QueryDict } from "../../../src/utils";
+import { logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -289,5 +292,31 @@ describe("FetchHttpApi", () => {
         describe("when fetch.opts.baseUrl does have a trailing slash", () => {
             runTests(baseUrlWithTrailingSlash);
         });
+    });
+
+    it("should not log query parameters", async () => {
+        jest.useFakeTimers();
+        const deferred = defer<Response>();
+        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        jest.spyOn(logger, "debug").mockImplementation(() => {});
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
+        jest.advanceTimersByTime(1234);
+        deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
+        await prom;
+        expect(logger.debug).not.toHaveBeenCalledWith("fragment");
+        expect(logger.debug).not.toHaveBeenCalledWith("query");
+        expect(logger.debug).not.toHaveBeenCalledWith("param");
+        expect(logger.debug).toHaveBeenCalledTimes(2);
+        expect(mocked(logger.debug).mock.calls[0]).toMatchInlineSnapshot(`
+            [
+              "FetchHttpApi: --> GET https://server:8448/some/path?query=xxx",
+            ]
+        `);
+        expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
+            [
+              "FetchHttpApi: <-- GET https://server:8448/some/path?query=xxx [1234ms 200]",
+            ]
+        `);
     });
 });

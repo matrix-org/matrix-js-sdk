@@ -657,7 +657,7 @@ describe("NotificationService", function () {
                     content: {
                         "body": "",
                         "msgtype": "m.text",
-                        "org.matrix.msc3952.mentions": {},
+                        "m.mentions": {},
                     },
                 });
 

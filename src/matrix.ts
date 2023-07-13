@@ -63,9 +63,22 @@ export * as SecretStorage from "./secret-storage";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
-export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
+export {
+    GroupCallEvent,
+    GroupCallIntent,
+    GroupCallState,
+    GroupCallType,
+    GroupCallStatsReportEvent,
+} from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
 export { CryptoEvent } from "./crypto";
+export { SlidingSyncEvent } from "./sliding-sync";
+export { MediaHandlerEvent } from "./webrtc/mediaHandler";
+export { CallEvent } from "./webrtc/call";
+export { CallFeedEvent } from "./webrtc/callFeed";
+export { StatsReport } from "./webrtc/stats/statsReport";
+export { RelationsEvent } from "./models/relations";
+export { LocalStorageErrors } from "./store/local-storage-events-emitter";
 
 /**
  * Types supporting cryptography.
