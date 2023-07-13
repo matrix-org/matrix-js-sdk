@@ -97,7 +97,7 @@ export interface ICapabilities {
  */
 export class RoomWidgetClient extends MatrixClient {
     private room?: Room;
-    private widgetApiReady = new Promise<void>((resolve) => this.widgetApi.once("ready", resolve));
+    private readonly widgetApiReady: Promise<void>;
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
@@ -108,6 +108,8 @@ export class RoomWidgetClient extends MatrixClient {
         opts: IMatrixClientCreateOpts,
     ) {
         super(opts);
+
+        this.widgetApiReady = new Promise<void>((resolve) => this.widgetApi.once("ready", resolve));
 
         // Request capabilities for the functionality this client needs to support
         if (

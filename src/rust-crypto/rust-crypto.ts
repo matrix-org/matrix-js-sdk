@@ -206,7 +206,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
      */
     public async userHasCrossSigningKeys(): Promise<boolean> {
-        const userIdentity = await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+        const userId = new RustSdkCryptoJs.UserId(this.userId);
+        /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
+         * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
+         */
+        const request = this.olmMachine.queryKeysForUsers([userId]);
+        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+        const userIdentity = await this.olmMachine.getIdentity(userId);
         return userIdentity !== undefined;
     }
 
