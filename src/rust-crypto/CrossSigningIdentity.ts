@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, CrossSigningStatus } from "@matrix-org/matrix-sdk-crypto-js";
+import { OlmMachine, CrossSigningStatus } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { BootstrapCrossSigningOpts } from "../crypto-api";
 import { logger } from "../logger";
