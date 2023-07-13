@@ -73,7 +73,6 @@ export {
 export type { GroupCall } from "./webrtc/groupCall";
 export { CryptoEvent } from "./crypto";
 export { SlidingSyncEvent } from "./sliding-sync";
-export { VerificationRequestEvent, VerifierEvent } from "./crypto-api/verification";
 export { MediaHandlerEvent } from "./webrtc/mediaHandler";
 export { CallEvent } from "./webrtc/call";
 export { CallFeedEvent } from "./webrtc/callFeed";
