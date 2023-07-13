@@ -310,7 +310,7 @@ export enum VerifierEvent {
     ShowSas = "show_sas",
 
     /**
-     * QR code data should be displayed to the user.
+     * The user should confirm if the other side has scanned our QR code.
      *
      * The payload is the {@link ShowQrCodeCallbacks} object.
      */
@@ -325,7 +325,7 @@ export type VerifierEventHandlerMap = {
 };
 
 /**
- * Callbacks for user actions while a QR code is displayed.
+ * Callbacks for user actions to confirm that the other side has scanned our QR code.
  *
  * This is exposed as the payload of a `VerifierEvent.ShowReciprocateQr` event, or can be retrieved directly from the
  * verifier as `reciprocateQREvent`.
