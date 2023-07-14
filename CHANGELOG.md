@@ -1,3 +1,9 @@
+Changes in [27.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0-rc.2) (2023-07-14)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix read receipt sending behaviour around thread roots ([\#3600](https://github.com/matrix-org/matrix-js-sdk/pull/3600)).
+
 Changes in [27.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0-rc.1) (2023-07-11)
 ============================================================================================================
 
