@@ -47,6 +47,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
+        
     }
 
     public abort(): void {
@@ -132,9 +133,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         path: string,
         queryParams?: QueryDict,
         body?: Body,
-        opts: IRequestOpts = {},
+        paramOpts: IRequestOpts = {},
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
+
+        let opts = { ...paramOpts };
 
         if (this.opts.accessToken) {
             if (this.opts.useAuthorizationHeader) {
@@ -154,7 +157,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         const requestPromise = this.request<T>(method, path, queryParams, body, opts);
 
-        requestPromise.catch((err: MatrixError) => {
+        requestPromise.catch(async (err: MatrixError) => {
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
@@ -201,6 +204,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts?: IRequestOpts,
     ): Promise<ResponseType<T, O>> {
         const fullUri = this.getUrl(path, queryParams, opts?.prefix, opts?.baseUrl);
+
         return this.requestOtherUrl<T>(method, fullUri, body, opts);
     }
 
@@ -226,6 +230,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.clearUrlParamsForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
+
+        console.log('hhhh REQUESTOTHERURL', opts);
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -280,6 +286,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
             logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
         } catch (e) {
+            console.log('hhhh requestOtherUrl error', e);
             logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
@@ -290,7 +297,27 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (!res.ok) {
-            throw parseErrorResponse(res, await res.text());
+            const err = parseErrorResponse(res, await res.text());
+
+            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, this.opts.tokenRefresher, opts.retryWithRefreshedToken);
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !!this.opts.tokenRefresher && !opts.retryWithRefreshedToken) {
+                const setToken = (newToken) => {
+                    console.log('hhhh refreshToken.setting token', newToken, this);
+                    this.opts.accessToken = newToken;
+                }
+                await this.opts.tokenRefresher.doRefreshAccessToken(setToken.bind(this));
+                // we set a new token successfully
+                console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
+                // @TODO(kerrya) don't mutate params (opts, qp)
+                // this function modifies these params :/ so the retry call may be with different params
+                return this.requestOtherUrl(method, url, body, {
+                    ...opts, retryWithRefreshedToken: true,
+                    headers: {
+                        ...opts.headers,
+                        Authorization: "Bearer " + this.opts.accessToken
+                    }
+                });
+            }
         }
 
         if (this.opts.onlyData) {
