@@ -29,6 +29,7 @@ describe("RoomHierarchy", () => {
             {
                 rooms: [],
             },
+            { overwriteRoutes: true },
         );
 
         const room = new Room(roomId, client, client.getSafeUserId());
@@ -61,6 +62,7 @@ describe("RoomHierarchy", () => {
                         },
                     ],
                 },
+                { overwriteRoutes: true },
             );
 
             const room = new Room(roomId, client, client.getSafeUserId());
