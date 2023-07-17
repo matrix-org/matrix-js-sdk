@@ -2251,7 +2251,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
         // listen only key verification request
         // other events are processed during the /sync
-        this.on(RoomEvent.Timeline, rustCrypto.onKeyVerificationRequest.bind(rustCrypto));
+        this.on(RoomEvent.Timeline, (event) => {
+            rustCrypto.onKeyVerificationRequest(event);
+        });
 
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);
