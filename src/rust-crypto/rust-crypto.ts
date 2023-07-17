@@ -590,6 +590,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const members = room.getMembers();
 
+        // Going through all members and return the first verification request we can found
         for (const member of members) {
             const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
                 new RustSdkCryptoJs.UserId(member.userId),
@@ -905,6 +906,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("missing roomId in the event");
         }
 
+        // Ignore if not a key verification request
         if (event.isKeyVerificationRequest()) {
             await this.olmMachine.receiveVerificationEvent(
                 JSON.stringify({
