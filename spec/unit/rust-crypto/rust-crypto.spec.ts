@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 

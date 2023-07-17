@@ -60,7 +60,7 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-js");
+    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
