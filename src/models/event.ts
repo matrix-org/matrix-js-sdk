@@ -856,7 +856,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         while (true) {
             this.retryDecryption = false;
 
-            let res: IEventDecryptionResult | undefined;
+            let res: IEventDecryptionResult;
             let err: Error | undefined = undefined;
             try {
                 if (!crypto) {
@@ -914,7 +914,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             //
             this.decryptionPromise = null;
             this.retryDecryption = false;
-            if (res) this.setClearData(res);
+            this.setClearData(res);
 
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
@@ -1656,6 +1656,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     public setThreadId(threadId?: string): void {
         this.threadId = threadId;
+    }
+
+    /**
+     * True if:
+     *  - The event type is {@link EventType.RoomMessage}
+     *  - The `msgType` of the event content is {@link MsgType.KeyVerificationRequest}
+     *
+     * @returns true if the event is key verification request
+     */
+    public isKeyVerificationRequest(): boolean {
+        return this.getType() === EventType.RoomMessage && this.getContent().msgtype === MsgType.KeyVerificationRequest;
     }
 }
 

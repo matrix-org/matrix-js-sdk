@@ -52,7 +52,7 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType, MsgType } from "../@types/event";
+import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IStore } from "../store";
@@ -144,7 +144,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         await encryptor.encryptEvent(event);
     }
 
-    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult | undefined> {
+    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         const roomId = event.getRoomId();
         if (!roomId) {
             // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
@@ -154,7 +154,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        return this.eventDecryptor.attemptEventDecryption(event);
+        return await this.eventDecryptor.attemptEventDecryption(event);
     }
 
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
@@ -892,6 +892,34 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
     }
 
+    /**
+     * Handle key verification request
+     * Ignore the event if not a key verification request
+     *
+     * @param event - a key validation request event
+     */
+    public async onKeyVerificationRequest(event: MatrixEvent): Promise<void> {
+        const roomId = event.getRoomId();
+
+        if (!roomId) {
+            throw new Error("missing roomId in the event");
+        }
+
+        if (event.isKeyVerificationRequest()) {
+            await this.olmMachine.receiveVerificationEvent(
+                JSON.stringify({
+                    event_id: event.getId(),
+                    type: event.getWireType(),
+                    sender: event.getSender(),
+                    state_key: event.getStateKey(),
+                    content: event.getWireContent(),
+                    origin_server_ts: event.getTs(),
+                }),
+                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+            );
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Outgoing requests
@@ -934,7 +962,7 @@ class EventDecryptor {
 
     public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine) {}
 
-    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult | undefined> {
+    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
         logger.info("Attempting decryption of event", event);
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
@@ -942,51 +970,28 @@ class EventDecryptor {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        const strEvent = JSON.stringify({
-            event_id: event.getId(),
-            type: event.getWireType(),
-            sender: event.getSender(),
-            state_key: event.getStateKey(),
-            content: event.getWireContent(),
-            origin_server_ts: event.getTs(),
-        });
-        const roomId = new RustSdkCryptoJs.RoomId(event.getRoomId()!);
-
-        let res: RustSdkCryptoJs.DecryptedRoomEvent | undefined;
-
-        // In case of `m.key.verification.request` in `m.room.message`
-        // We need to call `OlmMachine::receiveVerificationEvent`
-        if (
-            event.getType() === EventType.RoomMessage &&
-            event.getContent().msgtype === MsgType.KeyVerificationRequest
-        ) {
-            await this.olmMachine.receiveVerificationEvent(strEvent, roomId);
-        } else {
-            res = await this.olmMachine.decryptRoomEvent(
-                JSON.stringify({
-                    event_id: event.getId(),
-                    type: event.getWireType(),
-                    sender: event.getSender(),
-                    state_key: event.getStateKey(),
-                    content: event.getWireContent(),
-                    origin_server_ts: event.getTs(),
-                }),
-                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-            );
-        }
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
         // Success. We can remove the event from the pending list, if
         // that hasn't already happened.
         this.removeEventFromPendingList(event);
 
-        if (res) {
-            return {
-                clearEvent: JSON.parse(res.event),
-                claimedEd25519Key: res.senderClaimedEd25519Key,
-                senderCurve25519Key: res.senderCurve25519Key,
-                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
-            };
-        }
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
     }
 
     /**
