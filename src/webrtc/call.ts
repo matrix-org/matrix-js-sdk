@@ -25,7 +25,7 @@ import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger";
-import * as utils from "../utils";
+import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils";
 import { IContent, MatrixEvent } from "../models/event";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { RoomMember } from "../models/room-member";
@@ -255,7 +255,7 @@ export enum CallErrorCode {
 const VOIP_PROTO_VERSION = "1";
 
 /** The fallback ICE server to use for STUN or TURN protocols. */
-const FALLBACK_ICE_SERVER = "stun:turn.matrix.org";
+export const FALLBACK_ICE_SERVER = "stun:turn.matrix.org";
 
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60 * 1000; // ms
@@ -263,7 +263,8 @@ const CALL_TIMEOUT_MS = 60 * 1000; // ms
 const CALL_LENGTH_INTERVAL = 1000; // ms
 /** The time after which we end the call, if ICE got disconnected */
 const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
-
+/** The time after which we try a ICE restart, if ICE got disconnected */
+const ICE_RECONNECTING_TIMEOUT = 2 * 1000; // ms
 export class CallError extends Error {
     public readonly code: string;
 
@@ -382,6 +383,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentPartyId: string | null | undefined;
     private opponentCaps?: CallCapabilities;
     private iceDisconnectedTimeout?: ReturnType<typeof setTimeout>;
+    private iceReconnectionTimeOut?: ReturnType<typeof setTimeout> | undefined;
     private inviteTimeout?: ReturnType<typeof setTimeout>;
     private readonly removeTrackListeners = new Map<MediaStream, () => void>();
 
@@ -451,7 +453,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             });
         }
         for (const server of this.turnServers) {
-            utils.checkObjectHasKeys(server, ["urls"]);
+            checkObjectHasKeys(server, ["urls"]);
         }
         this.callId = genCallID();
         // If the Client provides calls without audio and video we need a datachannel for a webrtc connection
@@ -965,6 +967,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         await this.initOpponentCrypto();
         try {
             await this.peerConn.setRemoteDescription(invite.offer);
+            logger.debug(`Call ${this.callId} initWithInvite() set remote description: ${invite.offer.type}`);
             await this.addBufferedIceCandidates();
         } catch (e) {
             logger.debug(`Call ${this.callId} initWithInvite() failed to set remote description`, e);
@@ -1040,7 +1043,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             );
             return false;
         } else if (
-            !utils.isNullOrUndefined(wantedValue) &&
+            !isNullOrUndefined(wantedValue) &&
             wantedValue !== valueOfTheOtherSide &&
             !this.opponentSupportsSDPStreamMetadata()
         ) {
@@ -1790,10 +1793,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): void => {
         if (event.candidate) {
             if (this.candidatesEnded) {
-                logger.warn(
-                    `Call ${this.callId} gotLocalIceCandidate() got candidate after candidates have ended - ignoring!`,
-                );
-                return;
+                logger.warn(`Call ${this.callId} gotLocalIceCandidate() got candidate after candidates have ended!`);
             }
 
             logger.debug(`Call ${this.callId} got local ICE ${event.candidate.sdpMid} ${event.candidate.candidate}`);
@@ -1817,7 +1817,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }`,
         );
         if (this.peerConn?.iceGatheringState === "complete") {
-            this.queueCandidate(null);
+            this.queueCandidate(null); // We should leave it to WebRTC to announce the end
+            logger.debug(
+                `Call ${this.callId} onIceGatheringStateChange() ice gathering state complete, set candidates have ended`,
+            );
         }
     };
 
@@ -1899,6 +1902,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.isSettingRemoteAnswerPending = true;
             await this.peerConn!.setRemoteDescription(content.answer);
             this.isSettingRemoteAnswerPending = false;
+            logger.debug(`Call ${this.callId} onAnswerReceived() set remote description: ${content.answer.type}`);
         } catch (e) {
             this.isSettingRemoteAnswerPending = false;
             logger.debug(`Call ${this.callId} onAnswerReceived() failed to set remote description`, e);
@@ -1991,6 +1995,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.peerConn!.setRemoteDescription(description); // SRD rolls back as needed
             this.isSettingRemoteAnswerPending = false;
 
+            logger.debug(`Call ${this.callId} onNegotiateReceived() set remote description: ${description.type}`);
+
             if (description.type === "offer") {
                 let answer: RTCSessionDescriptionInit;
                 try {
@@ -2003,6 +2009,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
 
                 await this.peerConn!.setLocalDescription(answer);
+                logger.debug(`Call ${this.callId} onNegotiateReceived() create an answer`);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     description: this.peerConn!.localDescription?.toJSON(),
@@ -2023,7 +2030,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
-        this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
+        this.remoteSDPStreamMetadata = recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
             const metadata = this.remoteSDPStreamMetadata![streamId];
@@ -2226,7 +2233,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            `Call ${this.callId} onIceConnectionStateChanged() running (state=${this.peerConn?.iceConnectionState})`,
+            `Call ${this.callId} onIceConnectionStateChanged() running (state=${this.peerConn?.iceConnectionState}, conn=${this.peerConn?.connectionState})`,
         );
 
         // ideally we'd consider the call to be connected when we get media but
@@ -2234,6 +2241,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (["connected", "completed"].includes(this.peerConn?.iceConnectionState ?? "")) {
             clearTimeout(this.iceDisconnectedTimeout);
             this.iceDisconnectedTimeout = undefined;
+            if (this.iceReconnectionTimeOut) {
+                clearTimeout(this.iceReconnectionTimeOut);
+            }
             this.state = CallState.Connected;
 
             if (!this.callLengthInterval && !this.callStartTime) {
@@ -2244,11 +2254,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }, CALL_LENGTH_INTERVAL);
             }
         } else if (this.peerConn?.iceConnectionState == "failed") {
+            this.candidatesEnded = false;
             // Firefox for Android does not yet have support for restartIce()
             // (the types say it's always defined though, so we have to cast
             // to prevent typescript from warning).
             if (this.peerConn?.restartIce as (() => void) | null) {
                 this.candidatesEnded = false;
+                logger.debug(
+                    `Call ${this.callId} onIceConnectionStateChanged() ice restart (state=${this.peerConn?.iceConnectionState})`,
+                );
                 this.peerConn!.restartIce();
             } else {
                 logger.info(
@@ -2257,7 +2271,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.hangup(CallErrorCode.IceFailed, false);
             }
         } else if (this.peerConn?.iceConnectionState == "disconnected") {
-            this.iceDisconnectedTimeout = setTimeout(() => {
+            this.candidatesEnded = false;
+            this.iceReconnectionTimeOut = setTimeout((): void => {
+                logger.info(
+                    `Call ${this.callId} onIceConnectionStateChanged() ICE restarting because of ICE disconnected, (state=${this.peerConn?.iceConnectionState}, conn=${this.peerConn?.connectionState})`,
+                );
+                if (this.peerConn?.restartIce as (() => void) | null) {
+                    this.candidatesEnded = false;
+                    this.peerConn!.restartIce();
+                }
+                this.iceReconnectionTimeOut = undefined;
+            }, ICE_RECONNECTING_TIMEOUT);
+
+            this.iceDisconnectedTimeout = setTimeout((): void => {
                 logger.info(
                     `Call ${this.callId} onIceConnectionStateChanged() hanging up call (ICE disconnected for too long)`,
                 );
@@ -2822,7 +2848,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener("negotiationneeded", this.onNegotiationNeeded);
         pc.addEventListener("datachannel", this.onDataChannel);
 
-        this.stats?.addStatsReportGatherer(this.callId, "unknown", pc);
+        const opponentMember: RoomMember | undefined = this.getOpponentMember();
+        const opponentMemberId = opponentMember ? opponentMember.userId : "unknown";
+        this.stats?.addStatsReportGatherer(this.callId, opponentMemberId, pc);
         return pc;
     }
 
@@ -2856,6 +2884,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.opponentCaps = msg.capabilities || ({} as CallCapabilities);
         this.opponentMember = this.client.getRoom(this.roomId)!.getMember(ev.getSender()!) ?? undefined;
+        if (this.opponentMember) {
+            this.stats?.updateOpponentMember(this.callId, this.opponentMember.userId);
+        }
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
@@ -2887,6 +2918,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             } catch (err) {
                 if (!this.ignoreOffer) {
                     logger.info(`Call ${this.callId} addIceCandidates() failed to add remote ICE candidate`, err);
+                } else {
+                    logger.debug(
+                        `Call ${this.callId} addIceCandidates() failed to add remote ICE candidate because ignoring offer`,
+                        err,
+                    );
                 }
             }
         }

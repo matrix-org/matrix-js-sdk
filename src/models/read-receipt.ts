@@ -20,7 +20,7 @@ import {
     WrappedReceipt,
 } from "../@types/read_receipts";
 import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
-import * as utils from "../utils";
+import { isSupportedReceiptType } from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
@@ -267,7 +267,7 @@ export abstract class ReadReceipt<
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event)
             .filter(function (receipt) {
-                return utils.isSupportedReceiptType(receipt.type);
+                return isSupportedReceiptType(receipt.type);
             })
             .map(function (receipt) {
                 return receipt.userId;
@@ -309,4 +309,13 @@ export abstract class ReadReceipt<
         // We don't know if the user has read it, so assume not.
         return false;
     }
+
+    /**
+     * Returns the most recent unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
+     */
+    public abstract getLastUnthreadedReceiptFor(userId: string): Receipt | undefined;
 }

@@ -428,6 +428,45 @@ export class EventTimeline {
     }
 
     /**
+     * Insert a new event into the timeline, and update the state.
+     *
+     * TEMPORARY: until we have recursive relations, we need this function
+     * to exist to allow us to insert events in timeline order, which is our
+     * best guess for Sync Order.
+     * This is a copy of addEvent above, modified to allow inserting an event at
+     * a specific index.
+     *
+     * @internal
+     */
+    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
+        const timelineSet = this.getTimelineSet();
+
+        if (timelineSet.room) {
+            EventTimeline.setEventMetadata(event, roomState, false);
+
+            // modify state but only on unfiltered timelineSets
+            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+                roomState.setStateEvents([event], {});
+                // it is possible that the act of setting the state event means we
+                // can set more metadata (specifically sender/target props), so try
+                // it again if the prop wasn't previously set. It may also mean that
+                // the sender/target is updated (if the event set was a room member event)
+                // so we want to use the *updated* member (new avatar/name) instead.
+                //
+                // However, we do NOT want to do this on member events if we're going
+                // back in time, else we'll set the .sender value for BEFORE the given
+                // member event, whereas we want to set the .sender value for the ACTUAL
+                // member event itself.
+                if (!event.sender || event.getType() === EventType.RoomMember) {
+                    EventTimeline.setEventMetadata(event, roomState, false);
+                }
+            }
+        }
+
+        this.events.splice(insertIndex, 0, event); // insert element
+    }
+
+    /**
      * Remove an event from the timeline
      *
      * @param eventId -  ID of event to be removed

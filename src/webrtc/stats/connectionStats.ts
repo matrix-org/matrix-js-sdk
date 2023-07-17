@@ -33,7 +33,7 @@ export interface ConnectionStatsBitrate extends Bitrate {
     video?: Bitrate;
 }
 
-export interface PacketLoos {
+export interface PacketLoss {
     total: number;
     download: number;
     upload: number;
@@ -42,6 +42,6 @@ export interface PacketLoos {
 export class ConnectionStats {
     public bandwidth: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
     public bitrate: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
-    public packetLoss: PacketLoos = {} as PacketLoos;
+    public packetLoss: PacketLoss = {} as PacketLoss;
     public transport: TransportStats[] = [];
 }

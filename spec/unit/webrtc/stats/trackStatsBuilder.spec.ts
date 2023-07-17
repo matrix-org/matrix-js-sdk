@@ -13,20 +13,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { TrackStatsReporter } from "../../../../src/webrtc/stats/trackStatsReporter";
+import { TrackStatsBuilder } from "../../../../src/webrtc/stats/trackStatsBuilder";
 import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackStats";
 
-describe("TrackStatsReporter", () => {
+describe("TrackStatsBuilder", () => {
     describe("should on frame and resolution stats", () => {
         it("creating empty frame and resolution report, if no data available.", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
-            TrackStatsReporter.buildFramerateResolution(trackStats, {});
+            TrackStatsBuilder.buildFramerateResolution(trackStats, {});
             expect(trackStats.getFramerate()).toEqual(0);
             expect(trackStats.getResolution()).toEqual({ width: -1, height: -1 });
         });
         it("creating empty frame and resolution report.", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildFramerateResolution(trackStats, {
+            TrackStatsBuilder.buildFramerateResolution(trackStats, {
                 framesPerSecond: 22.2,
                 frameHeight: 180,
                 frameWidth: 360,
@@ -39,7 +39,7 @@ describe("TrackStatsReporter", () => {
     describe("should on simulcast", () => {
         it("creating simulcast framerate.", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
-            TrackStatsReporter.calculateSimulcastFramerate(
+            TrackStatsBuilder.calculateSimulcastFramerate(
                 trackStats,
                 {
                     framesSent: 100,
@@ -58,7 +58,7 @@ describe("TrackStatsReporter", () => {
     describe("should on bytes received stats", () => {
         it("creating build bitrate received report.", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildBitrateReceived(
+            TrackStatsBuilder.buildBitrateReceived(
                 trackStats,
                 {
                     bytesReceived: 2001000,
@@ -73,7 +73,7 @@ describe("TrackStatsReporter", () => {
     describe("should on bytes send stats", () => {
         it("creating build bitrate send report.", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
-            TrackStatsReporter.buildBitrateSend(
+            TrackStatsBuilder.buildBitrateSend(
                 trackStats,
                 {
                     bytesSent: 2001000,
@@ -90,7 +90,7 @@ describe("TrackStatsReporter", () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
             const remote = {} as RTCStatsReport;
             remote.get = jest.fn().mockReturnValue({ mimeType: "video/v8" });
-            TrackStatsReporter.buildCodec(remote, trackStats, { codecId: "codecID" });
+            TrackStatsBuilder.buildCodec(remote, trackStats, { codecId: "codecID" });
             expect(trackStats.getCodec()).toEqual("v8");
         });
     });
@@ -98,7 +98,7 @@ describe("TrackStatsReporter", () => {
     describe("should on package lost stats", () => {
         it("creating build package lost on send report.", async () => {
             const trackStats = new MediaTrackStats("1", "local", "video");
-            TrackStatsReporter.buildPacketsLost(
+            TrackStatsBuilder.buildPacketsLost(
                 trackStats,
                 {
                     type: "outbound-rtp",
@@ -114,7 +114,7 @@ describe("TrackStatsReporter", () => {
         });
         it("creating build package lost on received report.", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildPacketsLost(
+            TrackStatsBuilder.buildPacketsLost(
                 trackStats,
                 {
                     type: "inbound-rtp",
@@ -133,7 +133,7 @@ describe("TrackStatsReporter", () => {
     describe("should set state of a TrackStats", () => {
         it("to not alive if Transceiver undefined", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.setTrackStatsState(trackStats, undefined);
+            TrackStatsBuilder.setTrackStatsState(trackStats, undefined);
             expect(trackStats.alive).toBeFalsy();
         });
 
@@ -145,7 +145,7 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpSender,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            TrackStatsBuilder.setTrackStatsState(trackStats, ts);
             expect(trackStats.alive).toBeFalsy();
         });
 
@@ -162,7 +162,7 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpReceiver,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            TrackStatsBuilder.setTrackStatsState(trackStats, ts);
             expect(trackStats.alive).toBeTruthy();
         });
 
@@ -179,7 +179,7 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpSender,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            TrackStatsBuilder.setTrackStatsState(trackStats, ts);
             expect(trackStats.alive).toBeTruthy();
         });
 
@@ -195,7 +195,7 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpReceiver,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            TrackStatsBuilder.setTrackStatsState(trackStats, ts);
             expect(trackStats.alive).toBeFalsy();
         });
 
@@ -211,7 +211,7 @@ describe("TrackStatsReporter", () => {
                 } as RTCRtpReceiver,
             } as RTCRtpTransceiver;
 
-            TrackStatsReporter.setTrackStatsState(trackStats, ts);
+            TrackStatsBuilder.setTrackStatsState(trackStats, ts);
             expect(trackStats.alive).toBeTruthy();
             expect(trackStats.muted).toBeTruthy();
         });
@@ -219,38 +219,46 @@ describe("TrackStatsReporter", () => {
 
     describe("should build Track Summary", () => {
         it("and returns empty summary if stats list empty", async () => {
-            const summary = TrackStatsReporter.buildTrackSummary([]);
+            const summary = TrackStatsBuilder.buildTrackSummary([]);
             expect(summary).toEqual({
                 audioTrackSummary: {
                     count: 0,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 0,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
 
         it("and returns  summary if stats list not empty and ignore local summery", async () => {
             const trackStatsList = buildMockTrackStatsList();
-            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            const summary = TrackStatsBuilder.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
                 audioTrackSummary: {
                     count: 2,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -259,19 +267,23 @@ describe("TrackStatsReporter", () => {
             const trackStatsList = buildMockTrackStatsList();
             trackStatsList[1].muted = true;
             trackStatsList[5].muted = true;
-            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            const summary = TrackStatsBuilder.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
                 audioTrackSummary: {
                     count: 2,
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 1,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -280,24 +292,28 @@ describe("TrackStatsReporter", () => {
             const trackStatsList = buildMockTrackStatsList();
             trackStatsList[1].muted = true;
             trackStatsList[1].alive = false;
-            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            const summary = TrackStatsBuilder.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
                 audioTrackSummary: {
                     count: 2,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 0,
                     maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
 
-        it("and returns summary and build max jitter and packet loss", async () => {
+        it("and returns summary and build max jitter, packet loss and audio conealment", async () => {
             const trackStatsList = buildMockTrackStatsList();
             // video remote
             trackStatsList[1].setJitter(12);
@@ -311,20 +327,26 @@ describe("TrackStatsReporter", () => {
             trackStatsList[5].setJitter(15);
             trackStatsList[2].setLoss({ packetsLost: 5, packetsTotal: 0, isDownloadStream: true });
             trackStatsList[5].setLoss({ packetsLost: 0, packetsTotal: 0, isDownloadStream: true });
+            trackStatsList[2].setAudioConcealment(220, 2000);
+            trackStatsList[5].setAudioConcealment(180, 2000);
 
-            const summary = TrackStatsReporter.buildTrackSummary(trackStatsList);
+            const summary = TrackStatsBuilder.buildTrackSummary(trackStatsList);
             expect(summary).toEqual({
                 audioTrackSummary: {
                     count: 2,
                     muted: 0,
                     maxJitter: 15,
                     maxPacketLoss: 5,
+                    concealedAudio: 400,
+                    totalAudio: 4000,
                 },
                 videoTrackSummary: {
                     count: 3,
                     muted: 0,
                     maxJitter: 66,
                     maxPacketLoss: 55,
+                    concealedAudio: 0,
+                    totalAudio: 0,
                 },
             });
         });
@@ -333,25 +355,25 @@ describe("TrackStatsReporter", () => {
     describe("should build jitter value in Track Stats", () => {
         it("and returns track stats without jitter if report not 'inbound-rtp'", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildJitter(trackStats, { jitter: 0.01 });
+            TrackStatsBuilder.buildJitter(trackStats, { jitter: 0.01 });
             expect(trackStats.getJitter()).toEqual(0);
         });
 
         it("and returns track stats with jitter", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildJitter(trackStats, { type: "inbound-rtp", jitter: 0.01 });
+            TrackStatsBuilder.buildJitter(trackStats, { type: "inbound-rtp", jitter: 0.01 });
             expect(trackStats.getJitter()).toEqual(10);
         });
 
         it("and returns negative jitter if stats has no jitter value", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildJitter(trackStats, { type: "inbound-rtp" });
+            TrackStatsBuilder.buildJitter(trackStats, { type: "inbound-rtp" });
             expect(trackStats.getJitter()).toEqual(-1);
         });
 
         it("and returns jitter as number", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
-            TrackStatsReporter.buildJitter(trackStats, { type: "inbound-rtp", jitter: "0.5" });
+            TrackStatsBuilder.buildJitter(trackStats, { type: "inbound-rtp", jitter: "0.5" });
             expect(trackStats.getJitter()).toEqual(500);
         });
     });

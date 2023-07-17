@@ -115,6 +115,26 @@ type MakeThreadProps = {
     ts?: number;
 };
 
+type MakeThreadResult = {
+    /**
+     * Thread model
+     */
+    thread: Thread;
+    /**
+     * Thread root event
+     */
+    rootEvent: MatrixEvent;
+    /**
+     * Events added to the thread
+     */
+    events: MatrixEvent[];
+};
+
+/**
+ * Starts a new thread in a room by creating a message as thread root.
+ * Also creates a Thread model and adds it to the room.
+ * Does not insert the messages into a timeline.
+ */
 export const mkThread = ({
     room,
     client,
@@ -122,7 +142,7 @@ export const mkThread = ({
     participantUserIds,
     length = 2,
     ts = 1,
-}: MakeThreadProps): { thread: Thread; rootEvent: MatrixEvent; events: MatrixEvent[] } => {
+}: MakeThreadProps): MakeThreadResult => {
     const { rootEvent, events } = makeThreadEvents({
         roomId: room.roomId,
         authorId,
@@ -137,7 +157,7 @@ export const mkThread = ({
         room?.reEmitter.reEmit(evt, [MatrixEventEvent.BeforeRedaction]);
     }
 
-    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, events, true);
+    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, [rootEvent, ...events], true);
 
     return { thread, rootEvent, events };
 };

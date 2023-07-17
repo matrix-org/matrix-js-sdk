@@ -1161,11 +1161,6 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "f" }); // missing txn_id
             await httpBackend!.flushAllExpected();
 
-            // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
-            // which is a fail.
-            expect(failPromise).rejects.toEqual(gotTxnIds[0]);
-            expect(failPromise2).rejects.toEqual(gotTxnIds[1]);
-
             const okPromise = slidingSync.setListRanges("a", [[0, 20]]);
             let txnId: string | undefined;
             httpBackend!
@@ -1180,8 +1175,12 @@ describe("SlidingSync", () => {
                         txn_id: txnId,
                     };
                 });
-            await httpBackend!.flushAllExpected();
-            await okPromise;
+            await Promise.all([
+                expect(failPromise).rejects.toEqual(gotTxnIds[0]),
+                expect(failPromise2).rejects.toEqual(gotTxnIds[1]),
+                httpBackend!.flushAllExpected(),
+                okPromise,
+            ]);
 
             expect(txnId).toBeDefined();
         });
@@ -1200,7 +1199,6 @@ describe("SlidingSync", () => {
 
             // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
             // which is a fail.
-            expect(A).rejects.toEqual(gotTxnIds[0]);
 
             const C = slidingSync.setListRanges("a", [[0, 20]]);
             let pendingC = true;
@@ -1217,9 +1215,12 @@ describe("SlidingSync", () => {
                         txn_id: gotTxnIds[1],
                     };
                 });
-            await httpBackend!.flushAllExpected();
-            // A is rejected, see above
-            expect(B).resolves.toEqual(gotTxnIds[1]); // B is resolved
+            await Promise.all([
+                expect(A).rejects.toEqual(gotTxnIds[0]),
+                httpBackend!.flushAllExpected(),
+                // A is rejected, see above
+                expect(B).resolves.toEqual(gotTxnIds[1]), // B is resolved
+            ]);
             expect(pendingC).toBe(true); // C is pending still
         });
         it("should do nothing for unknown txn_ids", async () => {
@@ -1698,7 +1699,7 @@ describe("SlidingSync", () => {
 });
 
 function timeout(delayMs: number, reason: string): { promise: Promise<never>; cancel: () => void } {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     return {
         promise: new Promise((resolve, reject) => {
             timeoutId = setTimeout(() => {

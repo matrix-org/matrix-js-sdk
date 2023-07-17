@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { Device, DeviceVerification } from "../models/device";
 import { DeviceKeys } from "../client";
@@ -23,6 +23,8 @@ import { DeviceKeys } from "../client";
  * Convert a {@link RustSdkCryptoJs.Device} to a {@link Device}
  * @param device - Rust Sdk device
  * @param userId - owner of the device
+ *
+ * @internal
  */
 export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: RustSdkCryptoJs.UserId): Device {
     // Copy rust device keys to Device.keys
@@ -84,6 +86,8 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
 /**
  * Convert {@link DeviceKeys}  from `/keys/query` request to a `Map<string, Device>`
  * @param deviceKeys - Device keys object to convert
+ *
+ * @internal
  */
 export function deviceKeysToDeviceMap(deviceKeys: DeviceKeys): Map<string, Device> {
     return new Map(
@@ -97,6 +101,8 @@ type QueryDevice = DeviceKeys[keyof DeviceKeys];
 /**
  * Convert `/keys/query` {@link QueryDevice} device to {@link Device}
  * @param device - Device from `/keys/query` request
+ *
+ * @internal
  */
 export function downloadDeviceToJsDevice(device: QueryDevice): Device {
     const keys = new Map(Object.entries(device.keys));

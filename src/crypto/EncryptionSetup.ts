@@ -19,7 +19,7 @@ import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { Method, ClientPrefix } from "../http-api";
-import { Crypto, ICryptoCallbacks, IBootstrapCrossSigningOpts } from "./index";
+import { Crypto, ICryptoCallbacks } from "./index";
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -31,9 +31,10 @@ import {
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
+import { BootstrapCrossSigningOpts } from "../crypto-api";
 
 interface ICrossSigningKeys {
-    authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
+    authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
     keys: Record<"master" | "self_signing" | "user_signing", ICrossSigningKey>;
 }
 
@@ -187,7 +188,7 @@ export class EncryptionSetupOperation {
             // We must only call `uploadDeviceSigningKeys` from inside this auth
             // helper to ensure we properly handle auth errors.
             await this.crossSigningKeys.authUpload?.((authDict) => {
-                return baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
+                return baseApis.uploadDeviceSigningKeys(authDict ?? undefined, keys as CrossSigningKeys);
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.

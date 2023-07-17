@@ -24,6 +24,17 @@ import { EventType } from "../../../@types/event";
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
+import {
+    canAcceptVerificationRequest,
+    VerificationPhase as Phase,
+    VerificationRequest as IVerificationRequest,
+    VerificationRequestEvent,
+    VerificationRequestEventHandlerMap,
+    Verifier,
+} from "../../../crypto-api/verification";
+
+// backwards-compatibility exports
+export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes
@@ -44,15 +55,6 @@ export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
 export const READY_TYPE = EVENT_PREFIX + "ready";
 
-export enum Phase {
-    Unsent = 1,
-    Requested,
-    Ready,
-    Started,
-    Cancelled,
-    Done,
-}
-
 // Legacy export fields
 export const PHASE_UNSENT = Phase.Unsent;
 export const PHASE_REQUESTED = Phase.Requested;
@@ -71,26 +73,17 @@ interface ITransition {
     event?: MatrixEvent;
 }
 
-export enum VerificationRequestEvent {
-    Change = "change",
-}
-
-type EventHandlerMap = {
-    /**
-     * Fires whenever the state of the request object has changed.
-     */
-    [VerificationRequestEvent.Change]: () => void;
-};
-
 /**
  * State machine for verification requests.
  * Things that differ based on what channel is used to
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
+ *
+ * @deprecated Avoid direct references: instead prefer {@link Crypto.VerificationRequest}.
  */
-export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends TypedEventEmitter<
-    VerificationRequestEvent,
-    EventHandlerMap
-> {
+export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel>
+    extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
+    implements IVerificationRequest
+{
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
@@ -161,6 +154,22 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         }
 
         return true;
+    }
+
+    /**
+     * Unique ID for this verification request.
+     *
+     * An ID isn't assigned until the first message is sent, so this may be `undefined` in the early phases.
+     */
+    public get transactionId(): string | undefined {
+        return this.channel.transactionId;
+    }
+
+    /**
+     * For an in-room verification, the ID of the room.
+     */
+    public get roomId(): string | undefined {
+        return this.channel.roomId;
     }
 
     public get invalid(): boolean {
@@ -241,7 +250,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
     }
 
     public get canAccept(): boolean {
-        return this.phase < PHASE_READY && !this._accepting && !this._declining;
+        return canAcceptVerificationRequest(this);
     }
 
     public get accepting(): boolean {
@@ -257,9 +266,33 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return !this.observeOnly && this._phase !== PHASE_DONE && this._phase !== PHASE_CANCELLED;
     }
 
-    /** Only set after a .ready if the other party can scan a QR code */
+    /** Only set after a .ready if the other party can scan a QR code
+     *
+     * @deprecated Prefer `generateQRCode`.
+     */
     public get qrCodeData(): QRCodeData | null {
         return this._qrCodeData;
+    }
+
+    /**
+     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     *
+     * @deprecated Prefer `generateQRCode`.
+     */
+    public getQRCodeBytes(): Buffer | undefined {
+        return this._qrCodeData?.getBuffer();
+    }
+
+    /**
+     * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Only returns data once `phase` is `Ready` and the other party can scan a QR code;
+     * otherwise returns `undefined`.
+     */
+    public async generateQRCode(): Promise<Buffer | undefined> {
+        return this.getQRCodeBytes();
     }
 
     /** Checks whether the other party supports a given verification method.
@@ -347,6 +380,11 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return this.channel.userId!;
     }
 
+    /** The device id of the other party in this request, for requests happening over to-device messages only. */
+    public get otherDeviceId(): string | undefined {
+        return this.channel.deviceId;
+    }
+
     public get isSelfVerification(): boolean {
         return this.client.getUserId() === this.otherUserId;
     }
@@ -431,6 +469,17 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
             }
         }
         return this._verifier!;
+    }
+
+    public async startVerification(method: string): Promise<Verifier> {
+        const verifier = this.beginKeyVerification(method);
+        // kick off the verification in the background, but *don't* wait for to complete: we need to return the `Verifier`.
+        verifier.verify();
+        return verifier;
+    }
+
+    public scanQRCode(qrCodeData: Uint8Array): Promise<Verifier> {
+        throw new Error("QR code scanning not supported by legacy crypto");
     }
 
     /**

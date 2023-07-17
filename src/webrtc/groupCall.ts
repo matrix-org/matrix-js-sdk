@@ -25,7 +25,15 @@ import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
 import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
+import {
+    ByteSentStatsReport,
+    CallFeedReport,
+    ConnectionStatsReport,
+    StatsReport,
+    SummaryStatsReport,
+} from "./stats/statsReport";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -96,12 +104,17 @@ export enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
     SummaryStats = "GroupCall.summary_stats",
+    CallFeedStats = "GroupCall.call_feed_stats",
 }
 
+/**
+ * The final report-events that get consumed by client.
+ */
 export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
     [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
+    [GroupCallStatsReportEvent.CallFeedStats]: (report: GroupCallStatsReport<CallFeedReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -110,7 +123,9 @@ export enum GroupCallErrorCode {
     PlaceCallFailed = "place_call_failed",
 }
 
-export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport> {
+export interface GroupCallStatsReport<
+    T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport | CallFeedReport,
+> {
     report: T;
 }
 
@@ -269,15 +284,35 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
     };
 
     private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
     private onSummaryStats = (report: SummaryStatsReport): void => {
+        SummaryStatsReportGatherer.extendSummaryReport(report, this.participants);
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
+    };
+
+    private onCallFeedReport = (report: CallFeedReport): void => {
+        if (this.localCallFeed) {
+            report = CallFeedStatsReporter.expandCallFeedReport(report, [this.localCallFeed], "from-local-feed");
+        }
+
+        const callFeeds: CallFeed[] = [];
+        this.forEachCall((call) => {
+            if (call.callId === report.callId) {
+                call.getFeeds().forEach((f) => callFeeds.push(f));
+            }
+        });
+
+        report = CallFeedStatsReporter.expandCallFeedReport(report, callFeeds, "from-call-feed");
+        this.emit(GroupCallStatsReportEvent.CallFeedStats, { report });
     };
 
     public async create(): Promise<GroupCall> {
@@ -655,27 +690,9 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            // We needed this here to avoid an error in case user join a call without a device.
-            // I can not use .then .catch functions because linter :-(
-            try {
-                if (!muted) {
-                    const stream = await this.client
-                        .getMediaHandler()
-                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
-                    if (stream === null) {
-                        // if case permission denied to get a stream stop this here
-                        /* istanbul ignore next */
-                        logger.log(
-                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
-                        );
-                        return false;
-                    }
-                }
-            } catch (e) {
-                /* istanbul ignore next */
-                logger.log(
-                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
-                );
+            const hasPermission = await this.checkAudioPermissionIfNecessary(muted);
+
+            if (!hasPermission) {
                 return false;
             }
 
@@ -696,6 +713,42 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
+
+        return true;
+    }
+
+    /**
+     * If we allow entering a call without a camera and without video, it can happen that the access rights to the
+     * devices have not yet been queried. If a stream does not yet have an audio track, we assume that the rights have
+     * not yet been checked.
+     *
+     * `this.client.getMediaHandler().getUserMediaStream` clones the current stream, so it only wanted to be called when
+     * not Audio Track exists.
+     * As such, this is a compromise, because, the access rights should always be queried before the call.
+     */
+    private async checkAudioPermissionIfNecessary(muted: boolean): Promise<boolean> {
+        // We needed this here to avoid an error in case user join a call without a device.
+        try {
+            if (!muted && this.localCallFeed && !this.localCallFeed.hasAudioTrack) {
+                const stream = await this.client
+                    .getMediaHandler()
+                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                if (stream?.getTracks().length === 0) {
+                    // if case permission denied to get a stream stop this here
+                    /* istanbul ignore next */
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                    );
+                    return false;
+                }
+            }
+        } catch (e) {
+            /* istanbul ignore next */
+            logger.log(
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+            );
+            return false;
+        }
 
         return true;
     }
@@ -1577,6 +1630,8 @@ export class GroupCall extends TypedEventEmitter<
         });
 
         if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
+
+        // Update the participants stored in the stats object
     };
 
     private onStateChanged = (newState: GroupCallState, oldState: GroupCallState): void => {
@@ -1614,6 +1669,7 @@ export class GroupCall extends TypedEventEmitter<
             this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
             this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
             this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
+            this.stats.reports.on(StatsReport.CALL_FEED_REPORT, this.onCallFeedReport);
         }
         return this.stats;
     }

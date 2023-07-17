@@ -308,4 +308,25 @@ describe("MatrixEvent", () => {
             });
         });
     });
+
+    it("should ignore thread relation on state events", async () => {
+        const stateEvent = new MatrixEvent({
+            event_id: "$event_id",
+            type: "some_state_event",
+            content: {
+                "foo": "bar",
+                "m.relates_to": {
+                    "event_id": "$thread_id",
+                    "m.in_reply_to": {
+                        event_id: "$thread_id",
+                    },
+                    "rel_type": "m.thread",
+                },
+            },
+            state_key: "",
+        });
+
+        expect(stateEvent.isState()).toBeTruthy();
+        expect(stateEvent.threadRootId).toBeUndefined();
+    });
 });

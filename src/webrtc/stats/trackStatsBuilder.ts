@@ -1,8 +1,8 @@
 import { MediaTrackStats } from "./media/mediaTrackStats";
-import { StatsValueFormatter } from "./statsValueFormatter";
-import { TrackSummary } from "./summaryStats";
+import { ValueFormatter } from "./valueFormatter";
+import { TrackSummary } from "./callStatsReportSummary";
 
-export class TrackStatsReporter {
+export class TrackStatsBuilder {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {
         const resolution = {
             height: now.frameHeight,
@@ -56,7 +56,7 @@ export class TrackStatsReporter {
 
     public static buildBitrateReceived(trackStats: MediaTrackStats, now: any, before: any): void {
         trackStats.setBitrate({
-            download: TrackStatsReporter.calculateBitrate(
+            download: TrackStatsBuilder.calculateBitrate(
                 now.bytesReceived,
                 before.bytesReceived,
                 now.timestamp,
@@ -81,11 +81,11 @@ export class TrackStatsReporter {
             packetsNow = 0;
         }
 
-        const packetsBefore = StatsValueFormatter.getNonNegativeValue(before[key]);
+        const packetsBefore = ValueFormatter.getNonNegativeValue(before[key]);
         const packetsDiff = Math.max(0, packetsNow - packetsBefore);
 
-        const packetsLostNow = StatsValueFormatter.getNonNegativeValue(now.packetsLost);
-        const packetsLostBefore = StatsValueFormatter.getNonNegativeValue(before.packetsLost);
+        const packetsLostNow = ValueFormatter.getNonNegativeValue(now.packetsLost);
+        const packetsLostBefore = ValueFormatter.getNonNegativeValue(before.packetsLost);
         const packetsLostDiff = Math.max(0, packetsLostNow - packetsLostBefore);
 
         trackStats.setLoss({
@@ -101,8 +101,8 @@ export class TrackStatsReporter {
         nowTimestamp: number,
         beforeTimestamp: number,
     ): number {
-        const bytesNow = StatsValueFormatter.getNonNegativeValue(bytesNowAny);
-        const bytesBefore = StatsValueFormatter.getNonNegativeValue(bytesBeforeAny);
+        const bytesNow = ValueFormatter.getNonNegativeValue(bytesNowAny);
+        const bytesBefore = ValueFormatter.getNonNegativeValue(bytesBeforeAny);
         const bytesProcessed = Math.max(0, bytesNow - bytesBefore);
 
         const timeMs = nowTimestamp - beforeTimestamp;
@@ -140,23 +140,44 @@ export class TrackStatsReporter {
         audioTrackSummary: TrackSummary;
         videoTrackSummary: TrackSummary;
     } {
-        const audioTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        const videoTrackSummary = { count: 0, muted: 0, maxJitter: 0, maxPacketLoss: 0 };
-        trackStatsList
-            .filter((t) => t.getType() === "remote")
-            .forEach((stats) => {
-                const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
-                trackSummary.count++;
-                if (stats.alive && stats.muted) {
-                    trackSummary.muted++;
-                }
-                if (trackSummary.maxJitter < stats.getJitter()) {
-                    trackSummary.maxJitter = stats.getJitter();
-                }
-                if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
-                    trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
-                }
-            });
+        const videoTrackSummary: TrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
+        const audioTrackSummary: TrackSummary = {
+            count: 0,
+            muted: 0,
+            maxJitter: 0,
+            maxPacketLoss: 0,
+            concealedAudio: 0,
+            totalAudio: 0,
+        };
+
+        const remoteTrackList = trackStatsList.filter((t) => t.getType() === "remote");
+        const audioTrackList = remoteTrackList.filter((t) => t.kind === "audio");
+
+        remoteTrackList.forEach((stats) => {
+            const trackSummary = stats.kind === "video" ? videoTrackSummary : audioTrackSummary;
+            trackSummary.count++;
+            if (stats.alive && stats.muted) {
+                trackSummary.muted++;
+            }
+            if (trackSummary.maxJitter < stats.getJitter()) {
+                trackSummary.maxJitter = stats.getJitter();
+            }
+            if (trackSummary.maxPacketLoss < stats.getLoss().packetsLost) {
+                trackSummary.maxPacketLoss = stats.getLoss().packetsLost;
+            }
+            if (audioTrackList.length > 0) {
+                trackSummary.concealedAudio += stats.getAudioConcealment()?.concealedAudio;
+                trackSummary.totalAudio += stats.getAudioConcealment()?.totalAudioDuration;
+            }
+        });
+
         return { audioTrackSummary, videoTrackSummary };
     }
 
@@ -167,10 +188,20 @@ export class TrackStatsReporter {
 
         const jitterStr = statsReport?.jitter;
         if (jitterStr !== undefined) {
-            const jitter = StatsValueFormatter.getNonNegativeValue(jitterStr);
+            const jitter = ValueFormatter.getNonNegativeValue(jitterStr);
             trackStats.setJitter(Math.round(jitter * 1000));
         } else {
             trackStats.setJitter(-1);
         }
+    }
+
+    public static buildAudioConcealment(trackStats: MediaTrackStats, statsReport: any): void {
+        if (statsReport.type !== "inbound-rtp") {
+            return;
+        }
+        const msPerSample = (1000 * statsReport?.totalSamplesDuration) / statsReport?.totalSamplesReceived;
+        const concealedAudioDuration = msPerSample * statsReport?.concealedSamples;
+        const totalAudioDuration = 1000 * statsReport?.totalSamplesDuration;
+        trackStats.setAudioConcealment(concealedAudioDuration, totalAudioDuration);
     }
 }

@@ -129,7 +129,7 @@ describe("DeviceList", function () {
         });
     });
 
-    it("should have an outdated devicelist on an invalidation while an " + "update is in progress", function () {
+    it("should have an outdated devicelist on an invalidation while an update is in progress", async function () {
         const dl = createTestDeviceList();
 
         dl.startTrackingDeviceList("@test1:sw1v.org");
@@ -148,11 +148,8 @@ describe("DeviceList", function () {
         dl.invalidateUserDeviceList("@test1:sw1v.org");
         dl.refreshOutdatedDeviceLists();
 
-        // TODO: Fix this test so we actually await the call and assertions and remove
-        // the eslint disable, https://github.com/matrix-org/matrix-js-sdk/issues/2977
-        //
-        // eslint-disable-next-line jest/valid-expect-in-promise
-        dl.saveIfDirty()
+        await dl
+            .saveIfDirty()
             .then(() => {
                 // the first request completes
                 queryDefer1.resolve({
@@ -163,12 +160,13 @@ describe("DeviceList", function () {
                 });
                 return prom1;
             })
-            .then(() => {
+            .then(async () => {
                 // uh-oh; user restarts before second request completes. The new instance
                 // should know we never got a complete device list.
                 logger.log("Creating new devicelist to simulate app reload");
                 downloadSpy.mockReset();
                 const dl2 = createTestDeviceList();
+                await dl2.load();
                 const queryDefer3 = utils.defer<IDownloadKeyResult>();
                 downloadSpy.mockReturnValue(queryDefer3.promise);
 

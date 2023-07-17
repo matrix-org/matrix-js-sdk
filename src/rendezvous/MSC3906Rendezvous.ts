@@ -17,7 +17,12 @@ limitations under the License.
 import { UnstableValue } from "matrix-events-sdk";
 
 import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
-import { IMSC3882GetLoginTokenCapability, MatrixClient, UNSTABLE_MSC3882_CAPABILITY } from "../client";
+import {
+    ICrossSigningKey,
+    IMSC3882GetLoginTokenCapability,
+    MatrixClient,
+    UNSTABLE_MSC3882_CAPABILITY,
+} from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
@@ -178,7 +183,9 @@ export class MSC3906Rendezvous {
         return deviceId;
     }
 
-    private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo): Promise<CrossSigningInfo | DeviceInfo> {
+    private async verifyAndCrossSignDevice(
+        deviceInfo: DeviceInfo,
+    ): Promise<CrossSigningInfo | DeviceInfo | ICrossSigningKey | undefined> {
         if (!this.client.crypto) {
             throw new Error("Crypto not available on client");
         }
@@ -223,7 +230,7 @@ export class MSC3906Rendezvous {
      */
     public async verifyNewDeviceOnExistingDevice(
         timeout = 10 * 1000,
-    ): Promise<DeviceInfo | CrossSigningInfo | undefined> {
+    ): Promise<DeviceInfo | CrossSigningInfo | ICrossSigningKey | undefined> {
         if (!this.newDeviceId) {
             throw new Error("No new device to sign");
         }

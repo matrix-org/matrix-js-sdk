@@ -18,15 +18,14 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import * as utils from "../utils";
+import { checkObjectHasKeys, encodeParams } from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { ConnectionError, MatrixError } from "./errors";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
-
-type Body = Record<string, any> | BodyInit;
+import { logger } from "../logger";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
@@ -45,7 +44,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
         public readonly opts: O,
     ) {
-        utils.checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
+        checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
     }
@@ -225,6 +224,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
+        const urlForLogs = this.sanitizeUrlForLogs(url);
+        logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
+
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
         // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
@@ -260,6 +262,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const { signal, cleanup } = anySignal(signals);
 
         let res: Response;
+        const start = Date.now();
         try {
             res = await this.fetch(url, {
                 signal,
@@ -274,7 +277,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 credentials: "omit", // we send credentials via headers
                 keepalive: keepAlive,
             });
+
+            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
         } catch (e) {
+            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
@@ -293,18 +299,44 @@ export class FetchHttpApi<O extends IHttpOpts> {
         return res as ResponseType<T, O>;
     }
 
+    private sanitizeUrlForLogs(url: URL | string): string {
+        try {
+            let asUrl: URL;
+            if (typeof url === "string") {
+                asUrl = new URL(url);
+            } else {
+                asUrl = url;
+            }
+            // Remove the values of any URL params that could contain potential secrets
+            const sanitizedQs = new URLSearchParams();
+            for (const key of asUrl.searchParams.keys()) {
+                sanitizedQs.append(key, "xxx");
+            }
+            const sanitizedQsString = sanitizedQs.toString();
+            const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
+
+            return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
+        } catch (error) {
+            // defensive coding for malformed url
+            return "??";
+        }
+    }
     /**
      * Form and return a homeserver request URL based on the given path params and prefix.
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
      * @param queryParams - A dict of query params (these will NOT be urlencoded).
      * @param prefix - The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
-     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
+     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org", defaulting to this.opts.baseUrl.
      * @returns URL
      */
     public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
-        const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
+        const baseUrlWithFallback = baseUrl ?? this.opts.baseUrl;
+        const baseUrlWithoutTrailingSlash = baseUrlWithFallback.endsWith("/")
+            ? baseUrlWithFallback.slice(0, -1)
+            : baseUrlWithFallback;
+        const url = new URL(baseUrlWithoutTrailingSlash + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
-            utils.encodeParams(queryParams, url.searchParams);
+            encodeParams(queryParams, url.searchParams);
         }
         return url;
     }

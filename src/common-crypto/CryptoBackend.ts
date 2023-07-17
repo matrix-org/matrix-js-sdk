@@ -21,10 +21,11 @@ import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 
 /**
  * Common interface for the crypto implementations
+ *
+ * @internal
  */
 export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
@@ -80,15 +81,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
     /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     */
-    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
-
-    /**
      * Get the cross signing information for a given user.
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
@@ -100,7 +92,10 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 }
 
-/** The methods which crypto implementations should expose to the Sync api */
+/** The methods which crypto implementations should expose to the Sync api
+ *
+ * @internal
+ */
 export interface SyncCryptoCallbacks {
     /**
      * Called by the /sync loop whenever there are incoming to-device messages.
@@ -156,6 +151,9 @@ export interface SyncCryptoCallbacks {
     onSyncCompleted(syncState: OnSyncCompletedData): void;
 }
 
+/**
+ * @internal
+ */
 export interface OnSyncCompletedData {
     /**
      * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.

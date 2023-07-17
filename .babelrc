@@ -5,7 +5,7 @@
             "@babel/preset-env",
             {
                 "targets": {
-                    "node": 16
+                    "node": 18
                 },
                 "modules": "commonjs",
                 "include": ["@babel/plugin-proposal-class-properties"]

@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
 import { Mocked } from "jest-mock";
-import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-js";
+import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";

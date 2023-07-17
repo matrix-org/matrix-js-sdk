@@ -37,6 +37,8 @@ export * from "./models/event-timeline-set";
 export * from "./models/poll";
 export * from "./models/room-member";
 export * from "./models/room-state";
+export * from "./models/thread";
+export * from "./models/typed-event-emitter";
 export * from "./models/user";
 export * from "./models/device";
 export * from "./scheduler";
@@ -61,11 +63,44 @@ export * as SecretStorage from "./secret-storage";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
-export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
+export {
+    GroupCallEvent,
+    GroupCallIntent,
+    GroupCallState,
+    GroupCallType,
+    GroupCallStatsReportEvent,
+} from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
-export type { CryptoApi } from "./crypto-api";
-export { DeviceVerificationStatus } from "./crypto-api";
 export { CryptoEvent } from "./crypto";
+export { SlidingSyncEvent } from "./sliding-sync";
+export { MediaHandlerEvent } from "./webrtc/mediaHandler";
+export { CallEvent } from "./webrtc/call";
+export { CallFeedEvent } from "./webrtc/callFeed";
+export { StatsReport } from "./webrtc/stats/statsReport";
+export { RelationsEvent } from "./models/relations";
+export { LocalStorageErrors } from "./store/local-storage-events-emitter";
+
+/**
+ * Types supporting cryptography.
+ *
+ * The most important is {@link Crypto.CryptoApi}, an instance of which can be retrieved via
+ * {@link MatrixClient.getCrypto}.
+ */
+export * as Crypto from "./crypto-api";
+
+/**
+ * Backwards compatibility re-export
+ * @internal
+ * @deprecated use {@link Crypto.CryptoApi}
+ */
+export type { CryptoApi } from "./crypto-api";
+
+/**
+ * Backwards compatibility re-export
+ * @internal
+ * @deprecated use {@link Crypto.DeviceVerificationStatus}
+ */
+export { DeviceVerificationStatus } from "./crypto-api";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 

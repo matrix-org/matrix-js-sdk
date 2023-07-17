@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TrackID } from "../../../../src/webrtc/stats/statsReport";
 import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackStats";
-import { StatsReportBuilder } from "../../../../src/webrtc/stats/statsReportBuilder";
+import { ConnectionStatsReportBuilder } from "../../../../src/webrtc/stats/connectionStatsReportBuilder";
 
 describe("StatsReportBuilder", () => {
     const LOCAL_VIDEO_TRACK_ID = "LOCAL_VIDEO_TRACK_ID";
@@ -39,7 +39,7 @@ describe("StatsReportBuilder", () => {
 
     describe("should build stats", () => {
         it("by media track stats.", async () => {
-            expect(StatsReportBuilder.build(stats)).toEqual({
+            expect(ConnectionStatsReportBuilder.build(stats)).toEqual({
                 bitrate: {
                     audio: {
                         download: 4000,
@@ -91,6 +91,13 @@ describe("StatsReportBuilder", () => {
                     ["REMOTE_AUDIO_TRACK_ID", 0.1],
                     ["REMOTE_VIDEO_TRACK_ID", 50],
                 ]),
+                audioConcealment: new Map([
+                    ["REMOTE_AUDIO_TRACK_ID", { concealedAudio: 3000, totalAudioDuration: 3000 * 20 }],
+                ]),
+                totalAudioConcealment: {
+                    concealedAudio: 3000,
+                    totalAudioDuration: (1 / 0.05) * 3000,
+                },
             });
         });
     });
@@ -104,6 +111,7 @@ describe("StatsReportBuilder", () => {
         remoteAudioTrack.setLoss({ packetsTotal: 20, packetsLost: 0, isDownloadStream: true });
         remoteAudioTrack.setBitrate({ download: 4000, upload: 0 });
         remoteAudioTrack.setJitter(0.1);
+        remoteAudioTrack.setAudioConcealment(3000, 3000 * 20);
 
         localVideoTrack.setCodec("v8");
         localVideoTrack.setLoss({ packetsTotal: 30, packetsLost: 6, isDownloadStream: false });

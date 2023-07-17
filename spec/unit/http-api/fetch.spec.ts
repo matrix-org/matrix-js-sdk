@@ -14,10 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { ClientPrefix, HttpApiEvent, HttpApiEventHandlerMap, IdentityPrefix, IHttpOpts, Method } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
+import { defer, QueryDict } from "../../../src/utils";
+import { logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -234,5 +238,85 @@ describe("FetchHttpApi", () => {
             api.authedRequest(Method.Post, "/account/password");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
         });
+    });
+
+    describe("getUrl()", () => {
+        const localBaseUrl = "http://baseurl";
+        const baseUrlWithTrailingSlash = "http://baseurl/";
+        const makeApi = (thisBaseUrl = baseUrl): FetchHttpApi<any> => {
+            const fetchFn = jest.fn();
+            const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+            return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn });
+        };
+
+        type TestParams = {
+            path: string;
+            queryParams?: QueryDict;
+            prefix?: string;
+            baseUrl?: string;
+        };
+        type TestCase = [TestParams, string];
+        const queryParams: QueryDict = {
+            test1: 99,
+            test2: ["a", "b"],
+        };
+        const testPrefix = "/just/testing";
+        const testUrl = "http://justtesting.com";
+        const testUrlWithTrailingSlash = "http://justtesting.com/";
+
+        const testCases: TestCase[] = [
+            [{ path: "/terms" }, `${localBaseUrl}${prefix}/terms`],
+            [{ path: "/terms", queryParams }, `${localBaseUrl}${prefix}/terms?test1=99&test2=a&test2=b`],
+            [{ path: "/terms", prefix: testPrefix }, `${localBaseUrl}${testPrefix}/terms`],
+            [{ path: "/terms", baseUrl: testUrl }, `${testUrl}${prefix}/terms`],
+            [{ path: "/terms", baseUrl: testUrlWithTrailingSlash }, `${testUrl}${prefix}/terms`],
+            [
+                { path: "/terms", queryParams, prefix: testPrefix, baseUrl: testUrl },
+                `${testUrl}${testPrefix}/terms?test1=99&test2=a&test2=b`,
+            ],
+        ];
+        const runTests = (fetchBaseUrl: string) => {
+            it.each<TestCase>(testCases)(
+                "creates url with params %s",
+                ({ path, queryParams, prefix, baseUrl }, result) => {
+                    const api = makeApi(fetchBaseUrl);
+
+                    expect(api.getUrl(path, queryParams, prefix, baseUrl)).toEqual(new URL(result));
+                },
+            );
+        };
+
+        describe("when fetch.opts.baseUrl does not have a trailing slash", () => {
+            runTests(localBaseUrl);
+        });
+        describe("when fetch.opts.baseUrl does have a trailing slash", () => {
+            runTests(baseUrlWithTrailingSlash);
+        });
+    });
+
+    it("should not log query parameters", async () => {
+        jest.useFakeTimers();
+        const deferred = defer<Response>();
+        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        jest.spyOn(logger, "debug").mockImplementation(() => {});
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
+        jest.advanceTimersByTime(1234);
+        deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
+        await prom;
+        expect(logger.debug).not.toHaveBeenCalledWith("fragment");
+        expect(logger.debug).not.toHaveBeenCalledWith("query");
+        expect(logger.debug).not.toHaveBeenCalledWith("param");
+        expect(logger.debug).toHaveBeenCalledTimes(2);
+        expect(mocked(logger.debug).mock.calls[0]).toMatchInlineSnapshot(`
+            [
+              "FetchHttpApi: --> GET https://server:8448/some/path?query=xxx",
+            ]
+        `);
+        expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
+            [
+              "FetchHttpApi: <-- GET https://server:8448/some/path?query=xxx [1234ms 200]",
+            ]
+        `);
     });
 });
