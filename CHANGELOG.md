@@ -1,20 +1,14 @@
-Changes in [27.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0-rc.2) (2023-07-14)
-============================================================================================================
-
-## 🐛 Bug Fixes
- * Fix read receipt sending behaviour around thread roots ([\#3600](https://github.com/matrix-org/matrix-js-sdk/pull/3600)).
-
-Changes in [27.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0-rc.1) (2023-07-11)
-============================================================================================================
+Changes in [27.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0) (2023-07-18)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
+ * Drop support for Node 16 ([\#3533](https://github.com/matrix-org/matrix-js-sdk/pull/3533)).
  * Improve types around login, registration, UIA and identity servers ([\#3537](https://github.com/matrix-org/matrix-js-sdk/pull/3537)).
 
 ## 🦖 Deprecations
  * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
  * Simplify `MatrixClient::setPowerLevel` API ([\#3570](https://github.com/matrix-org/matrix-js-sdk/pull/3570)). Fixes vector-im/element-web#13900 and #1844.
  * Deprecate `VerificationRequest.getQRCodeBytes` and replace it with the asynchronous `generateQRCode`. ([\#3562](https://github.com/matrix-org/matrix-js-sdk/pull/3562)).
- * Drop support for Node 16 ([\#3533](https://github.com/matrix-org/matrix-js-sdk/pull/3533)).
  * Deprecate `VerificationRequest.beginKeyVerification()` in favour of `VerificationRequest.startVerification()`. ([\#3528](https://github.com/matrix-org/matrix-js-sdk/pull/3528)).
  * Deprecate `Crypto.VerificationRequest` application event, replacing it with `Crypto.VerificationRequestReceived`. ([\#3514](https://github.com/matrix-org/matrix-js-sdk/pull/3514)).
 
@@ -29,6 +23,7 @@ Changes in [27.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
  * OIDC: validate id token ([\#3531](https://github.com/matrix-org/matrix-js-sdk/pull/3531)). Contributed by @kerryarchibald.
 
 ## 🐛 Bug Fixes
+ * Fix read receipt sending behaviour around thread roots ([\#3600](https://github.com/matrix-org/matrix-js-sdk/pull/3600)).
  * Fix `TypedEventEmitter::removeAllListeners(void)` not working ([\#3561](https://github.com/matrix-org/matrix-js-sdk/pull/3561)).
  * Don't allow Olm unwedging rate-limiting to race ([\#3549](https://github.com/matrix-org/matrix-js-sdk/pull/3549)). Fixes vector-im/element-web#25716.
  * Fix an instance of failed to decrypt error when an in flight `/keys/query` fails. ([\#3486](https://github.com/matrix-org/matrix-js-sdk/pull/3486)).
