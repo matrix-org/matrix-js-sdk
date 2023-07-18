@@ -6846,22 +6846,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                             credential: "q1w2e3r4t5ASD!@#",
                         },
                         {
-                            urls: ["stun:relay.metered.ca:80"],
+                            urls: ["stun:stun.relay.metered.ca:80"],
                             username : "",
                             credential : ""
                         },
                         {
-                            urls: ["turn:relay.metered.ca:80"],
+                            urls: ["stun:global.stun.twilio.com:3478"],
+                            username : "",
+                            credential : ""
+                        },
+                        
+                        {
+                            urls: ["turn:a.relay.metered.ca"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },
                         {
-                            urls: ["turn:relay.metered.ca:443"],
+                            urls: ["turn:a.relay.metered.ca:443"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },
                         {
-                            urls: ["turn:relay.metered.ca:443?transport=tcp"],
+                            urls: ["turn:a.relay.metered.ca:443?transport=tcp"],
                             username: "e5f52bc6e44926ef487cc182",
                             credential: "h86wDhfLkKRXiDDo",
                         },

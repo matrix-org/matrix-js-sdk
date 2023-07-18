@@ -106,7 +106,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
+            const lastReplacement = this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement!);
         }
 
@@ -132,7 +132,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.removeAnnotationFromAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
+            const lastReplacement = this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement!);
         }
 
@@ -243,7 +243,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             // Remove the redacted annotation from aggregation by key
             this.removeAnnotationFromAggregation(redactedEvent);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
+            const lastReplacement = this.getLastReplacement();
             this.targetEvent.makeReplaced(lastReplacement!);
         }
 
@@ -293,7 +293,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * This is currently only supported for the m.replace relation type,
      * once the target event is known, see `addEvent`.
      */
-    public async getLastReplacement(): Promise<MatrixEvent | null> {
+    public getLastReplacement(): MatrixEvent | null {
         if (this.relationType !== RelationType.Replace) {
             // Aggregating on last only makes sense for this relation type
             return null;
@@ -323,10 +323,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return event;
         }, null);
 
-        if (lastReplacement?.shouldAttemptDecryption() && this.client.isCryptoEnabled()) {
-            await lastReplacement.attemptDecryption(this.client.crypto!);
-        } else if (lastReplacement?.isBeingDecrypted()) {
-            await lastReplacement.getDecryptionPromise();
+        if (this.client){
+
         }
 
         return lastReplacement;
@@ -342,7 +340,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         this.targetEvent = event;
 
         if (this.relationType === RelationType.Replace && !this.targetEvent.isState()) {
-            const replacement = await this.getLastReplacement();
+            const replacement = this.getLastReplacement();
             // this is the initial update, so only call it if we already have something
             // to not emit Event.replaced needlessly
             if (replacement) {
