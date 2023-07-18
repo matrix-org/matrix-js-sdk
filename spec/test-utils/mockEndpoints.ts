@@ -38,7 +38,10 @@ export function mockInitialApiRequests(homeserverUrl: string) {
  */
 export function mockSetupCrossSigningRequests(): void {
     // have account_data requests return an empty object
-    fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {});
+    fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {
+        status: 404,
+        body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
+    });
 
     // we expect a request to upload signatures for our device ...
     fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});

@@ -108,7 +108,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
-        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor);
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -386,6 +386,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
         await this.crossSigningIdentity.bootstrapCrossSigning(opts);
+
+        // Get the current device
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+
+        // Verify the device and upload the cross signing signatures
+        const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
     }
 
     /**
@@ -656,6 +666,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
         return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+    }
+
+    /**
+     * This function is unneeded for the rust-crypto.
+     * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
+     *
+     * The function is stub to keep the compatibility with the old crypto.
+     * More information: https://github.com/vector-im/element-web/issues/25648
+     *
+     *
+     * Implementation of {@link CryptoApi#checkOwnCrossSigningTrust}
+     */
+    public async checkOwnCrossSigningTrust(): Promise<void> {
+        return;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

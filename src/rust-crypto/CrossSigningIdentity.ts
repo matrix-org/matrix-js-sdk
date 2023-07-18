@@ -20,6 +20,7 @@ import { BootstrapCrossSigningOpts } from "../crypto-api";
 import { logger } from "../logger";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { UIAuthCallback } from "../interactive-auth";
+import { ServerSideSecretStorage } from "../secret-storage";
 
 /** Manages the cross-signing keys for our own user.
  *
@@ -29,6 +30,7 @@ export class CrossSigningIdentity {
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly secretStorage: ServerSideSecretStorage,
     ) {}
 
     /**
@@ -41,7 +43,13 @@ export class CrossSigningIdentity {
         }
 
         const olmDeviceStatus: CrossSigningStatus = await this.olmMachine.crossSigningStatus();
-        const privateKeysInSecretStorage = false; // TODO
+
+        // Fetch cross signing keys from the secret storage
+        const masterKey = await this.secretStorage.get("m.cross_signing.master");
+        const selfSigningKey = await this.secretStorage.get("m.cross_signing.self_signing");
+        const userSigningKey = await this.secretStorage.get("m.cross_signing.user_signing");
+        const privateKeysInSecretStorage = Boolean(masterKey && selfSigningKey && userSigningKey);
+
         const olmDeviceHasKeys =
             olmDeviceStatus.hasMaster && olmDeviceStatus.hasUserSigning && olmDeviceStatus.hasSelfSigning;
 
@@ -67,7 +75,7 @@ export class CrossSigningIdentity {
                 "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
                     "in secret storage, reading storage and caching locally",
             );
-            throw new Error("TODO");
+            await this.olmMachine.importCrossSigningKeys(masterKey, selfSigningKey, userSigningKey);
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the
