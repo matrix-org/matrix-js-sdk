@@ -2093,6 +2093,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Determine which timeline(s) a given event should live in
+     * Thread roots live in both the main timeline and their corresponding thread timeline
+     * Relations, redactions, replies to thread relation events live only in the thread timeline
+     * Relations (other than m.thread), redactions, replies to a thread root live only in the main timeline
+     * Relations, redactions, replies where the parent cannot be found live in no timelines but should be aggregated regardless.
+     * Otherwise, the event lives in the main timeline only.
+     */
     public eventShouldLiveIn(
         event: MatrixEvent,
         events?: MatrixEvent[],
@@ -2109,7 +2117,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // A thread root is always shown in both timelines
+        // A thread root is the only event shown in both timelines
         if (event.isThreadRoot || roots?.has(event.getId()!)) {
             return {
                 shouldLiveInRoom: true,
@@ -2118,30 +2126,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const isRelation = event.isRelation();
         const isThreadRelation = event.isRelation(RelationType.Thread);
-
         const parentEventId = event.getAssociatedId();
+        const threadRootId = event.threadRootId;
+
+        // Where the parent is the thread root and this is a non-thread relation this should live only in the main timeline
+        if (!!parentEventId && !isThreadRelation && (threadRootId === parentEventId || roots?.has(parentEventId!))) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+
         let parentEvent: MatrixEvent | undefined;
         if (parentEventId) {
             parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
         }
-        // Treat non-thread-relations and redactions as extensions of their parents so evaluate parentEvent instead
-        if (parentEvent && !isThreadRelation && (isRelation || event.isRedaction())) {
+
+        // Treat non-thread-relations, redactions, and replies as extensions of their parents so evaluate parentEvent instead
+        if (parentEvent && !isThreadRelation) {
             return this.eventShouldLiveIn(parentEvent, events, roots);
         }
 
-        // Edge case where we know the event is a non-thread relation but don't have the parentEvent
-        if (isRelation && !isThreadRelation && roots?.has(event.relationEventId!)) {
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: true,
-                threadId: event.relationEventId,
-            };
-        }
-
         // A thread relation (1st and 2nd order) is always only shown in a thread
-        const threadRootId = event.threadRootId;
         if (threadRootId != undefined) {
             return {
                 shouldLiveInRoom: false,
@@ -2150,7 +2157,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        if (!isRelation) {
+        if (!parentEventId) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
