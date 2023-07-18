@@ -2126,7 +2126,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const isThreadRelation = event.isRelation(RelationType.Thread);
+        const isThreadRelation = event.isRelation(THREAD_RELATION_TYPE.name);
         const parentEventId = event.getAssociatedId();
         const threadRootId = event.threadRootId;
 
