@@ -5008,7 +5008,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 !event.isThreadRoot &&
                 // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
                 event.isRelation() &&
-                (event.isRelation(RelationType.Thread) || event.relationEventId !== event.threadRootId);
+                (event.isRelation(THREAD_RELATION_TYPE.name) || event.relationEventId !== event.threadRootId);
             body = {
                 ...body,
                 // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
