@@ -917,7 +917,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     content: event.getWireContent(),
                     origin_server_ts: event.getTs(),
                 }),
-                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+                new RustSdkCryptoJs.RoomId(roomId),
             );
         }
     }
