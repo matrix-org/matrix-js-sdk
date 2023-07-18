@@ -18,7 +18,7 @@ import MockHttpBackend from "matrix-mock-request";
 
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { EventType } from "../../src/matrix";
+import { EventType, MatrixEvent, Room } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
@@ -42,34 +42,10 @@ let httpBackend: MockHttpBackend;
 const THREAD_ID = "$thread_event_id";
 const ROOM_ID = "!123:matrix.org";
 
-const threadEvent = utils.mkEvent({
-    event: true,
-    type: EventType.RoomMessage,
-    user: "@bob:matrix.org",
-    room: ROOM_ID,
-    content: {
-        "body": "Hello from a thread",
-        "m.relates_to": {
-            "event_id": THREAD_ID,
-            "m.in_reply_to": {
-                event_id: THREAD_ID,
-            },
-            "rel_type": "m.thread",
-        },
-    },
-});
-
-const roomEvent = utils.mkEvent({
-    event: true,
-    type: EventType.RoomMessage,
-    user: "@bob:matrix.org",
-    room: ROOM_ID,
-    content: {
-        body: "Hello from a room",
-    },
-});
-
 describe("Read receipt", () => {
+    let threadEvent: MatrixEvent;
+    let roomEvent: MatrixEvent;
+
     beforeEach(() => {
         httpBackend = new MockHttpBackend();
         client = new MatrixClient({
@@ -79,10 +55,36 @@ describe("Read receipt", () => {
             fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
         client.isGuest = () => false;
+
+        threadEvent = utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: "@bob:matrix.org",
+            room: ROOM_ID,
+            content: {
+                "body": "Hello from a thread",
+                "m.relates_to": {
+                    "event_id": THREAD_ID,
+                    "m.in_reply_to": {
+                        event_id: THREAD_ID,
+                    },
+                    "rel_type": "m.thread",
+                },
+            },
+        });
+        roomEvent = utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: "@bob:matrix.org",
+            room: ROOM_ID,
+            content: {
+                body: "Hello from a room",
+            },
+        });
     });
 
     describe("sendReceipt", () => {
-        it("sends a thread read receipt (deprecated)", async () => {
+        it("sends a thread read receipt", async () => {
             httpBackend
                 .when(
                     "POST",
@@ -103,28 +105,7 @@ describe("Read receipt", () => {
             await flushPromises();
         });
 
-        it("sends a thread read receipt", async () => {
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data.thread_id).toEqual(THREAD_ID);
-                })
-                .respond(200, {});
-
-            client.sendReceipt(threadEvent, ReceiptType.Read, THREAD_ID);
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends an unthreaded receipt (deprecated)", async () => {
+        it("sends an unthreaded receipt", async () => {
             httpBackend
                 .when(
                     "POST",
@@ -145,91 +126,7 @@ describe("Read receipt", () => {
             await flushPromises();
         });
 
-        it("sends an unthreaded receipt", async () => {
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data.thread_id).toBeUndefined();
-                })
-                .respond(200, {});
-
-            client.sendReadReceipt(threadEvent, ReceiptType.Read, null);
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends a main timeline receipt for a thread root (deprecated)", async () => {
-            const threadRootEvent = utils.mkEvent({
-                event: true,
-                type: EventType.RoomMessage,
-                user: "@bob:matrix.org",
-                room: ROOM_ID,
-                content: {
-                    body: "Hello, this is a thread root",
-                },
-            });
-            threadRootEvent.setThreadId(threadRootEvent.getId());
-
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: threadRootEvent.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data.thread_id).toBe("main");
-                })
-                .respond(200, {});
-            client.sendReadReceipt(threadRootEvent, ReceiptType.Read, false);
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends a main timeline receipt for a reaction to a thread root (deprecated)", async () => {
-            const threadRootEvent = utils.mkEvent({
-                event: true,
-                type: EventType.RoomMessage,
-                user: "@bob:matrix.org",
-                room: ROOM_ID,
-                content: {
-                    body: "Hello, this is a thread root",
-                },
-            });
-            const reactionToThreadRoot = utils.mkReaction(threadRootEvent, client, client.getSafeUserId(), ROOM_ID);
-            reactionToThreadRoot.setThreadId(threadRootEvent.getId());
-
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: reactionToThreadRoot.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data.thread_id).toBe("main");
-                })
-                .respond(200, {});
-            client.sendReadReceipt(reactionToThreadRoot, ReceiptType.Read, false);
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends a room read receipt (deprecated)", async () => {
+        it("sends a room read receipt", async () => {
             httpBackend
                 .when(
                     "POST",
@@ -250,14 +147,25 @@ describe("Read receipt", () => {
             await flushPromises();
         });
 
-        it("sends a main timeline room read receipt", async () => {
+        it("should send a main timeline read receipt for a reaction to a thread root", async () => {
+            roomEvent.event.event_id = THREAD_ID;
+            const reaction = utils.mkReaction(roomEvent, client, client.getSafeUserId(), ROOM_ID);
+            const thread = new Room(ROOM_ID, client, client.getSafeUserId()).createThread(
+                THREAD_ID,
+                roomEvent,
+                [threadEvent],
+                false,
+            );
+            threadEvent.setThread(thread);
+            reaction.setThread(thread);
+
             httpBackend
                 .when(
                     "POST",
                     encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                         $roomId: ROOM_ID,
                         $receiptType: ReceiptType.Read,
-                        $eventId: roomEvent.getId()!,
+                        $eventId: reaction.getId()!,
                     }),
                 )
                 .check((request) => {
@@ -265,7 +173,7 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            client.sendReceipt(roomEvent, ReceiptType.Read, "main");
+            client.sendReceipt(reaction, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
             await flushPromises();
@@ -274,9 +182,10 @@ describe("Read receipt", () => {
 
     describe("synthesizeReceipt", () => {
         it.each([
-            { event: roomEvent, destinationId: MAIN_ROOM_TIMELINE },
-            { event: threadEvent, destinationId: threadEvent.threadRootId! },
-        ])("adds the receipt to $destinationId", ({ event, destinationId }) => {
+            { getEvent: () => roomEvent, destinationId: MAIN_ROOM_TIMELINE },
+            { getEvent: () => threadEvent, destinationId: THREAD_ID },
+        ])("adds the receipt to $destinationId", ({ getEvent, destinationId }) => {
+            const event = getEvent();
             const userId = "@bob:example.org";
             const receiptType = ReceiptType.Read;
 
