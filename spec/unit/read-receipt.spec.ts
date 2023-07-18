@@ -166,7 +166,7 @@ describe("Read receipt", () => {
             await flushPromises();
         });
 
-        it("sends an main timeline receipt for a thread root (deprecated)", async () => {
+        it("sends a main timeline receipt for a thread root (deprecated)", async () => {
             const threadRootEvent = utils.mkEvent({
                 event: true,
                 type: EventType.RoomMessage,
@@ -197,7 +197,7 @@ describe("Read receipt", () => {
             await flushPromises();
         });
 
-        it("sends an main timeline receipt for a reaction to a thread root (deprecated)", async () => {
+        it("sends a main timeline receipt for a reaction to a thread root (deprecated)", async () => {
             const threadRootEvent = utils.mkEvent({
                 event: true,
                 type: EventType.RoomMessage,
