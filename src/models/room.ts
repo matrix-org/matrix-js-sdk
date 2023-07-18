@@ -2118,6 +2118,28 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
+        const isRelation = event.isRelation();
+        const isThreadRelation = event.isRelation(RelationType.Thread);
+
+        const parentEventId = event.getAssociatedId();
+        let parentEvent: MatrixEvent | undefined;
+        if (parentEventId) {
+            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        }
+        // Treat non-thread-relations and redactions as extensions of their parents so evaluate parentEvent instead
+        if (parentEvent && !isThreadRelation && (isRelation || event.isRedaction())) {
+            return this.eventShouldLiveIn(parentEvent, events, roots);
+        }
+
+        // Edge case where we know the event is a non-thread relation but don't have the parentEvent
+        if (isRelation && !isThreadRelation && roots?.has(event.relationEventId!)) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: true,
+                threadId: event.relationEventId,
+            };
+        }
+
         // A thread relation (1st and 2nd order) is always only shown in a thread
         const threadRootId = event.threadRootId;
         if (threadRootId != undefined) {
@@ -2128,30 +2150,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const parentEventId = event.getAssociatedId();
-        let parentEvent: MatrixEvent | undefined;
-        if (parentEventId) {
-            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
-        }
-
-        // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
-        if (parentEvent && (event.isRelation() || event.isRedaction())) {
-            return this.eventShouldLiveIn(parentEvent, events, roots);
-        }
-
-        if (!event.isRelation()) {
+        if (!isRelation) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
-            };
-        }
-
-        // Edge case where we know the event is a relation but don't have the parentEvent
-        if (roots?.has(event.relationEventId!)) {
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: true,
-                threadId: event.relationEventId,
             };
         }
 

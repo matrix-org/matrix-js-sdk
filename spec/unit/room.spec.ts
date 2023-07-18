@@ -2945,6 +2945,32 @@ describe("Room", function () {
             expect(room.eventShouldLiveIn(reply2, events, roots).shouldLiveInThread).toBeFalsy();
         });
 
+        it("edit to thread root should live in both", () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            const threadRootEdit = mkEdit(threadRoot);
+            threadRoot.makeReplaced(threadRootEdit);
+
+            const thread = room.createThread(threadRoot.getId()!, threadRoot, [threadResponse1], false);
+            threadResponse1.setThread(thread);
+            threadRootEdit.setThread(thread);
+
+            const roots = new Set([threadRoot.getId()!]);
+            const events = [threadRoot, threadResponse1, threadRootEdit];
+
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRoot, events, roots).threadId).toBe(threadRoot.getId());
+
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).shouldLiveInRoom).toBeFalsy();
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadResponse1, events, roots).threadId).toBe(threadRoot.getId());
+
+            expect(room.eventShouldLiveIn(threadRootEdit, events, roots).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRootEdit, events, roots).shouldLiveInThread).toBeTruthy();
+            expect(room.eventShouldLiveIn(threadRootEdit, events, roots).threadId).toBe(threadRoot.getId());
+        });
+
         it("should aggregate relations in thread event timeline set", async () => {
             Thread.setServerSideSupport(FeatureSupport.Stable);
             const threadRoot = mkMessage();
