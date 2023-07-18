@@ -250,8 +250,19 @@ export interface CryptoApi {
      * @param roomId - the room to use for verification
      *
      * @returns the VerificationRequest that is in progress, if any
+     * @deprecated prefer `userId` parameter variant.
      */
     findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id.
+     *
+     * @param roomId - the room to use for verification.
+     * @param userId - search the verification request for the given user.
+     *
+     * @returns the VerificationRequest that is in progress, if any.
+     */
+    findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined;
 
     /**
      * Send a verification request to our other devices.

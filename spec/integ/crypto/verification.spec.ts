@@ -832,7 +832,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
 
-            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
+            let request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+
+            // Test without providing userID
+            request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
             // Expect to find the verification request received during the sync
             expect(request?.roomId).toBe(TEST_ROOM_ID);
             expect(request?.isSelfVerification).toBe(false);
@@ -853,7 +860,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await syncPromise(aliceClient);
 
             // Expect to not find any verification request
-            const request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
+            const request = await aliceClient
+                .getCrypto()!
+                .findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
             expect(request).not.toBeDefined();
         });
     });

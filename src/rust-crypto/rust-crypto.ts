@@ -95,6 +95,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         /** The local user's User ID. */
         private readonly userId: string,
+
         /** The local user's Device ID. */
         _deviceId: string,
         /** Interface to server-side secret storage */
@@ -579,21 +580,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#findVerificationRequestDMInProgress}
      *
      * @param roomId - the room to use for verification
+     * @param userId - search the verification request for the given user
      *
      * @returns the VerificationRequest that is in progress, if any
      *
      */
-    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
-        const room = this.store.getRoom(roomId);
-
-        if (!room) throw new Error(`unknown roomId ${roomId}`);
-
-        const members = room.getMembers();
-
-        // Going through all members and return the first verification request we can find
-        for (const member of members) {
+    public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
+        const findVerificationRequestForUser = (userId: string): VerificationRequest | undefined => {
             const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
-                new RustSdkCryptoJs.UserId(member.userId),
+                new RustSdkCryptoJs.UserId(userId),
             );
 
             // Search for the verification request for the given room id
@@ -605,6 +600,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     this.outgoingRequestProcessor,
                     this._supportedVerificationMethods,
                 );
+            }
+        };
+
+        // If the userId is provided, we don't have to search in the room members
+        if (userId) return findVerificationRequestForUser(userId);
+
+        const room = this.store.getRoom(roomId);
+        if (!room) throw new Error(`unknown roomId ${roomId}`);
+
+        const members = room.getMembers();
+
+        // Go through all members and return the first verification request we can find
+        for (const member of members) {
+            const request = findVerificationRequestForUser(member.userId);
+
+            if (request) {
+                return request;
             }
         }
     }
@@ -894,32 +906,41 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Handle key verification request
-     * Ignore the event if not a key verification request
+     * Handle the timeline event.
+     * Event is ignored if not a key validation request.
      *
-     * @param event - a key validation request event
+     * @param event - timeline event
      */
-    public async onKeyVerificationRequest(event: MatrixEvent): Promise<void> {
+    public async onTimelineEvent(event: MatrixEvent): Promise<void> {
+        // Process only key validation request
+        if (event.isKeyVerificationRequest()) {
+            await this.onKeyVerificationRequest(event);
+        }
+    }
+
+    /**
+     * Handle key verification request.
+     *
+     * @param event - a key validation request event.
+     */
+    private async onKeyVerificationRequest(event: MatrixEvent): Promise<void> {
         const roomId = event.getRoomId();
 
         if (!roomId) {
             throw new Error("missing roomId in the event");
         }
 
-        // Ignore if not a key verification request
-        if (event.isKeyVerificationRequest()) {
-            await this.olmMachine.receiveVerificationEvent(
-                JSON.stringify({
-                    event_id: event.getId(),
-                    type: event.getWireType(),
-                    sender: event.getSender(),
-                    state_key: event.getStateKey(),
-                    content: event.getWireContent(),
-                    origin_server_ts: event.getTs(),
-                }),
-                new RustSdkCryptoJs.RoomId(roomId),
-            );
-        }
+        await this.olmMachine.receiveVerificationEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
