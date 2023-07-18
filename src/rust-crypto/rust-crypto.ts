@@ -590,7 +590,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const members = room.getMembers();
 
-        // Going through all members and return the first verification request we can found
+        // Going through all members and return the first verification request we can find
         for (const member of members) {
             const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
                 new RustSdkCryptoJs.UserId(member.userId),
