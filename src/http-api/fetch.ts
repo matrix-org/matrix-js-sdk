@@ -228,7 +228,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
-        const urlForLogs = this.clearUrlParamsForLogs(url);
+        const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
         console.log('hhhh REQUESTOTHERURL', opts);
@@ -326,7 +326,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         return res as ResponseType<T, O>;
     }
 
-    private clearUrlParamsForLogs(url: URL | string): string {
+    private sanitizeUrlForLogs(url: URL | string): string {
         try {
             let asUrl: URL;
             if (typeof url === "string") {
@@ -334,9 +334,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
             } else {
                 asUrl = url;
             }
-            // get just the path to remove any potential url param that could have
-            // some potential secrets
-            return asUrl.origin + asUrl.pathname;
+            // Remove the values of any URL params that could contain potential secrets
+            const sanitizedQs = new URLSearchParams();
+            for (const key of asUrl.searchParams.keys()) {
+                sanitizedQs.append(key, "xxx");
+            }
+            const sanitizedQsString = sanitizedQs.toString();
+            const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
+
+            return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
         } catch (error) {
             // defensive coding for malformed url
             return "??";

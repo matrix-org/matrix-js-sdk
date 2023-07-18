@@ -24,7 +24,7 @@ import {
     SignatureUploadRequest,
     ToDeviceRequest,
     SigningKeysUploadRequest,
-} from "@matrix-org/matrix-sdk-crypto-js";
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
