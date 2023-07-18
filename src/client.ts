@@ -4973,24 +4973,70 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.sendMessage(roomId, threadId, content);
     }
 
+    // Deprecated signature of MatrixClient::sendReceipt allows only specifying unthreaded (boolean) which means it is
+    // up to the SDK to guess which thread to send the receipt to. This isn't always possible, as for example a relation
+    // to the thread root shows up in both timelines and can be read separately in each.
+    // This method guesses which thread to send to, with known issues around thread root relations only sending to
+    // main timeline.
+    private guessThreadForReceipt(event: MatrixEvent): string {
+        // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
+        // but in practice this isn't possible and the spec needs updating.
+        const isThread =
+            !!event.threadRootId &&
+            // A thread cannot be just a thread root and a thread root can only be read in the main timeline
+            !event.isThreadRoot &&
+            // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
+            event.isRelation() &&
+            (event.isRelation(RelationType.Thread) || event.relationEventId !== event.threadRootId);
+        return isThread ? event.threadRootId : MAIN_ROOM_TIMELINE;
+    }
+
     /**
      * Send a receipt.
      * @param event - The event being acknowledged
      * @param receiptType - The kind of receipt e.g. "m.read". Other than
      * ReceiptType.Read are experimental!
      * @param body - Additional content to send alongside the receipt.
-     * @param unthreaded - An unthreaded receipt will clear room+thread notifications
+     * @param thread - the ID of the thread to which the read receipt corresponds,
+     *     "main" for main timeline, `null` for unthreaded (all timelines).
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
     public async sendReceipt(
         event: MatrixEvent,
         receiptType: ReceiptType,
+        thread: "main" | string | null,
         body?: Record<string, any>,
-        unthreaded = false,
+    ): Promise<{}>;
+    /**
+     * @deprecated backwards compatibility signature
+     */
+    public async sendReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        body?: Record<string, any>,
+        unthreaded?: boolean,
+    ): Promise<{}>;
+    public async sendReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        bodyOrThread?: Record<string, any> | string | null,
+        unthreadedOrBody?: boolean | Record<string, any>,
     ): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
+        }
+
+        let thread: string | null;
+        let body: Record<string, any>;
+
+        if ((bodyOrThread !== null && typeof bodyOrThread === "object") || typeof unthreadedOrBody === "boolean") {
+            // Backwards compatible signature case
+            thread = !unthreadedOrBody ? this.guessThreadForReceipt(event) : null;
+            body = (bodyOrThread as Record<string, any>) ?? {};
+        } else {
+            thread = bodyOrThread as string | null;
+            body = unthreadedOrBody ?? {};
         }
 
         const path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
@@ -4999,17 +5045,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (!unthreaded) {
-            // A thread cannot be just a thread root and a thread root can only be read in the main timeline
-            const isThread = !!event.threadRootId && !event.isThreadRoot;
-            body = {
-                ...body,
-                // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
-                thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
-            };
+        if (thread !== null) {
+            // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
+            body.thread_id = thread;
         }
 
-        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});
+        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body);
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
@@ -5022,13 +5063,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Send a read receipt.
      * @param event - The event that has been read.
      * @param receiptType - other than ReceiptType.Read are experimental! Optional.
+     * @param thread - the ID of the thread to which the read receipt corresponds,
+     *     "main" for main timeline, `null` for unthreaded (all timelines).
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
     public async sendReadReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        thread: "main" | string | null,
+    ): Promise<{}>;
+    /**
+     * @deprecated backwards compatibility signature
+     */
+    public async sendReadReceipt(
+        event: MatrixEvent | null,
+        receiptType?: ReceiptType,
+        unthreaded?: boolean,
+    ): Promise<{} | undefined>;
+    public async sendReadReceipt(
         event: MatrixEvent | null,
         receiptType = ReceiptType.Read,
-        unthreaded = false,
+        threadOrUnthreaded: boolean | string | null = false,
     ): Promise<{} | undefined> {
         if (!event) return;
         const eventId = event.getId()!;
@@ -5037,7 +5093,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
         }
 
-        return this.sendReceipt(event, receiptType, {}, unthreaded);
+        if (typeof threadOrUnthreaded === "boolean") {
+            // Backwards compatible case
+            return this.sendReceipt(event, receiptType, {}, threadOrUnthreaded);
+        }
+        return this.sendReceipt(event, receiptType, threadOrUnthreaded);
     }
 
     /**
