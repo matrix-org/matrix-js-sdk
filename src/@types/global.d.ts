@@ -105,6 +105,7 @@ declare global {
          *   low: A low priority fetch request relative to other requests of the same type.
          *   auto: Automatically determine the priority of the fetch request relative to other requests of the same type (default).
          *
+         * @see https://html.spec.whatwg.org/multipage/urls-and-fetching.html#fetch-priority-attribute
          * @see https://github.com/microsoft/TypeScript/issues/54472
          * @see https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API#browser_compatibility
          * Not yet supported in Safari or Firefox
