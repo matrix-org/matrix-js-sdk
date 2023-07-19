@@ -52,10 +52,9 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IStore } from "../store";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -102,8 +101,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         private readonly secretStorage: ServerSideSecretStorage,
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
-        /** Stored data of js-sdk */
-        private readonly store: IStore,
     ) {
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
@@ -586,38 +583,22 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      */
     public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
-        const findVerificationRequestForUser = (userId: string): VerificationRequest | undefined => {
-            const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
-                new RustSdkCryptoJs.UserId(userId),
+        // TODO raise an error
+        if (!userId) return;
+
+        const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
+            new RustSdkCryptoJs.UserId(userId),
+        );
+
+        // Search for the verification request for the given room id
+        const request = requests.find((request) => request.roomId?.toString() === roomId);
+
+        if (request) {
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
             );
-
-            // Search for the verification request for the given room id
-            const request = requests.find((request) => request.roomId?.toString() === roomId);
-
-            if (request) {
-                return new RustVerificationRequest(
-                    request,
-                    this.outgoingRequestProcessor,
-                    this._supportedVerificationMethods,
-                );
-            }
-        };
-
-        // If the userId is provided, we don't have to search in the room members
-        if (userId) return findVerificationRequestForUser(userId);
-
-        const room = this.store.getRoom(roomId);
-        if (!room) throw new Error(`unknown roomId ${roomId}`);
-
-        const members = room.getMembers();
-
-        // Go through all members and return the first verification request we can find
-        for (const member of members) {
-            const request = findVerificationRequestForUser(member.userId);
-
-            if (request) {
-                return request;
-            }
         }
     }
 
@@ -913,7 +894,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async onTimelineEvent(event: MatrixEvent): Promise<void> {
         // Process only key validation request
-        if (event.isKeyVerificationRequest()) {
+        if (
+            event.getType() === EventType.RoomMessage &&
+            event.getContent().msgtype === MsgType.KeyVerificationRequest
+        ) {
             await this.onKeyVerificationRequest(event);
         }
     }

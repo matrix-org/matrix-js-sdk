@@ -258,7 +258,7 @@ export interface CryptoApi {
      * Finds a DM verification request that is already in progress for the given room id.
      *
      * @param roomId - the room to use for verification.
-     * @param userId - search the verification request for the given user.
+     * @param userId - search for a verification request for the given user.
      *
      * @returns the VerificationRequest that is in progress, if any.
      */

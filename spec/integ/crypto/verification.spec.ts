@@ -832,28 +832,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
 
-            let request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            // Expect to find the verification request received during the sync
-            expect(request?.roomId).toBe(TEST_ROOM_ID);
-            expect(request?.isSelfVerification).toBe(false);
-            expect(request?.otherUserId).toBe("@bob:xyz");
-
-            // Test without providing userID
-            request = await aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID);
+            const request = await aliceClient
+                .getCrypto()!
+                .findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
             // Expect to find the verification request received during the sync
             expect(request?.roomId).toBe(TEST_ROOM_ID);
             expect(request?.isSelfVerification).toBe(false);
             expect(request?.otherUserId).toBe("@bob:xyz");
         });
 
-        // Only the rust-crypto raises an error when the room id is unknown
-        newBackendOnly("Unknown RoomId", () => {
-            expect(() => aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID)).toThrow(
-                `unknown roomId ${TEST_ROOM_ID}`,
-            );
-        });
-
-        it("Verification request unfound", async () => {
+        it("Verification request not found", async () => {
             // Tell alice she is sharing a room with bob
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             // Wait for the sync response to be processed

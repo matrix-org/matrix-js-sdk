@@ -2241,7 +2241,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.secretStorage,
             this.cryptoCallbacks,
             useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
-            this.store,
         );
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 

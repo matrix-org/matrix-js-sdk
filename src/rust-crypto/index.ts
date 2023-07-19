@@ -21,7 +21,6 @@ import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
-import { IStore } from "../store";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -45,7 +44,6 @@ export async function initRustCrypto(
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
     storePrefix: string | null,
-    store: IStore,
 ): Promise<RustCrypto> {
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
@@ -64,7 +62,7 @@ export async function initRustCrypto(
         storePrefix ?? undefined,
         (storePrefix && "test pass") ?? undefined,
     );
-    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks, store);
+    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );

@@ -1657,17 +1657,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     public setThreadId(threadId?: string): void {
         this.threadId = threadId;
     }
-
-    /**
-     * True if:
-     *  - The event type is {@link EventType.RoomMessage}
-     *  - The `msgType` of the event content is {@link MsgType.KeyVerificationRequest}
-     *
-     * @returns true if the event is key verification request
-     */
-    public isKeyVerificationRequest(): boolean {
-        return this.getType() === EventType.RoomMessage && this.getContent().msgtype === MsgType.KeyVerificationRequest;
-    }
 }
 
 /* REDACT_KEEP_KEYS gives the keys we keep when an event is redacted

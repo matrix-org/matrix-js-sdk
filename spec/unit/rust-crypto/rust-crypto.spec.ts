@@ -38,7 +38,7 @@ import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingReque
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
-import { IStore } from "../../../src/store";
+import { TEST_ROOM_ID } from "../../test-utils/test-data";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -244,7 +244,6 @@ describe("RustCrypto", () => {
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
-                {} as IStore,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
@@ -368,7 +367,6 @@ describe("RustCrypto", () => {
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
-                {} as IStore,
             );
         });
 
@@ -506,6 +504,13 @@ describe("RustCrypto", () => {
             );
         });
     });
+
+    describe("findVerificationRequestDMInProgress", () => {
+        it("misses userId", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            expect(rustCrypto.findVerificationRequestDMInProgress(TEST_ROOM_ID)).not.toBeDefined();
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
@@ -518,7 +523,6 @@ async function makeTestRustCrypto(
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
-    store: IStore = {} as IStore,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, store);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
 }
