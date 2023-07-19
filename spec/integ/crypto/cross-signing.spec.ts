@@ -18,9 +18,14 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
-import { createClient, IAuthDict, MatrixClient } from "../../../src";
-import { mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
+import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { AuthDict, createClient, IAuthDict, MatrixClient } from "../../../src";
+import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
+import { encryptAES } from "../../../src/crypto/aes";
+import { CryptoCallbacks } from "../../../src/crypto-api";
+import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -39,7 +44,26 @@ const TEST_DEVICE_ID = "xzcvb";
  * to provide the most effective integration tests possible.
  */
 describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: string, initCrypto: InitCrypto) => {
+    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
+    // backend. Once we drop support for legacy crypto, it will go away.
+    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
+
     let aliceClient: MatrixClient;
+
+    /** an object which intercepts `/sync` requests from {@link #aliceClient} */
+    let syncResponder: ISyncResponder;
+
+    // Encryption key used to generate private cross signing keys
+    const encryptionKey = new Uint8Array(64);
+
+    /**
+     * Create the {@link CryptoCallbacks}
+     */
+    function createCryptoCallbacks(): CryptoCallbacks {
+        return {
+            getSecretStorageKey: () => Promise.resolve<[string, Uint8Array]>(["key_id", encryptionKey]),
+        };
+    }
 
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
@@ -52,7 +76,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             userId: TEST_USER_ID,
             accessToken: "akjgkrgjs",
             deviceId: TEST_DEVICE_ID,
+            cryptoCallbacks: createCryptoCallbacks(),
         });
+
+        syncResponder = new SyncResponder(homeserverUrl);
+        /** an object which intercepts `/keys/upload` requests on the test homeserver */
+        new E2EKeyReceiver(homeserverUrl);
 
         await initCrypto(aliceClient);
     });
@@ -75,13 +104,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     }
 
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
-        it("publishes keys if none were yet published", async () => {
-            mockSetupCrossSigningRequests();
-
-            // provide a UIA callback, so that the cross-signing keys are uploaded
-            const authDict = { type: "test" };
-            await bootstrapCrossSigning(authDict);
-
+        /**
+         * Check that the cross signing keys are uploaded
+         * Check that the device signatures are uploaded
+         * @param authDict
+         */
+        function checkCrossSigningKeysAndSignature(authDict: AuthDict) {
             // check the cross-signing keys upload
             expect(fetchMock.called("upload-keys")).toBeTruthy();
             const [, keysOpts] = fetchMock.lastCall("upload-keys")!;
@@ -104,6 +132,63 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(body).toHaveProperty(
                 `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[${sskId}]`,
             );
+        }
+
+        it("publishes keys if none were yet published", async () => {
+            mockSetupCrossSigningRequests();
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+
+            checkCrossSigningKeysAndSignature(authDict);
+        });
+
+        newBackendOnly("get cross signing keys from secret storage and import them", async () => {
+            mockInitialApiRequests(aliceClient.getHomeserverUrl());
+
+            // we let the client do a very basic initial sync, which it needs before
+            // it will upload one-time keys.
+            syncResponder.sendOrQueueSyncResponse({ next_batch: 1 });
+            await aliceClient.startClient();
+            await syncPromise(aliceClient);
+
+            const mockAccountDataPrivateKey = async (name: string) => {
+                const key = await encryptAES("key", encryptionKey, name);
+                fetchMock.get(`express:/_matrix/client/r0/user/:userId/account_data/${name}`, {
+                    encrypted: {
+                        key_id: key,
+                    },
+                });
+            };
+
+            // Create the private keys and return them in the `/account_data/m.cross_signing.*` response
+            await mockAccountDataPrivateKey("m.cross_signing.master");
+            await mockAccountDataPrivateKey("m.cross_signing.self_signing");
+            await mockAccountDataPrivateKey("m.cross_signing.user_signing");
+
+            fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/m.secret_storage.key.key_id", {
+                key: "key_id",
+                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+            });
+
+            // we expect a request to upload signatures for our device ...
+            fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
+
+            // ... and one to upload the cross-signing keys (with UIA)
+            fetchMock.post(
+                {
+                    url: new RegExp("/_matrix/client/v3/keys/device_signing/upload"),
+                    name: "upload-keys",
+                },
+                {},
+            );
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+
+            checkCrossSigningKeysAndSignature(authDict);
         });
     });
 

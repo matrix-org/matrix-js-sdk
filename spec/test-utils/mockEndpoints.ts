@@ -32,7 +32,7 @@ export function mockInitialApiRequests(homeserverUrl: string) {
 /**
  * Mock the requests needed to set up cross signing
  *
- * Return `{}` for `GET _matrix/client/r0/user/:userId/account_data/:type` request
+ * Return 404 error for `GET _matrix/client/r0/user/:userId/account_data/:type` request
  * Return `{}` for `POST _matrix/client/v3/keys/signatures/upload` request (named `upload-sigs` for fetchMock check)
  * Return `{}` for `POST /_matrix/client/(unstable|v3)/keys/device_signing/upload` request (named `upload-keys` for fetchMock check)
  */
