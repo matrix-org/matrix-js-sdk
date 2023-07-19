@@ -296,15 +296,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     private async getUserDevices(userId: string): Promise<Map<string, Device>> {
         const rustUserId = new RustSdkCryptoJs.UserId(userId);
-        const devices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
-        return new Map(
-            devices
-                .devices()
-                .map((device: RustSdkCryptoJs.Device) => [
-                    device.deviceId.toString(),
-                    rustDeviceToJsDevice(device, rustUserId),
-                ]),
-        );
+
+        // For reasons I don't really understand, the Javascript FinalizationRegistry doesn't seem to run the
+        // registered callbacks when `userDevices` goes out of scope, nor when the individual devices in the array
+        // returned by `userDevices.devices` do so.
+        //
+        // This is particularly problematic, because each of those structures holds a reference to the
+        // VerificationMachine, which in turn holds a reference to the IndexeddbCryptoStore. Hence, we end up leaking
+        // open connections to the crypto store, which means the store can't be deleted on logout.
+        //
+        // To fix this, we explicitly call `.free` on each of the objects, which tells the rust code to drop the
+        // allocated memory and decrement the refcounts for the crypto store.
+
+        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        try {
+            const deviceArray: RustSdkCryptoJs.Device[] = userDevices.devices();
+            try {
+                return new Map(
+                    deviceArray.map((device) => [device.deviceId.toString(), rustDeviceToJsDevice(device, rustUserId)]),
+                );
+            } finally {
+                deviceArray.forEach((d) => d.free());
+            }
+        } finally {
+            userDevices.free();
+        }
     }
 
     /**
