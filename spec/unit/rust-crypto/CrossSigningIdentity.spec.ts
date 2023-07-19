@@ -32,6 +32,7 @@ describe("CrossSigningIdentity", () => {
         /** A mock OutgoingRequestProcessor which crossSigning is connected to */
         let outgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
 
+        /** A mock ServerSideSecretStorage which crossSigning is connected to */
         let secretStorage: Mocked<ServerSideSecretStorage>;
 
         beforeEach(async () => {
