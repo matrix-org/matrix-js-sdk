@@ -5128,6 +5128,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             {
                 prefix: MediaPrefix.R0,
+                priority: "low",
             },
         );
         // TODO: Expire the URL preview cache sometimes
