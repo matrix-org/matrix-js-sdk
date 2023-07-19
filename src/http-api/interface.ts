@@ -33,7 +33,7 @@ export interface IHttpOpts {
     localTimeoutMs?: number;
 }
 
-export interface IRequestOpts {
+export interface IRequestOpts extends Pick<RequestInit, "priority"> {
     /**
      * The alternative base url to use.
      * If not specified, uses this.opts.baseUrl
@@ -61,8 +61,6 @@ export interface IRequestOpts {
     // This is intended for use on endpoints where M_UNKNOWN_TOKEN is a valid/notable error response,
     // such as with token refreshes.
     inhibitLogoutEmit?: boolean;
-
-    priority?: RequestInit["priority"];
 }
 
 export interface IContentUri {
