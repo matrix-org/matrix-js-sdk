@@ -231,9 +231,10 @@ export interface CryptoApi {
 
     /**
      * Check the cross signing trust of the current user
-     * Unneeded for new crypto
      *
      * @param opts - Options object.
+     *
+     * @deprecated Unneeded for the new crypto
      */
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
