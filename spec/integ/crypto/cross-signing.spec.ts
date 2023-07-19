@@ -19,13 +19,20 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { AuthDict, createClient, IAuthDict, MatrixClient } from "../../../src";
+import { createClient, AuthDict, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { encryptAES } from "../../../src/crypto/aes";
 import { CryptoCallbacks } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import {
+    MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+    SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+    SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    SIGNED_CROSS_SIGNING_KEYS_DATA,
+    USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+} from "../../test-utils/test-data";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -53,15 +60,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: ISyncResponder;
 
-    // Encryption key used to generate private cross signing keys
-    const encryptionKey = new Uint8Array(64);
+    // Encryption key used to encrypt cross signing keys
+    const encryptionKey = new Uint8Array(32);
 
     /**
      * Create the {@link CryptoCallbacks}
      */
     function createCryptoCallbacks(): CryptoCallbacks {
         return {
-            getSecretStorageKey: () => Promise.resolve<[string, Uint8Array]>(["key_id", encryptionKey]),
+            getSecretStorageKey: (keys, name) => {
+                return Promise.resolve<[string, Uint8Array]>(["key_id", encryptionKey]);
+            },
         };
     }
 
@@ -97,19 +106,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
      * @param authDict - The parameters to as the `auth` dict in the key upload request.
      * @see https://spec.matrix.org/v1.6/client-server-api/#authentication-types
      */
-    async function bootstrapCrossSigning(authDict: IAuthDict): Promise<void> {
+    async function bootstrapCrossSigning(authDict: AuthDict): Promise<void> {
         await aliceClient.getCrypto()?.bootstrapCrossSigning({
             authUploadDeviceSigningKeys: (makeRequest) => makeRequest(authDict).then(() => undefined),
         });
     }
 
     describe("bootstrapCrossSigning (before initialsync completes)", () => {
-        /**
-         * Check that the cross signing keys are uploaded
-         * Check that the device signatures are uploaded
-         * @param authDict
-         */
-        function checkCrossSigningKeysAndSignature(authDict: AuthDict) {
+        it("publishes keys if none were yet published", async () => {
+            mockSetupCrossSigningRequests();
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+
             // check the cross-signing keys upload
             expect(fetchMock.called("upload-keys")).toBeTruthy();
             const [, keysOpts] = fetchMock.lastCall("upload-keys")!;
@@ -132,63 +142,86 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(body).toHaveProperty(
                 `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[${sskId}]`,
             );
-        }
-
-        it("publishes keys if none were yet published", async () => {
-            mockSetupCrossSigningRequests();
-
-            // provide a UIA callback, so that the cross-signing keys are uploaded
-            const authDict = { type: "test" };
-            await bootstrapCrossSigning(authDict);
-
-            checkCrossSigningKeysAndSignature(authDict);
         });
 
         newBackendOnly("get cross signing keys from secret storage and import them", async () => {
+            // Return public cross signing keys
+            fetchMock.postOnce("path:/_matrix/client/v3/keys/query", SIGNED_CROSS_SIGNING_KEYS_DATA);
+
             mockInitialApiRequests(aliceClient.getHomeserverUrl());
 
-            // we let the client do a very basic initial sync, which it needs before
-            // it will upload one-time keys.
-            syncResponder.sendOrQueueSyncResponse({ next_batch: 1 });
+            // Create the private keys and return them in the /sync
+            const masterKey = await encryptAES(
+                MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+                encryptionKey,
+                "m.cross_signing.master",
+            );
+            const selfSigningKey = await encryptAES(
+                SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+                encryptionKey,
+                "m.cross_signing.self_signing",
+            );
+            const userSigningKey = await encryptAES(
+                USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
+                encryptionKey,
+                "m.cross_signing.user_signing",
+            );
+
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                account_data: {
+                    events: [
+                        {
+                            type: "m.cross_signing.master",
+                            content: {
+                                encrypted: {
+                                    key_id: masterKey,
+                                },
+                            },
+                        },
+                        {
+                            type: "m.cross_signing.self_signing",
+                            content: {
+                                encrypted: {
+                                    key_id: selfSigningKey,
+                                },
+                            },
+                        },
+                        {
+                            type: "m.cross_signing.user_signing",
+                            content: {
+                                encrypted: {
+                                    key_id: userSigningKey,
+                                },
+                            },
+                        },
+                        {
+                            type: "m.secret_storage.key.key_id",
+                            content: {
+                                key: "key_id",
+                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+                            },
+                        },
+                    ],
+                },
+            });
             await aliceClient.startClient();
             await syncPromise(aliceClient);
-
-            const mockAccountDataPrivateKey = async (name: string) => {
-                const key = await encryptAES("key", encryptionKey, name);
-                fetchMock.get(`express:/_matrix/client/r0/user/:userId/account_data/${name}`, {
-                    encrypted: {
-                        key_id: key,
-                    },
-                });
-            };
-
-            // Create the private keys and return them in the `/account_data/m.cross_signing.*` response
-            await mockAccountDataPrivateKey("m.cross_signing.master");
-            await mockAccountDataPrivateKey("m.cross_signing.self_signing");
-            await mockAccountDataPrivateKey("m.cross_signing.user_signing");
-
-            fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/m.secret_storage.key.key_id", {
-                key: "key_id",
-                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
-            });
 
             // we expect a request to upload signatures for our device ...
             fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
 
-            // ... and one to upload the cross-signing keys (with UIA)
-            fetchMock.post(
-                {
-                    url: new RegExp("/_matrix/client/v3/keys/device_signing/upload"),
-                    name: "upload-keys",
-                },
-                {},
-            );
-
-            // provide a UIA callback, so that the cross-signing keys are uploaded
             const authDict = { type: "test" };
             await bootstrapCrossSigning(authDict);
 
-            checkCrossSigningKeysAndSignature(authDict);
+            // Expect the signature to be uploaded
+            expect(fetchMock.called("upload-sigs")).toBeTruthy();
+            const [, sigsOpts] = fetchMock.lastCall("upload-sigs")!;
+            const body = JSON.parse(sigsOpts!.body as string);
+            // the device should have a signature with the public self cross signing keys.
+            expect(body).toHaveProperty(
+                `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[ed25519:${SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64}]`,
+            );
         });
     });
 

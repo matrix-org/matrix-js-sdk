@@ -72,6 +72,30 @@ def main() -> None:
         master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
 
+    b64_master_private_key = encode_base64(
+        master_private_key.private_bytes_raw()
+    )
+
+    self_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+
+    b64_self_signing_public_key = encode_base64(
+        self_signing_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+
+    b64_self_signing_private_key = encode_base64(
+        self_signing_private_key.private_bytes_raw()
+    )
+
+    user_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+        USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    )
+
+    b64_user_signing_private_key = encode_base64(
+        user_signing_private_key.private_bytes_raw()
+    )
+
     print(
         f"""\
 /* Test data for cryptography tests
@@ -95,6 +119,18 @@ export const SIGNED_TEST_DEVICE_DATA: IDeviceKeys = {json.dumps(device_data, ind
 
 /** base64-encoded public master cross-signing key */
 export const MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "{b64_master_public_key}";
+
+/** base64-encoded private master cross-signing key */
+export const MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_master_private_key}";
+
+/** base64-encoded public self cross-signing key */
+export const SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "{b64_self_signing_public_key}";
+
+/** base64-encoded private self signing cross-signing key */
+export const SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_self_signing_private_key}";
+
+/** base64-encoded private user signing cross-signing key */
+export const USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_user_signing_private_key}";
 
 /** Signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
 export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {

@@ -36,6 +36,18 @@ export const SIGNED_TEST_DEVICE_DATA: IDeviceKeys = {
 /** base64-encoded public master cross-signing key */
 export const MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY";
 
+/** base64-encoded private master cross-signing key */
+export const MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "ZG95b3VzcGVha3doYWFhYWFhYWFhYWFhYWFhYWFhbGU";
+
+/** base64-encoded public self cross-signing key */
+export const SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "aU2+2CyXQTCuDcmWW0EL2bhJ6PdjFW2LbAsbHqf02AY";
+
+/** base64-encoded private self signing cross-signing key */
+export const SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "c2VsZnNlbGZzZWxmc2VsZnNlbGZzZWxmc2VsZnNlbGY";
+
+/** base64-encoded private user signing cross-signing key */
+export const USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "dXNlcnVzZXJ1c2VydXNlcnVzZXJ1c2VydXNlcnVzZXI";
+
 /** Signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
 export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
     "master_keys": {
