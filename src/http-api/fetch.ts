@@ -128,7 +128,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
-    public authedRequest<T>(
+    public async authedRequest<T>(
         method: Method,
         path: string,
         queryParams?: QueryDict,
@@ -155,19 +155,53 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
         }
 
-        const requestPromise = this.request<T>(method, path, queryParams, body, opts);
+        try {
+            const response = await this.request<T>(method, path, queryParams, body, opts);
+            return response;
+        } catch (error) {
+            const err = error as MatrixError;
 
-        requestPromise.catch(async (err: MatrixError) => {
+            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, this.opts.tokenRefresher, opts.retryWithRefreshedToken);
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.retryWithRefreshedToken) {
+                const shouldRetry = await this.tryRefreshToken();
+                // if we got a new token retry the request
+                if (shouldRetry) {
+                    // we set a new token successfully
+                    console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
+                    // @TODO(kerrya) don't mutate params (opts, qp)
+                    // this function modifies these params :/ so the retry call may be with different params
+                    return this.authedRequest(method, path, queryParams, body, {
+                        ...paramOpts,
+                        retryWithRefreshedToken: true
+                    });
+                }
+            }
+            // otherwise continue with error handling
+
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
-        });
 
-        // return the original promise, otherwise tests break due to it having to
-        // go around the event loop one more time to process the result of the request
-        return requestPromise;
+            throw err;
+        }
+    }
+
+    private async tryRefreshToken(): Promise<boolean> {
+        if (!this.opts.tokenRefresher) {
+            return false;
+        }
+
+        try {
+            const newToken = await this.opts.tokenRefresher.doRefreshAccessToken();
+            this.opts.accessToken = newToken;
+            // successfully got new token
+            return true;
+        } catch (error) {
+            logger.warn("Failed to refresh token", error);
+            return false;
+        }
     }
 
     /**
@@ -231,7 +265,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
-        console.log('hhhh REQUESTOTHERURL', opts);
+        console.log('hhhh REQUESTOTHERURL', {opts, body, url });
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -297,27 +331,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (!res.ok) {
-            const err = parseErrorResponse(res, await res.text());
-
-            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, this.opts.tokenRefresher, opts.retryWithRefreshedToken);
-            if (err.errcode === "M_UNKNOWN_TOKEN" && !!this.opts.tokenRefresher && !opts.retryWithRefreshedToken) {
-                const setToken = (newToken) => {
-                    console.log('hhhh refreshToken.setting token', newToken, this);
-                    this.opts.accessToken = newToken;
-                }
-                await this.opts.tokenRefresher.doRefreshAccessToken(setToken.bind(this));
-                // we set a new token successfully
-                console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
-                // @TODO(kerrya) don't mutate params (opts, qp)
-                // this function modifies these params :/ so the retry call may be with different params
-                return this.requestOtherUrl(method, url, body, {
-                    ...opts, retryWithRefreshedToken: true,
-                    headers: {
-                        ...opts.headers,
-                        Authorization: "Bearer " + this.opts.accessToken
-                    }
-                });
-            }
+            throw parseErrorResponse(res, await res.text());
         }
 
         if (this.opts.onlyData) {

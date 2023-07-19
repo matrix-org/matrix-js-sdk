@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClient, UseRefreshTokenArgs, WebStorageStateStore } from "oidc-client-ts";
+import { OidcClient, SigninResponse, UseRefreshTokenArgs, WebStorageStateStore } from "oidc-client-ts";
 import { IDelegatedAuthConfig } from "../client";
 import { MatrixClient } from "../client";
 
@@ -23,6 +23,7 @@ import { discoverAndValidateAuthenticationConfig } from "./discovery";
 
 export class OidcTokenRefresher {
     private oidcClient!: OidcClient;
+
     constructor(
         private refreshToken: string,
         authConfig: IDelegatedAuthConfig,
@@ -49,7 +50,12 @@ export class OidcTokenRefresher {
         });
     }
 
-    public async doRefreshAccessToken (setAccessToken: MatrixClient['setAccessToken']) {
+    public async doRefreshAccessToken (): Promise<string> {
+        // @TODO something here with only one inflight refresh attempt
+        return this.getNewToken();
+    }
+
+    private async getNewToken(): Promise<string> {
         if (!this.oidcClient) {
             throw new Error("No client TODO")
         }
@@ -66,9 +72,8 @@ export class OidcTokenRefresher {
         this.expiresAt = response.expires_at;
 
         // TODO persist tokens in storage
-
-        setAccessToken(response.access_token);
-
         console.log('hhhh doRefreshAccessToken', response);
+
+        return response.access_token;
     }
 }
