@@ -180,9 +180,6 @@ describe("RustCrypto", () => {
         };
         // @ts-ignore private property
         rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
-        // @ts-ignore private property
-        rustCrypto.olmMachine.getDevice = jest.fn().mockReturnValue({ verify: jest.fn().mockReturnValue({}) });
-
         await rustCrypto.bootstrapCrossSigning({});
         expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
     });

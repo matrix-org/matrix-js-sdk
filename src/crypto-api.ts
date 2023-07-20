@@ -229,15 +229,6 @@ export interface CryptoApi {
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 
-    /**
-     * Check the cross signing trust of the current user
-     *
-     * @param opts - Options object.
-     *
-     * @deprecated Unneeded for the new crypto
-     */
-    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Device/User verification
@@ -497,13 +488,6 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
-}
-
-/**
- * Options object for {@link CryptoApi#checkOwnCrossSigningTrust}.
- */
-export interface CheckOwnCrossSigningTrustOpts {
-    allowPrivateKeyRequests?: boolean;
 }
 
 export * from "./crypto-api/verification";

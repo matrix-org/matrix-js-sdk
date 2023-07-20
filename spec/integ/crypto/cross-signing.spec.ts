@@ -33,6 +33,7 @@ import {
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
 } from "../../test-utils/test-data";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -59,6 +60,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: ISyncResponder;
+
+    /** an object which intercepts `/keys/query` requests on the test homeserver */
+    let e2eKeyResponder: E2EKeyResponder;
 
     // Encryption key used to encrypt cross signing keys
     const encryptionKey = new Uint8Array(32);
@@ -89,6 +93,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         });
 
         syncResponder = new SyncResponder(homeserverUrl);
+        e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
         /** an object which intercepts `/keys/upload` requests on the test homeserver */
         new E2EKeyReceiver(homeserverUrl);
 
@@ -146,11 +151,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
         newBackendOnly("get cross signing keys from secret storage and import them", async () => {
             // Return public cross signing keys
-            fetchMock.postOnce("path:/_matrix/client/v3/keys/query", SIGNED_CROSS_SIGNING_KEYS_DATA);
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             mockInitialApiRequests(aliceClient.getHomeserverUrl());
 
-            // Create the private keys and return them in the /sync
+            // Encrypt the private keys and return them in the /sync response as if they are in Secret Storage
             const masterKey = await encryptAES(
                 MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,

@@ -45,6 +45,9 @@ export const SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "aU2+2CyXQTCuDcmWW0EL2bhJ6Pd
 /** base64-encoded private self signing cross-signing key */
 export const SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "c2VsZnNlbGZzZWxmc2VsZnNlbGZzZWxmc2VsZnNlbGY";
 
+/** base64-encoded public user cross-signing key */
+export const USER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "g5TC/zjQXyZYuDLZv7a41z5fFVrXpYPypG//AFQj8hY";
+
 /** base64-encoded private user signing cross-signing key */
 export const USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "dXNlcnVzZXJ1c2VydXNlcnVzZXJ1c2VydXNlcnVzZXI";
 

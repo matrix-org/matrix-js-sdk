@@ -386,16 +386,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
         await this.crossSigningIdentity.bootstrapCrossSigning(opts);
-
-        // Get the current device
-        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-            this.olmMachine.userId,
-            this.olmMachine.deviceId,
-        );
-
-        // Verify the device and upload the cross signing signatures
-        const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
-        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
     }
 
     /**
@@ -676,7 +666,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * More information: https://github.com/vector-im/element-web/issues/25648
      *
      *
-     * Implementation of {@link CryptoApi#checkOwnCrossSigningTrust}
+     * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
      */
     public async checkOwnCrossSigningTrust(): Promise<void> {
         return;

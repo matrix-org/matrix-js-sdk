@@ -71,29 +71,28 @@ def main() -> None:
     b64_master_public_key = encode_base64(
         master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
-
     b64_master_private_key = encode_base64(
-        master_private_key.private_bytes_raw()
+        MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
 
     self_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
         SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
-
     b64_self_signing_public_key = encode_base64(
         self_signing_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
-
     b64_self_signing_private_key = encode_base64(
-        self_signing_private_key.private_bytes_raw()
+        SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
 
     user_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
         USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
-
+    b64_user_signing_public_key = encode_base64(
+        user_signing_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
     b64_user_signing_private_key = encode_base64(
-        user_signing_private_key.private_bytes_raw()
+        USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
 
     print(
@@ -128,6 +127,9 @@ export const SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "{b64_self_signing_public_ke
 
 /** base64-encoded private self signing cross-signing key */
 export const SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_self_signing_private_key}";
+
+/** base64-encoded public user cross-signing key */
+export const USER_CROSS_SIGNING_PUBLIC_KEY_BASE64 = "{b64_user_signing_public_key}";
 
 /** base64-encoded private user signing cross-signing key */
 export const USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_user_signing_private_key}";
