@@ -815,13 +815,13 @@ export class Aes256 implements BackupAlgorithm {
 }
 */
 
-const UNSTABLE_MSC2883_NAME = new UnstableValue(
-    "m.mls_backup.v1.aes-hmac-sha2",
-    "org.matrix.msc2883.v0.aes-hmac-sha2",
+const UNSTABLE_MSC4038_NAME = new UnstableValue(
+    "m.dmls_backup.v1.aes-hmac-sha2",
+    "org.matrix.msc4038.v0.aes-hmac-sha2",
 );
 
 export class MlsAes256 implements BackupAlgorithm {
-    public static algorithmName = UNSTABLE_MSC2883_NAME.name;
+    public static algorithmName = UNSTABLE_MSC4038_NAME.name;
 
     public constructor(public readonly authData: IAes256AuthData, private readonly key: Uint8Array) {}
 
