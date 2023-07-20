@@ -903,12 +903,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Handle the timeline event.
+     * Handle the live event received via /sync.
+     * See {@link ClientEventHandlerMap#event}
+     *
      * Event is ignored if not a key validation request.
      *
-     * @param event - timeline event
+     * @param event - live event
      */
-    public async onTimelineEvent(event: MatrixEvent): Promise<void> {
+    public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
         // Process only key validation request
         if (
             event.getType() === EventType.RoomMessage &&
