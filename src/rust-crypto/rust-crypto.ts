@@ -575,7 +575,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
         const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
-            new RustSdkCryptoJs.UserId(this.userId),
+            new RustSdkCryptoJs.UserId(userId),
         );
         return requests
             .filter((request) => request.roomId === undefined)
