@@ -33,7 +33,6 @@ import { ICryptoCallbacks } from "../crypto";
  * @param cryptoCallbacks - Crypto callbacks provided by the application
  * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
  *     If unset, a memory store will be used.
- * @param store - stored data of js-sdk
  *
  * @internal
  */
