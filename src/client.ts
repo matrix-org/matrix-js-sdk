@@ -5000,8 +5000,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
 
         if (!unthreaded && this.supportsThreads()) {
-            // A thread cannot be just a thread root and a thread root can only be read in the main timeline
-            const isThread = !!event.threadRootId && !event.isThreadRoot;
+            // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
+            // but in practice this isn't possible and the spec needs updating.
+            const isThread =
+                !!event.threadRootId &&
+                // A thread cannot be just a thread root and a thread root can only be read in the main timeline
+                !event.isThreadRoot &&
+                // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
+                event.isRelation() &&
+                (event.isRelation(THREAD_RELATION_TYPE.name) || event.relationEventId !== event.threadRootId);
             body = {
                 ...body,
                 // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
