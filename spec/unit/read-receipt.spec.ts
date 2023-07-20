@@ -55,6 +55,7 @@ describe("Read receipt", () => {
             fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
         client.isGuest = () => false;
+        client.supportsThreads = () => true;
 
         threadEvent = utils.mkEvent({
             event: true,
@@ -174,6 +175,29 @@ describe("Read receipt", () => {
                 .respond(200, {});
 
             client.sendReceipt(reaction, ReceiptType.Read, {});
+
+            await httpBackend.flushAllExpected();
+            await flushPromises();
+        });
+
+        it("should always send unthreaded receipts if threads support is disabled", async () => {
+            client.supportsThreads = () => false;
+
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: roomEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data.thread_id).toEqual(undefined);
+                })
+                .respond(200, {});
+
+            client.sendReceipt(roomEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
             await flushPromises();
