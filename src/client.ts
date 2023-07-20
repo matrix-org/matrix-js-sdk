@@ -4999,7 +4999,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (!unthreaded) {
+        if (!unthreaded && this.supportsThreads()) {
             // A thread cannot be just a thread root and a thread root can only be read in the main timeline
             const isThread = !!event.threadRootId && !event.isThreadRoot;
             body = {
