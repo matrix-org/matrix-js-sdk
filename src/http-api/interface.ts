@@ -18,6 +18,9 @@ import { MatrixError } from "./errors";
 
 export type Body = Record<string, any> | BodyInit;
 
+export type TokenRefreshFunction = (refreshToken: string) => Promise<{
+    accessToken: string; refreshToken: string;
+}>
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 
@@ -27,6 +30,8 @@ export interface IHttpOpts {
     extraParams?: Record<string, string>;
 
     accessToken?: string;
+    refreshToken?: string;
+    tokenRefreshFunction?: TokenRefreshFunction;
     useAuthorizationHeader?: boolean; // defaults to true
 
     onlyData?: boolean;

@@ -72,6 +72,7 @@ import {
     HTTPError,
     IRequestOpts,
     Body,
+    TokenRefreshFunction
 } from "./http-api";
 import {
     Crypto,
@@ -293,6 +294,14 @@ export interface ICreateClientOpts {
     deviceId?: string;
 
     accessToken?: string;
+    refreshToken?: string;
+
+    /**
+     * Function used to attempt refreshing the access token
+     * Called by http-api when a possibly expired token is encountered
+     * and a refreshToken is found
+     */
+    tokenRefreshFunction?: TokenRefreshFunction;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -1291,6 +1300,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
+            refreshToken: opts.refreshToken,
+            tokenRefreshFunction: opts.tokenRefreshFunction,
             prefix: ClientPrefix.R0,
             onlyData: true,
             extraParams: opts.queryParams,

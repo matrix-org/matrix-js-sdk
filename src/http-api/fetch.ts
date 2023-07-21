@@ -161,7 +161,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         } catch (error) {
             const err = error as MatrixError;
 
-            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, this.opts.tokenRefresher, opts.retryWithRefreshedToken);
+            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, opts.retryWithRefreshedToken);
             if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.retryWithRefreshedToken) {
                 const shouldRetry = await this.tryRefreshToken();
                 // if we got a new token retry the request
@@ -189,14 +189,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
     }
 
     private async tryRefreshToken(): Promise<boolean> {
-        if (!this.opts.tokenRefresher) {
+        if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
             return false;
         }
 
         try {
-            const newToken = await this.opts.tokenRefresher.doRefreshAccessToken();
-            this.opts.accessToken = newToken;
-            // successfully got new token
+            const {
+                accessToken, refreshToken,
+            } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
+            this.opts.accessToken = accessToken;
+            this.opts.refreshToken = refreshToken;
+            // successfully got new tokens
             return true;
         } catch (error) {
             logger.warn("Failed to refresh token", error);
@@ -265,8 +268,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
-        console.log('hhhh REQUESTOTHERURL', {opts, body, url });
-
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
         // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
@@ -321,7 +322,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
             logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
         } catch (e) {
-            console.log('hhhh requestOtherUrl error', e);
             logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
