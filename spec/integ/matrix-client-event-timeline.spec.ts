@@ -1284,7 +1284,6 @@ describe("MatrixClient event timelines", function () {
             THREAD_ROOT.event_id,
             THREAD_REPLY.event_id,
             THREAD_REPLY2.getId(),
-            THREAD_ROOT_REACTION.getId(),
             THREAD_REPLY3.getId(),
         ]);
     });

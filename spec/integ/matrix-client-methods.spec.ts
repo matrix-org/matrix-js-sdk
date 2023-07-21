@@ -656,7 +656,7 @@ describe("MatrixClient", function () {
             expect(threaded).toEqual([]);
         });
 
-        it("copies pre-thread in-timeline vote events onto both timelines", function () {
+        it("should not copy pre-thread in-timeline vote events onto both timelines", function () {
             // @ts-ignore setting private property
             client.clientOpts = {
                 ...defaultClientOpts,
@@ -684,10 +684,10 @@ describe("MatrixClient", function () {
             const eventRefWithThreadId = withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!);
             expect(eventRefWithThreadId.threadRootId).toBeTruthy();
 
-            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread, eventRefWithThreadId]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies pre-thread in-timeline reactions onto both timelines", function () {
+        it("should not copy pre-thread in-timeline reactions onto both timelines", function () {
             // @ts-ignore setting private property
             client.clientOpts = {
                 ...defaultClientOpts,
@@ -704,14 +704,10 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventReaction]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies post-thread in-timeline vote events onto both timelines", function () {
+        it("should not copy post-thread in-timeline vote events onto both timelines", function () {
             // @ts-ignore setting private property
             client.clientOpts = {
                 ...defaultClientOpts,
@@ -728,14 +724,10 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventPollResponseReference]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
-                eventMessageInThread,
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies post-thread in-timeline reactions onto both timelines", function () {
+        it("should not copy post-thread in-timeline reactions onto both timelines", function () {
             // @ts-ignore setting private property
             client.clientOpts = {
                 ...defaultClientOpts,
@@ -752,11 +744,7 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventReaction]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
         it("sends room state events to the main timeline only", function () {
@@ -809,11 +797,7 @@ describe("MatrixClient", function () {
             ]);
 
             // Thread should contain only stuff that happened in the thread - no room state events
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
-                eventMessageInThread,
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
         it("sends redactions of reactions to thread responses to thread timeline only", () => {
@@ -878,9 +862,9 @@ describe("MatrixClient", function () {
 
             const [timeline, threaded] = room.partitionThreadedEvents(events);
 
-            expect(timeline).toEqual([threadRootEvent, replyToThreadResponse]);
+            expect(timeline).toEqual([threadRootEvent]);
 
-            expect(threaded).toEqual([threadRootEvent, eventMessageInThread]);
+            expect(threaded).toEqual([threadRootEvent, eventMessageInThread, replyToThreadResponse]);
         });
     });
 

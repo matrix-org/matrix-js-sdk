@@ -18,7 +18,7 @@ import { RelationType } from "../../src/@types/event";
 import { MatrixClient } from "../../src/client";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
-import { Thread } from "../../src/models/thread";
+import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { mkMessage } from "./test-utils";
 
 export const makeThreadEvent = ({
@@ -34,7 +34,7 @@ export const makeThreadEvent = ({
         ...props,
         relatesTo: {
             event_id: rootEventId,
-            rel_type: "m.thread",
+            rel_type: THREAD_RELATION_TYPE.name,
             ["m.in_reply_to"]: {
                 event_id: replyToEventId,
             },

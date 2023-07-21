@@ -260,7 +260,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
@@ -316,6 +316,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 cache: "no-cache",
                 credentials: "omit", // we send credentials via headers
                 keepalive: keepAlive,
+                priority: opts.priority,
             });
 
             logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
