@@ -5004,7 +5004,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (!unthreaded) {
+        if (!unthreaded && this.supportsThreads()) {
             // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
             // but in practice this isn't possible and the spec needs updating.
             const isThread =
