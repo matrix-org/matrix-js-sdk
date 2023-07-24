@@ -19,7 +19,7 @@ limitations under the License.
 import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
+import { MatrixError, MatrixErrorJson } from "./http-api";
 import { UIAResponse } from "./@types/uia";
 import { UserIdentifier } from "./@types/auth";
 
@@ -264,8 +264,8 @@ export class InteractiveAuth<T> {
     private readonly requestEmailTokenCallback: IOpts<T>["requestEmailToken"];
     private readonly supportedStages?: Set<string>;
 
-    // The current latest data received from the server during the user interactive auth flow.
-    private data: IAuthData;
+    // The current latest data or error received from the server during the user interactive auth flow.
+    private data: IAuthData & MatrixErrorJson;
     private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<T> | null = null;
@@ -549,7 +549,7 @@ export class InteractiveAuth<T> {
                 matrixError.data.session = (this.data as IAuthData).session;
             }
             if (matrixError) {
-                this.data = matrixError.data as IAuthData;
+                this.data = matrixError.data;
             }
             try {
                 this.startNextAuthStage();
@@ -598,6 +598,14 @@ export class InteractiveAuth<T> {
         if (nextStage === AuthType.Dummy) {
             this.submitAuthDict({
                 type: "m.login.dummy",
+            });
+            return;
+        }
+
+        if (this.data?.errcode || this.data?.error) {
+            this.stateUpdatedCallback(nextStage, {
+                errcode: this.data?.errcode || "",
+                error: this.data?.error || "",
             });
             return;
         }
