@@ -17,7 +17,7 @@ limitations under the License.
 import { IUsageLimit } from "../@types/partials";
 import { MatrixEvent } from "../models/event";
 
-export interface MatrixErrorJson extends Partial<IUsageLimit> {
+interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
     errcode?: string;
     error?: string;
@@ -39,7 +39,7 @@ export class MatrixError extends HTTPError {
     // The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
     public readonly errcode?: string;
     // The raw Matrix error JSON used to construct this object.
-    public data: MatrixErrorJson;
+    public data: IErrorJson;
 
     /**
      * Construct a Matrix error. This is a JavaScript Error with additional
@@ -48,7 +48,7 @@ export class MatrixError extends HTTPError {
      * @param httpStatus - The numeric HTTP status code given
      */
     public constructor(
-        errorJson: MatrixErrorJson = {},
+        errorJson: IErrorJson = {},
         public readonly httpStatus?: number,
         public url?: string,
         public event?: MatrixEvent,

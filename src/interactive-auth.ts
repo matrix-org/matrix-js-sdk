@@ -19,7 +19,7 @@ limitations under the License.
 import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
-import { MatrixError, MatrixErrorJson } from "./http-api";
+import { MatrixError } from "./http-api";
 import { UIAResponse } from "./@types/uia";
 import { UserIdentifier } from "./@types/auth";
 
@@ -265,7 +265,7 @@ export class InteractiveAuth<T> {
     private readonly supportedStages?: Set<string>;
 
     // The current latest data or error received from the server during the user interactive auth flow.
-    private data: IAuthData & MatrixErrorJson;
+    private data: IAuthData & MatrixError["data"];
     private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<T> | null = null;
