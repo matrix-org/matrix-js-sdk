@@ -16,7 +16,7 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { MAIN_ROOM_TIMELINE, ReceiptType } from "../../src/@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
 import { EventType, MatrixEvent, Room } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
@@ -218,6 +218,44 @@ describe("Read receipt", () => {
             const content = fakeReadReceipt.getContent()[event.getId()!][receiptType][userId];
 
             expect(content.thread_id).toEqual(destinationId);
+        });
+    });
+
+    describe("addReceiptToStructure", () => {
+        it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
+            const userId = client.getSafeUserId();
+            const room = new Room(ROOM_ID, client, userId);
+
+            const unthreadedReceipt: WrappedReceipt = {
+                eventId: "$olderEvent",
+                data: {
+                    ts: 1234567880,
+                },
+            };
+            const mainTimelineReceipt: WrappedReceipt = {
+                eventId: "$newerEvent",
+                data: {
+                    ts: 1234567890,
+                },
+            };
+
+            room.addReceiptToStructure(
+                mainTimelineReceipt.eventId,
+                ReceiptType.ReadPrivate,
+                userId,
+                mainTimelineReceipt.data,
+                false,
+            );
+            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
+
+            room.addReceiptToStructure(
+                unthreadedReceipt.eventId,
+                ReceiptType.ReadPrivate,
+                userId,
+                unthreadedReceipt.data,
+                false,
+            );
+            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
         });
     });
 });
