@@ -3018,6 +3018,14 @@ describe("Room", function () {
             expect(responseRelations![0][1].size).toEqual(1);
             expect(responseRelations![0][1].has(threadReaction)).toBeTruthy();
         });
+
+        it("a non-thread reply to an unknown parent event should live in the main timeline only", async () => {
+            const message = mkMessage(); // we do not add this message to any timelines
+            const reply = mkReply(message);
+
+            expect(room.eventShouldLiveIn(reply).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(reply).shouldLiveInThread).toBeFalsy();
+        });
     });
 
     describe("getEventReadUpTo()", () => {
