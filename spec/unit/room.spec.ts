@@ -3112,10 +3112,10 @@ describe("Room", function () {
                 it("should give precedence to m.read.private", () => {
                     room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                         if (receiptType === ReceiptType.ReadPrivate) {
-                            return { eventId: "eventId1" } as WrappedReceipt;
+                            return { eventId: "eventId1", data: { ts: 123 } };
                         }
                         if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2" } as WrappedReceipt;
+                            return { eventId: "eventId2", data: { ts: 123 } };
                         }
                         return null;
                     };
