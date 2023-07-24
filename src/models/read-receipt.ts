@@ -57,9 +57,10 @@ export abstract class ReadReceipt<
     // which pass in an event ID and get back some receipts, so we also store
     // a pre-cached list for this purpose.
     // Map: receipt type → user Id → receipt
-    private receipts = new MapWithDefault<string, Map<string, [WrappedReceipt | null, WrappedReceipt | null]>>(
-        () => new Map(),
-    );
+    private receipts = new MapWithDefault<
+        string,
+        Map<string, [realReceipt: WrappedReceipt | null, syntheticReceipt: WrappedReceipt | null]>
+    >(() => new Map());
     private receiptCacheByEventId: ReceiptCache = new Map();
 
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
@@ -85,6 +86,13 @@ export abstract class ReadReceipt<
         return syntheticReceipt ?? realReceipt;
     }
 
+    private compareReceipts(a: WrappedReceipt, b: WrappedReceipt): number {
+        // Try compare them in our unfiltered timeline set order, falling back to receipt timestamp which should be
+        // relatively sane as receipts are set only by the originating homeserver so as long as its clock doesn't
+        // jump around then it should be valid.
+        return this.getUnfilteredTimelineSet().compareEventOrdering(a.eventId, b.eventId) ?? a.data.ts - b.data.ts;
+    }
+
     /**
      * Get the ID of the event that a given user has read up to, or null if we
      * have received no read receipts from them.
@@ -99,19 +107,13 @@ export abstract class ReadReceipt<
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
 
-        const timelineSet = this.getUnfilteredTimelineSet();
         const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
         const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
 
         // If we have both, compare them
         let comparison: number | null | undefined;
         if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
-            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
-        }
-
-        // If we didn't get a comparison try to compare the ts of the receipts
-        if (!comparison && publicReadReceipt?.data?.ts && privateReadReceipt?.data?.ts) {
-            comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+            comparison = this.compareReceipts(publicReadReceipt, privateReadReceipt);
         }
 
         // The public receipt is more likely to drift out of date so the private
@@ -142,19 +144,19 @@ export abstract class ReadReceipt<
             existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
         }
 
-        if (existingReceipt) {
-            // we only want to add this receipt if we think it is later than the one we already have.
-            // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(existingReceipt.eventId, eventId);
-            if (ordering !== null && ordering >= 0) {
-                return;
-            }
-        }
-
         const wrappedReceipt: WrappedReceipt = {
             eventId,
             data: receipt,
         };
+
+        if (existingReceipt) {
+            // We only want to add this receipt if we think it is later than the one we already have.
+            // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
+            const ordering = this.compareReceipts(existingReceipt, wrappedReceipt);
+            if (ordering >= 0) {
+                return;
+            }
+        }
 
         const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
         const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
