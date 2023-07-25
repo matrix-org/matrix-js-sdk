@@ -34,6 +34,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 # input data
 TEST_USER_ID = "@alice:localhost"
 TEST_DEVICE_ID = "test_device"
+TEST_ROOM_ID = "!room:id"
 # any 32-byte string can be an ed25519 private key.
 TEST_DEVICE_PRIVATE_KEY_BYTES = b"deadbeefdeadbeefdeadbeefdeadbeef"
 
@@ -86,6 +87,7 @@ import {{ IDownloadKeyResult }} from "../../../src";
 
 export const TEST_USER_ID = "{TEST_USER_ID}";
 export const TEST_DEVICE_ID = "{TEST_DEVICE_ID}";
+export const TEST_ROOM_ID = "{TEST_ROOM_ID}";
 
 /** The base64-encoded public ed25519 key for this device */
 export const TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64 = "{b64_public_key}";
