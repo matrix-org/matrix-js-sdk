@@ -2556,7 +2556,7 @@ describe("Room", function () {
                     next_batch: "start_token",
                 });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([randomMessage, threadRoot, threadResponse]);
             const thread: Thread = await prom;
             await emitPromise(room, ThreadEvent.Update);
