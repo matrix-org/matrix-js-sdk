@@ -194,6 +194,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return null;
     }
 
+    /**
+     * This function is unneeded for the rust-crypto.
+     * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
+     *
+     * The function is stub to keep the compatibility with the old crypto.
+     * More information: https://github.com/vector-im/element-web/issues/25648
+     *
+     *
+     * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
+     */
+    public async checkOwnCrossSigningTrust(): Promise<void> {
+        return;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -672,20 +686,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             );
         await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
         return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
-    }
-
-    /**
-     * This function is unneeded for the rust-crypto.
-     * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
-     *
-     * The function is stub to keep the compatibility with the old crypto.
-     * More information: https://github.com/vector-im/element-web/issues/25648
-     *
-     *
-     * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
-     */
-    public async checkOwnCrossSigningTrust(): Promise<void> {
-        return;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
