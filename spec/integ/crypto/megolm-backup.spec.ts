@@ -154,18 +154,12 @@ describe("megolm key backups", function () {
         // mock for the outgoing key requests that will be sent
         fetchMock.put("express:/_matrix/client/r0/sendToDevice/m.room_key_request/:txid", {});
 
-        fetchMock.get("express:/_matrix/client/v3/room_keys/version", CURVE25519_BACKUP_INFO);
+        // We'll need to add a signature to the backup data, so take a copy to avoid mutating global state.
+        const backupData = JSON.parse(JSON.stringify(CURVE25519_BACKUP_INFO));
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData);
 
         aliceClient = await initTestClient();
-
-        // we need the backup to be trusted for the test to work
-        const backupDataToSign = JSON.parse(JSON.stringify(CURVE25519_BACKUP_INFO));
-
-        await aliceClient.crypto!.signObject(backupDataToSign.auth_data);
-        fetchMock.get("express:/_matrix/client/v3/room_keys/version", backupDataToSign, {
-            overwriteRoutes: true,
-        });
-
+        await aliceClient.crypto!.signObject(backupData.auth_data);
         await aliceClient.crypto!.storeSessionBackupPrivateKey(decodeRecoveryKey(RECOVERY_KEY));
         await aliceClient.crypto!.backupManager!.checkAndStart();
 
