@@ -41,7 +41,7 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
-    CrossSigningPubKey,
+    CrossSigningKeyInfo,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -419,7 +419,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 return null;
         }
 
-        const parsedKey: CrossSigningPubKey = JSON.parse(key);
+        const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
         // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
         // We assume only a single key, and we want the bare form without type
         // prefix, so we select the values.

@@ -484,7 +484,7 @@ export enum CrossSigningKey {
  * Cross signing key
  * More information https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
  */
-export interface CrossSigningPubKey {
+export interface CrossSigningKeyInfo {
     keys: { [algorithm: string]: string };
     signatures?: ISignatures;
     usage: string[];
