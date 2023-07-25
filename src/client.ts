@@ -524,7 +524,6 @@ export interface Capabilities {
     [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
 }
 
-/* eslint-disable camelcase */
 export type ICrossSigningKey = CrossSigningKeyInfo;
 
 enum CrossSigningKeyType {
