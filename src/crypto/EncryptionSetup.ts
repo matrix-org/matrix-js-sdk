@@ -188,7 +188,7 @@ export class EncryptionSetupOperation {
             // We must only call `uploadDeviceSigningKeys` from inside this auth
             // helper to ensure we properly handle auth errors.
             await this.crossSigningKeys.authUpload?.((authDict) => {
-                return baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
+                return baseApis.uploadDeviceSigningKeys(authDict ?? undefined, keys as CrossSigningKeys);
             });
 
             // pass the new keys to the main instance of our own CrossSigningInfo.

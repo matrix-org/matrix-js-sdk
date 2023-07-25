@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-js";
+import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
@@ -26,6 +26,8 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
+ *
+ * @internal
  */
 export class RoomEncryptor {
     private readonly prefixedLogger: PrefixedLogger;

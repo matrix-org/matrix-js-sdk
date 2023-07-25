@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
@@ -34,13 +34,17 @@ import {
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
-import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
+
+afterEach(() => {
+    fetchMock.reset();
+});
 
 describe("RustCrypto", () => {
     describe(".importRoomKeys and .exportRoomKeys", () => {
@@ -390,60 +394,39 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto(undefined, testData.TEST_USER_ID);
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
-        it("returns false initially", async () => {
-            jest.useFakeTimers();
-            const prom = rustCrypto.userHasCrossSigningKeys();
-            // the getIdentity() request should wait for a /keys/query request to complete, but times out after 1500ms
-            await jest.advanceTimersByTimeAsync(2000);
-            await expect(prom).resolves.toBe(false);
-        });
-
-        it("returns false if there is no cross-signing identity", async () => {
-            // @ts-ignore private field
-            const olmMachine = rustCrypto.olmMachine;
-
-            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
-            // pick out the KeysQueryRequest, and respond to it with the device keys but *no* cross-signing keys.
-            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
-            await olmMachine.markRequestAsSent(
-                req.id!,
-                req.type,
-                JSON.stringify({
-                    device_keys: {
-                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
-                    },
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
                 }),
+                testData.TEST_USER_ID,
             );
+        });
+
+        it("throws an error if the fetch fails", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/query", 400);
+            await expect(rustCrypto.userHasCrossSigningKeys()).rejects.toThrow("400 error");
+        });
+
+        it("returns false if the user has no cross-signing keys", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                },
+            });
 
             await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(false);
         });
 
-        it("returns true if OlmMachine has a cross-signing identity", async () => {
-            // @ts-ignore private field
-            const olmMachine = rustCrypto.olmMachine;
+        it("returns true if the user has cross-signing keys", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
+                },
+                ...testData.SIGNED_CROSS_SIGNING_KEYS_DATA,
+            });
 
-            const outgoingRequests: OutgoingRequest[] = await olmMachine.outgoingRequests();
-            // pick out the KeysQueryRequest, and respond to it with the cross-signing keys
-            const req = outgoingRequests.find((r) => r instanceof KeysQueryRequest)!;
-            await olmMachine.markRequestAsSent(
-                req.id!,
-                req.type,
-                JSON.stringify({
-                    device_keys: {
-                        [testData.TEST_USER_ID]: { [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA },
-                    },
-                    ...testData.SIGNED_CROSS_SIGNING_KEYS_DATA,
-                }),
-            );
-
-            // ... and we should now have cross-signing keys.
             await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
         });
     });

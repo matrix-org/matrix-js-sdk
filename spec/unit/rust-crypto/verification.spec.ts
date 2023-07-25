@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 
 import { RustVerificationRequest } from "../../../src/rust-crypto/verification";
@@ -87,7 +87,7 @@ function makeTestRequest(
 ): RustVerificationRequest {
     inner ??= makeMockedInner();
     outgoingRequestProcessor ??= {} as OutgoingRequestProcessor;
-    return new RustVerificationRequest(inner, outgoingRequestProcessor, undefined);
+    return new RustVerificationRequest(inner, outgoingRequestProcessor, []);
 }
 
 /** Mock up a rust-side VerificationRequest */

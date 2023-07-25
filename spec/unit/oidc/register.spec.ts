@@ -66,7 +66,7 @@ describe("registerOidcClient()", () => {
         fetchMockJest.post(registrationEndpoint, {
             status: 500,
         });
-        expect(() => registerOidcClient(delegatedAuthConfig, clientName, baseUrl)).rejects.toThrow(
+        await expect(() => registerOidcClient(delegatedAuthConfig, clientName, baseUrl)).rejects.toThrow(
             OidcError.DynamicRegistrationFailed,
         );
     });
@@ -77,7 +77,7 @@ describe("registerOidcClient()", () => {
             // no clientId in response
             body: "{}",
         });
-        expect(() => registerOidcClient(delegatedAuthConfig, clientName, baseUrl)).rejects.toThrow(
+        await expect(() => registerOidcClient(delegatedAuthConfig, clientName, baseUrl)).rejects.toThrow(
             OidcError.DynamicRegistrationInvalid,
         );
     });

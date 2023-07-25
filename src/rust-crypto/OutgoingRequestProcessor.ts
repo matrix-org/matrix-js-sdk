@@ -24,7 +24,7 @@ import {
     SignatureUploadRequest,
     ToDeviceRequest,
     SigningKeysUploadRequest,
-} from "@matrix-org/matrix-sdk-crypto-js";
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
@@ -34,6 +34,8 @@ import { UIAResponse } from "../@types/uia";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
+ *
+ * @internal
  */
 export interface OutgoingRequest {
     readonly id: string | undefined;
@@ -49,6 +51,8 @@ export interface OutgoingRequest {
  *   * holding the reference to the `MatrixHttpApi`
  *   * turning `OutgoingRequest`s from the rust backend into HTTP requests, and sending them
  *   * sending the results of such requests back to the rust backend.
+ *
+ * @internal
  */
 export class OutgoingRequestProcessor {
     public constructor(
@@ -112,11 +116,13 @@ export class OutgoingRequestProcessor {
         }
 
         const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: IAuthDict): Promise<UIAResponse<T>> => {
-            const newBody = {
+        const makeRequest = async (auth: IAuthDict | null): Promise<UIAResponse<T>> => {
+            const newBody: Record<string, any> = {
                 ...parsedBody,
-                auth,
             };
+            if (auth !== null) {
+                newBody.auth = auth;
+            }
             const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
             return JSON.parse(resp) as T;
         };

@@ -38,8 +38,6 @@ import { mkMessage } from "../test-utils/test-utils";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import { ReceiptType } from "../../src/@types/read_receipts";
 
-// TODO: Fix types throughout
-
 describe("utils", function () {
     describe("encodeParams", function () {
         it("should url encode and concat with &s", function () {

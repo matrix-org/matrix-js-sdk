@@ -1,6 +1,8 @@
 name: Build downstream artifacts
 on:
-    pull_request: {}
+    # We only want the Rust Crypto Cypress tests on merge queue to prevent regressions
+    # from creeping in. They take a long time to run and consume 4 concurrent runners.
+    # Anyone working on Rust Crypto is able to run the tests locally if required.
     merge_group:
         types: [checks_requested]
 
@@ -19,7 +21,7 @@ concurrency:
 jobs:
     build-element-web:
         name: Build element-web
-        uses: matrix-org/matrix-react-sdk/.github/workflows/element-web.yaml@v3.74.0
+        uses: matrix-org/matrix-react-sdk/.github/workflows/element-web.yaml@v3.75.0
         with:
             matrix-js-sdk-sha: ${{ github.sha }}
             react-sdk-repository: matrix-org/matrix-react-sdk
