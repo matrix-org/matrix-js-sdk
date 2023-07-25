@@ -415,7 +415,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#boostrapCrossSigning}
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
-        await this.crossSigningIdentity.bootstrapCrossSigning(opts);
+        // Fire if the cross signing keys are imported from the secret storage
+        const onCrossSigningKeysImport = (): void => {
+            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(this.userId));
+        };
+        await this.crossSigningIdentity.bootstrapCrossSigning({ ...opts, onCrossSigningKeysImport });
     }
 
     /**
@@ -1033,11 +1037,16 @@ class EventDecryptor {
     }
 }
 
-type RustCryptoEvents = CryptoEvent.VerificationRequestReceived;
+type RustCryptoEvents = CryptoEvent.VerificationRequestReceived | CryptoEvent.UserTrustStatusChanged;
 
 type RustCryptoEventMap = {
     /**
      * Fires when a key verification request is received.
      */
     [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
+
+    /**
+     * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
+     */
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserTrustLevel) => void;
 };

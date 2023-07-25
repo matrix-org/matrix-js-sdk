@@ -19,7 +19,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { createClient, AuthDict, MatrixClient } from "../../../src";
+import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { encryptAES } from "../../../src/crypto/aes";
 import { CryptoCallbacks } from "../../../src/crypto-api";
@@ -216,8 +216,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             // we expect a request to upload signatures for our device ...
             fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
 
+            // we expect the UserTrustStatusChanged event to be fired after the cross signing keys import
+            const userTrustStatusChangedPromise = new Promise<string>((resolve) =>
+                aliceClient.on(CryptoEvent.UserTrustStatusChanged, resolve),
+            );
+
             const authDict = { type: "test" };
             await bootstrapCrossSigning(authDict);
+
+            // Check if the UserTrustStatusChanged event was fired
+            expect(await userTrustStatusChangedPromise).toBe(aliceClient.getUserId());
 
             // Expect the signature to be uploaded
             expect(fetchMock.called("upload-sigs")).toBeTruthy();

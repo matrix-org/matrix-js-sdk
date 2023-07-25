@@ -93,6 +93,8 @@ export class CrossSigningIdentity {
             // Sign the device with our cross-signing key and upload the signature
             const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
             await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+
+            opts.onCrossSigningKeysImport?.();
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the

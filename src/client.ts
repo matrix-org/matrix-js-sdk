@@ -2250,7 +2250,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
 
         // re-emit the events emitted by the crypto impl
-        this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);
+        this.reEmitter.reEmit(rustCrypto, [
+            CryptoEvent.VerificationRequestReceived,
+            CryptoEvent.UserTrustStatusChanged,
+        ]);
     }
 
     /**
