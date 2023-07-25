@@ -181,9 +181,7 @@ describe("RustCrypto", () => {
         // @ts-ignore private property
         rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
         await rustCrypto.bootstrapCrossSigning({});
-        expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({
-            onCrossSigningKeysImport: expect.any(Function),
-        });
+        expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
     });
 
     it("isSecretStorageReady", async () => {

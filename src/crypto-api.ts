@@ -298,11 +298,6 @@ export interface BootstrapCrossSigningOpts {
      * will not be uploaded to the server (which seems like a bad thing?).
      */
     authUploadDeviceSigningKeys?: UIAuthCallback<void>;
-
-    /**
-     * Called if the cross signing keys are imported from the secret storage
-     */
-    onCrossSigningKeysImport?: () => void;
 }
 
 export class DeviceVerificationStatus {
