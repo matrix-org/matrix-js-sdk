@@ -215,21 +215,6 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     }
 
     /**
-     * Set up expectations that the client will query key backups for a particular session
-     */
-    public expectKeyBackupQuery(roomId: string, sessionId: string, status: number, response: IKeyBackupSession) {
-        this.httpBackend
-            .when(
-                "GET",
-                encodeUri("/room_keys/keys/$roomId/$sessionId", {
-                    $roomId: roomId,
-                    $sessionId: sessionId,
-                }),
-            )
-            .respond(status, response);
-    }
-
-    /**
      * get the uploaded curve25519 device key
      *
      * @returns base64 device key
