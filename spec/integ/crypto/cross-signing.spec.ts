@@ -21,6 +21,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
 import { createClient, IAuthDict, MatrixClient } from "../../../src";
 import { mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
+import { CrossSigningKey } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -155,6 +156,57 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
 
             expect(isCrossSigningReady).toBeTruthy();
+        });
+    });
+
+    describe("getCrossSigningKeyId", () => {
+        /**
+         * Intercept /keys/device_signing/upload request and return the cross signing keys
+         * https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+         *
+         * @returns the cross signing keys
+         */
+        function awaitCrossSigningKeysUpload() {
+            return new Promise<any>((resolve) => {
+                fetchMock.post(
+                    // legacy crypto uses /unstable/; /v3/ is correct
+                    {
+                        url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                        name: "upload-keys",
+                    },
+                    (url, options) => {
+                        const content = JSON.parse(options.body as string);
+                        resolve(content);
+                        return {};
+                    },
+                    // Override the routes define in `mockSetupCrossSigningRequests`
+                    { overwriteRoutes: true },
+                );
+            });
+        }
+
+        it("should return the cross signing key id for each cross signing key", async () => {
+            mockSetupCrossSigningRequests();
+
+            // Intercept cross singing keys upload
+            const crossSigningKeysPromise = awaitCrossSigningKeysUpload();
+
+            // provide a UIA callback, so that the cross-signing keys are uploaded
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+            // Get the cross signing keys
+            const crossSigningKeys = await crossSigningKeysPromise;
+
+            const getPubKey = (crossSigningKey: any) => Object.values(crossSigningKey!.keys)[0];
+
+            const masterKeyId = await aliceClient.getCrypto()!.getCrossSigningKeyId();
+            expect(masterKeyId).toBe(getPubKey(crossSigningKeys.master_key));
+
+            const selfSigningKeyId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.SelfSigning);
+            expect(selfSigningKeyId).toBe(getPubKey(crossSigningKeys.self_signing_key));
+
+            const userSigningKeyId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.UserSigning);
+            expect(userSigningKeyId).toBe(getPubKey(crossSigningKeys.user_signing_key));
         });
     });
 });

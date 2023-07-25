@@ -41,6 +41,7 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
+    CrossSigningPubKey,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -393,8 +394,36 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getCrossSigningKeyId}
      */
     public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
-        // TODO
-        return null;
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+
+        // The public keys are not available on this device
+        if (!userIdentity) {
+            return null;
+        }
+
+        let key: string;
+        switch (type) {
+            case CrossSigningKey.Master:
+                key = userIdentity.masterKey;
+                break;
+            case CrossSigningKey.SelfSigning:
+                key = userIdentity.selfSigningKey;
+                break;
+            case CrossSigningKey.UserSigning:
+                key = userIdentity.userSigningKey;
+                break;
+            default:
+                // Unknown type
+                return null;
+        }
+
+        const parsedKey: CrossSigningPubKey = JSON.parse(key);
+        // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+        // We assume only a single key, and we want the bare form without type
+        // prefix, so we select the values.
+        return Object.values(parsedKey.keys)[0];
     }
 
     /**
