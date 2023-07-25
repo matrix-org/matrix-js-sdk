@@ -164,6 +164,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expect(requests[0].transactionId).toEqual(transactionId);
             }
 
+            // check that the returned request depends on the given userID
+            {
+                const requests = aliceClient
+                    .getCrypto()!
+                    .getVerificationRequestsToDeviceInProgress("@unknown:localhost");
+                expect(requests.length).toEqual(0);
+            }
+
             let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);

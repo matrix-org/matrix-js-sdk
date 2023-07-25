@@ -33,7 +33,7 @@ export interface IHttpOpts {
     localTimeoutMs?: number;
 }
 
-export interface IRequestOpts {
+export interface IRequestOpts extends Pick<RequestInit, "priority"> {
     /**
      * The alternative base url to use.
      * If not specified, uses this.opts.baseUrl
