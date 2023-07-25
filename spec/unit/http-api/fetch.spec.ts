@@ -277,11 +277,13 @@ describe("FetchHttpApi", () => {
         ];
         const runTests = (fetchBaseUrl: string) => {
             it.each<TestCase>(testCases)(
-                "creates url with params %s",
-                ({ path, queryParams, prefix, baseUrl }, result) => {
+                "creates url with params %s => %s",
+                ({ path, queryParams, prefix, baseUrl }, expected) => {
                     const api = makeApi(fetchBaseUrl);
 
-                    expect(api.getUrl(path, queryParams, prefix, baseUrl)).toEqual(new URL(result));
+                    const result = api.getUrl(path, queryParams, prefix, baseUrl);
+                    // we only check the stringified URL, to avoid having the test depend on the internals of URL.
+                    expect(result.toString()).toEqual(expected);
                 },
             );
         };
