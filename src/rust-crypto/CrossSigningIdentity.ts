@@ -15,11 +15,13 @@ limitations under the License.
 */
 
 import { OlmMachine, CrossSigningStatus } from "@matrix-org/matrix-sdk-crypto-wasm";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { BootstrapCrossSigningOpts } from "../crypto-api";
 import { logger } from "../logger";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { UIAuthCallback } from "../interactive-auth";
+import { ServerSideSecretStorage } from "../secret-storage";
 
 /** Manages the cross-signing keys for our own user.
  *
@@ -29,6 +31,9 @@ export class CrossSigningIdentity {
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly secretStorage: ServerSideSecretStorage,
+        /** Called if the cross signing keys are imported from the secret storage */
+        private readonly onCrossSigningKeysImport: () => void,
     ) {}
 
     /**
@@ -41,7 +46,15 @@ export class CrossSigningIdentity {
         }
 
         const olmDeviceStatus: CrossSigningStatus = await this.olmMachine.crossSigningStatus();
-        const privateKeysInSecretStorage = false; // TODO
+
+        // Try to fetch cross signing keys from the secret storage
+        const masterKeyFromSecretStorage = await this.secretStorage.get("m.cross_signing.master");
+        const selfSigningKeyFromSecretStorage = await this.secretStorage.get("m.cross_signing.self_signing");
+        const userSigningKeyFromSecretStorage = await this.secretStorage.get("m.cross_signing.user_signing");
+        const privateKeysInSecretStorage = Boolean(
+            masterKeyFromSecretStorage && selfSigningKeyFromSecretStorage && userSigningKeyFromSecretStorage,
+        );
+
         const olmDeviceHasKeys =
             olmDeviceStatus.hasMaster && olmDeviceStatus.hasUserSigning && olmDeviceStatus.hasSelfSigning;
 
@@ -67,7 +80,23 @@ export class CrossSigningIdentity {
                 "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
                     "in secret storage, reading storage and caching locally",
             );
-            throw new Error("TODO");
+            await this.olmMachine.importCrossSigningKeys(
+                masterKeyFromSecretStorage,
+                selfSigningKeyFromSecretStorage,
+                userSigningKeyFromSecretStorage,
+            );
+
+            // Get the current device
+            const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+                this.olmMachine.userId,
+                this.olmMachine.deviceId,
+            );
+
+            // Sign the device with our cross-signing key and upload the signature
+            const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+            await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+
+            this.onCrossSigningKeysImport();
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the

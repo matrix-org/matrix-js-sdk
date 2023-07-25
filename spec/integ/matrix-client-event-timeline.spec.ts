@@ -2026,6 +2026,25 @@ describe("MatrixClient event timelines", function () {
                 .respond(200, function () {
                     return THREAD_ROOT;
                 });
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function () {
+                    return THREAD_ROOT;
+                });
+            httpBackend
+                .when(
+                    "GET",
+                    "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                        encodeURIComponent(THREAD_ROOT.event_id!) +
+                        "/" +
+                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                )
+                .respond(200, function () {
+                    return {
+                        chunk: [THREAD_REPLY],
+                    };
+                });
             await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
             const room = client.getRoom(roomId)!;
