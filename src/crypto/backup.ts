@@ -40,7 +40,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
-import { SecureKeyBackup } from "../crypto-api/keybackup";
+import { SecureKeyBackup } from "../common-crypto/SecureKeyBackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms

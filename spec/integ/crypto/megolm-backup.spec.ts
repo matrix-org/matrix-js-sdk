@@ -158,6 +158,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         // tell Alice to trust the dummy device that signed the backup
         await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+        // @ts-ignore backupManager is an internal property
         await aliceCrypto.backupManager.checkAndStart();
 
         // Now, send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
