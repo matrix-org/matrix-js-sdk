@@ -253,6 +253,7 @@ export class GroupCall extends TypedEventEmitter<
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
     private _livekitServiceURL?: string;
+    private _passwordHash?: string;
 
     private stats: GroupCallStats | undefined;
     /**
@@ -356,6 +357,17 @@ export class GroupCall extends TypedEventEmitter<
 
     public updateLivekitServiceURL(newURL: string): Promise<void> {
         this._livekitServiceURL = newURL;
+        return this.sendCallStateEvent();
+    }
+
+    public get passwordHash(): string | undefined {
+        return this._passwordHash;
+    }
+
+    public setPasswordHash(hash: string): Promise<void> | undefined {
+        if (this.passwordHash) return;
+        this._passwordHash = hash;
+
         return this.sendCallStateEvent();
     }
 
