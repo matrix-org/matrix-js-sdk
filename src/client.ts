@@ -524,6 +524,7 @@ export interface Capabilities {
     [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
 }
 
+/** @deprecated prefer {@link CrossSigningKeyInfo}. */
 export type ICrossSigningKey = CrossSigningKeyInfo;
 
 enum CrossSigningKeyType {

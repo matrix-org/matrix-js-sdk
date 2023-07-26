@@ -422,8 +422,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             new RustSdkCryptoJs.UserId(this.userId),
         );
 
-        // The public keys are not available on this device
-        if (!userIdentity) {
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const privateKeysOnDevice =
+            crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
+
+        // The public or private keys are not available on this device
+        // Or the current user is not verified
+        if (!userIdentity?.isVerified() || !privateKeysOnDevice) {
             return null;
         }
 
