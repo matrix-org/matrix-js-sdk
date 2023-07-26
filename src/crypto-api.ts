@@ -137,6 +137,22 @@ export interface CryptoApi {
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
 
     /**
+     * Mark the given device as locally verified.
+     *
+     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * a cross-signing signature for it.
+     *
+     * @param userId - owner of the device
+     * @param deviceId - unique identifier for the device.
+     * @param verified - whether to mark the device as verified. Defaults to 'true'.
+     *
+     * @throws an error if the device is unknown, or has not published any encryption keys.
+     *
+     * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
+     */
+    setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
+
+    /**
      * Checks whether cross signing:
      * - is enabled on this account and trusted by this device
      * - has private keys either cached locally or stored in secret storage

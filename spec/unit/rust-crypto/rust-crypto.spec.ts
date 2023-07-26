@@ -23,6 +23,7 @@ import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
     CryptoEvent,
+    DeviceVerification,
     HttpApiEvent,
     HttpApiEventHandlerMap,
     IHttpOpts,
@@ -348,6 +349,47 @@ describe("RustCrypto", () => {
             expect(rustCrypto.getTrustCrossSignedDevices()).toBe(false);
             rustCrypto.setTrustCrossSignedDevices(true);
             expect(rustCrypto.getTrustCrossSignedDevices()).toBe(true);
+        });
+    });
+
+    describe("setDeviceVerified", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+        });
+
+        it("should mark a device as verified", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: {
+                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+            });
+            // call onSyncCompleted to kick off the outgoingRequestLoop and download the device list.
+            rustCrypto.onSyncCompleted({});
+
+            // before the call, the device should be unverified.
+            let devices = await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+            let device = devices.get(testData.TEST_USER_ID)!.get(testData.TEST_DEVICE_ID);
+            expect(device!.verified).toEqual(DeviceVerification.Unverified);
+
+            // Now call setDeviceVerified()
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // and confirm that the device is now verified
+            devices = await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+            device = devices.get(testData.TEST_USER_ID)!.get(testData.TEST_DEVICE_ID);
+            expect(device!.verified).toEqual(DeviceVerification.Verified);
         });
     });
 
