@@ -255,7 +255,7 @@ export interface CryptoApi {
     findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
 
     /**
-     * Finds a DM verification request that is already in progress for the given room id.
+     * Finds a DM verification request that is already in progress for the given room and user.
      *
      * @param roomId - the room to use for verification.
      * @param userId - search for a verification request for the given user.

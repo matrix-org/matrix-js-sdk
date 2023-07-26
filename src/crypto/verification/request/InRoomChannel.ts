@@ -354,7 +354,7 @@ export class InRoomRequests implements IRequestsMap {
         const requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             for (const request of requestsByTxnId.values()) {
-                if (request.pending && (!userId || request.requestingUserId === userId)) {
+                if (request.pending && (userId === undefined || request.requestingUserId === userId)) {
                     return request;
                 }
             }

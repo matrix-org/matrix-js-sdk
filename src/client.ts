@@ -2248,8 +2248,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // attach the event listeners needed by RustCrypto
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
-        // listen only key verification request
-        // other events are processed during the /sync
         this.on(ClientEvent.Event, (event) => {
             rustCrypto.onLiveEventFromSync(event);
         });

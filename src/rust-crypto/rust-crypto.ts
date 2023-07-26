@@ -19,7 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
-import { IContent, MatrixEvent } from "../models/event";
+import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
@@ -97,6 +97,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         /** The local user's Device ID. */
         _deviceId: string,
+
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
         /** Crypto callbacks provided by the application */
@@ -954,16 +955,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Handle the live event received via /sync.
+     * Handle a live event received via /sync.
      * See {@link ClientEventHandlerMap#event}
-     *
-     * Event is ignored if not a key validation request.
      *
      * @param event - live event
      */
     public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
         // Process only key validation request
+        // and ignore state event
         if (
+            !event.isState() &&
             event.getType() === EventType.RoomMessage &&
             event.getContent().msgtype === MsgType.KeyVerificationRequest
         ) {
@@ -982,18 +983,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (!roomId) {
             throw new Error("missing roomId in the event");
         }
+        const receiveVerificationEvent = async (evt: MatrixEvent): Promise<void> => {
+            await this.olmMachine.receiveVerificationEvent(
+                JSON.stringify({
+                    event_id: evt.getId(),
+                    type: evt.getWireType(),
+                    sender: evt.getSender(),
+                    state_key: evt.getStateKey(),
+                    content: evt.getContent(),
+                    origin_server_ts: evt.getTs(),
+                }),
+                new RustSdkCryptoJs.RoomId(roomId),
+            );
+        };
 
-        await this.olmMachine.receiveVerificationEvent(
-            JSON.stringify({
-                event_id: event.getId(),
-                type: event.getWireType(),
-                sender: event.getSender(),
-                state_key: event.getStateKey(),
-                content: event.getWireContent(),
-                origin_server_ts: event.getTs(),
-            }),
-            new RustSdkCryptoJs.RoomId(roomId),
-        );
+        // In case we failed to decrypt the event
+        // We wait for the event to be decrypted
+        if (event.isDecryptionFailure()) {
+            event.once(MatrixEventEvent.Decrypted, (decryptedEvent) => {
+                receiveVerificationEvent(decryptedEvent);
+            });
+        } else {
+            await receiveVerificationEvent(event);
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
