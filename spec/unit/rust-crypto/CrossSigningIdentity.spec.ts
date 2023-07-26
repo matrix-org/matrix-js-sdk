@@ -19,6 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { ServerSideSecretStorage } from "../../../src/secret-storage";
 
 describe("CrossSigningIdentity", () => {
     describe("bootstrapCrossSigning", () => {
@@ -30,6 +31,9 @@ describe("CrossSigningIdentity", () => {
 
         /** A mock OutgoingRequestProcessor which crossSigning is connected to */
         let outgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
+
+        /** A mock ServerSideSecretStorage which crossSigning is connected to */
+        let secretStorage: Mocked<ServerSideSecretStorage>;
 
         beforeEach(async () => {
             await RustSdkCryptoJs.initAsync();
@@ -44,7 +48,11 @@ describe("CrossSigningIdentity", () => {
                 makeOutgoingRequest: jest.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
-            crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor);
+            secretStorage = {
+                get: jest.fn(),
+            } as unknown as Mocked<ServerSideSecretStorage>;
+
+            crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage, jest.fn());
         });
 
         it("should do nothing if keys are present on-device and in secret storage", async () => {
