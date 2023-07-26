@@ -426,9 +426,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const privateKeysOnDevice =
             crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
 
-        // The public or private keys are not available on this device
-        // Or the current user is not verified
-        if (!userIdentity?.isVerified() || !privateKeysOnDevice) {
+        if (!userIdentity || !privateKeysOnDevice) {
+            // The public or private keys are not available on this device
+            return null;
+        }
+
+        if (!userIdentity.isVerified()) {
+            // We have both public and private keys, but they don't match!
             return null;
         }
 

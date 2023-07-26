@@ -318,7 +318,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         it("should return the cross signing key id for each cross signing key", async () => {
             mockSetupCrossSigningRequests();
 
-            // Intercept cross singing keys upload
+            // Intercept cross signing keys upload
             const crossSigningKeysPromise = awaitCrossSigningKeysUpload();
 
             // provide a UIA callback, so that the cross-signing keys are uploaded
