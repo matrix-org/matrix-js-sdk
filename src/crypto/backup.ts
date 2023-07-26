@@ -36,11 +36,11 @@ import {
     IKeyBackupInfo,
     IKeyBackupSession,
 } from "./keybackup";
+import { SecureKeyBackup } from "../crypto-api";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
-import { SecureKeyBackup } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -136,6 +136,7 @@ export class BackupManager implements SecureKeyBackup {
         this.clientRunning = false;
     }
 
+    /** @deprecated use {@link getActiveBackupVersion} instead */
     public get version(): string | undefined {
         return this.backupInfo && this.backupInfo.version;
     }
@@ -195,11 +196,28 @@ export class BackupManager implements SecureKeyBackup {
         this.baseApis.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
+    /** @deprecated use {@link getActiveBackupVersion} instead */
     public getKeyBackupEnabled(): boolean | null {
         if (!this.checkedForBackup) {
             return null;
         }
         return Boolean(this.algorithm);
+    }
+
+    /**
+     * Get the current status of key backup.
+     *
+     * Implementation of {@link SecureKeyBackup.getActiveBackupVersion}.
+     */
+    public async getActiveBackupVersion(): Promise<string | null> {
+        if (!this.checkedForBackup) {
+            return null;
+        }
+        if (this.algorithm && this.version) {
+            return this.version;
+        } else {
+            return null;
+        }
     }
 
     public async prepareKeyBackupVersion(

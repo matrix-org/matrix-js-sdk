@@ -20,4 +20,14 @@ export class RustBackupManager implements SecureKeyBackup {
     public async checkAndStart(): Promise<KeyBackupCheck | null> {
         return null;
     }
+
+    /**
+     * Get the current status of key backup.
+     *
+     * Implementation of {@link SecureKeyBackup.getActiveBackupVersion}.
+     */
+    public async getActiveBackupVersion(): Promise<string | null> {
+        // TODO stub
+        return null;
+    }
 }

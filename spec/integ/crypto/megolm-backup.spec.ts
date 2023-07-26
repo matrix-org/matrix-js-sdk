@@ -18,7 +18,7 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { createClient, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -151,12 +151,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         // start after saving the private key
         await aliceClient.startClient();
 
-        // Persuade alice to fetch the device list. Completing the initial sync will make the device list download
-        // outdated device lists (of which our own user will be one).
-        syncResponder.sendOrQueueSyncResponse({});
-        await jest.advanceTimersByTimeAsync(10); // DeviceList has a sleep(5) which we need to make happen
-
         // tell Alice to trust the dummy device that signed the backup
+        await waitForDeviceList();
         await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
         await aliceCrypto.backupManager.checkAndStart();
 
@@ -169,4 +165,72 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         await awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(event.getContent()).toEqual("testytest");
     });
+
+    oldBackendOnly("getKeyBackupStatus() should give correct status", async function () {
+        // 404 means that there is no active backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", 404);
+
+        aliceClient = await initTestClient();
+        const aliceCrypto = aliceClient.getCrypto()!;
+        await aliceClient.startClient();
+
+        // tell Alice to trust the dummy device that signed the backup
+        await waitForDeviceList();
+        await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+        await aliceCrypto.backupManager.checkAndStart();
+
+        // At this point there is no backup
+        let backupStatus: string | null;
+        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        expect(backupStatus).toBeNull();
+
+        // Serve a backup with no trusted signature
+        const unsignedBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+        delete unsignedBackup.auth_data.signatures;
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", unsignedBackup, {
+            overwriteRoutes: true,
+        });
+
+        const checked = await aliceCrypto.backupManager.checkAndStart();
+        expect(checked?.backupInfo?.version).toStrictEqual(unsignedBackup.version);
+        expect(checked?.trustInfo?.usable).toBeFalsy();
+
+        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        expect(backupStatus).toBeNull();
+
+        // Add a valid signature to the backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+            overwriteRoutes: true,
+        });
+
+        // check that signaling is working
+        const backupPromise = new Promise<void>((resolve, reject) => {
+            aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                if (enabled) {
+                    resolve();
+                }
+            });
+        });
+
+        const validCheck = await aliceCrypto.backupManager.checkAndStart();
+        expect(validCheck?.trustInfo?.usable).toStrictEqual(true);
+
+        await backupPromise;
+
+        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        expect(backupStatus).toStrictEqual(testData.SIGNED_BACKUP_DATA.version);
+    });
+
+    /** make sure that the client knows about the dummy device */
+    async function waitForDeviceList(): Promise<void> {
+        // Completing the initial sync will make the device list download outdated device lists (of which our own
+        // user will be one).
+        syncResponder.sendOrQueueSyncResponse({});
+        // DeviceList has a sleep(5) which we need to make happen
+        await jest.advanceTimersByTimeAsync(10);
+
+        // The client should now know about the dummy device
+        const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+        expect(devices.get(TEST_USER_ID)!.keys()).toContain(TEST_DEVICE_ID);
+    }
 });
