@@ -503,6 +503,16 @@ describe("RustCrypto", () => {
             );
         });
     });
+
+    describe("get|storeSessionBackupPrivateKey", () => {
+        it("can save and restore a key", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

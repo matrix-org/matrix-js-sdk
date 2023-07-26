@@ -285,6 +285,30 @@ export interface CryptoApi {
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
     requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Secure key backup
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Fetch the backup decryption key we have saved in our store.
+     *
+     * This can be used for gossiping the key to other devices.
+     *
+     * @returns the key, if any, or null
+     */
+    getSessionBackupPrivateKey(): Promise<Uint8Array | null>;
+
+    /**
+     * Store the backup decryption key.
+     *
+     * This should be called if the client has received the key from another device via secret sharing (gossiping).
+     *
+     * @param key - the backup decryption key
+     */
+    storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
 }
 
 /**
