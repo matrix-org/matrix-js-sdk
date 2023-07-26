@@ -2250,7 +2250,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
 
         // re-emit the events emitted by the crypto impl
-        this.reEmitter.reEmit(rustCrypto, [CryptoEvent.VerificationRequestReceived]);
+        this.reEmitter.reEmit(rustCrypto, [
+            CryptoEvent.VerificationRequestReceived,
+            CryptoEvent.UserTrustStatusChanged,
+        ]);
     }
 
     /**
@@ -2679,12 +2682,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
      * @param opts - ICheckOwnCrossSigningTrustOpts object
+     *
+     * @deprecated Unneeded for the new crypto
      */
     public checkOwnCrossSigningTrust(opts?: ICheckOwnCrossSigningTrustOpts): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkOwnCrossSigningTrust(opts);
+        return this.cryptoBackend.checkOwnCrossSigningTrust(opts);
     }
 
     /**
@@ -3721,10 +3726,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        const privKey = await this.crypto.getSessionBackupPrivateKey();
+        const privKey = await this.cryptoBackend.getSessionBackupPrivateKey();
         if (!privKey) {
             throw new Error("Couldn't get key");
         }
@@ -3762,7 +3767,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const cacheCompleteCallback = opts?.cacheCompleteCallback;
         const progressCallback = opts?.progressCallback;
 
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
 
@@ -3785,9 +3790,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
             }
 
+            if (!(privKey instanceof Uint8Array)) {
+                // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                throw new Error(`restoreKeyBackup expects Uint8Array, got ${privKey}`);
+            }
             // Cache the key, if possible.
             // This is async.
-            this.crypto
+            this.cryptoBackend
                 .storeSessionBackupPrivateKey(privKey)
                 .catch((e) => {
                     logger.warn("Error caching session backup key:", e);
@@ -3844,7 +3853,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             algorithm.free();
         }
 
-        await this.getCrypto()?.importRoomKeys(keys, {
+        await this.cryptoBackend.importRoomKeys(keys, {
             progressCallback,
             untrusted,
             source: "backup",
