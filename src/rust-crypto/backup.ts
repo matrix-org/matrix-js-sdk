@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SecureKeyBackup } from "../crypto-api/keybackup";
+import { KeyBackupCheck, SecureKeyBackup } from "../crypto-api/keybackup";
 
-export class RustBackupManager implements SecureKeyBackup {}
+export class RustBackupManager implements SecureKeyBackup {
+    public async checkAndStart(): Promise<KeyBackupCheck | null> {
+        return null;
+    }
+}

@@ -55,6 +55,7 @@ type SigInfo = {
     deviceTrust?: DeviceTrustLevel;
 };
 
+/** @deprecated Prefer {@link Crypto.BackupTrustInfo} */
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
@@ -62,6 +63,7 @@ export type TrustInfo = {
     trusted_locally?: boolean;
 };
 
+/** @deprecated Prefer {@link Crypto.KeyBackupCheck} */
 export interface IKeyBackupCheck {
     backupInfo?: IKeyBackupInfo;
     trustInfo: TrustInfo;

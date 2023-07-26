@@ -31,7 +31,27 @@ import { ISigned } from "../@types/signed";
  * @see https://spec.matrix.org/v1.7/client-server-api/#server-side-key-backups
  */
 export interface SecureKeyBackup {
-    // TODO: add some stuff here
+    /**
+     * Check the server for an active key backup.
+     *
+     * If a key backup is present, and has a valid signature from one of the user's verified devices, start backing up
+     * to it.
+     *
+     * @returns `null` if there was an error checking for an active backup; otherwise, information about the active backup
+     *    (or lack thereof).
+     */
+    checkAndStart(): Promise<KeyBackupCheck | null>;
+}
+
+/**
+ * The result of {@link SecureKeyBackup.checkAndStart}.
+ */
+export interface KeyBackupCheck {
+    /** Information from the server about the backup. `undefined` if there is no active backup. */
+    backupInfo?: KeyBackupInfo;
+
+    /** Information on whether we trust this backup. */
+    trustInfo: BackupTrustInfo;
 }
 
 export interface Curve25519AuthData {
@@ -49,7 +69,10 @@ export interface Aes256AuthData {
 }
 
 /**
- * Extra info of a recovery key
+ * Information about a server-side key backup.
+ *
+ * Returned by `GET /_matrix/client/v3/room_keys/version`
+ * (see https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3room_keysversion).
  */
 export interface KeyBackupInfo {
     algorithm: string;
@@ -57,4 +80,16 @@ export interface KeyBackupInfo {
     count?: number;
     etag?: string;
     version?: string; // number contained within
+}
+
+/**
+ * Information on whether a given server-side backup is trusted.
+ */
+export interface BackupTrustInfo {
+    /**
+     * Is this backup trusted?
+     *
+     * True if, and only if, there is a valid signature on the backup from a trusted device
+     */
+    readonly usable: boolean;
 }
