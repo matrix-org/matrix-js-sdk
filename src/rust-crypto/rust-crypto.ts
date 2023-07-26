@@ -698,6 +698,33 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
     }
 
+    /**
+     * Fetch the backup decryption key we have saved in our store.
+     *
+     * Implementation of {@link CryptoApi#getSessionBackupPrivateKey}.
+     *
+     * @returns the key, if any, or null
+     */
+    public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (!backupKeys.decryptionKeyBase64) return null;
+        return Buffer.from(backupKeys.decryptionKeyBase64, "base64");
+    }
+
+    /**
+     * Store the backup decryption key.
+     *
+     * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
+     * @param key - the backup decryption key
+     */
+    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+        const base64Key = Buffer.from(key).toString("base64");
+
+        // TODO get version from backupManager
+        await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
