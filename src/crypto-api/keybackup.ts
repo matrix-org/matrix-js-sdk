@@ -16,6 +16,24 @@ limitations under the License.
 
 import { ISigned } from "../@types/signed";
 
+/**
+ * Interface to server-side key backup
+ *
+ * Server-side key backup, aka "secure (key) backup" or "session backup", is a feature in which devices save copies of
+ * the megolm session keys that they receive on the server. The keys are encrypted with the public part of an asymmetric
+ * key, which makes it easy for devices to add newly-received session keys. In future, if the user logs in on another
+ * device which lacks history, the backup can be restored by providing the private part of the key (the "backup
+ * decryption key"), thus providing access to historical messages.
+ *
+ * (The backup decryption key is normally retrieved from server-side-secret-storage (4S) or gossipped between devices
+ * using secret sharing, rather than being entered directly).
+ *
+ * @see https://spec.matrix.org/v1.7/client-server-api/#server-side-key-backups
+ */
+export interface SecureKeyBackup {
+    // TODO: add some stuff here
+}
+
 export interface Curve25519AuthData {
     public_key: string;
     private_key_salt?: string;

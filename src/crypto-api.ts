@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { KeyBackupInfo, SecureKeyBackup } from "./crypto-api/keybackup";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -306,6 +306,13 @@ export interface CryptoApi {
     // Secure key backup
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Access the backup manager
+     *
+     * @see Crypto.SecureKeyBackup
+     */
+    readonly backupManager: SecureKeyBackup;
 
     /**
      * Fetch the backup decryption key we have saved in our store.

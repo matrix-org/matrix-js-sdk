@@ -40,6 +40,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
+import { SecureKeyBackup } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -112,7 +113,7 @@ export interface IKeyBackup {
 /**
  * Manages the key backup.
  */
-export class BackupManager {
+export class BackupManager implements SecureKeyBackup {
     private algorithm: BackupAlgorithm | undefined;
     public backupInfo: IKeyBackupInfo | undefined; // The info dict from /room_keys/version
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
