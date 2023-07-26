@@ -532,4 +532,3 @@ export interface GeneratedSecretStorageKey {
 
 export * from "./crypto-api/verification";
 export * from "./crypto-api/keybackup";
-export type { SecureKeyBackup } from "./common-crypto/SecureKeyBackup";
