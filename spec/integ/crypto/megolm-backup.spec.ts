@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
+import "fake-indexeddb/auto";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
@@ -22,7 +23,7 @@ import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import { awaitDecryption, syncPromise } from "../../test-utils/test-utils";
+import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 
 const ROOM_ID = "!ROOM:ID";
@@ -73,7 +74,11 @@ const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
 const TEST_USER_ID = "@alice:localhost";
 const TEST_DEVICE_ID = "xzcvb";
 
-describe("megolm key backups", function () {
+describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
+    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
+    // Rust backend. Once we have full support in the rust sdk, it will go away.
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
@@ -117,12 +122,12 @@ describe("megolm key backups", function () {
             deviceId: TEST_DEVICE_ID,
             ...opts,
         });
-        await client.initCrypto();
+        await initCrypto(client);
 
         return client;
     }
 
-    it("Alice checks key backups when receiving a message she can't decrypt", async function () {
+    oldBackendOnly("Alice checks key backups when receiving a message she can't decrypt", async function () {
         const syncResponse = {
             next_batch: 1,
             rooms: {
