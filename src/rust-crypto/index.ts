@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto";
 import { logger } from "../logger";
@@ -33,6 +33,8 @@ import { ICryptoCallbacks } from "../crypto";
  * @param cryptoCallbacks - Crypto callbacks provided by the application
  * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
  *     If unset, a memory store will be used.
+ *
+ * @internal
  */
 export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
@@ -42,7 +44,7 @@ export async function initRustCrypto(
     cryptoCallbacks: ICryptoCallbacks,
     storePrefix: string | null,
 ): Promise<RustCrypto> {
-    // initialise the rust matrix-sdk-crypto-js, if it hasn't already been done
+    // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
 
     // enable tracing in the rust-sdk

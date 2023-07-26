@@ -96,7 +96,7 @@ describe("ECDHv2", function () {
 
             expect(aliceChecksum).toEqual(bobChecksum);
 
-            expect(alice.connect()).rejects.toThrow();
+            await expect(alice.connect()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
             await bob.cancel(RendezvousFailureReason.Unknown);
@@ -120,9 +120,9 @@ describe("ECDHv2", function () {
 
             alice.close();
 
-            expect(alice.connect()).rejects.toThrow();
-            expect(alice.send({})).rejects.toThrow();
-            expect(alice.receive()).rejects.toThrow();
+            await expect(alice.connect()).rejects.toThrow();
+            await expect(alice.send({})).rejects.toThrow();
+            await expect(alice.receive()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
             await bob.cancel(RendezvousFailureReason.Unknown);
@@ -146,10 +146,10 @@ describe("ECDHv2", function () {
 
             // send a message without encryption
             await aliceTransport.send({ iv: "dummy", ciphertext: "dummy" });
-            expect(bob.receive()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
             await bob.cancel(RendezvousFailureReason.Unknown);
+            await expect(bob.receive()).rejects.toThrow();
         });
 
         it("ciphertext before set up", async function () {
@@ -164,9 +164,8 @@ describe("ECDHv2", function () {
 
             await bobTransport.send({ iv: "dummy", ciphertext: "dummy" });
 
-            expect(alice.receive()).rejects.toThrow();
-
             await alice.cancel(RendezvousFailureReason.Unknown);
+            await expect(alice.receive()).rejects.toThrow();
         });
     });
 });

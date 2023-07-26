@@ -15,8 +15,9 @@ limitations under the License.
 */
 
 import jwtDecode from "jwt-decode";
+import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
-import { IClientWellKnown, IDelegatedAuthConfig, M_AUTHENTICATION } from "../client";
+import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
 
@@ -39,9 +40,7 @@ export type ValidatedIssuerConfig = {
  * @returns config - when present and valid
  * @throws when config is not found or invalid
  */
-export const validateWellKnownAuthentication = (wellKnown: IClientWellKnown): IDelegatedAuthConfig => {
-    const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown);
-
+export const validateWellKnownAuthentication = (authentication?: IDelegatedAuthConfig): IDelegatedAuthConfig => {
     if (!authentication) {
         throw new Error(OidcError.NotSupported);
     }
@@ -63,14 +62,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
 const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!wellKnown[key] || !optionalStringProperty(wellKnown, key)) {
-        logger.error(`OIDC issuer configuration: ${key} is invalid`);
+        logger.error(`Missing or invalid property: ${key}`);
         return false;
     }
     return true;
 };
 const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!!wellKnown[key] && typeof wellKnown[key] !== "string") {
-        logger.error(`OIDC issuer configuration: ${key} is invalid`);
+        logger.error(`Invalid property: ${key}`);
         return false;
     }
     return true;
@@ -78,7 +77,7 @@ const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string)
 const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, value: any): boolean => {
     const array = wellKnown[key];
     if (!array || !Array.isArray(array) || !array.includes(value)) {
-        logger.error(`OIDC issuer configuration: ${key} is invalid. ${value} is required.`);
+        logger.error(`Invalid property: ${key}. ${value} is required.`);
         return false;
     }
     return true;
@@ -101,6 +100,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     const isInvalid = [
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
+        requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
@@ -118,6 +118,36 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     logger.error("Issuer configuration not valid");
     throw new Error(OidcError.OpSupport);
 };
+
+/**
+ * Metadata from OIDC authority discovery
+ * With validated properties required in type
+ */
+export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
+    Pick<
+        OidcMetadata,
+        | "issuer"
+        | "authorization_endpoint"
+        | "token_endpoint"
+        | "registration_endpoint"
+        | "revocation_endpoint"
+        | "response_types_supported"
+        | "grant_types_supported"
+        | "code_challenge_methods_supported"
+    >;
+
+/**
+ * Wraps validateOIDCIssuerWellKnown in a type assertion
+ * that asserts expected properties are present
+ * (Typescript assertions cannot be arrow functions)
+ * @param metadata - issuer openid-configuration response
+ * @throws when metadata validation fails
+ */
+export function isValidatedIssuerMetadata(
+    metadata: Partial<OidcMetadata>,
+): asserts metadata is ValidatedIssuerMetadata {
+    validateOIDCIssuerWellKnown(metadata);
+}
 
 /**
  * Standard JWT claims.
@@ -199,3 +229,80 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
         throw new Error(OidcError.InvalidIdToken);
     }
 };
+
+/**
+ * State we ask OidcClient to store when starting oidc authorization flow (in `generateOidcAuthorizationUrl`)
+ * so that we can access it on return from the OP and complete login
+ */
+export type UserState = {
+    /**
+     * Remember which server we were trying to login to
+     */
+    homeserverUrl: string;
+    identityServerUrl?: string;
+    /**
+     * Used to validate id token
+     */
+    nonce: string;
+};
+/**
+ * Validate stored user state exists and is valid
+ * @param userState - userState returned by oidcClient.processSigninResponse
+ * @throws when userState is invalid
+ */
+export function validateStoredUserState(userState: unknown): asserts userState is UserState {
+    if (!isRecord(userState)) {
+        logger.error("Stored user state not found");
+        throw new Error(OidcError.MissingOrInvalidStoredState);
+    }
+    const isInvalid = [
+        requiredStringProperty(userState, "homeserverUrl"),
+        requiredStringProperty(userState, "nonce"),
+        optionalStringProperty(userState, "identityServerUrl"),
+    ].some((isValid) => !isValid);
+
+    if (isInvalid) {
+        throw new Error(OidcError.MissingOrInvalidStoredState);
+    }
+}
+
+/**
+ * The expected response type from the token endpoint during authorization code flow
+ * Normalized to always use capitalized 'Bearer' for token_type
+ *
+ * See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4,
+ * https://openid.net/specs/openid-connect-basic-1_0.html#TokenOK.
+ */
+export type BearerTokenResponse = {
+    token_type: "Bearer";
+    access_token: string;
+    scope: string;
+    refresh_token?: string;
+    expires_in?: number;
+    // from oidc-client-ts
+    expires_at?: number;
+    id_token?: string;
+};
+
+/**
+ * Make required properties required in type
+ */
+type ValidSignInResponse = SigninResponse &
+    BearerTokenResponse & {
+        token_type: "Bearer" | "bearer";
+    };
+
+const isValidBearerTokenResponse = (response: unknown): response is ValidSignInResponse =>
+    isRecord(response) &&
+    requiredStringProperty(response, "token_type") &&
+    // token_type is case insensitive, some OPs return `token_type: "bearer"`
+    (response["token_type"] as string).toLowerCase() === "bearer" &&
+    requiredStringProperty(response, "access_token") &&
+    requiredStringProperty(response, "refresh_token") &&
+    (!("expires_in" in response) || typeof response["expires_in"] === "number");
+
+export function validateBearerTokenResponse(response: unknown): asserts response is ValidSignInResponse {
+    if (!isValidBearerTokenResponse(response)) {
+        throw new Error(OidcError.InvalidBearerTokenResponse);
+    }
+}

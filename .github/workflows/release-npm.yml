@@ -24,7 +24,7 @@ jobs:
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@a25b4180b728b0279fca97d4e5bccf391685aead # v2.2.0
+              uses: JS-DevTools/npm-publish@5a85faf05d2ade2d5b6682bfe5359915d5159c6c # v2.2.1
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public

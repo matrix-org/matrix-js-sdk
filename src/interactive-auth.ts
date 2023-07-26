@@ -159,11 +159,12 @@ export class NoAuthFlowFoundError extends Error {
  * The type of an application callback to perform the user-interactive bit of UIA.
  *
  * It is called with a single parameter, `makeRequest`, which is a function which takes the UIA parameters and
- * makes the HTTP request.
+ * makes the HTTP request. The `authData` parameter in `makeRequest` can be set to null to omit the `auth` field
+ * from the UIA request.
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
-export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict) => Promise<UIAResponse<T>>) => Promise<T>;
+export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
 
 interface IOpts<T> {
     /**
@@ -263,8 +264,8 @@ export class InteractiveAuth<T> {
     private readonly requestEmailTokenCallback: IOpts<T>["requestEmailToken"];
     private readonly supportedStages?: Set<string>;
 
-    // The current latest data received from the server during the user interactive auth flow.
-    private data: IAuthData;
+    // The current latest data or error received from the server during the user interactive auth flow.
+    private data: IAuthData & MatrixError["data"];
     private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<T> | null = null;
@@ -548,7 +549,7 @@ export class InteractiveAuth<T> {
                 matrixError.data.session = (this.data as IAuthData).session;
             }
             if (matrixError) {
-                this.data = matrixError.data as IAuthData;
+                this.data = matrixError.data;
             }
             try {
                 this.startNextAuthStage();
@@ -597,6 +598,14 @@ export class InteractiveAuth<T> {
         if (nextStage === AuthType.Dummy) {
             this.submitAuthDict({
                 type: "m.login.dummy",
+            });
+            return;
+        }
+
+        if (this.data?.errcode || this.data?.error) {
+            this.stateUpdatedCallback(nextStage, {
+                errcode: this.data?.errcode || "",
+                error: this.data?.error || "",
             });
             return;
         }

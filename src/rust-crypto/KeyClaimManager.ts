@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, UserId } from "@matrix-org/matrix-sdk-crypto-js";
+import { OlmMachine, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
@@ -22,6 +22,8 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
  * KeyClaimManager: linearises calls to OlmMachine.getMissingSessions to avoid races
  *
  * We have one of these per `RustCrypto` (and hence per `MatrixClient`).
+ *
+ * @internal
  */
 export class KeyClaimManager {
     private currentClaimPromise: Promise<void>;

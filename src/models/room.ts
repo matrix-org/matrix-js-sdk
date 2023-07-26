@@ -2093,6 +2093,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Determine which timeline(s) a given event should live in
+     * Thread roots live in both the main timeline and their corresponding thread timeline
+     * Relations, redactions, replies to thread relation events live only in the thread timeline
+     * Relations (other than m.thread), redactions, replies to a thread root live only in the main timeline
+     * Relations, redactions, replies where the parent cannot be found live in no timelines but should be aggregated regardless.
+     * Otherwise, the event lives in the main timeline only.
+     */
     public eventShouldLiveIn(
         event: MatrixEvent,
         events?: MatrixEvent[],
@@ -2109,7 +2117,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // A thread root is always shown in both timelines
+        // A thread root is the only event shown in both timelines
         if (event.isThreadRoot || roots?.has(event.getId()!)) {
             return {
                 shouldLiveInRoom: true,
@@ -2118,8 +2126,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        // A thread relation (1st and 2nd order) is always only shown in a thread
+        const isThreadRelation = event.isRelation(THREAD_RELATION_TYPE.name);
+        const parentEventId = event.getAssociatedId();
         const threadRootId = event.threadRootId;
+
+        // Where the parent is the thread root and this is a non-thread relation this should live only in the main timeline
+        if (!!parentEventId && !isThreadRelation && (threadRootId === parentEventId || roots?.has(parentEventId!))) {
+            return {
+                shouldLiveInRoom: true,
+                shouldLiveInThread: false,
+            };
+        }
+
+        let parentEvent: MatrixEvent | undefined;
+        if (parentEventId) {
+            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
+        }
+
+        // Treat non-thread-relations, redactions, and replies as extensions of their parents so evaluate parentEvent instead
+        if (parentEvent && !isThreadRelation) {
+            return this.eventShouldLiveIn(parentEvent, events, roots);
+        }
+
+        // A thread relation (1st and 2nd order) is always only shown in a thread
         if (threadRootId != undefined) {
             return {
                 shouldLiveInRoom: false,
@@ -2128,30 +2157,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const parentEventId = event.getAssociatedId();
-        let parentEvent: MatrixEvent | undefined;
-        if (parentEventId) {
-            parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
-        }
-
-        // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
-        if (parentEvent && (event.isRelation() || event.isRedaction())) {
-            return this.eventShouldLiveIn(parentEvent, events, roots);
-        }
-
-        if (!event.isRelation()) {
+        // Due to replies not being typical relations and being used as fallbacks for threads relations
+        // If we bypass the if case above then we know we are not a thread, so if we are still a reply
+        // then we know that we must be in the main timeline. Same goes if we have no associated parent event.
+        if (!parentEventId || !!event.replyEventId) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
-            };
-        }
-
-        // Edge case where we know the event is a relation but don't have the parentEvent
-        if (roots?.has(event.relationEventId!)) {
-            return {
-                shouldLiveInRoom: true,
-                shouldLiveInThread: true,
-                threadId: event.relationEventId,
             };
         }
 

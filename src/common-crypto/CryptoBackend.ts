@@ -24,6 +24,8 @@ import { IEventDecryptionResult } from "../@types/crypto";
 
 /**
  * Common interface for the crypto implementations
+ *
+ * @internal
  */
 export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
@@ -89,10 +91,22 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      */
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 
+    /**
+     * Check the cross signing trust of the current user
+     *
+     * @param opts - Options object.
+     *
+     * @deprecated Unneeded for the new crypto
+     */
+    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
+
     getBackupManager(): SecureKeyBackup;
 }
 
-/** The methods which crypto implementations should expose to the Sync api */
+/** The methods which crypto implementations should expose to the Sync api
+ *
+ * @internal
+ */
 export interface SyncCryptoCallbacks {
     /**
      * Called by the /sync loop whenever there are incoming to-device messages.
@@ -148,6 +162,9 @@ export interface SyncCryptoCallbacks {
     onSyncCompleted(syncState: OnSyncCompletedData): void;
 }
 
+/**
+ * @internal
+ */
 export interface OnSyncCompletedData {
     /**
      * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.
@@ -158,4 +175,11 @@ export interface OnSyncCompletedData {
      * True if we are working our way through a backlog of events after connecting.
      */
     catchingUp?: boolean;
+}
+
+/**
+ * Options object for {@link CryptoBackend#checkOwnCrossSigningTrust}.
+ */
+export interface CheckOwnCrossSigningTrustOpts {
+    allowPrivateKeyRequests?: boolean;
 }

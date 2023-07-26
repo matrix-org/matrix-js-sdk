@@ -26,15 +26,16 @@ import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { SetPresence } from "../../src/sync";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
     const idServerDomain = "identity.localhost"; // not a real server
     const identityAccessToken = "woop-i-am-a-secret";
-    let client: MatrixClient | undefined;
-    let httpBackend: HttpBackend | undefined;
-    let store: MemoryStore | undefined;
+    let client: MatrixClient;
+    let httpBackend: HttpBackend;
+    let store: MemoryStore;
 
     const defaultClientOpts: IStoredClientOpts = {
         threadSupport: false,
@@ -58,8 +59,8 @@ describe("MatrixClient", function () {
     });
 
     afterEach(function () {
-        httpBackend!.verifyNoOutstandingExpectation();
-        return httpBackend!.stop();
+        httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     describe("uploadContent", function () {
@@ -71,7 +72,7 @@ describe("MatrixClient", function () {
         };
 
         it("should upload the file", function () {
-            httpBackend!
+            httpBackend
                 .when("POST", "/_matrix/media/r0/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
@@ -85,11 +86,11 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, '{"content_uri": "content"}', true);
 
-            const prom = client!.uploadContent(file, opts);
+            const prom = client.uploadContent(file, opts);
 
             expect(prom).toBeTruthy();
 
-            const uploads = client!.getCurrentUploads();
+            const uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
@@ -97,16 +98,16 @@ describe("MatrixClient", function () {
             const prom2 = prom.then(function (response) {
                 expect(response.content_uri).toEqual("content");
 
-                const uploads = client!.getCurrentUploads();
+                const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
             });
 
-            httpBackend!.flush("");
+            httpBackend.flush("");
             return prom2;
         });
 
         it("should parse errors into a MatrixError", function () {
-            httpBackend!
+            httpBackend
                 .when("POST", "/_matrix/media/r0/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
@@ -118,7 +119,7 @@ describe("MatrixClient", function () {
                     error: "broken",
                 });
 
-            const prom = client!.uploadContent(file, opts).then(
+            const prom = client.uploadContent(file, opts).then(
                 function (response) {
                     throw Error("request not failed");
                 },
@@ -129,30 +130,30 @@ describe("MatrixClient", function () {
                 },
             );
 
-            httpBackend!.flush("");
+            httpBackend.flush("");
             return prom;
         });
 
         it("should return a promise which can be cancelled", async () => {
-            const prom = client!.uploadContent(file, opts);
+            const prom = client.uploadContent(file, opts);
 
-            const uploads = client!.getCurrentUploads();
+            const uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            const r = client!.cancelUpload(prom);
+            const r = client.cancelUpload(prom);
             expect(r).toBe(true);
             await expect(prom).rejects.toThrow("Aborted");
-            expect(client!.getCurrentUploads()).toHaveLength(0);
+            expect(client.getCurrentUploads()).toHaveLength(0);
         });
     });
 
     describe("joinRoom", function () {
         it("should no-op if you've already joined a room", function () {
             const roomId = "!foo:bar";
-            const room = new Room(roomId, client!, userId);
-            client!.fetchRoomEvent = () =>
+            const room = new Room(roomId, client, userId);
+            client.fetchRoomEvent = () =>
                 Promise.resolve({
                     type: "test",
                     content: {},
@@ -165,10 +166,10 @@ describe("MatrixClient", function () {
                     event: true,
                 }),
             ]);
-            httpBackend!.verifyNoOutstandingRequests();
-            store!.storeRoom(room);
-            client!.joinRoom(roomId);
-            httpBackend!.verifyNoOutstandingRequests();
+            httpBackend.verifyNoOutstandingRequests();
+            store.storeRoom(room);
+            client.joinRoom(roomId);
+            httpBackend.verifyNoOutstandingRequests();
         });
 
         it("should send request to inviteSignUrl if specified", async () => {
@@ -182,24 +183,24 @@ describe("MatrixClient", function () {
                 signatures: {},
             };
 
-            httpBackend!
+            httpBackend
                 .when("POST", inviteSignUrl)
                 .check((request) => {
-                    expect(request.queryParams?.mxid).toEqual(client!.getUserId());
+                    expect(request.queryParams?.mxid).toEqual(client.getUserId());
                 })
                 .respond(200, signature);
-            httpBackend!
+            httpBackend
                 .when("POST", "/join/" + encodeURIComponent(roomId))
                 .check((request) => {
                     expect(request.data.third_party_signed).toEqual(signature);
                 })
                 .respond(200, { room_id: roomId });
 
-            const prom = client!.joinRoom(roomId, {
+            const prom = client.joinRoom(roomId, {
                 inviteSignUrl,
                 viaServers,
             });
-            await httpBackend!.flushAllExpected();
+            await httpBackend.flushAllExpected();
             expect((await prom).roomId).toBe(roomId);
         });
     });
@@ -211,10 +212,10 @@ describe("MatrixClient", function () {
             const filter = Filter.fromJson(userId, filterId, {
                 event_format: "client",
             });
-            store!.storeFilter(filter);
-            const gotFilter = await client!.getFilter(userId, filterId, true);
+            store.storeFilter(filter);
+            const gotFilter = await client.getFilter(userId, filterId, true);
             expect(gotFilter).toEqual(filter);
-            httpBackend!.verifyNoOutstandingRequests();
+            httpBackend.verifyNoOutstandingRequests();
         });
 
         it("should do an HTTP request if !allowCached even if one exists", async () => {
@@ -222,15 +223,15 @@ describe("MatrixClient", function () {
                 event_format: "federation",
             };
 
-            httpBackend!
+            httpBackend
                 .when("GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId)
                 .respond(200, httpFilterDefinition);
 
             const storeFilter = Filter.fromJson(userId, filterId, {
                 event_format: "client",
             });
-            store!.storeFilter(storeFilter);
-            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, false), httpBackend!.flush("")]);
+            store.storeFilter(storeFilter);
+            const [gotFilter] = await Promise.all([client.getFilter(userId, filterId, false), httpBackend.flush("")]);
             expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
         });
 
@@ -238,14 +239,14 @@ describe("MatrixClient", function () {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
-            expect(store!.getFilter(userId, filterId)).toBe(null);
+            expect(store.getFilter(userId, filterId)).toBe(null);
 
-            httpBackend!
+            httpBackend
                 .when("GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId)
                 .respond(200, httpFilterDefinition);
-            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, true), httpBackend!.flush("")]);
+            const [gotFilter] = await Promise.all([client.getFilter(userId, filterId, true), httpBackend.flush("")]);
             expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-            expect(store!.getFilter(userId, filterId)).toBeTruthy();
+            expect(store.getFilter(userId, filterId)).toBeTruthy();
         });
     });
 
@@ -253,13 +254,13 @@ describe("MatrixClient", function () {
         const filterId = "f1llllllerid";
 
         it("should do an HTTP request and then store the filter", async () => {
-            expect(store!.getFilter(userId, filterId)).toBe(null);
+            expect(store.getFilter(userId, filterId)).toBe(null);
 
             const filterDefinition = {
                 event_format: "client" as IFilterDefinition["event_format"],
             };
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/user/" + encodeURIComponent(userId) + "/filter")
                 .check(function (req) {
                     expect(req.data).toEqual(filterDefinition);
@@ -268,9 +269,9 @@ describe("MatrixClient", function () {
                     filter_id: filterId,
                 });
 
-            const [gotFilter] = await Promise.all([client!.createFilter(filterDefinition), httpBackend!.flush("")]);
+            const [gotFilter] = await Promise.all([client.createFilter(filterDefinition), httpBackend.flush("")]);
             expect(gotFilter.getDefinition()).toEqual(filterDefinition);
-            expect(store!.getFilter(userId, filterId)).toEqual(gotFilter);
+            expect(store.getFilter(userId, filterId)).toEqual(gotFilter);
         });
     });
 
@@ -299,10 +300,10 @@ describe("MatrixClient", function () {
                 },
             };
 
-            client!.searchMessageText({
+            client.searchMessageText({
                 query: "monkeys",
             });
-            httpBackend!
+            httpBackend
                 .when("POST", "/search")
                 .check(function (req) {
                     expect(req.data).toEqual({
@@ -315,7 +316,7 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, response);
 
-            return httpBackend!.flush("");
+            return httpBackend.flush("");
         });
 
         describe("should filter out context from different timelines (threads)", () => {
@@ -385,7 +386,7 @@ describe("MatrixClient", function () {
                     results: [],
                     highlights: [],
                 };
-                client!.processRoomEventsSearch(data, response);
+                client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(2);
@@ -449,7 +450,7 @@ describe("MatrixClient", function () {
                     results: [],
                     highlights: [],
                 };
-                client!.processRoomEventsSearch(data, response);
+                client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(1);
@@ -511,7 +512,7 @@ describe("MatrixClient", function () {
                     results: [],
                     highlights: [],
                 };
-                client!.processRoomEventsSearch(data, response);
+                client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(1);
@@ -529,17 +530,17 @@ describe("MatrixClient", function () {
 
         beforeEach(function () {
             // running initCrypto should trigger a key upload
-            httpBackend!.when("POST", "/keys/upload").respond(200, {});
-            return Promise.all([client!.initCrypto(), httpBackend!.flush("/keys/upload", 1)]);
+            httpBackend.when("POST", "/keys/upload").respond(200, {});
+            return Promise.all([client.initCrypto(), httpBackend.flush("/keys/upload", 1)]);
         });
 
         afterEach(() => {
-            client!.stopClient();
+            client.stopClient();
         });
 
         it("should do an HTTP request and then store the keys", function () {
             const ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
-            // ed25519key = client!.getDeviceEd25519Key();
+            // ed25519key = client.getDeviceEd25519Key();
             const borisKeys = {
                 dev1: {
                     algorithms: ["1"],
@@ -579,7 +580,7 @@ describe("MatrixClient", function () {
                 var b = JSON.parse(JSON.stringify(o));
                 delete(b.signatures);
                 delete(b.unsigned);
-                return client!.crypto.olmDevice.sign(anotherjson.stringify(b));
+                return client.crypto.olmDevice.sign(anotherjson.stringify(b));
             };
 
             logger.log("Ed25519: " + ed25519key);
@@ -587,7 +588,7 @@ describe("MatrixClient", function () {
             logger.log("chaz:", sign(chazKeys.dev2));
             */
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/keys/query")
                 .check(function (req) {
                     expect(req.data).toEqual({
@@ -604,7 +605,7 @@ describe("MatrixClient", function () {
                     },
                 });
 
-            const prom = client!.downloadKeys(["boris", "chaz"]).then(function (res) {
+            const prom = client.downloadKeys(["boris", "chaz"]).then(function (res) {
                 assertObjectContains(res.get("boris")!.get("dev1")!, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
@@ -620,7 +621,7 @@ describe("MatrixClient", function () {
                 });
             });
 
-            httpBackend!.flush("");
+            httpBackend.flush("");
             return prom;
         });
     });
@@ -628,16 +629,16 @@ describe("MatrixClient", function () {
     describe("deleteDevice", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
-            httpBackend!
+            httpBackend
                 .when("DELETE", "/_matrix/client/r0/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
                 .respond(200);
 
-            const prom = client!.deleteDevice("my_device", auth);
+            const prom = client.deleteDevice("my_device", auth);
 
-            httpBackend!.flush("");
+            httpBackend.flush("");
             return prom;
         });
     });
@@ -645,7 +646,7 @@ describe("MatrixClient", function () {
     describe("partitionThreadedEvents", function () {
         let room: Room;
         beforeEach(() => {
-            room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client!, userId);
+            room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client, userId);
         });
 
         it("returns empty arrays when given an empty arrays", function () {
@@ -655,9 +656,9 @@ describe("MatrixClient", function () {
             expect(threaded).toEqual([]);
         });
 
-        it("copies pre-thread in-timeline vote events onto both timelines", function () {
+        it("should not copy pre-thread in-timeline vote events onto both timelines", function () {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -683,12 +684,12 @@ describe("MatrixClient", function () {
             const eventRefWithThreadId = withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!);
             expect(eventRefWithThreadId.threadRootId).toBeTruthy();
 
-            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread, eventRefWithThreadId]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies pre-thread in-timeline reactions onto both timelines", function () {
+        it("should not copy pre-thread in-timeline reactions onto both timelines", function () {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -703,16 +704,12 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventReaction]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies post-thread in-timeline vote events onto both timelines", function () {
+        it("should not copy post-thread in-timeline vote events onto both timelines", function () {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -727,16 +724,12 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventPollResponseReference]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
-                eventMessageInThread,
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
-        it("copies post-thread in-timeline reactions onto both timelines", function () {
+        it("should not copy post-thread in-timeline reactions onto both timelines", function () {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -751,16 +744,12 @@ describe("MatrixClient", function () {
 
             expect(timeline).toEqual([eventPollStartThreadRoot, eventReaction]);
 
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
         it("sends room state events to the main timeline only", function () {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -808,16 +797,12 @@ describe("MatrixClient", function () {
             ]);
 
             // Thread should contain only stuff that happened in the thread - no room state events
-            expect(threaded).toEqual([
-                eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
-                eventMessageInThread,
-            ]);
+            expect(threaded).toEqual([eventPollStartThreadRoot, eventMessageInThread]);
         });
 
         it("sends redactions of reactions to thread responses to thread timeline only", () => {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -843,7 +828,7 @@ describe("MatrixClient", function () {
 
         it("sends reply to reply to thread root outside of thread to main timeline only", () => {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -864,7 +849,7 @@ describe("MatrixClient", function () {
 
         it("sends reply to thread responses to main timeline only", () => {
             // @ts-ignore setting private property
-            client!.clientOpts = {
+            client.clientOpts = {
                 ...defaultClientOpts,
                 threadSupport: true,
             };
@@ -877,9 +862,9 @@ describe("MatrixClient", function () {
 
             const [timeline, threaded] = room.partitionThreadedEvents(events);
 
-            expect(timeline).toEqual([threadRootEvent, replyToThreadResponse]);
+            expect(timeline).toEqual([threadRootEvent]);
 
-            expect(threaded).toEqual([threadRootEvent, eventMessageInThread]);
+            expect(threaded).toEqual([threadRootEvent, eventMessageInThread, replyToThreadResponse]);
         });
     });
 
@@ -893,9 +878,9 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            const prom = client!.getThirdpartyUser("irc", {});
-            httpBackend!.when("GET", "/thirdparty/user/irc").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getThirdpartyUser("irc", {});
+            httpBackend.when("GET", "/thirdparty/user/irc").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -910,9 +895,9 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            const prom = client!.getThirdpartyLocation("irc", {});
-            httpBackend!.when("GET", "/thirdparty/location/irc").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getThirdpartyLocation("irc", {});
+            httpBackend.when("GET", "/thirdparty/location/irc").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -923,10 +908,10 @@ describe("MatrixClient", function () {
                 pushers: [],
             };
 
-            const prom = client!.getPushers();
-            httpBackend!.when("GET", "/_matrix/client/versions").respond(200, {});
-            httpBackend!.when("GET", "/pushers").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getPushers();
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {});
+            httpBackend.when("GET", "/pushers").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -938,15 +923,15 @@ describe("MatrixClient", function () {
                 left: [],
             };
 
-            const prom = client!.getKeyChanges("old", "new");
-            httpBackend!
+            const prom = client.getKeyChanges("old", "new");
+            httpBackend
                 .when("GET", "/keys/changes")
                 .check((req) => {
                     expect(req.queryParams?.from).toEqual("old");
                     expect(req.queryParams?.to).toEqual("new");
                 })
                 .respond(200, response);
-            await httpBackend!.flush("");
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -957,9 +942,9 @@ describe("MatrixClient", function () {
                 devices: [],
             };
 
-            const prom = client!.getDevices();
-            httpBackend!.when("GET", "/devices").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getDevices();
+            httpBackend.when("GET", "/devices").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -973,9 +958,9 @@ describe("MatrixClient", function () {
                 last_seen_ts: 1,
             };
 
-            const prom = client!.getDevice("DEADBEEF");
-            httpBackend!.when("GET", "/devices/DEADBEEF").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getDevice("DEADBEEF");
+            httpBackend.when("GET", "/devices/DEADBEEF").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -986,9 +971,9 @@ describe("MatrixClient", function () {
                 threepids: [],
             };
 
-            const prom = client!.getThreePids();
-            httpBackend!.when("GET", "/account/3pid").respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.getThreePids();
+            httpBackend.when("GET", "/account/3pid").respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -996,9 +981,9 @@ describe("MatrixClient", function () {
     describe("deleteAlias", () => {
         it("should hit the expected API endpoint", async () => {
             const response = {};
-            const prom = client!.deleteAlias("#foo:bar");
-            httpBackend!.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.deleteAlias("#foo:bar");
+            httpBackend.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1006,10 +991,10 @@ describe("MatrixClient", function () {
     describe("deleteRoomTag", () => {
         it("should hit the expected API endpoint", async () => {
             const response = {};
-            const prom = client!.deleteRoomTag("!roomId:server", "u.tag");
+            const prom = client.deleteRoomTag("!roomId:server", "u.tag");
             const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags/u.tag`;
-            httpBackend!.when("DELETE", url).respond(200, response);
-            await httpBackend!.flush("");
+            httpBackend.when("DELETE", url).respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1024,10 +1009,10 @@ describe("MatrixClient", function () {
                 },
             };
 
-            const prom = client!.getRoomTags("!roomId:server");
+            const prom = client.getRoomTags("!roomId:server");
             const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags`;
-            httpBackend!.when("GET", url).respond(200, response);
-            await httpBackend!.flush("");
+            httpBackend.when("GET", url).respond(200, response);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1039,12 +1024,12 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend!.when("GET", "/_matrix/client/versions").respond(200, {
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
                 versions: ["r0.6.0"],
             });
 
-            const prom = client!.requestRegisterEmailToken("bob@email", "secret", 1);
-            httpBackend!
+            const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
+            httpBackend
                 .when("POST", "/register/email/requestToken")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
@@ -1054,7 +1039,7 @@ describe("MatrixClient", function () {
                     });
                 })
                 .respond(200, response);
-            await httpBackend!.flush("");
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1063,11 +1048,11 @@ describe("MatrixClient", function () {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
 
-            httpBackend!.when("GET", "/_matrix/client/versions").respond(200, {
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
                 versions: ["r0.6.0"],
             });
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/invite")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
@@ -1079,8 +1064,8 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, {});
 
-            const prom = client!.inviteByThreePid("!room:example.org", "email", targetEmail);
-            await httpBackend!.flush("");
+            const prom = client.inviteByThreePid("!room:example.org", "email", targetEmail);
+            await httpBackend.flush("");
             await prom; // returns empty object, so no validation needed
         });
     });
@@ -1102,11 +1087,11 @@ describe("MatrixClient", function () {
                 ],
             };
 
-            httpBackend!.when("GET", "/_matrix/client/versions").respond(200, {
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
                 versions: ["r0.6.0"],
             });
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/createRoom")
                 .check((req) => {
                     expect(req.data).toMatchObject({
@@ -1121,57 +1106,57 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, response);
 
-            const prom = client!.createRoom(input);
-            await httpBackend!.flush("");
+            const prom = client.createRoom(input);
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
     });
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
-            httpBackend!
+            httpBackend
                 .when("GET", "/capabilities")
                 .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
-            const prom = client!.requestLoginToken(uiaData);
-            httpBackend!
+            const prom = client.requestLoginToken(uiaData);
+            httpBackend
                 .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
                 .respond(200, response);
-            await httpBackend!.flush("");
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
-            httpBackend!
+            httpBackend
                 .when("GET", "/capabilities")
                 .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
-            const prom = client!.requestLoginToken();
-            httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.requestLoginToken();
+            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
         });
 
         it("should hit the r1 endpoint when capability is disabled", async () => {
-            httpBackend!
+            httpBackend
                 .when("GET", "/capabilities")
                 .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
-            const prom = client!.requestLoginToken();
-            httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.requestLoginToken();
+            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
         });
 
         it("should hit the r0 endpoint for fallback", async () => {
-            httpBackend!.when("GET", "/capabilities").respond(200, {});
+            httpBackend.when("GET", "/capabilities").respond(200, {});
             const response = { login_token: "xyz", expires_in: 5 };
-            const prom = client!.requestLoginToken();
-            httpBackend!.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
-            await httpBackend!.flush("");
+            const prom = client.requestLoginToken();
+            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
+            await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r1
             expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
         });
@@ -1179,18 +1164,18 @@ describe("MatrixClient", function () {
 
     describe("logout", () => {
         it("should abort pending requests when called with stopClient=true", async () => {
-            httpBackend!.when("POST", "/logout").respond(200, {});
+            httpBackend.when("POST", "/logout").respond(200, {});
             const fn = jest.fn();
-            client!.http.request(Method.Get, "/test").catch(fn);
-            client!.logout(true);
-            await httpBackend!.flush(undefined);
+            client.http.request(Method.Get, "/test").catch(fn);
+            client.logout(true);
+            await httpBackend.flush(undefined);
             expect(fn).toHaveBeenCalled();
         });
     });
 
     describe("sendHtmlEmote", () => {
         it("should send valid html emote", async () => {
-            httpBackend!
+            httpBackend
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
@@ -1201,15 +1186,15 @@ describe("MatrixClient", function () {
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
-            const prom = client!.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
-            await httpBackend!.flush(undefined);
+            const prom = client.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush(undefined);
             await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
         });
     });
 
     describe("sendHtmlMessage", () => {
         it("should send valid html message", async () => {
-            httpBackend!
+            httpBackend
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
@@ -1220,34 +1205,34 @@ describe("MatrixClient", function () {
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
-            const prom = client!.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
-            await httpBackend!.flush(undefined);
+            const prom = client.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush(undefined);
             await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
         });
     });
 
     describe("forget", () => {
         it("should remove from store by default", async () => {
-            const room = new Room("!roomId:server", client!, userId);
-            client!.store.storeRoom(room);
-            expect(client!.store.getRooms()).toContain(room);
+            const room = new Room("!roomId:server", client, userId);
+            client.store.storeRoom(room);
+            expect(client.store.getRooms()).toContain(room);
 
-            httpBackend!.when("POST", "/forget").respond(200, {});
-            await Promise.all([client!.forget(room.roomId), httpBackend!.flushAllExpected()]);
-            expect(client!.store.getRooms()).not.toContain(room);
+            httpBackend.when("POST", "/forget").respond(200, {});
+            await Promise.all([client.forget(room.roomId), httpBackend.flushAllExpected()]);
+            expect(client.store.getRooms()).not.toContain(room);
         });
     });
 
     describe("getCapabilities", () => {
         it("should cache by default", async () => {
-            httpBackend!.when("GET", "/capabilities").respond(200, {
+            httpBackend.when("GET", "/capabilities").respond(200, {
                 capabilities: {
                     "m.change_password": false,
                 },
             });
-            const prom = httpBackend!.flushAllExpected();
-            const capabilities1 = await client!.getCapabilities();
-            const capabilities2 = await client!.getCapabilities();
+            const prom = httpBackend.flushAllExpected();
+            const capabilities1 = await client.getCapabilities();
+            const capabilities2 = await client.getCapabilities();
             await prom;
 
             expect(capabilities1).toStrictEqual(capabilities2);
@@ -1256,16 +1241,16 @@ describe("MatrixClient", function () {
 
     describe("getTerms", () => {
         it("should return Identity Server terms", async () => {
-            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
-            const prom = client!.getTerms(SERVICE_TYPES.IS, "http://identity.server");
-            await httpBackend!.flushAllExpected();
+            httpBackend.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client.getTerms(SERVICE_TYPES.IS, "http://identity.server");
+            await httpBackend.flushAllExpected();
             await expect(prom).resolves.toEqual({ foo: "bar" });
         });
 
         it("should return Integrations Manager terms", async () => {
-            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
-            const prom = client!.getTerms(SERVICE_TYPES.IM, "http://im.server");
-            await httpBackend!.flushAllExpected();
+            httpBackend.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client.getTerms(SERVICE_TYPES.IM, "http://im.server");
+            await httpBackend.flushAllExpected();
             await expect(prom).resolves.toEqual({ foo: "bar" });
         });
     });
@@ -1274,46 +1259,46 @@ describe("MatrixClient", function () {
         it("should send `user_accepts` via body of POST request", async () => {
             const terms = ["https://vector.im/notice-1"];
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/terms")
                 .check((req) => {
                     expect(req.data.user_accepts).toStrictEqual(terms);
                 })
                 .respond(200, {});
 
-            const prom = client!.agreeToTerms(SERVICE_TYPES.IS, "https://vector.im", "at", terms);
-            await httpBackend!.flushAllExpected();
+            const prom = client.agreeToTerms(SERVICE_TYPES.IS, "https://vector.im", "at", terms);
+            await httpBackend.flushAllExpected();
             await prom;
         });
     });
 
     describe("publicRooms", () => {
         it("should use GET request if no server or filter is specified", () => {
-            httpBackend!.when("GET", "/publicRooms").respond(200, {});
-            client!.publicRooms({});
-            return httpBackend!.flushAllExpected();
+            httpBackend.when("GET", "/publicRooms").respond(200, {});
+            client.publicRooms({});
+            return httpBackend.flushAllExpected();
         });
 
         it("should use GET request if only server is specified", () => {
-            httpBackend!
+            httpBackend
                 .when("GET", "/publicRooms")
                 .check((request) => {
                     expect(request.queryParams?.server).toBe("server1");
                 })
                 .respond(200, {});
-            client!.publicRooms({ server: "server1" });
-            return httpBackend!.flushAllExpected();
+            client.publicRooms({ server: "server1" });
+            return httpBackend.flushAllExpected();
         });
 
         it("should use POST request if filter is specified", () => {
-            httpBackend!
+            httpBackend
                 .when("POST", "/publicRooms")
                 .check((request) => {
                     expect(request.data.filter.generic_search_term).toBe("foobar");
                 })
                 .respond(200, {});
-            client!.publicRooms({ filter: { generic_search_term: "foobar" } });
-            return httpBackend!.flushAllExpected();
+            client.publicRooms({ filter: { generic_search_term: "foobar" } });
+            return httpBackend.flushAllExpected();
         });
     });
 
@@ -1322,17 +1307,17 @@ describe("MatrixClient", function () {
             const token = "!token&";
             const userId = "@m:t";
 
-            httpBackend!.when("POST", "/login").respond(200, {
+            httpBackend.when("POST", "/login").respond(200, {
                 access_token: token,
                 user_id: userId,
             });
-            const prom = client!.login("fake.login", {});
-            await httpBackend!.flushAllExpected();
+            const prom = client.login("fake.login", {});
+            await httpBackend.flushAllExpected();
             const resp = await prom;
             expect(resp.access_token).toBe(token);
             expect(resp.user_id).toBe(userId);
-            expect(client!.getUserId()).toBe(userId);
-            expect(client!.http.opts.accessToken).toBe(token);
+            expect(client.getUserId()).toBe(userId);
+            expect(client.http.opts.accessToken).toBe(token);
         });
     });
 
@@ -1345,7 +1330,7 @@ describe("MatrixClient", function () {
                 expires_in: 12345,
             };
 
-            httpBackend!
+            httpBackend
                 .when("POST", "/account/register")
                 .check((req) => {
                     expect(req.data).toStrictEqual(token);
@@ -1355,8 +1340,8 @@ describe("MatrixClient", function () {
                     token: "tt",
                 });
 
-            const prom = client!.registerWithIdentityServer(token);
-            await httpBackend!.flushAllExpected();
+            const prom = client.registerWithIdentityServer(token);
+            await httpBackend.flushAllExpected();
             const resp = await prom;
             expect(resp.access_token).toBe("at");
             expect(resp.token).toBe("tt");
@@ -1386,24 +1371,90 @@ describe("MatrixClient", function () {
                 expectation: {},
             },
         ])("should modify power levels of $userId correctly", async ({ userId, powerLevel, expectation }) => {
-            const event = {
-                getType: () => "m.room.power_levels",
-                getContent: () => ({
-                    users: {
-                        "alice@localhost": 50,
-                    },
-                }),
-            } as MatrixEvent;
+            httpBackend.when("GET", "/state/m.room.power_levels/").respond(200, {
+                users: {
+                    "alice@localhost": 50,
+                },
+            });
 
-            httpBackend!
+            httpBackend
                 .when("PUT", "/state/m.room.power_levels")
                 .check((req) => {
                     expect(req.data.users).toStrictEqual(expectation);
                 })
                 .respond(200, {});
 
-            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel, event);
-            await httpBackend!.flushAllExpected();
+            const prom = client.setPowerLevel("!room_id:server", userId, powerLevel);
+            await httpBackend.flushAllExpected();
+            await prom;
+        });
+
+        it("should use power level from room state if available", async () => {
+            client.clientRunning = true;
+            client.isInitialSyncComplete = () => true;
+            const room = new Room("!room_id:server", client, client.getUserId()!);
+            room.currentState.events.set("m.room.power_levels", new Map());
+            room.currentState.events.get("m.room.power_levels")!.set(
+                "",
+                new MatrixEvent({
+                    type: "m.room.power_levels",
+                    state_key: "",
+                    content: {
+                        users: {
+                            "@bob:localhost": 50,
+                        },
+                    },
+                }),
+            );
+            client.getRoom = () => room;
+
+            httpBackend
+                .when("PUT", "/state/m.room.power_levels")
+                .check((req) => {
+                    expect(req.data).toStrictEqual({
+                        users: {
+                            "@bob:localhost": 50,
+                            [userId]: 42,
+                        },
+                    });
+                })
+                .respond(200, {});
+
+            const prom = client.setPowerLevel("!room_id:server", userId, 42);
+            await httpBackend.flushAllExpected();
+            await prom;
+        });
+
+        it("should throw error if state API errors", async () => {
+            httpBackend.when("GET", "/state/m.room.power_levels/").respond(500, {
+                errcode: "ERR_DERP",
+            });
+
+            const prom = client.setPowerLevel("!room_id:server", userId, 42);
+            await Promise.all([
+                expect(prom).rejects.toMatchInlineSnapshot(`[ERR_DERP: MatrixError: [500] Unknown message]`),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should not throw error if /state/ API returns M_NOT_FOUND", async () => {
+            httpBackend.when("GET", "/state/m.room.power_levels/").respond(404, {
+                errcode: "M_NOT_FOUND",
+            });
+
+            httpBackend
+                .when("PUT", "/state/m.room.power_levels")
+                .check((req) => {
+                    expect(req.data).toStrictEqual({
+                        users: {
+                            [userId]: 42,
+                        },
+                    });
+                })
+                .respond(200, {});
+
+            const prom = client.setPowerLevel("!room_id:server", userId, 42);
+            await httpBackend.flushAllExpected();
             await prom;
         });
     });
@@ -1411,43 +1462,116 @@ describe("MatrixClient", function () {
     describe("uploadKeys", () => {
         // uploadKeys() is a no-op nowadays, so there's not much to test here.
         it("should complete successfully", async () => {
-            await client!.uploadKeys();
+            await client.uploadKeys();
         });
     });
 
     describe("getCryptoTrustCrossSignedDevices", () => {
         it("should throw if e2e is disabled", () => {
-            expect(() => client!.getCryptoTrustCrossSignedDevices()).toThrow("End-to-end encryption disabled");
+            expect(() => client.getCryptoTrustCrossSignedDevices()).toThrow("End-to-end encryption disabled");
         });
 
         it("should proxy to the crypto backend", async () => {
             const mockBackend = {
                 getTrustCrossSignedDevices: jest.fn().mockReturnValue(true),
             } as unknown as Mocked<CryptoBackend>;
-            client!["cryptoBackend"] = mockBackend;
+            client["cryptoBackend"] = mockBackend;
 
-            expect(client!.getCryptoTrustCrossSignedDevices()).toBe(true);
+            expect(client.getCryptoTrustCrossSignedDevices()).toBe(true);
             mockBackend.getTrustCrossSignedDevices.mockReturnValue(false);
-            expect(client!.getCryptoTrustCrossSignedDevices()).toBe(false);
+            expect(client.getCryptoTrustCrossSignedDevices()).toBe(false);
         });
     });
 
     describe("setCryptoTrustCrossSignedDevices", () => {
         it("should throw if e2e is disabled", () => {
-            expect(() => client!.setCryptoTrustCrossSignedDevices(false)).toThrow("End-to-end encryption disabled");
+            expect(() => client.setCryptoTrustCrossSignedDevices(false)).toThrow("End-to-end encryption disabled");
         });
 
         it("should proxy to the crypto backend", async () => {
             const mockBackend = {
                 setTrustCrossSignedDevices: jest.fn(),
             } as unknown as Mocked<CryptoBackend>;
-            client!["cryptoBackend"] = mockBackend;
+            client["cryptoBackend"] = mockBackend;
 
-            client!.setCryptoTrustCrossSignedDevices(true);
+            client.setCryptoTrustCrossSignedDevices(true);
             expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(true);
 
-            client!.setCryptoTrustCrossSignedDevices(false);
+            client.setCryptoTrustCrossSignedDevices(false);
             expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
+        });
+    });
+
+    describe("setSyncPresence", () => {
+        it("should pass calls through to the underlying sync api", () => {
+            const setPresence = jest.fn();
+            // @ts-ignore
+            client.syncApi = { setPresence };
+            client.setSyncPresence(SetPresence.Unavailable);
+            expect(setPresence).toHaveBeenCalledWith(SetPresence.Unavailable);
+        });
+    });
+
+    describe("sendTyping", () => {
+        it("should bail early for guests", async () => {
+            client.setGuest(true);
+            await client.sendTyping("!room:server", true, 100);
+        });
+
+        it("should call /typing API", async () => {
+            client.setGuest(false);
+            httpBackend
+                .when("PUT", "/rooms/!room%3Aserver/typing/" + encodeURIComponent(client.getSafeUserId()))
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        typing: true,
+                        timeout: 100,
+                    });
+                })
+                .respond(200, {});
+            await Promise.all([client.sendTyping("!room:server", true, 100), httpBackend.flushAllExpected()]);
+        });
+    });
+
+    describe("setGuestAccess", () => {
+        it("should set both guest access and history visibility if opts.allowRead=true", async () => {
+            httpBackend
+                .when("PUT", "/rooms/!room%3Aserver/state/m.room.guest_access/")
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        guest_access: "forbidden",
+                    });
+                })
+                .respond(200, { event_id: "$event1" });
+            httpBackend
+                .when("PUT", "/rooms/!room%3Aserver/state/m.room.history_visibility/")
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        history_visibility: "world_readable",
+                    });
+                })
+                .respond(200, { event_id: "$event2" });
+            await Promise.all([
+                client.setGuestAccess("!room:server", { allowRead: true, allowJoin: false }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("searchUserDirectory", () => {
+        it("should call /user_directory/search API", async () => {
+            httpBackend
+                .when("POST", "/user_directory/search")
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        search_term: "This is my query",
+                    });
+                })
+                .respond(200, {});
+            await Promise.all([
+                client.searchUserDirectory({ term: "This is my query" }),
+                httpBackend.flushAllExpected(),
+            ]);
         });
     });
 });

@@ -78,7 +78,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         conditions: [
             {
                 kind: ConditionKind.EventPropertyContains,
-                key: "content.org\\.matrix\\.msc3952\\.mentions.user_ids",
+                key: "content.m\\.mentions.user_ids",
                 value: "", // The user ID is dynamically added in rewriteDefaultRules.
             },
         ],
@@ -91,7 +91,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         conditions: [
             {
                 kind: ConditionKind.EventPropertyIs,
-                key: "content.org\\.matrix\\.msc3952\\.mentions.room",
+                key: "content.m\\.mentions.room",
                 value: true,
             },
             {
@@ -724,7 +724,7 @@ export class PushProcessor {
         // Disable the deprecated mentions push rules if the new mentions property exists.
         if (
             this.client.supportsIntentionalMentions() &&
-            ev.getContent()["org.matrix.msc3952.mentions"] !== undefined &&
+            ev.getContent()["m.mentions"] !== undefined &&
             (rule.rule_id === RuleId.ContainsUserName ||
                 rule.rule_id === RuleId.ContainsDisplayName ||
                 rule.rule_id === RuleId.AtRoomNotification)

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import { Emoji } from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { Emoji, QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     ShowQrCodeCallbacks,
@@ -30,21 +30,27 @@ import {
 } from "../crypto-api/verification";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { TypedReEmitter } from "../ReEmitter";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
+ *
+ * @internal
  */
 export class RustVerificationRequest
     extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>
     implements VerificationRequest
 {
+    /** a reëmitter which relays VerificationRequestEvent.Changed events emitted by the verifier */
+    private readonly reEmitter: TypedReEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap>;
+
     /** Are we in the process of sending an `m.key.verification.ready` event? */
     private _accepting = false;
 
     /** Are we in the process of sending an `m.key.verification.cancellation` event? */
     private _cancelling = false;
 
-    private _verifier: Verifier | undefined;
+    private _verifier: undefined | RustSASVerifier | RustQrCodeVerifier;
 
     /**
      * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
@@ -56,23 +62,37 @@ export class RustVerificationRequest
     public constructor(
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
-        private readonly supportedVerificationMethods: string[] | undefined,
+        private readonly supportedVerificationMethods: string[],
     ) {
         super();
 
+        this.reEmitter = new TypedReEmitter(this);
+
         const onChange = async (): Promise<void> => {
-            // if we now have a `Verification` where we lacked one before, wrap it.
-            // TODO: QR support
-            if (this._verifier === undefined) {
-                const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
-                if (verification instanceof RustSdkCryptoJs.Sas) {
-                    this._verifier = new RustSASVerifier(verification, this, outgoingRequestProcessor);
+            const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
+
+            // If we now have a `Verification` where we lacked one before, or we have transitioned from QR to SAS,
+            // wrap the new rust Verification as a js-sdk Verifier.
+            if (verification instanceof RustSdkCryptoJs.Sas) {
+                if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
+                    this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
                 }
+            } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
+                this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
             }
 
             this.emit(VerificationRequestEvent.Change);
         };
         inner.registerChangesCallback(onChange);
+    }
+
+    private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
+        // if we already have a verifier, unsubscribe from its events
+        if (this._verifier) {
+            this.reEmitter.stopReEmitting(this._verifier, [VerificationRequestEvent.Change]);
+        }
+        this._verifier = verifier;
+        this.reEmitter.reEmit(this._verifier, [VerificationRequestEvent.Change]);
     }
 
     /**
@@ -131,7 +151,11 @@ export class RustVerificationRequest
                 // parlance.
                 return this._accepting ? VerificationPhase.Requested : VerificationPhase.Ready;
             case RustSdkCryptoJs.VerificationRequestPhase.Transitioned:
-                return VerificationPhase.Started;
+                if (!this._verifier) {
+                    // this shouldn't happen, because the onChange handler should have created a _verifier.
+                    throw new Error("VerificationRequest: inner phase == Transitioned but no verifier!");
+                }
+                return this._verifier.verificationPhase;
             case RustSdkCryptoJs.VerificationRequestPhase.Done:
                 return VerificationPhase.Done;
             case RustSdkCryptoJs.VerificationRequestPhase.Cancelled:
@@ -182,10 +206,13 @@ export class RustVerificationRequest
 
     /** the method picked in the .start event */
     public get chosenMethod(): string | null {
+        if (this.phase !== VerificationPhase.Started) return null;
+
         const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
-        // TODO: this isn't quite right. The existence of a Verification doesn't prove that we have .started.
         if (verification instanceof RustSdkCryptoJs.Sas) {
             return "m.sas.v1";
+        } else if (verification instanceof RustSdkCryptoJs.Qr) {
+            return "m.reciprocate.v1";
         } else {
             return null;
         }
@@ -223,12 +250,9 @@ export class RustVerificationRequest
 
         this._accepting = true;
         try {
-            const req: undefined | OutgoingRequest =
-                this.supportedVerificationMethods === undefined
-                    ? this.inner.accept()
-                    : this.inner.acceptWithMethods(
-                          this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
-                      );
+            const req: undefined | OutgoingRequest = this.inner.acceptWithMethods(
+                this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+            );
             if (req) {
                 await this.outgoingRequestProcessor.makeOutgoingRequest(req);
             }
@@ -314,21 +338,60 @@ export class RustVerificationRequest
     }
 
     /**
-     * The verifier which is doing the actual verification, once the method has been established.
-     * Only defined when the `phase` is Started.
+     * Start a QR code verification by providing a scanned QR code for this verification flow.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#scanQRCode}.
+     *
+     * @param qrCodeData - the decoded QR code.
+     * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
      */
-    public get verifier(): Verifier | undefined {
+    public async scanQRCode(uint8Array: Uint8Array): Promise<Verifier> {
+        const scan = RustSdkCryptoJs.QrCodeScan.fromBytes(new Uint8ClampedArray(uint8Array));
+        const verifier: RustSdkCryptoJs.Qr = await this.inner.scanQrCode(scan);
+
+        // this should have triggered the onChange callback, and we should now have a verifier
+        if (!this._verifier) {
+            throw new Error("Still no verifier after scanQrCode() call");
+        }
+
+        // we can immediately trigger the reciprocate request
+        const req: undefined | OutgoingRequest = verifier.reciprocate();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+
         return this._verifier;
     }
 
     /**
-     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
-     *
-     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
+     * The verifier which is doing the actual verification, once the method has been established.
+     * Only defined when the `phase` is Started.
+     */
+    public get verifier(): Verifier | undefined {
+        // It's possible for us to have a Verifier before a method has been chosen (in particular,
+        // if we are showing a QR code which the other device has not yet scanned. At that point, we could
+        // still switch to SAS).
+        //
+        // In that case, we should not return it to the application yet, since the application will not expect the
+        // Verifier to be replaced during the lifetime of the VerificationRequest.
+        return this.phase === VerificationPhase.Started ? this._verifier : undefined;
+    }
+
+    /**
+     * Stub implementation of {@link Crypto.VerificationRequest#getQRCodeBytes}.
      */
     public getQRCodeBytes(): Buffer | undefined {
-        // TODO
-        return undefined;
+        throw new Error("getQRCodeBytes() unsupported in Rust Crypto; use generateQRCode() instead.");
+    }
+
+    /**
+     * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
+     *
+     * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
+     */
+    public async generateQRCode(): Promise<Buffer | undefined> {
+        const innerVerifier: RustSdkCryptoJs.Qr = await this.inner.generateQrCode();
+        return Buffer.from(innerVerifier.toBytes());
     }
 
     /**
@@ -349,22 +412,28 @@ export class RustVerificationRequest
     }
 }
 
-export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap> implements Verifier {
+/** Common base class for `Verifier` implementations which wrap rust classes.
+ *
+ * The generic parameter `InnerType` is the type of the rust Verification class which we wrap.
+ *
+ * @internal
+ */
+abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas> extends TypedEventEmitter<
+    VerifierEvent | VerificationRequestEvent,
+    VerifierEventHandlerMap & VerificationRequestEventHandlerMap
+> {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
-    private readonly completionPromise: Promise<void>;
-
-    private callbacks: ShowSasCallbacks | null = null;
+    protected readonly completionPromise: Promise<void>;
 
     public constructor(
-        private readonly inner: RustSdkCryptoJs.Sas,
-        _verificationRequest: RustVerificationRequest,
-        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        protected readonly inner: InnerType,
+        protected readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
 
         this.completionPromise = new Promise<void>((resolve, reject) => {
             const onChange = async (): Promise<void> => {
-                this.updateCallbacks();
+                this.onChange();
 
                 if (this.inner.isDone()) {
                     resolve(undefined);
@@ -378,6 +447,8 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
                         ),
                     );
                 }
+
+                this.emit(VerificationRequestEvent.Change);
             };
             inner.registerChangesCallback(onChange);
         });
@@ -385,8 +456,178 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
         this.completionPromise.catch(() => null);
     }
 
+    /**
+     * Hook which is called when the underlying rust class notifies us that there has been a change.
+     *
+     * Can be overridden by subclasses to see if we can notify the application about an update.
+     */
+    protected onChange(): void {}
+
+    /**
+     * Returns true if the verification has been cancelled, either by us or the other side.
+     */
+    public get hasBeenCancelled(): boolean {
+        return this.inner.isCancelled();
+    }
+
+    /**
+     * The ID of the other user in the verification process.
+     */
+    public get userId(): string {
+        return this.inner.otherUserId.toString();
+    }
+
+    /**
+     * Cancel a verification.
+     *
+     * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
+     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
+     *
+     * @param e - the reason for the cancellation.
+     */
+    public cancel(e?: Error): void {
+        // TODO: something with `e`
+        const req: undefined | OutgoingRequest = this.inner.cancel();
+        if (req) {
+            this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+    }
+
+    /**
+     * Get the details for an SAS verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
+     * the SAS matches.
+     */
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return null;
+    }
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return null;
+    }
+}
+
+/** A Verifier instance which is used to show and/or scan a QR code. */
+export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> implements Verifier {
+    private callbacks: ShowQrCodeCallbacks | null = null;
+
+    public constructor(inner: RustSdkCryptoJs.Qr, outgoingRequestProcessor: OutgoingRequestProcessor) {
+        super(inner, outgoingRequestProcessor);
+    }
+
+    protected onChange(): void {
+        // if the other side has scanned our QR code and sent us a "reciprocate" message, it is now time for the
+        // application to prompt the user to confirm their side.
+        if (this.callbacks === null && this.inner.hasBeenScanned()) {
+            this.callbacks = {
+                confirm: () => this.confirmScanning(),
+                cancel: () => this.cancel(),
+            };
+        }
+    }
+
+    /**
+     * Start the key verification, if it has not already been started.
+     *
+     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
+     *    or times out.
+     */
+    public async verify(): Promise<void> {
+        // Some applications (hello, matrix-react-sdk) may not check if there is a `ShowQrCodeCallbacks` and instead
+        // register a `ShowReciprocateQr` listener which they expect to be called once `.verify` is called.
+        if (this.callbacks !== null) {
+            this.emit(VerifierEvent.ShowReciprocateQr, this.callbacks);
+        }
+        // Nothing to do here but wait.
+        await this.completionPromise;
+    }
+
+    /**
+     * Calculate an appropriate VerificationPhase for a VerificationRequest where this is the verifier.
+     *
+     * This is abnormally complicated because a rust-side QR Code verifier can span several verification phases.
+     */
+    public get verificationPhase(): VerificationPhase {
+        switch (this.inner.state()) {
+            case QrState.Created:
+                // we have created a QR for display; neither side has yet sent an `m.key.verification.start`.
+                return VerificationPhase.Ready;
+            case QrState.Scanned:
+                // other side has scanned our QR and sent an `m.key.verification.start` with `m.reciprocate.v1`
+                return VerificationPhase.Started;
+            case QrState.Confirmed:
+                // we have confirmed the other side's scan and sent an `m.key.verification.done`.
+                return VerificationPhase.Done;
+            case QrState.Reciprocated:
+                // although the rust SDK doesn't immediately send the `m.key.verification.start` on transition into this
+                // state, `RustVerificationRequest.scanQrCode` immediately calls `reciprocate()` and does so, so in practice
+                // we can treat the two the same.
+                return VerificationPhase.Started;
+            case QrState.Done:
+                return VerificationPhase.Done;
+            case QrState.Cancelled:
+                return VerificationPhase.Cancelled;
+            default:
+                throw new Error(`Unknown qr code state ${this.inner.state()}`);
+        }
+    }
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return this.callbacks;
+    }
+
+    private async confirmScanning(): Promise<void> {
+        const req: undefined | OutgoingRequest = this.inner.confirmScanning();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+    }
+}
+
+/** A Verifier instance which is used if we are exchanging emojis */
+export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implements Verifier {
+    private callbacks: ShowSasCallbacks | null = null;
+
+    public constructor(
+        inner: RustSdkCryptoJs.Sas,
+        _verificationRequest: RustVerificationRequest,
+        outgoingRequestProcessor: OutgoingRequestProcessor,
+    ) {
+        super(inner, outgoingRequestProcessor);
+    }
+
+    /**
+     * Start the key verification, if it has not already been started.
+     *
+     * This means sending a `m.key.verification.start` if we are the first responder, or a `m.key.verification.accept`
+     * if the other side has already sent a start event.
+     *
+     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
+     *    or times out.
+     */
+    public async verify(): Promise<void> {
+        const req: undefined | OutgoingRequest = this.inner.accept();
+        if (req) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+        await this.completionPromise;
+    }
+
     /** if we can now show the callbacks, do so */
-    private updateCallbacks(): void {
+    protected onChange(): void {
         if (this.callbacks === null) {
             const emoji: Array<Emoji> | undefined = this.inner.emoji();
             const decimal = this.inner.decimals() as [number, number, number] | undefined;
@@ -418,50 +659,10 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
     }
 
     /**
-     * Returns true if the verification has been cancelled, either by us or the other side.
+     * Calculate an appropriate VerificationPhase for a VerificationRequest where this is the verifier.
      */
-    public get hasBeenCancelled(): boolean {
-        return this.inner.isCancelled();
-    }
-
-    /**
-     * The ID of the other user in the verification process.
-     */
-    public get userId(): string {
-        return this.inner.otherUserId.toString();
-    }
-
-    /**
-     * Start the key verification, if it has not already been started.
-     *
-     * This means sending a `m.key.verification.start` if we are the first responder, or a `m.key.verification.accept`
-     * if the other side has already sent a start event.
-     *
-     * @returns Promise which resolves when the verification has completed, or rejects if the verification is cancelled
-     *    or times out.
-     */
-    public async verify(): Promise<void> {
-        const req: undefined | OutgoingRequest = this.inner.accept();
-        if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
-        }
-        await this.completionPromise;
-    }
-
-    /**
-     * Cancel a verification.
-     *
-     * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
-     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
-     *
-     * @param e - the reason for the cancellation.
-     */
-    public cancel(e: Error): void {
-        // TODO: something with `e`
-        const req: undefined | OutgoingRequest = this.inner.cancel();
-        if (req) {
-            this.outgoingRequestProcessor.makeOutgoingRequest(req);
-        }
+    public get verificationPhase(): VerificationPhase {
+        return VerificationPhase.Started;
     }
 
     /**
@@ -472,16 +673,6 @@ export class RustSASVerifier extends TypedEventEmitter<VerifierEvent, VerifierEv
      */
     public getShowSasCallbacks(): ShowSasCallbacks | null {
         return this.callbacks;
-    }
-
-    /**
-     * Get the details for reciprocating QR code verification, if one is in progress
-     *
-     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
-     * already scanned our QR code), and we are waiting for the user to confirm.
-     */
-    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
-        return null;
     }
 }
 
@@ -499,6 +690,8 @@ const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.Verificati
  * @param method - specced method identifier, for example `m.sas.v1`.
  * @returns Rust-side `VerificationMethod` corresponding to `method`.
  * @throws An error if the method is unknown.
+ *
+ * @internal
  */
 export function verificationMethodIdentifierToMethod(method: string): RustSdkCryptoJs.VerificationMethod {
     const meth = verificationMethodsByIdentifier[method];

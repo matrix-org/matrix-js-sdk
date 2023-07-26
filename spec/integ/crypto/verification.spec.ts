@@ -59,7 +59,7 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-js");
+    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
@@ -81,9 +81,9 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  */
 // we test with both crypto stacks...
 describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
-    // Rust backend. Once we have full support in the rust sdk, it will go away.
-    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
+    // backend. Once we drop support for legacy crypto, it will go away.
+    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
 
     /** the client under test */
     let aliceClient: MatrixClient;
@@ -162,6 +162,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 const requests = aliceClient.getCrypto()!.getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
                 expect(requests.length).toEqual(1);
                 expect(requests[0].transactionId).toEqual(transactionId);
+            }
+
+            // check that the returned request depends on the given userID
+            {
+                const requests = aliceClient
+                    .getCrypto()!
+                    .getVerificationRequestsToDeviceInProgress("@unknown:localhost");
+                expect(requests.length).toEqual(0);
             }
 
             let toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
@@ -387,12 +395,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
         });
 
-        oldBackendOnly("can verify another via QR code with an untrusted cross-signing key", async () => {
+        it("can verify another via QR code with an untrusted cross-signing key", async () => {
             aliceClient = await startTestClient();
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             await waitForDeviceList();
-            expect(aliceClient.getStoredCrossSigningForUser(TEST_USER_ID)).toBeTruthy();
 
             // have alice initiate a verification. She should send a m.key.verification.request
             const [requestBody, request] = await Promise.all([
@@ -414,7 +421,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(VerificationPhase.Ready);
 
             // we should now have QR data we can display
-            const qrCodeBuffer = request.getQRCodeBytes()!;
+            const qrCodeBuffer = (await request.generateQRCode())!;
             expect(qrCodeBuffer).toBeTruthy();
 
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
@@ -430,16 +437,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             );
             const sharedSecret = qrCodeBuffer.subarray(74 + txnIdLen);
 
+            // we should still be "Ready" and have no verifier
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
             // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
-            returnToDeviceMessageFromSync({
-                type: "m.key.verification.start",
-                content: {
-                    from_device: TEST_DEVICE_ID,
-                    method: "m.reciprocate.v1",
-                    transaction_id: transactionId,
-                    secret: encodeUnpaddedBase64(sharedSecret),
-                },
-            });
+            returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
             await waitForVerificationRequestChanged(request);
             expect(request.phase).toEqual(VerificationPhase.Started);
             expect(request.chosenMethod).toEqual("m.reciprocate.v1");
@@ -447,27 +450,176 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // there should now be a verifier
             const verifier: Verifier = request.verifier!;
             expect(verifier).toBeDefined();
-            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
 
             // ... which we call .verify on, which emits a ShowReciprocateQr event
-            const verificationPromise = verifier.verify();
-            const reciprocateQRCodeCallbacks = await new Promise<ShowQrCodeCallbacks>((resolve) => {
+            const reciprocatePromise = new Promise<ShowQrCodeCallbacks>((resolve) => {
                 verifier.once(VerifierEvent.ShowReciprocateQr, resolve);
             });
+            const verificationPromise = verifier.verify();
+            const reciprocateQRCodeCallbacks = await reciprocatePromise;
 
             // getReciprocateQrCodeCallbacks() is an alternative way to get the callbacks
             expect(verifier.getReciprocateQrCodeCallbacks()).toBe(reciprocateQRCodeCallbacks);
             expect(verifier.getShowSasCallbacks()).toBeNull();
 
-            // Alice confirms she is happy
+            // Alice confirms she is happy, which makes her reply with a 'done'
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.done");
             reciprocateQRCodeCallbacks.confirm();
+            await sendToDevicePromise;
 
-            // that should satisfy Alice, who should reply with a 'done'
+            // the dummy device replies with its own 'done'
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
+            expect(request.phase).toEqual(VerificationPhase.Done);
+        });
+
+        newBackendOnly("can verify another by scanning their QR code", async () => {
+            aliceClient = await startTestClient();
+            // we need cross-signing keys for a QR code verification
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can show a QR code
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.qr_code.show.v1", "m.reciprocate.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.otherPartySupportsMethod("m.qr_code.show.v1")).toBe(true);
+
+            // the dummy device shows a QR code
+            const sharedSecret = "SUPERSEKRET";
+            const qrCodeBuffer = buildQRCode(
+                transactionId,
+                TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+                MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+                sharedSecret,
+            );
+
+            // Alice scans the QR code
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            const verifier = await request.scanQRCode(qrCodeBuffer);
+
+            const requestBody = await sendToDevicePromise;
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            expect(toDeviceMessage).toEqual({
+                from_device: aliceClient.deviceId,
+                method: "m.reciprocate.v1",
+                transaction_id: transactionId,
+                secret: encodeUnpaddedBase64(Buffer.from(sharedSecret)),
+            });
+
+            expect(request.phase).toEqual(VerificationPhase.Started);
+            expect(request.chosenMethod).toEqual("m.reciprocate.v1");
+            expect(verifier.getReciprocateQrCodeCallbacks()).toBeNull();
+
+            const verificationPromise = verifier.verify();
+
+            // the dummy device confirms that Alice scanned the QR code, by replying with a done
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
+
+            // Alice also replies with a 'done'
             await expectSendToDeviceMessage("m.key.verification.done");
 
             // ... and the whole thing should be done!
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
+        });
+
+        it("can send an SAS start after QR code display", async () => {
+            aliceClient = await startTestClient();
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan a QR code
+            // or do the emoji dance
+            returnToDeviceMessageFromSync(
+                buildReadyMessage(transactionId, ["m.qr_code.scan.v1", "m.sas.v1", "m.reciprocate.v1"]),
+            );
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice displays the QR code
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // ... but Alice wants to do an SAS verification
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            await request.startVerification("m.sas.v1");
+            await sendToDevicePromise;
+
+            // There should now be a `verifier`
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(request.chosenMethod).toEqual("m.sas.v1");
+
+            // clean up the test
+            expectSendToDeviceMessage("m.key.verification.cancel");
+            request.cancel();
+            await expect(verifier.verify()).rejects.toBeTruthy();
+        });
+
+        it("can receive an SAS start after QR code display", async () => {
+            aliceClient = await startTestClient();
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan a QR code
+            // or do the emoji dance
+            returnToDeviceMessageFromSync(
+                buildReadyMessage(transactionId, ["m.qr_code.scan.v1", "m.sas.v1", "m.reciprocate.v1"]),
+            );
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice displays the QR code
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+            expect(request.verifier).toBeUndefined();
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // ... but the dummy device wants to do an SAS verification
+            returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
+            await emitPromise(request, VerificationRequestEvent.Change);
+
+            // Alice should now have a `verifier`
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+            expect(request.chosenMethod).toEqual("m.sas.v1");
+
+            // clean up the test
+            expectSendToDeviceMessage("m.key.verification.cancel");
+            request.cancel();
+            await expect(verifier.verify()).rejects.toBeTruthy();
         });
     });
 
@@ -475,6 +627,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             // pretend that we have another device, which we will start verifying
             e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             aliceClient = await startTestClient();
             await waitForDeviceList();
@@ -539,6 +692,50 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // ... which should cancel the verifier
             await expect(verificationPromise).rejects.toThrow();
+            expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(verifier.hasBeenCancelled).toBe(true);
+        });
+
+        it("can cancel in the ShowQrCodeCallbacks", async () => {
+            // have alice initiate a verification. She should send a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, with an indication it can scan the QR code
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.qr_code.scan.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // we should now have QR data we can display
+            const qrCodeBuffer = (await request.generateQRCode())!;
+            expect(qrCodeBuffer).toBeTruthy();
+            const sharedSecret = qrCodeBuffer.subarray(74 + transactionId.length);
+
+            // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
+            returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Started);
+            expect(request.chosenMethod).toEqual("m.reciprocate.v1");
+
+            // there should now be a verifier
+            const verifier: Verifier = request.verifier!;
+            expect(verifier).toBeDefined();
+
+            // ... which we call .verify on, which emits a ShowReciprocateQr event
+            const reciprocatePromise = emitPromise(verifier, VerifierEvent.ShowReciprocateQr);
+            const verificationPromise = verifier.verify();
+            const reciprocateQRCodeCallbacks: ShowQrCodeCallbacks = await reciprocatePromise;
+
+            // Alice complains that she didn't see the dummy device scan her code
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.cancel");
+            reciprocateQRCodeCallbacks.cancel();
+            await sendToDevicePromise;
+
+            // ... which should cancel the verifier
+            await expect(verificationPromise).rejects.toBeTruthy();
             expect(request.phase).toEqual(VerificationPhase.Cancelled);
             expect(verifier.hasBeenCancelled).toBe(true);
         });
@@ -717,6 +914,19 @@ function buildReadyMessage(transactionId: string, methods: string[]): { type: st
     };
 }
 
+/** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: Uint8Array) {
+    return {
+        type: "m.key.verification.start",
+        content: {
+            from_device: TEST_DEVICE_ID,
+            method: "m.reciprocate.v1",
+            transaction_id: transactionId,
+            secret: encodeUnpaddedBase64(sharedSecret),
+        },
+    };
+}
+
 /** build an m.key.verification.start to-device message suitable for the SAS flow, originating from the dummy device */
 function buildSasStartMessage(transactionId: string): { type: string; content: object } {
     return {
@@ -793,4 +1003,23 @@ function buildDoneMessage(transactionId: string) {
             transaction_id: transactionId,
         },
     };
+}
+
+function buildQRCode(transactionId: string, key1Base64: string, key2Base64: string, sharedSecret: string): Uint8Array {
+    // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
+
+    const qrCodeBuffer = Buffer.alloc(150); // oversize
+    let idx = 0;
+    idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
+    idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
+    idx = qrCodeBuffer.writeUInt8(0x02, idx); // mode
+    idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
+    idx += qrCodeBuffer.write(transactionId, idx, "ascii");
+
+    idx += Buffer.from(key1Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += Buffer.from(key2Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += qrCodeBuffer.write(sharedSecret, idx);
+
+    // truncate to the right length
+    return qrCodeBuffer.subarray(0, idx);
 }
