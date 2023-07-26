@@ -326,11 +326,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
         this.setEventMetadata(event);
 
-        if (!this.initialEventsFetched && !toStartOfTimeline && event.getId() === this.id) {
-            // We're loading the thread organically
-            this.initialEventsFetched = true;
-        }
-
         const lastReply = this.lastReply();
         const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 

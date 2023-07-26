@@ -38,7 +38,6 @@ import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingReque
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
-import { TEST_ROOM_ID } from "../../test-utils/test-data";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -505,10 +504,20 @@ describe("RustCrypto", () => {
         });
     });
 
+    describe("get|storeSessionBackupPrivateKey", () => {
+        it("can save and restore a key", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+    });
+
     describe("findVerificationRequestDMInProgress", () => {
         it("misses userId", async () => {
             const rustCrypto = await makeTestRustCrypto();
-            expect(rustCrypto.findVerificationRequestDMInProgress(TEST_ROOM_ID)).not.toBeDefined();
+            expect(rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).not.toBeDefined();
         });
     });
 });

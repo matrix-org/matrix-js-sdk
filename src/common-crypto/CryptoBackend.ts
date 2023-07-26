@@ -90,6 +90,15 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns the cross signing information for the user.
      */
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
+
+    /**
+     * Check the cross signing trust of the current user
+     *
+     * @param opts - Options object.
+     *
+     * @deprecated Unneeded for the new crypto
+     */
+    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -164,4 +173,11 @@ export interface OnSyncCompletedData {
      * True if we are working our way through a backlog of events after connecting.
      */
     catchingUp?: boolean;
+}
+
+/**
+ * Options object for {@link CryptoBackend#checkOwnCrossSigningTrust}.
+ */
+export interface CheckOwnCrossSigningTrustOpts {
+    allowPrivateKeyRequests?: boolean;
 }

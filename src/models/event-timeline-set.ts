@@ -984,11 +984,20 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const { threadId, shouldLiveInRoom } = this.room.eventShouldLiveIn(event);
+        const { threadId, shouldLiveInRoom, shouldLiveInThread } = this.room.eventShouldLiveIn(event);
 
         if (this.thread) {
             return this.thread.id === threadId;
         }
+
+        if (!shouldLiveInRoom && !shouldLiveInThread) {
+            logger.warn(
+                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${
+                    this.room?.roomId
+                } eventId=${event.getId()} threadId=${event.threadRootId}`,
+            );
+        }
+
         return shouldLiveInRoom;
     }
 }

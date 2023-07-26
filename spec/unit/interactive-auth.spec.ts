@@ -375,7 +375,7 @@ describe("InteractiveAuth", () => {
         await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
     });
 
-    it("should handle unexpected error types without data propery set", async () => {
+    it("should handle unexpected error types without data property set", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
         const requestEmailToken = jest.fn();
@@ -558,5 +558,41 @@ describe("InteractiveAuth", () => {
         // @ts-ignore
         ia.chooseStage();
         expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
+    });
+
+    it("should fire stateUpdated callback if with error when encountered", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: [AuthType.Password] }],
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            },
+        });
+
+        // first we expect a call here
+        stateUpdated.mockImplementation((stage) => {
+            expect(stage).toEqual(AuthType.Password);
+            ia.submitAuthDict({
+                type: AuthType.Password,
+            });
+        });
+
+        // .. which should trigger a call here
+        doRequest.mockRejectedValue(new MatrixError({ errcode: "M_UNKNOWN", error: "This is an error" }));
+
+        await Promise.allSettled([ia.attemptAuth()]);
+        expect(stateUpdated).toHaveBeenCalledWith("m.login.password", {
+            errcode: "M_UNKNOWN",
+            error: "This is an error",
+        });
     });
 });
