@@ -3354,12 +3354,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         password?: string | Uint8Array | null,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
-        if (!this.getCrypto()) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
 
         // eslint-disable-next-line camelcase
-        const { algorithm, auth_data, recovery_key, privateKey } = await this.getCrypto()!.prepareKeyBackupVersion(
+        const { algorithm, auth_data, recovery_key, privateKey } = await this.cryptoBackend.prepareKeyBackupVersion(
             password,
         );
 
@@ -3395,11 +3395,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Object with 'version' param indicating the version created
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
-        if (!this.getCrypto()) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.getCrypto()!.getBackupManager().createKeyBackupVersion(info);
+        await this.cryptoBackend.backupManager.createKeyBackupVersion(info);
 
         const data = {
             algorithm: info.algorithm,
@@ -3414,7 +3414,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we run the same signature verification that will be used for future
         // sessions.
         await this.checkKeyBackup();
-        if (!this.getKeyBackupEnabled()) {
+        if (!(await this.cryptoBackend.getActiveSessionBackupVersion())) {
             logger.error("Key backup not usable even though we just created it");
         }
 

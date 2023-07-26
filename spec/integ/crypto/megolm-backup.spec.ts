@@ -267,7 +267,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         await backupEnabled;
 
-        const backupStatus = aliceClient.getCrypto()!.getActiveSessionBackupVersion();
+        const backupStatus = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
         expect(backupStatus).toBeDefined();
         expect(backupStatus).toStrictEqual(backupVersion);
     });
