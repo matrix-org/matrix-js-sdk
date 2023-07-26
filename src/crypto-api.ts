@@ -324,6 +324,13 @@ export interface CryptoApi {
      * @param key - the backup decryption key
      */
     storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
+
+    /**
+     * Get the current status of key backup.
+     *
+     * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
+     */
+    getActiveSessionBackupVersion(): Promise<string | null>;
 }
 
 /**

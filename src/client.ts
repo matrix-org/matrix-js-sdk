@@ -3300,10 +3300,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      *
-     * @deprecated Prefer direct access to {@link Crypto.SecureBackup.getKeyBackupStatus}:
+     * @deprecated Prefer direct access to {@link CryptoApi.getActiveSessionBackupVersion}:
      *
      * ```javascript
-     * let enabled = (await client.getCrypto().backupManager.getKeyBackupStatus()) !== null;
+     * let enabled = (await client.getCrypto().getActiveSessionBackupVersion()) !== null;
      * ```
      */
     public getKeyBackupEnabled(): boolean | null {
@@ -3447,7 +3447,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If we're currently backing up to this backup... stop.
         // (We start using it automatically in createKeyBackupVersion
         // so this is symmetrical).
-        if ((await this.getCrypto()?.backupManager.getActiveBackupVersion()) === version) {
+        if ((await this.getCrypto()?.getActiveSessionBackupVersion()) === version) {
             this.crypto.backupManager.disableKeyBackup();
         }
 

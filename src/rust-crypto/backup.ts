@@ -22,9 +22,7 @@ export class RustBackupManager implements SecureKeyBackup {
     }
 
     /**
-     * Get the current status of key backup.
-     *
-     * Implementation of {@link SecureKeyBackup.getActiveBackupVersion}.
+     * Get the backup version we are currently backing up to, if any
      */
     public async getActiveBackupVersion(): Promise<string | null> {
         // TODO stub

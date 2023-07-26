@@ -25,6 +25,7 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
+import { SecureKeyBackup } from "../../../src/common-crypto/SecureKeyBackup";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -173,16 +174,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         aliceClient = await initTestClient();
         const aliceCrypto = aliceClient.getCrypto()!;
+        // @ts-ignore backupManager is an internal property
+        const aliceBackupManager: SecureKeyBackup = aliceCrypto.backupManager;
         await aliceClient.startClient();
 
         // tell Alice to trust the dummy device that signed the backup
         await waitForDeviceList();
         await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-        await aliceCrypto.backupManager.checkAndStart();
+        await aliceBackupManager.checkAndStart();
 
         // At this point there is no backup
         let backupStatus: string | null;
-        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toBeNull();
 
         // Serve a backup with no trusted signature
@@ -192,11 +195,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             overwriteRoutes: true,
         });
 
-        const checked = await aliceCrypto.backupManager.checkAndStart();
+        const checked = await aliceBackupManager.checkAndStart();
         expect(checked?.backupInfo?.version).toStrictEqual(unsignedBackup.version);
         expect(checked?.trustInfo?.usable).toBeFalsy();
 
-        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toBeNull();
 
         // Add a valid signature to the backup
@@ -213,12 +216,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
         });
 
-        const validCheck = await aliceCrypto.backupManager.checkAndStart();
+        const validCheck = await aliceBackupManager.checkAndStart();
         expect(validCheck?.trustInfo?.usable).toStrictEqual(true);
 
         await backupPromise;
 
-        backupStatus = await aliceCrypto.backupManager.getActiveBackupVersion();
+        backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toStrictEqual(testData.SIGNED_BACKUP_DATA.version);
     });
 

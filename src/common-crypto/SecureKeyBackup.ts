@@ -42,13 +42,6 @@ export interface SecureKeyBackup {
      *    (or lack thereof).
      */
     checkAndStart(): Promise<KeyBackupCheck | null>;
-
-    /**
-     * Get the current status of key backup.
-     *
-     * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
-     */
-    getActiveBackupVersion(): Promise<string | null>;
 }
 
 /**

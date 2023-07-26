@@ -136,7 +136,6 @@ export class BackupManager implements SecureKeyBackup {
         this.clientRunning = false;
     }
 
-    /** @deprecated use {@link getActiveBackupVersion} instead */
     public get version(): string | undefined {
         return this.backupInfo && this.backupInfo.version;
     }
@@ -196,28 +195,11 @@ export class BackupManager implements SecureKeyBackup {
         this.baseApis.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
-    /** @deprecated use {@link getActiveBackupVersion} instead */
     public getKeyBackupEnabled(): boolean | null {
         if (!this.checkedForBackup) {
             return null;
         }
         return Boolean(this.algorithm);
-    }
-
-    /**
-     * Get the current status of key backup.
-     *
-     * Implementation of {@link SecureKeyBackup.getActiveBackupVersion}.
-     */
-    public async getActiveBackupVersion(): Promise<string | null> {
-        if (!this.checkedForBackup) {
-            return null;
-        }
-        if (this.algorithm && this.version) {
-            return this.version;
-        } else {
-            return null;
-        }
     }
 
     public async prepareKeyBackupVersion(
