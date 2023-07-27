@@ -2175,6 +2175,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Mark the given device as locally verified.
+     *
+     * Implementation of {@link CryptoApi#setDeviceVerified}.
+     */
+    public async setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
+        await this.setDeviceVerification(userId, deviceId, verified);
+    }
+
+    /**
      * Update the blocked/verified state of the given device
      *
      * @param userId - owner of the device
