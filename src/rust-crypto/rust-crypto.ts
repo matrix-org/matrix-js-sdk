@@ -56,6 +56,7 @@ import { RustVerificationRequest, verificationMethodIdentifierToMethod } from ".
 import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { RustBackupManager } from "./backup";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -81,6 +82,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
     private crossSigningIdentity: CrossSigningIdentity;
+
+    public readonly backupManager: RustBackupManager;
 
     public constructor(
         /** The `OlmMachine` from the underlying rust crypto sdk. */
@@ -109,6 +112,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.backupManager = new RustBackupManager();
 
         // Fire if the cross signing keys are imported from the secret storage
         const onCrossSigningKeysImport = (): void => {
