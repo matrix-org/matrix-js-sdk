@@ -156,9 +156,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         syncResponder.sendOrQueueSyncResponse({});
         await jest.advanceTimersByTimeAsync(10); // DeviceList has a sleep(5) which we need to make happen
 
-        // tell Alice to trust the dummy device that signed the backup
+        // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+        // XXX: should we automatically re-check after a device becomes verified?
         await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-        await aliceCrypto.backupManager.checkAndStart();
+        await aliceClient.checkKeyBackup();
 
         // Now, send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
         syncResponder.sendOrQueueSyncResponse(syncResponse);
