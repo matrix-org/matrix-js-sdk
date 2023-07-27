@@ -41,6 +41,7 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
+    CrossSigningKeyInfo,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -416,8 +417,45 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getCrossSigningKeyId}
      */
     public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
-        // TODO
-        return null;
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const privateKeysOnDevice =
+            crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
+
+        if (!userIdentity || !privateKeysOnDevice) {
+            // The public or private keys are not available on this device
+            return null;
+        }
+
+        if (!userIdentity.isVerified()) {
+            // We have both public and private keys, but they don't match!
+            return null;
+        }
+
+        let key: string;
+        switch (type) {
+            case CrossSigningKey.Master:
+                key = userIdentity.masterKey;
+                break;
+            case CrossSigningKey.SelfSigning:
+                key = userIdentity.selfSigningKey;
+                break;
+            case CrossSigningKey.UserSigning:
+                key = userIdentity.userSigningKey;
+                break;
+            default:
+                // Unknown type
+                return null;
+        }
+
+        const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
+        // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+        // We assume only a single key, and we want the bare form without type
+        // prefix, so we select the values.
+        return Object.values(parsedKey.keys)[0];
     }
 
     /**

@@ -210,7 +210,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { BootstrapCrossSigningOpts, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -524,13 +524,8 @@ export interface Capabilities {
     [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
 }
 
-/* eslint-disable camelcase */
-export interface ICrossSigningKey {
-    keys: { [algorithm: string]: string };
-    signatures?: ISignatures;
-    usage: string[];
-    user_id: string;
-}
+/** @deprecated prefer {@link CrossSigningKeyInfo}. */
+export type ICrossSigningKey = CrossSigningKeyInfo;
 
 enum CrossSigningKeyType {
     MasterKey = "master_key",

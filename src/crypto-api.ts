@@ -21,6 +21,7 @@ import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { ISignatures } from "./@types/signed";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -512,6 +513,17 @@ export enum CrossSigningKey {
     Master = "master",
     SelfSigning = "self_signing",
     UserSigning = "user_signing",
+}
+
+/**
+ * Information on one of the cross-signing keys.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+ */
+export interface CrossSigningKeyInfo {
+    keys: { [algorithm: string]: string };
+    signatures?: ISignatures;
+    usage: string[];
+    user_id: string;
 }
 
 /**
