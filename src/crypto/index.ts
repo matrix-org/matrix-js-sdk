@@ -92,6 +92,7 @@ import {
     CrossSigningStatus,
     DeviceVerificationStatus,
     ImportRoomKeysOpts,
+    KeyBackupCheck,
     KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
@@ -1302,6 +1303,20 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
         const trustInfo = await this.backupManager.isKeyBackupTrusted(info);
         return backupTrustInfoFromLegacyTrustInfo(trustInfo);
+    }
+
+    /**
+     * Force a re-check of the key backup and enable/disable it as appropriate.
+     *
+     * Implementation of {@link CryptoApi.checkKeyBackupAndEnable}.
+     */
+    public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
+        const checkResult = await this.backupManager.checkKeyBackup();
+        if (!checkResult || !checkResult.backupInfo) return null;
+        return {
+            backupInfo: checkResult.backupInfo,
+            trustInfo: backupTrustInfoFromLegacyTrustInfo(checkResult.trustInfo),
+        };
     }
 
     /**
