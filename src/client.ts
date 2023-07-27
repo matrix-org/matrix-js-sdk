@@ -3442,7 +3442,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If we're currently backing up to this backup... stop.
         // (We start using it automatically in createKeyBackupVersion
         // so this is symmetrical).
-        if ((await this.getCrypto()?.getActiveSessionBackupVersion()) === version) {
+        // TODO: convert this to use crypto.getActiveSessionBackupVersion. And actually check the version.
+        if (this.crypto.backupManager.version) {
             this.crypto.backupManager.disableKeyBackup();
         }
 
