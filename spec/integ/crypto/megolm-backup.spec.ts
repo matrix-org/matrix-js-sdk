@@ -15,17 +15,16 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
+import "fake-indexeddb/auto";
 
-import { logger } from "../../../src/logger";
-import { decodeRecoveryKey } from "../../../src/crypto/recoverykey";
-import { IKeyBackupInfo, IKeyBackupSession } from "../../../src/crypto/keybackup";
+import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
-import { MatrixEventEvent } from "../../../src/models/event";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import { syncPromise } from "../../test-utils/test-utils";
+import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import * as testData from "../../test-utils/test-data";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -72,22 +71,14 @@ const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
     },
 };
 
-const CURVE25519_BACKUP_INFO: IKeyBackupInfo = {
-    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-    version: "1",
-    auth_data: {
-        public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-        // Will be updated with correct value on the fly
-        signatures: {},
-    },
-};
-
-const RECOVERY_KEY = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
-
 const TEST_USER_ID = "@alice:localhost";
 const TEST_DEVICE_ID = "xzcvb";
 
-describe("megolm key backups", function () {
+describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
+    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
+    // Rust backend. Once we have full support in the rust sdk, it will go away.
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
@@ -108,6 +99,7 @@ describe("megolm key backups", function () {
         syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
         e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
         e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
+        e2eKeyResponder.addDeviceKeys(testData.SIGNED_TEST_DEVICE_DATA);
         e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
     });
 
@@ -130,12 +122,12 @@ describe("megolm key backups", function () {
             deviceId: TEST_DEVICE_ID,
             ...opts,
         });
-        await client.initCrypto();
+        await initCrypto(client);
 
         return client;
     }
 
-    it("Alice checks key backups when receiving a message she can't decrypt", async function () {
+    oldBackendOnly("Alice checks key backups when receiving a message she can't decrypt", async function () {
         const syncResponse = {
             next_batch: 1,
             rooms: {
@@ -150,35 +142,32 @@ describe("megolm key backups", function () {
         };
 
         fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", CURVE25519_KEY_BACKUP_DATA);
-
-        // mock for the outgoing key requests that will be sent
-        fetchMock.put("express:/_matrix/client/r0/sendToDevice/m.room_key_request/:txid", {});
-
-        // We'll need to add a signature to the backup data, so take a copy to avoid mutating global state.
-        const backupData = JSON.parse(JSON.stringify(CURVE25519_BACKUP_INFO));
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData);
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
         aliceClient = await initTestClient();
-        await aliceClient.crypto!.signObject(backupData.auth_data);
-        await aliceClient.crypto!.storeSessionBackupPrivateKey(decodeRecoveryKey(RECOVERY_KEY));
-        await aliceClient.crypto!.backupManager!.checkAndStart();
+        const aliceCrypto = aliceClient.getCrypto()!;
+        await aliceCrypto.storeSessionBackupPrivateKey(Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"));
 
         // start after saving the private key
         await aliceClient.startClient();
 
+        // Persuade alice to fetch the device list. Completing the initial sync will make the device list download
+        // outdated device lists (of which our own user will be one).
+        syncResponder.sendOrQueueSyncResponse({});
+        await jest.advanceTimersByTimeAsync(10); // DeviceList has a sleep(5) which we need to make happen
+
+        // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+        // XXX: should we automatically re-check after a device becomes verified?
+        await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+        await aliceClient.checkKeyBackup();
+
+        // Now, send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
         syncResponder.sendOrQueueSyncResponse(syncResponse);
         await syncPromise(aliceClient);
 
         const room = aliceClient.getRoom(ROOM_ID)!;
-
         const event = room.getLiveTimeline().getEvents()[0];
-        await new Promise((resolve, reject) => {
-            event.once(MatrixEventEvent.Decrypted, (ev) => {
-                logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-                resolve(ev);
-            });
-        });
-
+        await awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(event.getContent()).toEqual("testytest");
     });
 });

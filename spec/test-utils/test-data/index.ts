@@ -5,6 +5,7 @@
 
 import { IDeviceKeys } from "../../../src/@types/crypto";
 import { IDownloadKeyResult } from "../../../src";
+import { KeyBackupInfo } from "../../../src/crypto-api";
 
 /* eslint-disable comma-dangle */
 
@@ -93,6 +94,23 @@ export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
                 "@alice:localhost": {
                     "ed25519:J+5An10v1vzZpAXTYFokD1/PEVccFnLC61EfRXit0UY": "6AkD1XM2H0/ebgP9oBdMKNeft7uxsrb0XN1CsjjHgeZCvCTMmv3BHlLiT/Hzy4fe8H+S1tr484dcXN/PIdnfDA"
                 }
+            }
+        }
+    }
+};
+
+/** base64-encoded backup decryption (private) key */
+export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
+export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
+    "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+    "version": "1",
+    "auth_data": {
+        "public_key": "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+        "signatures": {
+            "@alice:localhost": {
+                "ed25519:test_device": "KDSNeumirTsd8piI0oVfv/wzg4J4HlEc7rs5XhODFcJ/YAcUdg65ajsZG+rLI0TQOSSGjorJqcrSiSB1HRSCAA"
             }
         }
     }
