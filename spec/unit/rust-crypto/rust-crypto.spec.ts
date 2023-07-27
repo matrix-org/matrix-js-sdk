@@ -170,7 +170,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    it("getCrossSigningKeyId", async () => {
+    it("getCrossSigningKeyId when there is no cross signing keys", async () => {
         const rustCrypto = await makeTestRustCrypto();
         await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
     });
