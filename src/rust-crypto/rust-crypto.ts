@@ -101,6 +101,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
+
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
     ) {

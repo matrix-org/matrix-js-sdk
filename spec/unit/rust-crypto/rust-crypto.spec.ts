@@ -515,7 +515,7 @@ describe("RustCrypto", () => {
     });
 
     describe("findVerificationRequestDMInProgress", () => {
-        it("returns null if the userId is not provided", async () => {
+        it("returns undefined if the userId is not provided", async () => {
             const rustCrypto = await makeTestRustCrypto();
             expect(rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).not.toBeDefined();
         });
