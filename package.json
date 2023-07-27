@@ -82,7 +82,7 @@
         "@babel/register": "^7.12.10",
         "@casualbot/jest-sonar-reporter": "^2.2.5",
         "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz",
-        "@matrix-org/matrix-dmls-wasm": "https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.3.tgz",
+        "@matrix-org/matrix-dmls-wasm": "https://gitlab.matrix.org/api/v4/projects/876/packages/npm/@matrix-org/matrix-dmls-wasm/-/@matrix-org/matrix-dmls-wasm-0.0.4.tgz",
         "@types/bs58": "^4.0.1",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",

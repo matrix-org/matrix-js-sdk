@@ -1825,6 +1825,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         };
 
         return this.signObject(deviceKeys).then(() => {
+            this.mlsProvider.signObject(deviceKeys);
             return this.baseApis.uploadKeysRequest({
                 device_keys: deviceKeys as Required<IDeviceKeys>,
             });

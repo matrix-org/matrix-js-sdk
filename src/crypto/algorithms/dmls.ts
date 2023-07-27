@@ -18,6 +18,7 @@ limitations under the License.
  * Defines m.dmls encryption/decryption
  */
 
+import anotherjson from "another-json";
 import {
     EventType
 } from "../../@types/event";
@@ -286,11 +287,24 @@ class MlsDecryption extends DecryptionAlgorithm {
             }
             throw e;
         }
-        const processedMessage = group.process_unverified_message(
-            unverifiedMessage,
-            epochCreator,
-            mlsProvider.backend!,
-        );
+        let processedMessage;
+        try {
+            processedMessage = group.process_unverified_message(
+                unverifiedMessage,
+                epochCreator,
+                mlsProvider.backend!,
+            );
+        } catch (e) {
+            if (isHandshake) {
+                return {
+                    clearEvent: {
+                        type: "io.element.mls.internal",
+                        content: {"body": "This is an MLS handshake message, so there's nothing useful to see here."},
+                    },
+                };
+            }
+            throw e;
+        }
         this.removeEventFromPendingList(event, epochNumber, content.epoch_creator);
         if (processedMessage.is_application_message()) {
             const messageArr = processedMessage.as_application_message();
@@ -928,6 +942,25 @@ export class MlsProvider {
             throw e;
         }
         console.log("Done");
+    }
+
+    signObject(obj: object & olmlib.IObject): void {
+        const sigs = obj.signatures || {};
+        delete obj.signatures;
+        const unsigned = obj.unsigned;
+        if (obj.unsigned) delete obj.unsigned;
+        try {
+            const payload = textEncoder.encode(anotherjson.stringify(obj));
+            const sig = this.backend!.sign(this.credential!, payload);
+
+            const userId = this.crypto.baseApis.getUserId()!
+            const mysigs = sigs[userId] || {};
+            sigs[userId] = mysigs;
+            mysigs[`org.matrix.msc2883.v0.dmls.credential.ed25519:${this.crypto.baseApis.getDeviceId()!}`] = olmlib.encodeBase64(sig);
+        } finally {
+            obj.signatures = sigs;
+            if (unsigned) obj.unsigned = unsigned;
+        }
     }
 }
 
