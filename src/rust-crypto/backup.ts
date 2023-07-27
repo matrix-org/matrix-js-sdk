@@ -14,4 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export class RustBackupManager {}
+export class RustBackupManager {
+    /**
+     * Get the backup version we are currently backing up to, if any
+     */
+    public async getActiveBackupVersion(): Promise<string | null> {
+        // TODO stub
+        return null;
+    }
+}

@@ -1281,6 +1281,18 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Get the current status of key backup.
+     *
+     * Implementation of {@link CryptoApi.getActiveSessionBackupVersion}.
+     */
+    public async getActiveSessionBackupVersion(): Promise<string | null> {
+        if (this.backupManager.getKeyBackupEnabled()) {
+            return this.backupManager.version ?? null;
+        }
+        return null;
+    }
+
+    /**
      * Checks that a given cross-signing private key matches a given public key.
      * This can be used by the getCrossSigningKey callback to verify that the
      * private key it is about to supply is the one that was requested.

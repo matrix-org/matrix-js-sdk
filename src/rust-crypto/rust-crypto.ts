@@ -784,6 +784,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
     }
 
+    /**
+     * Get the current status of key backup.
+     *
+     * Implementation of {@link CryptoApi#getActiveSessionBackupVersion}.
+     */
+    public async getActiveSessionBackupVersion(): Promise<string | null> {
+        return await this.backupManager.getActiveBackupVersion();
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
