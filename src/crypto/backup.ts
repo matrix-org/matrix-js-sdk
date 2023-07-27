@@ -40,6 +40,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
+import { BackupTrustInfo } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -48,17 +49,18 @@ type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
     deviceId: string;
-    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
-    device?: DeviceInfo | null;
-    crossSigningId?: boolean;
+    valid: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device: DeviceInfo | null;
+    crossSigningId: boolean;
     deviceTrust?: DeviceTrustLevel;
 };
 
+/** @deprecated Prefer {@link BackupTrustInfo} */
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
     // eslint-disable-next-line camelcase
-    trusted_locally?: boolean;
+    trusted_locally: boolean;
 };
 
 export interface IKeyBackupCheck {
@@ -324,7 +326,7 @@ export class BackupManager {
      * @param backupInfo - key backup info dict from /room_keys/version
      */
     public async isKeyBackupTrusted(backupInfo?: IKeyBackupInfo): Promise<TrustInfo> {
-        const ret = {
+        const ret: TrustInfo = {
             usable: false,
             trusted_locally: false,
             sigs: [] as SigInfo[],
@@ -364,7 +366,7 @@ export class BackupManager {
             }
             // Could be a cross-signing master key, but just say this is the device
             // ID for backwards compat
-            const sigInfo: SigInfo = { deviceId: keyIdParts[1] };
+            const sigInfo: SigInfo = { deviceId: keyIdParts[1], valid: null, crossSigningId: false, device: null };
 
             // first check to see if it's from our cross-signing key
             const crossSigningId = this.baseApis.crypto!.crossSigningInfo.getId();
@@ -419,7 +421,7 @@ export class BackupManager {
                     sigInfo.valid = false;
                 }
             } else {
-                sigInfo.valid = null; // Can't determine validity because we don't have the signing device
+                // Can't determine validity because we don't have the signing device
                 logger.info("Ignoring signature from unknown key " + keyId);
             }
             ret.sigs.push(sigInfo);
@@ -829,3 +831,15 @@ export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
 };
 
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
+
+/**
+ * Map a legacy {@link TrustInfo} into a new-style {@link BackupTrustInfo}.
+ *
+ * @param trustInfo - trustInfo to convert
+ */
+export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): BackupTrustInfo {
+    return {
+        trusted: trustInfo.usable,
+        matchesDecryptionKey: trustInfo.trusted_locally,
+    };
+}

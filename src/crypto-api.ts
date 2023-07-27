@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { BackupTrustInfo, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
 
 /**
@@ -332,6 +332,13 @@ export interface CryptoApi {
      * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
      */
     getActiveSessionBackupVersion(): Promise<string | null>;
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     */
+    isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 }
 
 /**

@@ -16,6 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
@@ -25,6 +26,7 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
+import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -73,6 +75,13 @@ const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
 
 const TEST_USER_ID = "@alice:localhost";
 const TEST_DEVICE_ID = "xzcvb";
+
+afterEach(() => {
+    // reset fake-indexeddb after each test, to make sure we don't leak connections
+    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
+    // eslint-disable-next-line no-global-assign
+    indexedDB = new IDBFactory();
+});
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
@@ -204,7 +213,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             overwriteRoutes: true,
         });
 
-        // check that signaling is working
+        // check that signalling is working
         const backupPromise = new Promise<void>((resolve, reject) => {
             aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
                 if (enabled) {
@@ -220,6 +229,61 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toStrictEqual(testData.SIGNED_BACKUP_DATA.version);
+    });
+
+    describe("isKeyBackupTrusted", () => {
+        it("does not trust a backup signed by an untrusted device", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // download the device list, to match the trusted case
+            await aliceClient.startClient();
+            await waitForDeviceList();
+
+            const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
+            expect(result).toEqual({ trusted: false, matchesDecryptionKey: false });
+        });
+
+        it("trusts a backup signed by a trusted device", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
+            expect(result).toEqual({ trusted: true, matchesDecryptionKey: false });
+        });
+
+        it("recognises a backup which matches the decryption key", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            await aliceClient.startClient();
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+            );
+
+            const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
+            expect(result).toEqual({ trusted: false, matchesDecryptionKey: true });
+        });
+
+        it("is not fooled by a backup which matches the decryption key but uses a different algorithm", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            await aliceClient.startClient();
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+            );
+
+            const backup: KeyBackupInfo = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            backup.algorithm = "m.megolm_backup.v1.aes-hmac-sha2";
+            const result = await aliceCrypto.isKeyBackupTrusted(backup);
+            expect(result).toEqual({ trusted: false, matchesDecryptionKey: false });
+        });
     });
 
     /** make sure that the client knows about the dummy device */

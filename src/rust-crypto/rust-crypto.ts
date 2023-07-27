@@ -31,6 +31,7 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { KeyClaimManager } from "./KeyClaimManager";
 import { MapWithDefault } from "../utils";
 import {
+    BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CreateSecretStorageOpts,
     CrossSigningKey,
@@ -40,6 +41,7 @@ import {
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
+    KeyBackupInfo,
     VerificationRequest,
     CrossSigningKeyInfo,
 } from "../crypto-api";
@@ -112,7 +114,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
-        this.backupManager = new RustBackupManager();
+        this.backupManager = new RustBackupManager(olmMachine);
 
         // Fire if the cross signing keys are imported from the secret storage
         const onCrossSigningKeysImport = (): void => {
@@ -766,8 +768,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-        if (!backupKeys.decryptionKeyBase64) return null;
-        return Buffer.from(backupKeys.decryptionKeyBase64, "base64");
+        if (!backupKeys.decryptionKey) return null;
+        return Buffer.from(backupKeys.decryptionKey.toBase64(), "base64");
     }
 
     /**
@@ -791,6 +793,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getActiveSessionBackupVersion(): Promise<string | null> {
         return await this.backupManager.getActiveBackupVersion();
+    }
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * Implementation of {@link Crypto.CryptoApi.isKeyBackupTrusted}.
+     */
+    public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
+        return await this.backupManager.isKeyBackupTrusted(info);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
