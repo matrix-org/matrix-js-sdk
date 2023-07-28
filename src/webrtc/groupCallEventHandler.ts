@@ -111,7 +111,7 @@ export class GroupCallEventHandler {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
 
-    private createGroupCallForRoom(room: Room): void {
+    private chooseGroupCallEventForRoom(room: Room): MatrixEvent | undefined {
         const callEvents = room.currentState.getStateEvents(EventType.GroupCallPrefix);
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
@@ -128,8 +128,23 @@ export class GroupCallEventHandler {
                 }, numOfPossibleCalls=${callEvents.length})`,
             );
 
-            this.createGroupCallFromRoomStateEvent(callEvent);
-            break;
+            return callEvent;
+        }
+
+        return undefined;
+    }
+
+    private createGroupCallForRoom(room: Room): void {
+        const groupCallEvent = this.chooseGroupCallEventForRoom(room);
+        if (groupCallEvent) {
+            const currentGroupCall = this.groupCalls.get(room.roomId);
+
+            if (currentGroupCall?.groupCallId != groupCallEvent.getStateKey()) {
+                // if there was a current group call,this will replace it with the new one.
+                // We don't auto-terminate/leave the old one, but it will no longer be the
+                // current group call in that room.
+                this.createGroupCallFromRoomStateEvent(groupCallEvent);
+            }
         }
 
         logger.info(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
@@ -212,9 +227,8 @@ export class GroupCallEventHandler {
 
             const currentGroupCall = this.groupCalls.get(state.roomId);
 
-            if (!currentGroupCall && !content["m.terminated"] && !event.isRedacted()) {
-                this.createGroupCallFromRoomStateEvent(event);
-            } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
+            if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
+                // An update to the current group call (eg. it's been terminated)
                 if (content["m.terminated"] || event.isRedacted()) {
                     currentGroupCall.terminate(false);
                 } else if (content["m.type"] !== currentGroupCall.type) {
@@ -223,11 +237,14 @@ export class GroupCallEventHandler {
                         `GroupCallEventHandler onRoomStateChanged() currently does not support changing type (roomId=${state.roomId})`,
                     );
                 }
-            } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
-                // TODO: Handle new group calls and multiple group calls
-                logger.warn(
-                    `GroupCallEventHandler onRoomStateChanged() currently does not support multiple calls (roomId=${state.roomId})`,
-                );
+            } else {
+                // anything else - see if we need to (re)create the group call
+                const room = this.client.getRoom(event.getRoomId());
+                if (room == null) {
+                    logger.error(`Got state event for room ${event.getRoomId()} but couldn't find room!`);
+                    return;
+                }
+                this.createGroupCallForRoom(room);
             }
         }
     };
