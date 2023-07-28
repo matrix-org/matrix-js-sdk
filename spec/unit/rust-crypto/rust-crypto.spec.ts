@@ -569,6 +569,13 @@ describe("RustCrypto", () => {
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
         });
     });
+
+    describe("getActiveSessionBackupVersion", () => {
+        it("returns null", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
