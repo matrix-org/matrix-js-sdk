@@ -22,7 +22,7 @@ import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 
-import { Category, createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
 import {
     canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
@@ -34,7 +34,7 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, emitPromise, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
@@ -42,7 +42,6 @@ import {
     SIGNED_TEST_DEVICE_DATA,
     TEST_DEVICE_ID,
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
-    TEST_ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
@@ -806,56 +805,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
-        });
-    });
-
-    describe("Incoming verification in a DM", () => {
-        beforeEach(async () => {
-            aliceClient = await startTestClient();
-        });
-
-        it("Verification request from Bob to Alice", async () => {
-            // Tell alice she is sharing a room with bob
-            const syncResponse = getSyncResponse(["@bob:xyz"]);
-
-            // Add verification request from Bob to Alice in the DM between them
-            syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push({
-                content: {
-                    body: "Verification request from Bob to Alice",
-                    from_device: "BobDevice",
-                    methods: ["m.sas.v1"],
-                    msgtype: "m.key.verification.request",
-                    to: aliceClient.getUserId()!,
-                },
-                event_id: "$143273582443PhrSn:example.org",
-                origin_server_ts: Date.now(),
-                room_id: TEST_ROOM_ID,
-                sender: "@bob:xyz",
-                type: "m.room.message",
-                unsigned: {
-                    age: 1234,
-                },
-            });
-            syncResponder.sendOrQueueSyncResponse(syncResponse);
-            // Wait for the sync response to be processed
-            await syncPromise(aliceClient);
-
-            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            // Expect to find the verification request received during the sync
-            expect(request?.roomId).toBe(TEST_ROOM_ID);
-            expect(request?.isSelfVerification).toBe(false);
-            expect(request?.otherUserId).toBe("@bob:xyz");
-        });
-
-        it("Verification request not found", async () => {
-            // Tell alice she is sharing a room with bob
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            // Wait for the sync response to be processed
-            await syncPromise(aliceClient);
-
-            // Expect to not find any verification request
-            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            expect(request).not.toBeDefined();
         });
     });
 

@@ -34,6 +34,7 @@ import {
     BootstrapCrossSigningOpts,
     CreateSecretStorageOpts,
     CrossSigningKey,
+    CrossSigningKeyInfo,
     CrossSigningStatus,
     CryptoCallbacks,
     DeviceVerificationStatus,
@@ -41,7 +42,6 @@ import {
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     VerificationRequest,
-    CrossSigningKeyInfo,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -1000,14 +1000,38 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param event - live event
      */
     public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
-        // Process only key validation request
-        // and ignore state event
-        if (
-            !event.isState() &&
-            event.getType() === EventType.RoomMessage &&
-            event.getContent().msgtype === MsgType.KeyVerificationRequest
-        ) {
-            await this.onKeyVerificationRequest(event);
+        // Ignore state event
+        if (event.isState()) return;
+
+        const processEvent = async (evt: MatrixEvent): Promise<void> => {
+            // Process only key validation request
+            if (
+                evt.getType() === EventType.RoomMessage &&
+                evt.getContent().msgtype === MsgType.KeyVerificationRequest
+            ) {
+                await this.onKeyVerificationRequest(evt);
+            }
+        };
+
+        // If the event is encrypted of in failure, we wait for decryption
+        if (event.isDecryptionFailure() || event.isEncrypted()) {
+            // 5 mins
+            const TIMEOUT_DELAY = 5 * 60 * 1000;
+
+            let timeoutId: number;
+            const onDecrypted = (decryptedEvent: MatrixEvent, error?: Error): void => {
+                if (error) return;
+
+                clearTimeout(timeoutId);
+                event.off(MatrixEventEvent.Decrypted, onDecrypted);
+                processEvent(decryptedEvent);
+            };
+            // After 5mins, we are not expecting the event to be decrypted
+            timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
+
+            event.on(MatrixEventEvent.Decrypted, onDecrypted);
+        } else {
+            await processEvent(event);
         }
     }
 
@@ -1022,29 +1046,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (!roomId) {
             throw new Error("missing roomId in the event");
         }
-        const receiveVerificationEvent = async (evt: MatrixEvent): Promise<void> => {
-            await this.olmMachine.receiveVerificationEvent(
-                JSON.stringify({
-                    event_id: evt.getId(),
-                    type: evt.getWireType(),
-                    sender: evt.getSender(),
-                    state_key: evt.getStateKey(),
-                    content: evt.getContent(),
-                    origin_server_ts: evt.getTs(),
-                }),
-                new RustSdkCryptoJs.RoomId(roomId),
-            );
-        };
 
-        // In case we failed to decrypt the event
-        // We wait for the event to be decrypted
-        if (event.isDecryptionFailure()) {
-            event.once(MatrixEventEvent.Decrypted, (decryptedEvent) => {
-                receiveVerificationEvent(decryptedEvent);
-            });
-        } else {
-            await receiveVerificationEvent(event);
-        }
+        await this.olmMachine.receiveVerificationEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
