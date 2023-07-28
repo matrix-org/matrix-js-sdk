@@ -546,6 +546,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     afterEach(async () => {
         await aliceClient.stopClient();
+
+        // Allow in-flight things to complete before we tear down the test
+        await jest.runAllTimersAsync();
+
         fetchMock.mockReset();
     });
 
@@ -2386,6 +2390,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             jest.useRealTimers();
         });
 
+        /**
+         * Return a verification request event from Bob
+         * @see https://spec.matrix.org/v1.7/client-server-api/#mkeyverificationrequest
+         */
         function createVerificationRequestEvent(): IRoomEvent {
             return {
                 content: {
@@ -2406,6 +2414,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             };
         }
 
+        /**
+         * Create a to-device event
+         * @param groupSession
+         * @param p2pSession
+         */
         function createToDeviceEvent(groupSession: Olm.OutboundGroupSession, p2pSession: Olm.Session): Partial<IEvent> {
             return encryptGroupSessionKey({
                 recipient: aliceClient.getUserId()!,
@@ -2418,6 +2431,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
+        /**
+         * Create and encrypt a verification request event
+         * @param groupSession
+         */
         function createEncryptedMessage(groupSession: Olm.OutboundGroupSession): IEvent {
             return encryptMegolmEvent({
                 senderKey: testSenderKey,
