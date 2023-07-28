@@ -124,7 +124,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     describe("Outgoing verification requests for another device", () => {
         beforeEach(async () => {
             // pretend that we have another device, which we will verify
-            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+            e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
@@ -626,7 +626,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     describe("cancellation", () => {
         beforeEach(async () => {
             // pretend that we have another device, which we will start verifying
-            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+            e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             aliceClient = await startTestClient();
@@ -743,7 +743,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
     describe("Incoming verification from another device", () => {
         beforeEach(async () => {
-            e2eKeyResponder.addDeviceKeys(TEST_USER_ID, TEST_DEVICE_ID, SIGNED_TEST_DEVICE_DATA);
+            e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
 
             aliceClient = await startTestClient();
             await waitForDeviceList();

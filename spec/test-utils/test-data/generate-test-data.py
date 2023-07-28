@@ -28,7 +28,7 @@ import base64
 import json
 
 from canonicaljson import encode_canonical_json
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 # input data
@@ -42,6 +42,8 @@ MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"doyouspeakwhaaaaaaaaaaaaaaaaaale"
 USER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"useruseruseruseruseruseruseruser"
 SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"selfselfselfselfselfselfselfself"
 
+# Private key for secure key backup. There are some sessions encrypted with this key in megolm-backup.spec.ts
+B64_BACKUP_DECRYPTION_KEY = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo="
 
 def main() -> None:
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
@@ -72,29 +74,47 @@ def main() -> None:
     b64_master_public_key = encode_base64(
         master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
-    b64_master_private_key = encode_base64(
-        MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES
-    )
+    b64_master_private_key = encode_base64(MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES)
 
     self_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
         SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
     b64_self_signing_public_key = encode_base64(
-        self_signing_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        self_signing_private_key.public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw
+        )
     )
-    b64_self_signing_private_key = encode_base64(
-        SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES
-    )
+    b64_self_signing_private_key = encode_base64(SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES)
 
     user_signing_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
         USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
     )
     b64_user_signing_public_key = encode_base64(
-        user_signing_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        user_signing_private_key.public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw
+        )
     )
-    b64_user_signing_private_key = encode_base64(
-        USER_CROSS_SIGNING_PRIVATE_KEY_BYTES
+    b64_user_signing_private_key = encode_base64(USER_CROSS_SIGNING_PRIVATE_KEY_BYTES)
+
+    backup_decryption_key = x25519.X25519PrivateKey.from_private_bytes(
+        base64.b64decode(B64_BACKUP_DECRYPTION_KEY)
     )
+    b64_backup_public_key = encode_base64(
+        backup_decryption_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+
+    backup_data = {
+        "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+        "version": "1",
+        "auth_data": {
+            "public_key": b64_backup_public_key,
+        },
+    }
+    # sign with our device key
+    sig = sign_json(backup_data["auth_data"], private_key)
+    backup_data["auth_data"]["signatures"] = {
+        TEST_USER_ID: {f"ed25519:{TEST_DEVICE_ID}": sig}
+    }
 
     print(
         f"""\
@@ -105,6 +125,7 @@ def main() -> None:
 
 import {{ IDeviceKeys }} from "../../../src/@types/crypto";
 import {{ IDownloadKeyResult }} from "../../../src";
+import {{ KeyBackupInfo }} from "../../../src/crypto-api";
 
 /* eslint-disable comma-dangle */
 
@@ -140,6 +161,12 @@ export const USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_user_signing_private_
 export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
         json.dumps(build_cross_signing_keys_data(), indent=4)
 };
+
+/** base64-encoded backup decryption (private) key */
+export const BACKUP_DECRYPTION_KEY_BASE64 = "{ B64_BACKUP_DECRYPTION_KEY }";
+
+/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
+export const SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 """,
         end="",
     )

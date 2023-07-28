@@ -40,6 +40,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
+import { BackupTrustInfo } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -54,6 +55,7 @@ type SigInfo = {
     deviceTrust?: DeviceTrustLevel;
 };
 
+/** @deprecated Prefer {@link BackupTrustInfo} */
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
@@ -829,3 +831,15 @@ export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
 };
 
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
+
+/**
+ * Map a legacy {@link TrustInfo} into a new-style {@link BackupTrustInfo}.
+ *
+ * @param trustInfo - trustInfo to convert
+ */
+export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): BackupTrustInfo {
+    return {
+        trusted: trustInfo.usable,
+        matchesDecryptionKey: trustInfo.trusted_locally ?? false,
+    };
+}

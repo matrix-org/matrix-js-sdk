@@ -23,6 +23,8 @@ import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
     CryptoEvent,
+    Device,
+    DeviceVerification,
     HttpApiEvent,
     HttpApiEventHandlerMap,
     IHttpOpts,
@@ -351,6 +353,60 @@ describe("RustCrypto", () => {
         });
     });
 
+    describe("setDeviceVerified", () => {
+        let rustCrypto: RustCrypto;
+
+        async function getTestDevice(): Promise<Device> {
+            const devices = await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+            return devices.get(testData.TEST_USER_ID)!.get(testData.TEST_DEVICE_ID)!;
+        }
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: {
+                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+            });
+            // call onSyncCompleted to kick off the outgoingRequestLoop and download the device list.
+            rustCrypto.onSyncCompleted({});
+
+            // before the call, the device should be unverified.
+            const device = await getTestDevice();
+            expect(device.verified).toEqual(DeviceVerification.Unverified);
+        });
+
+        it("should throw an error for an unknown device", async () => {
+            await expect(rustCrypto.setDeviceVerified(testData.TEST_USER_ID, "xxy")).rejects.toThrow("Unknown device");
+        });
+
+        it("should mark an unverified device as verified", async () => {
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // and confirm that the device is now verified
+            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Verified);
+        });
+
+        it("should mark a verified device as unverified", async () => {
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Verified);
+
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID, false);
+            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Unverified);
+        });
+    });
+
     describe("getDeviceVerificationStatus", () => {
         let rustCrypto: RustCrypto;
         let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
@@ -511,6 +567,13 @@ describe("RustCrypto", () => {
             await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+    });
+
+    describe("getActiveSessionBackupVersion", () => {
+        it("returns null", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
     });
 

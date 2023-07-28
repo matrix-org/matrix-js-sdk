@@ -89,12 +89,10 @@ export class E2EKeyResponder {
     /**
      * Add a set of device keys for return by a future `/keys/query`, as if they had been `/upload`ed
      *
-     * @param userId - user the keys belong to
-     * @param deviceId - device the keys belong to
      * @param keys - device keys for this device.
      */
-    public addDeviceKeys(userId: string, deviceId: string, keys: IDeviceKeys) {
-        this.deviceKeysByUserByDevice.getOrCreate(userId).set(deviceId, keys);
+    public addDeviceKeys(keys: IDeviceKeys) {
+        this.deviceKeysByUserByDevice.getOrCreate(keys.user_id).set(keys.device_id, keys);
     }
 
     /** Add a set of cross-signing keys for return by a future `/keys/query`, as if they had been `/keys/device_signing/upload`ed

@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { BackupTrustInfo, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
 
 /**
@@ -136,6 +136,22 @@ export interface CryptoApi {
      *     encryption); otherwise the verification status of the device.
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
+
+    /**
+     * Mark the given device as locally verified.
+     *
+     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * a cross-signing signature for it.
+     *
+     * @param userId - owner of the device
+     * @param deviceId - unique identifier for the device.
+     * @param verified - whether to mark the device as verified. Defaults to 'true'.
+     *
+     * @throws an error if the device is unknown, or has not published any encryption keys.
+     *
+     * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
+     */
+    setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
     /**
      * Checks whether cross signing:
@@ -320,6 +336,20 @@ export interface CryptoApi {
      * @param key - the backup decryption key
      */
     storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
+
+    /**
+     * Get the current status of key backup.
+     *
+     * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
+     */
+    getActiveSessionBackupVersion(): Promise<string | null>;
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     */
+    isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 }
 
 /**
