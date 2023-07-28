@@ -17,10 +17,12 @@ limitations under the License.
 export enum ClientPrefix {
     /**
      * A constant representing the URI path for release 0 of the Client-Server HTTP API.
+     * @deprecated - the Matrix spec is moving away from this prefix but in v1.1 some endpoints still used it
      */
     R0 = "/_matrix/client/r0",
     /**
      * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
+     * @deprecated - the Matrix spec is moving away from this prefix but in v1.1 some endpoints still used it
      */
     V1 = "/_matrix/client/v1",
     /**
