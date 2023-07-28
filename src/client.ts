@@ -1371,8 +1371,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // actions for themselves, so we have to kinda help them out when they are encrypted.
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
-        this.on(MatrixEventEvent.Decrypted, (event) => {
-            fixNotificationCountOnDecryption(this, event);
+        this.on(MatrixEventEvent.Decrypted, (event, _, pushDetails) => {
+            fixNotificationCountOnDecryption(this, event, pushDetails);
         });
 
         // Like above, we have to listen for read receipts from ourselves in order to
@@ -9842,14 +9842,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  * Servers do not have enough knowledge about encrypted events to calculate an
  * accurate notification_count
  */
-export function fixNotificationCountOnDecryption(cli: MatrixClient, event: MatrixEvent): void {
+export function fixNotificationCountOnDecryption(
+    cli: MatrixClient,
+    event: MatrixEvent,
+    pushDetails: PushDetails,
+): void {
     const ourUserId = cli.getUserId();
     const eventId = event.getId();
 
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
 
-    const oldActions = event.getPushActions();
+    // We cannot call event.getPushActions here as the decryption loop just nulled them for re-calculation
+    const oldActions = pushDetails.actions;
     const actions = cli.getPushActionsForEvent(event, true);
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
@@ -9901,19 +9906,18 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     const currentTotalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
 
     // `notify` is used in practice for incrementing the total count
+    const oldNotify = !!oldActions?.notify;
     const newNotify = !!actions?.notify;
 
-    // The room total count is NEVER incremented by the server for encrypted rooms. We basically ignore
-    // the server here as it's always going to tell us to increment for encrypted events.
-    if (newNotify) {
+    if (oldNotify !== newNotify || currentTotalCount > 0) {
+        let newCount = currentTotalCount;
+        if (newHighlight && !oldHighlight) newCount++;
+        if (!newHighlight && oldHighlight) newCount--;
+
         if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(
-                event.threadRootId,
-                NotificationCountType.Total,
-                currentTotalCount + 1,
-            );
+            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, newCount);
         } else {
-            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount + 1);
+            room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
         }
     }
 }

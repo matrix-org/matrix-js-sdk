@@ -226,7 +226,7 @@ export type MatrixEventHandlerMap = {
      * @param event - The matrix event which has been decrypted
      * @param err - The error that occurred during decryption, or `undefined` if no error occurred.
      */
-    [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
+    [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err: Error | undefined, pushDetails: PushDetails) => void;
     [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
     [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
     [MatrixEventEvent.LocalEventIdReplaced]: (event: MatrixEvent) => void;
@@ -916,6 +916,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.retryDecryption = false;
             this.setClearData(res);
 
+            const pushDetails = this.getPushDetails();
+
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
             // so that existing rules can be re-run over the applicable properties. Stuff like
@@ -925,7 +927,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.setPushDetails();
 
             if (options.emit !== false) {
-                this.emit(MatrixEventEvent.Decrypted, this, err);
+                this.emit(MatrixEventEvent.Decrypted, this, err, pushDetails);
             }
 
             return;
