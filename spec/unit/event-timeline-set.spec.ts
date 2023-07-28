@@ -303,8 +303,13 @@ describe("EventTimelineSet", () => {
                     messageEventIsDecryptionFailureSpy.mockReturnValue(true);
                     replyEventIsDecryptionFailureSpy.mockReturnValue(true);
 
-                    messageEvent.emit(MatrixEventEvent.Decrypted, messageEvent);
-                    replyEvent.emit(MatrixEventEvent.Decrypted, replyEvent);
+                    messageEvent.emit(
+                        MatrixEventEvent.Decrypted,
+                        messageEvent,
+                        undefined,
+                        messageEvent.getPushDetails(),
+                    );
+                    replyEvent.emit(MatrixEventEvent.Decrypted, replyEvent, undefined, replyEvent.getPushDetails());
 
                     // simulate decryption
                     messageEventIsDecryptionFailureSpy.mockReturnValue(false);
@@ -313,8 +318,13 @@ describe("EventTimelineSet", () => {
                     messageEventShouldAttemptDecryptionSpy.mockReturnValue(false);
                     replyEventShouldAttemptDecryptionSpy.mockReturnValue(false);
 
-                    messageEvent.emit(MatrixEventEvent.Decrypted, messageEvent);
-                    replyEvent.emit(MatrixEventEvent.Decrypted, replyEvent);
+                    messageEvent.emit(
+                        MatrixEventEvent.Decrypted,
+                        messageEvent,
+                        undefined,
+                        messageEvent.getPushDetails(),
+                    );
+                    replyEvent.emit(MatrixEventEvent.Decrypted, replyEvent, undefined, replyEvent.getPushDetails());
                 });
 
                 itShouldReturnTheRelatedEvents();

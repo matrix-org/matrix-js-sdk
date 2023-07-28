@@ -1371,8 +1371,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // actions for themselves, so we have to kinda help them out when they are encrypted.
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
-        this.on(MatrixEventEvent.Decrypted, (event) => {
-            fixNotificationCountOnDecryption(this, event);
+        this.on(MatrixEventEvent.Decrypted, (event, _, pushDetails) => {
+            fixNotificationCountOnDecryption(this, event, pushDetails);
         });
 
         // Like above, we have to listen for read receipts from ourselves in order to
@@ -9854,25 +9854,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  * Servers do not have enough knowledge about encrypted events to calculate an
  * accurate notification_count
  */
-export function fixNotificationCountOnDecryption(cli: MatrixClient, event: MatrixEvent): void {
+export function fixNotificationCountOnDecryption(
+    cli: MatrixClient,
+    event: MatrixEvent,
+    pushDetails: PushDetails,
+): void {
     const ourUserId = cli.getUserId();
     const eventId = event.getId();
 
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
 
-    const oldActions = event.getPushActions();
+    // We cannot call event.getPushActions here as the decryption loop just nulled them for re-calculation
+    const oldActions = pushDetails.actions;
     const actions = cli.getPushActionsForEvent(event, true);
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
-
-    const currentHighlightCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
-
-    // Ensure the unread counts are kept up to date if the event is encrypted
-    // We also want to make sure that the notification count goes up if we already
-    // have encrypted events to avoid other code from resetting 'highlight' to zero.
-    const oldHighlight = !!oldActions?.tweaks?.highlight;
-    const newHighlight = !!actions?.tweaks?.highlight;
 
     let hasReadEvent;
     if (isThreadEvent) {
@@ -9895,37 +9892,35 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         return;
     }
 
-    if (oldHighlight !== newHighlight || currentHighlightCount > 0) {
-        // TODO: Handle mentions received while the client is offline
-        // See also https://github.com/vector-im/element-web/issues/9069
-        let newCount = currentHighlightCount;
-        if (newHighlight && !oldHighlight) newCount++;
-        if (!newHighlight && oldHighlight) newCount--;
+    // Ensure the unread counts are kept up to date if the event is encrypted
+    // We also want to make sure that the notification count goes up if we already
+    // have encrypted events to avoid other code from resetting 'highlight' to zero.
+    // TODO: Handle mentions received while the client is offline
+    // See also https://github.com/vector-im/element-web/issues/9069
+    for (const type of [NotificationCountType.Highlight, NotificationCountType.Total]) {
+        let count = room.getUnreadCountForEventContext(type, event);
 
-        if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight, newCount);
+        let oldValue: boolean;
+        let newValue: boolean;
+        if (type === NotificationCountType.Total) {
+            // Total count is used to typically increment a room notification counter, but not loudly highlight it.
+            // `notify` is used in practice for incrementing the total count
+            oldValue = !!oldActions?.notify;
+            newValue = !!actions?.notify;
         } else {
-            room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
+            oldValue = !!oldActions?.tweaks?.highlight;
+            newValue = !!actions?.tweaks?.highlight;
         }
-    }
 
-    // Total count is used to typically increment a room notification counter, but not loudly highlight it.
-    const currentTotalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
+        if (oldValue !== newValue || count > 0) {
+            if (newValue && !oldValue) count++;
+            if (!newValue && oldValue) count--;
 
-    // `notify` is used in practice for incrementing the total count
-    const newNotify = !!actions?.notify;
-
-    // The room total count is NEVER incremented by the server for encrypted rooms. We basically ignore
-    // the server here as it's always going to tell us to increment for encrypted events.
-    if (newNotify) {
-        if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(
-                event.threadRootId,
-                NotificationCountType.Total,
-                currentTotalCount + 1,
-            );
-        } else {
-            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount + 1);
+            if (isThreadEvent) {
+                room.setThreadUnreadNotificationCount(event.threadRootId, type, count);
+            } else {
+                room.setUnreadNotificationCount(type, count);
+            }
         }
     }
 }

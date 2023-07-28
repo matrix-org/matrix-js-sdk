@@ -1037,7 +1037,12 @@ describe("RoomState", function () {
 
                 // this event is a message after decryption
                 decryptingRelatedEvent.event.type = EventType.RoomMessage;
-                decryptingRelatedEvent.emit(MatrixEventEvent.Decrypted, decryptingRelatedEvent);
+                decryptingRelatedEvent.emit(
+                    MatrixEventEvent.Decrypted,
+                    decryptingRelatedEvent,
+                    undefined,
+                    decryptingRelatedEvent.getPushDetails(),
+                );
 
                 expect(addLocationsSpy).not.toHaveBeenCalled();
             });
