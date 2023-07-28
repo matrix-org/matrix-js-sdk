@@ -175,7 +175,7 @@ describe("MatrixClient events", function () {
             });
         });
 
-        it("should emit User events", function (done) {
+        it("should emit User events", async () => {
             httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             let fired = false;
@@ -192,10 +192,8 @@ describe("MatrixClient events", function () {
             });
             client!.startClient();
 
-            httpBackend!.flushAllExpected().then(function () {
-                expect(fired).toBe(true);
-                done();
-            });
+            await httpBackend!.flushAllExpected();
+            expect(fired).toBe(true);
         });
 
         it("should emit Room events", function () {

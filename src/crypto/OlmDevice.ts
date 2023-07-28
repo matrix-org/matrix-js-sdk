@@ -368,6 +368,11 @@ export class OlmDevice {
      */
     private saveSession(deviceKey: string, sessionInfo: IUnpickledSessionInfo, txn: unknown): void {
         const sessionId = sessionInfo.session.session_id();
+        logger.debug(`Saving Olm session ${sessionId} with device ${deviceKey}: ${sessionInfo.session.describe()}`);
+
+        // Why do we re-use the input object for this, overwriting the same key with a different
+        // type? Is it because we want to erase the unpickled session to enforce that it's no longer
+        // used? A comment would be great.
         const pickledSessionInfo = Object.assign(sessionInfo, {
             session: sessionInfo.session.pickle(this.pickleKey),
         });

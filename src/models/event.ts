@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,11 +24,18 @@ import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 import type { IEventDecryptionResult } from "../@types/crypto";
 import { logger } from "../logger";
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
-import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
+import {
+    EVENT_VISIBILITY_CHANGE_TYPE,
+    EventType,
+    MsgType,
+    RelationType,
+    ToDeviceMessageId,
+    UNSIGNED_THREAD_ID_FIELD,
+} from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
-import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
+import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread";
 import { IActionsObject } from "../pushprocessor";
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
@@ -36,6 +43,8 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
 import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
+import { IAnnotatedPushRule } from "../@types/PushRules";
 
 export { EventStatus } from "./event-status";
 
@@ -47,18 +56,23 @@ export interface IContent {
     "avatar_url"?: string;
     "displayname"?: string;
     "m.relates_to"?: IEventRelation;
+
+    "m.mentions"?: IMentions;
 }
 
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
 
 export interface IUnsigned {
+    [key: string]: any;
     "age"?: number;
     "prev_sender"?: string;
     "prev_content"?: IContent;
     "redacted_because"?: IEvent;
+    "replaces_state"?: string;
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
+    [UNSIGNED_THREAD_ID_FIELD.name]?: string;
 }
 
 export interface IThreadBundledRelationship {
@@ -111,6 +125,16 @@ export interface IEventRelation {
         event_id?: string;
     };
     "key"?: string;
+}
+
+export interface IMentions {
+    user_ids?: string[];
+    room?: boolean;
+}
+
+export interface PushDetails {
+    rule?: IAnnotatedPushRule;
+    actions?: IActionsObject;
 }
 
 /**
@@ -212,7 +236,8 @@ export type MatrixEventHandlerMap = {
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
-    private pushActions: IActionsObject | null = null;
+    // applied push rule and action for this event
+    private pushDetails: PushDetails = {};
     private _replacingEvent: MatrixEvent | null = null;
     private _localRedactionEvent: MatrixEvent | null = null;
     private _isCancelled = false;
@@ -267,11 +292,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     private txnId?: string;
 
     /**
-     * @experimental
      * A reference to the thread this event belongs to
      */
     private thread?: Thread;
     private threadId?: string;
+
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    private encryptedDisabledForUnverifiedDevices = false;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -490,16 +520,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * ```
      */
     public getDetails(): string {
-        let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
         const room = this.getRoomId();
         if (room) {
-            details += ` room=${room}`;
+            // in-room event
+            return `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()} room=${room} ts=${this.getDate()?.toISOString()}`;
+        } else {
+            // to-device event
+            const msgid = this.getContent()[ToDeviceMessageId];
+            return `msgid=${msgid} type=${this.getWireType()} sender=${this.getSender()}`;
         }
-        const date = this.getDate();
-        if (date) {
-            details += ` ts=${date.toISOString()}`;
-        }
-        return details;
     }
 
     /**
@@ -546,38 +575,49 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
      * Get the event ID of the thread head
      */
     public get threadRootId(): string | undefined {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return undefined;
+        }
         const relatesTo = this.getWireContent()?.["m.relates_to"];
         if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
             return relatesTo.event_id;
-        } else {
-            return this.getThread()?.id || this.threadId;
         }
+        if (this.thread) {
+            return this.thread.id;
+        }
+        if (this.threadId !== undefined) {
+            return this.threadId;
+        }
+        const unsigned = this.getUnsigned();
+        if (typeof unsigned[UNSIGNED_THREAD_ID_FIELD.name] === "string") {
+            return unsigned[UNSIGNED_THREAD_ID_FIELD.name];
+        }
+        return undefined;
     }
 
     /**
-     * @experimental
+     * A helper to check if an event is a thread's head or not
      */
     public get isThreadRoot(): boolean {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return false;
+        }
+
         const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         // Bundled relationships only returned when the sync response is limited
         // hence us having to check both bundled relation and inspect the thread
         // model
-        return !!threadDetails || this.getThread()?.id === this.getId();
+        return !!threadDetails || this.threadRootId === this.getId();
     }
 
     public get replyEventId(): string | undefined {
-        // We're prefer ev.getContent() over ev.getWireContent() to make sure
-        // we grab the latest edit with potentially new relations. But we also
-        // can't just rely on ev.getContent() by itself because historically we
-        // still show the reply from the original message even though the edit
-        // event does not include the relation reply.
-        const mRelatesTo = this.getContent()["m.relates_to"] || this.getWireContent()["m.relates_to"];
-        return mRelatesTo?.["m.in_reply_to"]?.event_id;
+        return this.getWireContent()["m.relates_to"]?.["m.in_reply_to"]?.event_id;
     }
 
     public get relationEventId(): string | undefined {
@@ -706,6 +746,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    public get isEncryptedDisabledForUnverifiedDevices(): boolean {
+        return this.isDecryptionFailure() && this.encryptedDisabledForUnverifiedDevices;
+    }
+
     public shouldAttemptDecryption(): boolean {
         if (this.isRedacted()) return false;
         if (this.isBeingDecrypted()) return false;
@@ -786,22 +834,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns array of recipients
      */
     public getKeyRequestRecipients(userId: string): IKeyRequestRecipient[] {
-        // send the request to all of our own devices, and the
-        // original sending device if it wasn't us.
-        const wireContent = this.getWireContent();
+        // send the request to all of our own devices
         const recipients = [
             {
                 userId,
                 deviceId: "*",
             },
         ];
-        const sender = this.getSender();
-        if (sender !== userId) {
-            recipients.push({
-                userId: sender!,
-                deviceId: wireContent.device_id,
-            });
-        }
+
         return recipients;
     }
 
@@ -828,17 +868,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     }
                 }
             } catch (e) {
-                if ((<Error>e).name !== "DecryptionError") {
-                    // not a decryption error: log the whole exception as an error
-                    // (and don't bother with a retry)
-                    const re = options.isRetry ? "re" : "";
-                    // For find results: this can produce "Error decrypting event (id=$ev)" and
-                    // "Error redecrypting event (id=$ev)".
-                    logger.error(`Error ${re}decrypting event (${this.getDetails()})`, e);
-                    this.decryptionPromise = null;
-                    this.retryDecryption = false;
-                    return;
-                }
+                const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
                 err = e as Error;
 
@@ -858,10 +888,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
-                            (<DecryptionError>e).detailedString,
-                    );
+                    logger.log(`Error decrypting event (${this.getDetails()}), but retrying: ${detailedError}`);
                     continue;
                 }
 
@@ -870,9 +897,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 // the detailedString already includes the name and message of the error, and the stack isn't much use,
                 // so we don't bother to log `e` separately.
-                logger.warn(`Error decrypting event (${this.getDetails()}): ` + (<DecryptionError>e).detailedString);
+                logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage((<DecryptionError>e).message);
+                res = this.badEncryptedMessage(String(e));
             }
 
             // at this point, we've either successfully decrypted the event, or have given up
@@ -895,7 +922,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             // highlighting when the user's name is mentioned rely on this happening. We also want
             // to set the push actions before emitting so that any notification listeners don't
             // pick up the wrong contents.
-            this.setPushActions(null);
+            this.setPushDetails();
 
             if (options.emit !== false) {
                 this.emit(MatrixEventEvent.Decrypted, this, err);
@@ -914,6 +941,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     body: "** Unable to decrypt: " + reason + " **",
                 },
             },
+            encryptedDisabledForUnverifiedDevices: reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`,
         };
     }
 
@@ -935,6 +963,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
         this.invalidateExtensibleEvent();
     }
 
@@ -1246,16 +1275,42 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns push actions
      */
     public getPushActions(): IActionsObject | null {
-        return this.pushActions;
+        return this.pushDetails.actions || null;
+    }
+
+    /**
+     * Get the push details, if known, for this event
+     *
+     * @returns push actions
+     */
+    public getPushDetails(): PushDetails {
+        return this.pushDetails;
     }
 
     /**
      * Set the push actions for this event.
+     * Clears rule from push details if present
+     * @deprecated use `setPushDetails`
      *
      * @param pushActions - push actions
      */
     public setPushActions(pushActions: IActionsObject | null): void {
-        this.pushActions = pushActions;
+        this.pushDetails = {
+            actions: pushActions || undefined,
+        };
+    }
+
+    /**
+     * Set the push details for this event.
+     *
+     * @param pushActions - push actions
+     * @param rule - the executed push rule
+     */
+    public setPushDetails(pushActions?: IActionsObject, rule?: IAnnotatedPushRule): void {
+        this.pushDetails = {
+            actions: pushActions,
+            rule,
+        };
     }
 
     /**
@@ -1321,8 +1376,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const relation = this.getWireContent()?.["m.relates_to"];
-        if (this.isState() && relation?.rel_type === RelationType.Replace) {
-            // State events cannot be m.replace relations
+        if (
+            this.isState() &&
+            !!relation?.rel_type &&
+            ([RelationType.Replace, RelationType.Thread] as string[]).includes(relation.rel_type)
+        ) {
+            // State events cannot be m.replace or m.thread relations
             return false;
         }
         return !!(relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true));
@@ -1570,9 +1629,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Set the instance of a thread associated with the current event
+     * @param thread - the thread
      */
     public setThread(thread?: Thread): void {
+        // don't allow state events to be threaded as per the spec
+        if (this.isState()) {
+            return;
+        }
         if (this.thread) {
             this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
         }
@@ -1584,7 +1648,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
      */
     public getThread(): Thread | undefined {
         return this.thread;

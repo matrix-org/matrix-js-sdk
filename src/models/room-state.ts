@@ -16,7 +16,7 @@ limitations under the License.
 
 import { RoomMember } from "./room-member";
 import { logger } from "../logger";
-import * as utils from "../utils";
+import { isNumber, removeHiddenChars } from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
@@ -467,7 +467,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.emit(RoomStateEvent.Update, this);
     }
 
-    public processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
+    public async processBeaconEvents(events: MatrixEvent[], matrixClient: MatrixClient): Promise<void> {
         if (
             !events.length ||
             // discard locations if we have no beacons
@@ -476,10 +476,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        const beaconByEventIdDict: Record<string, Beacon> = [...this.beacons.values()].reduce(
-            (dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }),
-            {},
-        );
+        const beaconByEventIdDict = [...this.beacons.values()].reduce<Record<string, Beacon>>((dict, beacon) => {
+            dict[beacon.beaconInfoId] = beacon;
+            return dict;
+        }, {});
 
         const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
             if (!M_BEACON.matches(event.getType())) {
@@ -493,22 +493,24 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
         };
 
-        events.forEach((event: MatrixEvent) => {
+        for (const event of events) {
             const relatedToEventId = event.getRelation()?.event_id;
             // not related to a beacon we know about; discard
             if (!relatedToEventId || !beaconByEventIdDict[relatedToEventId]) return;
+            if (!M_BEACON.matches(event.getType()) && !event.isEncrypted()) return;
 
-            matrixClient.decryptEventIfNeeded(event);
-
-            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-                // add an event listener for once the event is decrypted.
-                event.once(MatrixEventEvent.Decrypted, async () => {
-                    processBeaconRelation(relatedToEventId, event);
-                });
-            } else {
+            try {
+                await matrixClient.decryptEventIfNeeded(event);
                 processBeaconRelation(relatedToEventId, event);
+            } catch {
+                if (event.isDecryptionFailure()) {
+                    // add an event listener for once the event is decrypted.
+                    event.once(MatrixEventEvent.Decrypted, async () => {
+                        processBeaconRelation(relatedToEventId, event);
+                    });
+                }
             }
-        });
+        }
     }
 
     /**
@@ -621,6 +623,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public needsOutOfBandMembers(): boolean {
         return this.oobMemberFlags.status === OobStatus.NotStarted;
+    }
+
+    /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded. False if it is not started or is in
+     *    progress.
+     */
+    public outOfBandMembersReady(): boolean {
+        return this.oobMemberFlags.status === OobStatus.Finished;
     }
 
     /**
@@ -747,7 +759,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @returns An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
+        return this.displayNameToUserIds.get(removeHiddenChars(displayName)) ?? [];
     }
 
     /**
@@ -786,7 +798,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
 
         let requiredLevel = 50;
-        if (utils.isNumber(powerLevels[action])) {
+        if (isNumber(powerLevels[action])) {
             requiredLevel = powerLevels[action]!;
         }
 
@@ -916,7 +928,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             powerLevelsEvent &&
             powerLevelsEvent.getContent() &&
             powerLevelsEvent.getContent().notifications &&
-            utils.isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
+            isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
         ) {
             notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
         }
@@ -954,6 +966,75 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         return guestAccessContent["guest_access"] || GuestAccess.Forbidden;
     }
 
+    /**
+     * Find the predecessor room based on this room state.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId, last eventId and viaServers of the predecessor room.
+     *
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     *
+     * Note: if an m.predecessor event is used, eventId may be undefined
+     * since last_known_event_id is optional.
+     *
+     * Note: viaServers may be undefined, and will definitely be undefined if
+     * this predecessor comes from a RoomCreate event (rather than a
+     * RoomPredecessor, which has the optional via_servers property).
+     */
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId?: string; viaServers?: string[] } | null {
+        // Note: the tests for this function are against Room.findPredecessor,
+        // which just calls through to here.
+
+        if (msc3946ProcessDynamicPredecessor) {
+            const predecessorEvent = this.getStateEvents(EventType.RoomPredecessor, "");
+            if (predecessorEvent) {
+                const content = predecessorEvent.getContent<{
+                    predecessor_room_id: string;
+                    last_known_event_id?: string;
+                    via_servers?: string[];
+                }>();
+                const roomId = content.predecessor_room_id;
+                let eventId = content.last_known_event_id;
+                if (typeof eventId !== "string") {
+                    eventId = undefined;
+                }
+                let viaServers = content.via_servers;
+                if (!Array.isArray(viaServers)) {
+                    viaServers = undefined;
+                }
+                if (typeof roomId === "string") {
+                    return { roomId, eventId, viaServers };
+                }
+            }
+        }
+
+        const createEvent = this.getStateEvents(EventType.RoomCreate, "");
+        if (createEvent) {
+            const predecessor = createEvent.getContent<{
+                predecessor?: Partial<{
+                    room_id: string;
+                    event_id: string;
+                }>;
+            }>()["predecessor"];
+            if (predecessor) {
+                const roomId = predecessor["room_id"];
+                if (typeof roomId === "string") {
+                    let eventId = predecessor["event_id"];
+                    if (typeof eventId !== "string" || eventId === "") {
+                        eventId = undefined;
+                    }
+                    return { roomId, eventId };
+                }
+            }
+        }
+        return null;
+    }
+
     private updateThirdPartyTokenCache(memberEvent: MatrixEvent): void {
         if (!memberEvent.getContent().third_party_invite) {
             return;
@@ -977,7 +1058,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // We clobber the user_id > name lookup but the name -> [user_id] lookup
             // means we need to remove that user ID from that array rather than nuking
             // the lot.
-            const strippedOldName = utils.removeHiddenChars(oldName);
+            const strippedOldName = removeHiddenChars(oldName);
 
             const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
@@ -989,7 +1070,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.userIdsToDisplayNames[userId] = displayName;
 
-        const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
+        const strippedDisplayname = displayName && removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
             const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];

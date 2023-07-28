@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ReceiptType } from "../../src/@types/read_receipts";
 import { Feature, ServerSupport } from "../../src/feature";
 import {
     EventType,
@@ -52,10 +53,11 @@ describe("fixNotificationCountOnDecryption", () => {
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
             ...mockClientMethodsUser(),
+            isInitialSyncComplete: jest.fn().mockReturnValue(false),
             getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-            supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+            supportsThreads: jest.fn().mockReturnValue(true),
         });
         mockClient.reEmitter = mock(ReEmitter, "ReEmitter");
         mockClient.canSupport = new Map();
@@ -64,6 +66,30 @@ describe("fixNotificationCountOnDecryption", () => {
         });
 
         room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "");
+
+        const receipt = new MatrixEvent({
+            type: "m.receipt",
+            room_id: "!foo:bar",
+            content: {
+                "$event0:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 123 },
+                    },
+                },
+                "$event1:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 666, thread_id: THREAD_ID },
+                    },
+                },
+                "$otherevent:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 999, thread_id: "$otherthread:localhost" },
+                    },
+                },
+            },
+        });
+        room.addReceipt(receipt);
+
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
@@ -75,6 +101,7 @@ describe("fixNotificationCountOnDecryption", () => {
                     body: "Hello world!",
                 },
                 event: true,
+                ts: 1234,
             },
             mockClient,
         );
@@ -90,6 +117,7 @@ describe("fixNotificationCountOnDecryption", () => {
                 "msgtype": MsgType.Text,
                 "body": "Thread reply",
             },
+            ts: 5678,
             event: true,
         });
         room.createThread(THREAD_ID, event, [threadEvent], false);
@@ -107,7 +135,7 @@ describe("fixNotificationCountOnDecryption", () => {
 
         fixNotificationCountOnDecryption(mockClient, event);
 
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(3);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 
@@ -127,11 +155,11 @@ describe("fixNotificationCountOnDecryption", () => {
 
         fixNotificationCountOnDecryption(mockClient, threadEvent);
 
-        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(2);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
     });
 
-    it("does not change the room count when there's no unread count", () => {
+    it("does not change the thread count when there's no unread count", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
@@ -155,11 +183,37 @@ describe("fixNotificationCountOnDecryption", () => {
                 "msgtype": MsgType.Text,
                 "body": "Thread reply",
             },
+            ts: 8901,
             event: true,
         });
 
         fixNotificationCountOnDecryption(mockClient, unknownThreadEvent);
 
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
+    });
+
+    it("does not change the total room count when an event is marked as non-notifying", () => {
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setUnreadNotificationCount(NotificationCountType.Total, 0);
+        room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
+
+        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
+        mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
+
+        fixNotificationCountOnDecryption(mockClient, event);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
+    });
+
+    it("does not change the total room count when a threaded event is marked as non-notifying", () => {
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
+
+        threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
+        mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
+
+        fixNotificationCountOnDecryption(mockClient, event);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
     });

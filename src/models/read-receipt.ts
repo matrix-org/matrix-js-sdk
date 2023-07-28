@@ -16,15 +16,16 @@ import {
     MAIN_ROOM_TIMELINE,
     Receipt,
     ReceiptCache,
-    Receipts,
     ReceiptType,
     WrappedReceipt,
 } from "../@types/read_receipts";
 import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
-import * as utils from "../utils";
+import { isSupportedReceiptType } from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
+import { MapWithDefault } from "../utils";
+import { NotificationCountType } from "./room";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -55,8 +56,12 @@ export abstract class ReadReceipt<
     // the form of this structure. This is sub-optimal for the exposed APIs
     // which pass in an event ID and get back some receipts, so we also store
     // a pre-cached list for this purpose.
-    private receipts: Receipts = {}; // { receipt_type: { user_id: Receipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: CachedReceipt[] }
+    // Map: receipt type → user Id → receipt
+    private receipts = new MapWithDefault<
+        string,
+        Map<string, [realReceipt: WrappedReceipt | null, syntheticReceipt: WrappedReceipt | null]>
+    >(() => new Map());
+    private receiptCacheByEventId: ReceiptCache = new Map();
 
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
     public abstract timeline: MatrixEvent[];
@@ -73,12 +78,19 @@ export abstract class ReadReceipt<
         ignoreSynthesized = false,
         receiptType = ReceiptType.Read,
     ): WrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
+        const [realReceipt, syntheticReceipt] = this.receipts.get(receiptType)?.get(userId) ?? [null, null];
         if (ignoreSynthesized) {
             return realReceipt;
         }
 
         return syntheticReceipt ?? realReceipt;
+    }
+
+    private compareReceipts(a: WrappedReceipt, b: WrappedReceipt): number {
+        // Try compare them in our unfiltered timeline set order, falling back to receipt timestamp which should be
+        // relatively sane as receipts are set only by the originating homeserver so as long as its clock doesn't
+        // jump around then it should be valid.
+        return this.getUnfilteredTimelineSet().compareEventOrdering(a.eventId, b.eventId) ?? a.data.ts - b.data.ts;
     }
 
     /**
@@ -95,19 +107,13 @@ export abstract class ReadReceipt<
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
 
-        const timelineSet = this.getUnfilteredTimelineSet();
         const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
         const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
 
         // If we have both, compare them
         let comparison: number | null | undefined;
         if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
-            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
-        }
-
-        // If we didn't get a comparison try to compare the ts of the receipts
-        if (!comparison && publicReadReceipt?.data?.ts && privateReadReceipt?.data?.ts) {
-            comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+            comparison = this.compareReceipts(publicReadReceipt, privateReadReceipt);
         }
 
         // The public receipt is more likely to drift out of date so the private
@@ -125,33 +131,32 @@ export abstract class ReadReceipt<
         receipt: Receipt,
         synthetic: boolean,
     ): void {
-        if (!this.receipts[receiptType]) {
-            this.receipts[receiptType] = {};
-        }
-        if (!this.receipts[receiptType][userId]) {
-            this.receipts[receiptType][userId] = [null, null];
-        }
+        const receiptTypesMap = this.receipts.getOrCreate(receiptType);
+        let pair = receiptTypesMap.get(userId);
 
-        const pair = this.receipts[receiptType][userId];
+        if (!pair) {
+            pair = [null, null];
+            receiptTypesMap.set(userId, pair);
+        }
 
         let existingReceipt = pair[ReceiptPairRealIndex];
         if (synthetic) {
             existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
         }
 
-        if (existingReceipt) {
-            // we only want to add this receipt if we think it is later than the one we already have.
-            // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(existingReceipt.eventId, eventId);
-            if (ordering !== null && ordering >= 0) {
-                return;
-            }
-        }
-
         const wrappedReceipt: WrappedReceipt = {
             eventId,
             data: receipt,
         };
+
+        if (existingReceipt) {
+            // We only want to add this receipt if we think it is later than the one we already have.
+            // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
+            const ordering = this.compareReceipts(existingReceipt, wrappedReceipt);
+            if (ordering >= 0) {
+                return;
+            }
+        }
 
         const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
         const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
@@ -184,23 +189,26 @@ export abstract class ReadReceipt<
         if (cachedReceipt === newCachedReceipt) return;
 
         // clean up any previous cache entry
-        if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
+        if (cachedReceipt && this.receiptCacheByEventId.get(cachedReceipt.eventId)) {
             const previousEventId = cachedReceipt.eventId;
             // Remove the receipt we're about to clobber out of existence from the cache
-            this.receiptCacheByEventId[previousEventId] = this.receiptCacheByEventId[previousEventId].filter((r) => {
-                return r.type !== receiptType || r.userId !== userId;
-            });
+            this.receiptCacheByEventId.set(
+                previousEventId,
+                this.receiptCacheByEventId.get(previousEventId)!.filter((r) => {
+                    return r.type !== receiptType || r.userId !== userId;
+                }),
+            );
 
-            if (this.receiptCacheByEventId[previousEventId].length < 1) {
-                delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
+            if (this.receiptCacheByEventId.get(previousEventId)!.length < 1) {
+                this.receiptCacheByEventId.delete(previousEventId); // clean up the cache keys
             }
         }
 
         // cache the new one
-        if (!this.receiptCacheByEventId[eventId]) {
-            this.receiptCacheByEventId[eventId] = [];
+        if (!this.receiptCacheByEventId.get(eventId)) {
+            this.receiptCacheByEventId.set(eventId, []);
         }
-        this.receiptCacheByEventId[eventId].push({
+        this.receiptCacheByEventId.get(eventId)!.push({
             userId: userId,
             type: receiptType as ReceiptType,
             data: receipt,
@@ -214,10 +222,33 @@ export abstract class ReadReceipt<
      * an empty list.
      */
     public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
-        return this.receiptCacheByEventId[event.getId()!] || [];
+        return this.receiptCacheByEventId.get(event.getId()!) || [];
     }
 
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;
+
+    public abstract setUnread(type: NotificationCountType, count: number): void;
+
+    /**
+     * This issue should also be addressed on synapse's side and is tracked as part
+     * of https://github.com/matrix-org/synapse/issues/14837
+     *
+     * Retrieves the read receipt for the logged in user and checks if it matches
+     * the last event in the room and whether that event originated from the logged
+     * in user.
+     * Under those conditions we can consider the context as read. This is useful
+     * because we never send read receipts against our own events
+     * @param userId - the logged in user
+     */
+    public fixupNotifications(userId: string): void {
+        const receipt = this.getReadReceiptForUserId(userId, false);
+
+        const lastEvent = this.timeline[this.timeline.length - 1];
+        if (lastEvent && receipt?.eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+            this.setUnread(NotificationCountType.Total, 0);
+            this.setUnread(NotificationCountType.Highlight, 0);
+        }
+    }
 
     /**
      * Add a temporary local-echo receipt to the room to reflect in the
@@ -238,7 +269,7 @@ export abstract class ReadReceipt<
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event)
             .filter(function (receipt) {
-                return utils.isSupportedReceiptType(receipt.type);
+                return isSupportedReceiptType(receipt.type);
             })
             .map(function (receipt) {
                 return receipt.userId;
@@ -280,4 +311,13 @@ export abstract class ReadReceipt<
         // We don't know if the user has read it, so assume not.
         return false;
     }
+
+    /**
+     * Returns the most recent unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
+     */
+    public abstract getLastUnthreadedReceiptFor(userId: string): Receipt | undefined;
 }

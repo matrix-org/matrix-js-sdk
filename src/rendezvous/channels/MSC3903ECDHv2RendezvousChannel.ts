@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,20 +25,20 @@ import {
     RendezvousTransport,
     RendezvousFailureReason,
 } from "..";
-import { encodeBase64, decodeBase64 } from "../../crypto/olmlib";
+import { encodeUnpaddedBase64, decodeBase64 } from "../../crypto/olmlib";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
 
-const ECDH_V1 = new UnstableValue(
-    "m.rendezvous.v1.curve25519-aes-sha256",
-    "org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256",
+const ECDH_V2 = new UnstableValue(
+    "m.rendezvous.v2.curve25519-aes-sha256",
+    "org.matrix.msc3903.rendezvous.v2.curve25519-aes-sha256",
 );
 
-export interface ECDHv1RendezvousCode extends RendezvousCode {
+export interface ECDHv2RendezvousCode extends RendezvousCode {
     rendezvous: {
         transport: RendezvousTransportDetails;
-        algorithm: typeof ECDH_V1.name | typeof ECDH_V1.altName;
+        algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName;
         key: string;
     };
 }
@@ -46,7 +46,7 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
 export type MSC3903ECDHPayload = PlainTextPayload | EncryptedPayload;
 
 export interface PlainTextPayload {
-    algorithm: typeof ECDH_V1.name | typeof ECDH_V1.altName;
+    algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName;
     key?: string;
 }
 
@@ -70,7 +70,7 @@ async function importKey(key: Uint8Array): Promise<CryptoKey> {
  * X25519/ECDH key agreement based secure rendezvous channel.
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
+export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey;
@@ -85,17 +85,17 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         this.ourPublicKey = decodeBase64(this.olmSAS.get_pubkey());
     }
 
-    public async generateCode(intent: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
+    public async generateCode(intent: RendezvousIntent): Promise<ECDHv2RendezvousCode> {
         if (this.transport.ready) {
             throw new Error("Code already generated");
         }
 
-        await this.transport.send({ algorithm: ECDH_V1.name });
+        await this.transport.send({ algorithm: ECDH_V2.name });
 
-        const rendezvous: ECDHv1RendezvousCode = {
+        const rendezvous: ECDHv2RendezvousCode = {
             rendezvous: {
-                algorithm: ECDH_V1.name,
-                key: encodeBase64(this.ourPublicKey),
+                algorithm: ECDH_V2.name,
+                key: encodeUnpaddedBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
             },
             intent,
@@ -123,7 +123,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             }
             const res = rawRes as Partial<PlainTextPayload>;
             const { key, algorithm } = res;
-            if (!algorithm || !ECDH_V1.matches(algorithm) || !key) {
+            if (!algorithm || !ECDH_V2.matches(algorithm) || !key) {
                 throw new RendezvousError(
                     "Unsupported algorithm: " + algorithm,
                     RendezvousFailureReason.UnsupportedAlgorithm,
@@ -134,20 +134,20 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         } else {
             // send our public key unencrypted
             await this.transport.send({
-                algorithm: ECDH_V1.name,
-                key: encodeBase64(this.ourPublicKey),
+                algorithm: ECDH_V2.name,
+                key: encodeUnpaddedBase64(this.ourPublicKey),
             });
         }
 
         this.connected = true;
 
-        this.olmSAS.set_their_key(encodeBase64(this.theirPublicKey!));
+        this.olmSAS.set_their_key(encodeUnpaddedBase64(this.theirPublicKey!));
 
         const initiatorKey = isInitiator ? this.ourPublicKey : this.theirPublicKey!;
         const recipientKey = isInitiator ? this.theirPublicKey! : this.ourPublicKey;
-        let aesInfo = ECDH_V1.name;
-        aesInfo += `|${encodeBase64(initiatorKey)}`;
-        aesInfo += `|${encodeBase64(recipientKey)}`;
+        let aesInfo = ECDH_V2.name;
+        aesInfo += `|${encodeUnpaddedBase64(initiatorKey)}`;
+        aesInfo += `|${encodeUnpaddedBase64(recipientKey)}`;
 
         const aesKeyBytes = this.olmSAS.generate_bytes(aesInfo, 32);
 
@@ -181,8 +181,8 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         );
 
         return {
-            iv: encodeBase64(iv),
-            ciphertext: encodeBase64(ciphertext),
+            iv: encodeUnpaddedBase64(iv),
+            ciphertext: encodeUnpaddedBase64(ciphertext),
         };
     }
 

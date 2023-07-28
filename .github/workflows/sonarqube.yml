@@ -11,6 +11,7 @@ jobs:
     # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
     prepare:
         name: Prepare
+        if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group'
         runs-on: ubuntu-latest
         outputs:
             reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
@@ -19,7 +20,7 @@ jobs:
             # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
             # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
             - name: 📥 Download artifact
-              uses: dawidd6/action-download-artifact@v2
+              uses: dawidd6/action-download-artifact@246dbf436b23d7c49e21a7ab8204ca9ecd1fe615 # v2
               with:
                   workflow: tests.yaml
                   run_id: ${{ github.event.workflow_run.id }}
@@ -35,6 +36,7 @@ jobs:
 
     sonarqube:
         name: 🩻 SonarQube
+        if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group'
         needs: prepare
         uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
         secrets:

@@ -78,11 +78,11 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle auth errcode presence ", async () => {
+    it("should handle auth errcode presence", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -94,7 +94,6 @@ describe("InteractiveAuth", () => {
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Password] }],
-                errcode: "MockError0",
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
@@ -128,8 +127,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should handle set emailSid for email flow", async () => {
@@ -180,9 +179,9 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
-        expect(requestEmailToken).toBeCalledTimes(0);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
+        expect(requestEmailToken).toHaveBeenCalledTimes(0);
         expect(ia.getEmailSid()).toBe("myEmailSid");
     });
 
@@ -244,8 +243,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(2);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(2);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should make a request if authdata is null", async () => {
@@ -306,8 +305,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(2);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(2);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should start an auth stage and reject if no auth flow", async () => {
@@ -376,7 +375,7 @@ describe("InteractiveAuth", () => {
         await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
     });
 
-    it("should handle unexpected error types without data propery set", async () => {
+    it("should handle unexpected error types without data property set", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
         const requestEmailToken = jest.fn();
@@ -430,40 +429,11 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(0);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(0);
     });
 
     describe("requestEmailToken", () => {
-        it("increases auth attempts", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
-            requestEmailToken.mockImplementation(async () => ({ sid: "" }));
-
-            const ia = new InteractiveAuth({
-                matrixClient: getFakeClient(),
-                doRequest,
-                stateUpdated,
-                requestEmailToken,
-            });
-
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 1, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 2, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 3, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 4, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 5, undefined);
-        });
-
         it("increases auth attempts", async () => {
             const doRequest = jest.fn();
             const stateUpdated = jest.fn();
@@ -508,7 +478,7 @@ describe("InteractiveAuth", () => {
                 requestEmailToken,
             });
 
-            await expect(ia.requestEmailToken.bind(ia)).rejects.toThrowError("unspecific network error");
+            await expect(ia.requestEmailToken.bind(ia)).rejects.toThrow("unspecific network error");
         });
 
         it("only starts one request at a time", async () => {
@@ -544,6 +514,85 @@ describe("InteractiveAuth", () => {
 
             await ia.requestEmailToken();
             expect(ia.getEmailSid()).toEqual(sid);
+        });
+    });
+
+    it("should prioritise shorter flows", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: [AuthType.Recaptcha, AuthType.Password] }, { stages: [AuthType.Password] }],
+                params: {},
+            },
+        });
+
+        // @ts-ignore
+        ia.chooseStage();
+        expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
+    });
+
+    it("should prioritise flows with entirely supported stages", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: ["com.devture.shared_secret_auth"] }, { stages: [AuthType.Password] }],
+                params: {},
+            },
+            supportedStages: [AuthType.Password],
+        });
+
+        // @ts-ignore
+        ia.chooseStage();
+        expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
+    });
+
+    it("should fire stateUpdated callback if with error when encountered", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [{ stages: [AuthType.Password] }],
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            },
+        });
+
+        // first we expect a call here
+        stateUpdated.mockImplementation((stage) => {
+            expect(stage).toEqual(AuthType.Password);
+            ia.submitAuthDict({
+                type: AuthType.Password,
+            });
+        });
+
+        // .. which should trigger a call here
+        doRequest.mockRejectedValue(new MatrixError({ errcode: "M_UNKNOWN", error: "This is an error" }));
+
+        await Promise.allSettled([ia.attemptAuth()]);
+        expect(stateUpdated).toHaveBeenCalledWith("m.login.password", {
+            errcode: "M_UNKNOWN",
+            error: "This is an error",
         });
     });
 });

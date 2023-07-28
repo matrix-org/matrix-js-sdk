@@ -58,10 +58,12 @@ describe("MatrixScheduler", function () {
         let yieldedA = false;
         scheduler.setProcessFunction(function (event) {
             if (yieldedA) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventB);
                 return deferB.promise;
             } else {
                 yieldedA = true;
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventA);
                 return deferA.promise;
             }
@@ -89,6 +91,7 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferred.promise;
             } else if (procCount === 2) {
@@ -112,7 +115,7 @@ describe("MatrixScheduler", function () {
         expect(procCount).toEqual(2);
     });
 
-    it("should give up if the retryFn on failure returns -1 and try the next event", async function () {
+    it("should give up if the retryFn on failure returns -1", async function () {
         // Queue A & B.
         // Reject A and return -1 on retry.
         // Expect B to be tried next and the promise for A to be rejected.
@@ -129,9 +132,11 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferA.promise;
             } else if (procCount === 2) {
+                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventB);
                 return deferB.promise;
             }
@@ -139,22 +144,18 @@ describe("MatrixScheduler", function () {
             return new Promise<Record<string, boolean>>(() => {});
         });
 
-        const globalA = scheduler.queueEvent(eventA);
-        scheduler.queueEvent(eventB);
+        const queuedA = scheduler.queueEvent(eventA);
+        const queuedB = scheduler.queueEvent(eventB);
+        await Promise.resolve();
+        deferA.reject(new Error("Testerror"));
         // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
         // wait just long enough before it does
-        await Promise.resolve();
+        await expect(queuedA).rejects.toThrow("Testerror");
+        await expect(queuedB).rejects.toThrow("Testerror");
         expect(procCount).toEqual(1);
-        deferA.reject({});
-        try {
-            await globalA;
-        } catch (err) {
-            await Promise.resolve();
-            expect(procCount).toEqual(2);
-        }
     });
 
-    it("should treat each queue separately", function (done) {
+    it("should treat each queue separately", async () => {
         // Queue messages A B C D.
         // Bucket A&D into queue_A
         // Bucket B&C into queue_B
@@ -179,13 +180,15 @@ describe("MatrixScheduler", function () {
 
         const expectOrder = [eventA.getId(), eventB.getId(), eventD.getId()];
         const deferA = defer<Record<string, boolean>>();
-        scheduler.setProcessFunction(function (event) {
-            const id = expectOrder.shift();
-            expect(id).toEqual(event.getId());
-            if (expectOrder.length === 0) {
-                done();
-            }
-            return id === eventA.getId() ? deferA.promise : deferred.promise;
+        const allExpectedEventsSeenInOrderPromise = new Promise((resolve) => {
+            scheduler.setProcessFunction(function (event) {
+                const id = expectOrder.shift();
+                expect(id).toEqual(event.getId());
+                if (expectOrder.length === 0) {
+                    resolve(null);
+                }
+                return id === eventA.getId() ? deferA.promise : deferred.promise;
+            });
         });
         scheduler.queueEvent(eventA);
         scheduler.queueEvent(eventB);
@@ -197,6 +200,7 @@ describe("MatrixScheduler", function () {
             deferA.resolve({});
         }, 1000);
         jest.advanceTimersByTime(1000);
+        await allExpectedEventsSeenInOrderPromise;
     });
 
     describe("queueEvent", function () {
@@ -294,7 +298,7 @@ describe("MatrixScheduler", function () {
     });
 
     describe("setProcessFunction", function () {
-        it("should call the processFn if there are queued events", function () {
+        it("should call the processFn if there are queued events", async () => {
             queueFn = function () {
                 return "yep";
             };
@@ -307,9 +311,8 @@ describe("MatrixScheduler", function () {
             });
             // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
             // wait just long enough before it does
-            Promise.resolve().then(() => {
-                expect(procCount).toEqual(1);
-            });
+            await Promise.resolve();
+            expect(procCount).toEqual(1);
         });
 
         it("should not call the processFn if there are no queued events", function () {

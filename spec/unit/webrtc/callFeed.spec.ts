@@ -73,7 +73,7 @@ describe("CallFeed", () => {
         });
 
         describe("muting after calling setAudioVideoMuted()", () => {
-            it("should mute audio by default ", () => {
+            it("should mute audio by default", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
                 feed.setAudioVideoMuted(true, false);
@@ -102,7 +102,7 @@ describe("CallFeed", () => {
             [CallState.Connected, true],
             [CallState.Connecting, false],
         ])("should react to call state, when !isLocal()", (state: CallState, expected: Boolean) => {
-            call.emit(CallEvent.State, state);
+            call.emit(CallEvent.State, state, CallState.InviteSent, call.typed());
 
             expect(feed.connected).toBe(expected);
         });

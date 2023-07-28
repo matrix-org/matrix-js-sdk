@@ -211,7 +211,7 @@ export interface OutgoingRoomKeyRequest {
      */
     requestBody: IRoomKeyRequestBody;
     /**
-     * current state of this request (states are defined in {@link OutgoingRoomKeyRequestManager})
+     * current state of this request
      */
     state: RoomKeyRequestState;
 }

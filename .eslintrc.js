@@ -1,6 +1,9 @@
 module.exports = {
     plugins: ["matrix-org", "import", "jsdoc"],
-    extends: ["plugin:matrix-org/babel", "plugin:import/typescript"],
+    extends: ["plugin:matrix-org/babel", "plugin:matrix-org/jest", "plugin:import/typescript"],
+    parserOptions: {
+        project: ["./tsconfig.json"],
+    },
     env: {
         browser: true,
         node: true,
@@ -58,6 +61,17 @@ module.exports = {
                             "whether release or development, target the specific module or matrix.ts instead",
                     },
                 ],
+            },
+        ],
+        // Disabled tests are a reality for now but as soon as all of the xits are
+        // eliminated, we should enforce this.
+        "jest/no-disabled-tests": "off",
+        // Also treat "oldBackendOnly" as a test function.
+        // Used in some crypto tests.
+        "jest/no-standalone-expect": [
+            "error",
+            {
+                additionalTestBlockFunctions: ["beforeAll", "beforeEach", "oldBackendOnly", "newBackendOnly"],
             },
         ],
     },

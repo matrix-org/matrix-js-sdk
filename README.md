@@ -21,6 +21,8 @@ endpoints from before Matrix 1.1, for example.
 
 ## In a browser
 
+### Note, the browserify build has been deprecated. Please use a bundler like webpack or vite instead.
+
 Download the browser version from
 https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
 `<script>` to your page. There will be a global variable `matrixcs`
@@ -46,7 +48,7 @@ if you do not have it already.
 
 ```javascript
 import * as sdk from "matrix-js-sdk";
-const client = sdk.createClient("https://matrix.org");
+const client = sdk.createClient({ baseUrl: "https://matrix.org" });
 client.publicRooms(function (err, data) {
     console.log("Public Rooms: %s", JSON.stringify(data));
 });
@@ -54,6 +56,8 @@ client.publicRooms(function (err, data) {
 
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
+
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
 
 To start the client:
 

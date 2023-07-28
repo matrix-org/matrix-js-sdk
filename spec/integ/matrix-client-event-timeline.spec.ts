@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,13 @@ import {
     EventStatus,
     EventTimeline,
     EventTimelineSet,
+    EventType,
     Filter,
     IEvent,
     MatrixClient,
     MatrixEvent,
     PendingEventOrdering,
+    RelationType,
     Room,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
@@ -33,6 +35,7 @@ import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/util
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
+import { Feature, ServerSupport } from "../../src/feature";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -245,7 +248,7 @@ describe("getEventTimeline support", function () {
         return startClient(httpBackend, client).then(function () {
             const room = client.getRoom(roomId)!;
             const timelineSet = room!.getTimelineSets()[0];
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
+            return expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -257,7 +260,18 @@ describe("getEventTimeline support", function () {
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId)!;
             const timelineSet = room!.getTimelineSets()[0];
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeFalsy();
+            httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/context/event`).respond(200, () => ({
+                event: {
+                    event_id: "event",
+                },
+                events_after: [],
+                events_before: [],
+                state: [],
+            }));
+            return Promise.all([
+                expect(client.getEventTimeline(timelineSet, "event")).resolves.toBeTruthy(),
+                httpBackend.flushAllExpected(),
+            ]);
         });
     });
 
@@ -268,7 +282,7 @@ describe("getEventTimeline support", function () {
 
         return startClient(httpBackend, client).then(function () {
             const timelineSet = new EventTimelineSet(undefined);
-            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
+            return expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -590,16 +604,10 @@ describe("MatrixClient event timelines", function () {
 
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             await client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
-
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
 
             httpBackend
                 .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
@@ -631,12 +639,6 @@ describe("MatrixClient event timelines", function () {
             const thread = room.createThread(THREAD_ROOT.event_id!, undefined, [], false);
             await httpBackend.flushAllExpected();
             const timelineSet = thread.timelineSet;
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            await flushHttp(emitPromise(thread, ThreadEvent.Update));
 
             const timeline = await client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
 
@@ -647,7 +649,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -680,7 +682,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -709,7 +711,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is within a thread but timelineSet is not", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -787,7 +789,18 @@ describe("MatrixClient event timelines", function () {
             return startClient(httpBackend, client).then(() => {
                 const room = client.getRoom(roomId)!;
                 const timelineSet = room.getTimelineSets()[0];
-                expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
+                httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/context/event`).respond(200, () => ({
+                    event: {
+                        event_id: "event",
+                    },
+                    events_after: [],
+                    events_before: [],
+                    state: [],
+                }));
+                return Promise.all([
+                    expect(client.getEventTimeline(timelineSet, "event")).resolves.toBeTruthy(),
+                    httpBackend.flushAllExpected(),
+                ]);
             });
         });
 
@@ -1127,7 +1140,7 @@ describe("MatrixClient event timelines", function () {
         };
 
         // @ts-ignore
-        client.clientOpts.experimentalThreadSupport = true;
+        client.clientOpts.threadSupport = true;
         Thread.setServerSideSupport(FeatureSupport.Stable);
         Thread.setServerSideListSupport(FeatureSupport.Stable);
         Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1139,7 +1152,7 @@ describe("MatrixClient event timelines", function () {
 
         const prom = emitPromise(room, ThreadEvent.Update);
         // Assume we're seeing the reply while loading backlog
-        room.addLiveEvents([THREAD_REPLY2]);
+        await room.addLiveEvents([THREAD_REPLY2]);
         httpBackend
             .when(
                 "GET",
@@ -1153,7 +1166,118 @@ describe("MatrixClient event timelines", function () {
             });
         await flushHttp(prom);
         // but while loading the metadata, a new reply has arrived
-        room.addLiveEvents([THREAD_REPLY3]);
+        await room.addLiveEvents([THREAD_REPLY3]);
+        const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
+        // then the events should still be all in the right order
+        expect(thread.events.map((it) => it.getId())).toEqual([
+            THREAD_ROOT.event_id,
+            THREAD_REPLY.event_id,
+            THREAD_REPLY2.getId(),
+            THREAD_REPLY3.getId(),
+        ]);
+    });
+
+    it("should ensure thread events don't get reordered with recursive relations", async () => {
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY2 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 2",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY2.localTimestamp += 1000;
+        const THREAD_ROOT_REACTION = utils.mkEvent({
+            event: true,
+            type: EventType.Reaction,
+            user: userId,
+            room: roomId,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: THREAD_ROOT.event_id!,
+                    key: Math.random().toString(),
+                },
+            },
+        });
+        THREAD_ROOT_REACTION.localTimestamp += 2000;
+
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY3 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 3",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY3.localTimestamp += 3000;
+
+        // Test data for the first thread, with the second reply
+        const THREAD_ROOT_UPDATED = {
+            ...THREAD_ROOT,
+            unsigned: {
+                ...THREAD_ROOT.unsigned,
+                "m.relations": {
+                    ...THREAD_ROOT.unsigned!["m.relations"],
+                    "io.element.thread": {
+                        ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
+                        count: 3,
+                        latest_event: THREAD_REPLY3.event,
+                    },
+                },
+            },
+        };
+
+        // @ts-ignore
+        client.clientOpts.threadSupport = true;
+        client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Stable);
+        Thread.setServerSideSupport(FeatureSupport.Stable);
+        Thread.setServerSideListSupport(FeatureSupport.Stable);
+        Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+        client.fetchRoomEvent = () => Promise.resolve(THREAD_ROOT_UPDATED);
+
+        await client.stopClient(); // we don't need the client to be syncing at this time
+        const room = client.getRoom(roomId)!;
+
+        const prom = emitPromise(room, ThreadEvent.Update);
+        // Assume we're seeing the reply while loading backlog
+        await room.addLiveEvents([THREAD_REPLY2]);
+        httpBackend
+            .when(
+                "GET",
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
+                    "/" +
+                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                    buildRelationPaginationQuery({
+                        dir: Direction.Backward,
+                        limit: 3,
+                        recurse: true,
+                    }),
+            )
+            .respond(200, {
+                chunk: [THREAD_REPLY3.event, THREAD_ROOT_REACTION, THREAD_REPLY2.event, THREAD_REPLY],
+            });
+        await flushHttp(prom);
+        // but while loading the metadata, a new reply has arrived
+        await room.addLiveEvents([THREAD_REPLY3]);
         const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
         // then the events should still be all in the right order
         expect(thread.events.map((it) => it.getId())).toEqual([
@@ -1208,7 +1332,7 @@ describe("MatrixClient event timelines", function () {
             request.respond(200, function () {
                 return {
                     original_event: root,
-                    chunk: [replies],
+                    chunk: replies,
                     // no next batch as this is the oldest end of the timeline
                 };
             });
@@ -1263,7 +1387,7 @@ describe("MatrixClient event timelines", function () {
         describe("with server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1338,7 +1462,7 @@ describe("MatrixClient event timelines", function () {
                 expect(room.getPendingEvents()).toHaveLength(1);
             });
 
-            it("should handle thread updates by reordering the thread list", async () => {
+            it("should handle new thread replies by reordering the thread list", async () => {
                 // Test data for a second thread
                 const THREAD2_ROOT = utils.mkEvent({
                     room: roomId,
@@ -1365,7 +1489,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread2 reply",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1385,7 +1509,7 @@ describe("MatrixClient event timelines", function () {
                     user: userId,
                     type: "m.room.message",
                     content: {
-                        "body": "thread reply",
+                        "body": "thread reply2",
                         "msgtype": "m.text",
                         "m.relates_to": {
                             // We can't use the const here because we change server support mode for test
@@ -1395,7 +1519,8 @@ describe("MatrixClient event timelines", function () {
                     },
                     event: true,
                 });
-                THREAD_REPLY2.localTimestamp += 1000;
+                // this has to come after THREAD_REPLY which hasn't been instantiated by us
+                THREAD_REPLY2.localTimestamp += 10000000;
 
                 // Test data for the first thread, with the second reply
                 const THREAD_ROOT_UPDATED = {
@@ -1421,7 +1546,7 @@ describe("MatrixClient event timelines", function () {
                 };
 
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1455,10 +1580,8 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.NewReply);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD_ROOT_UPDATED);
                 respondToEvent(THREAD2_ROOT);
-                room.addLiveEvents([THREAD_REPLY2]);
+                await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
                 await prom;
                 expect(thread.length).toBe(2);
@@ -1468,12 +1591,138 @@ describe("MatrixClient event timelines", function () {
                     THREAD_ROOT.event_id,
                 ]);
             });
+
+            it("should not reorder the thread list on other thread updates", async () => {
+                // Test data for a second thread
+                const THREAD2_ROOT = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.room.message",
+                    content: {
+                        body: "thread root",
+                        msgtype: "m.text",
+                    },
+                    unsigned: {
+                        "m.relations": {
+                            "io.element.thread": {
+                                //"latest_event": undefined,
+                                count: 1,
+                                current_user_participated: true,
+                            },
+                        },
+                    },
+                    event: false,
+                });
+
+                const THREAD2_REPLY = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.room.message",
+                    content: {
+                        "body": "thread2 reply",
+                        "msgtype": "m.text",
+                        "m.relates_to": {
+                            // We can't use the const here because we change server support mode for test
+                            rel_type: "io.element.thread",
+                            event_id: THREAD_ROOT.event_id,
+                        },
+                    },
+                    event: false,
+                });
+
+                // @ts-ignore we know this is a defined path for THREAD ROOT
+                THREAD2_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD2_REPLY;
+
+                const THREAD_REPLY_REACTION = utils.mkEvent({
+                    room: roomId,
+                    user: userId,
+                    type: "m.reaction",
+                    content: {
+                        "m.relates_to": {
+                            rel_type: RelationType.Annotation,
+                            event_id: THREAD_REPLY.event_id,
+                            key: "🪿",
+                        },
+                    },
+                    event: true,
+                });
+                THREAD_REPLY_REACTION.localTimestamp += 1000;
+
+                // Modified thread root event containing latest thread reply in its unsigned
+                const THREAD_ROOT_UPDATED = {
+                    ...THREAD_ROOT,
+                    unsigned: {
+                        ...THREAD_ROOT.unsigned,
+                        "m.relations": {
+                            ...THREAD_ROOT.unsigned!["m.relations"],
+                            "io.element.thread": {
+                                ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
+                                count: 2,
+                                latest_event: THREAD_REPLY,
+                            },
+                        },
+                    },
+                };
+
+                // Response with test data for the thread list request
+                const threadsResponse = {
+                    chunk: [THREAD2_ROOT, THREAD_ROOT],
+                    state: [],
+                    next_batch: RANDOM_TOKEN as string | null,
+                };
+
+                // @ts-ignore
+                client.clientOpts.threadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Stable);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+                Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+                await client.stopClient(); // we don't need the client to be syncing at this time
+                const room = client.getRoom(roomId)!;
+
+                // Set up room threads
+                const timelineSets = await room!.createThreadsTimelineSets();
+                expect(timelineSets).not.toBeNull();
+                respondToThreads(threadsResponse);
+                respondToThreads(threadsResponse);
+                respondToEvent(THREAD_ROOT);
+                respondToEvent(THREAD2_ROOT);
+                respondToThread(THREAD_ROOT, [THREAD_REPLY]);
+                respondToThread(THREAD2_ROOT, [THREAD2_REPLY]);
+                await flushHttp(room.fetchRoomThreads());
+                const threadIds = room.getThreads().map((thread) => thread.id);
+                expect(threadIds).toContain(THREAD_ROOT.event_id);
+                expect(threadIds).toContain(THREAD2_ROOT.event_id);
+                const [allThreads] = timelineSets!;
+                const timeline = allThreads.getLiveTimeline()!;
+                // Test threads are in chronological order
+                expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
+                    THREAD_ROOT.event_id,
+                    THREAD2_ROOT.event_id,
+                ]);
+
+                // Test adding a second event to the first thread
+                const thread = room.getThread(THREAD_ROOT.event_id!)!;
+                thread.initialEventsFetched = true;
+                const prom = emitPromise(room, ThreadEvent.Update);
+                respondToEvent(THREAD_ROOT_UPDATED);
+                respondToEvent(THREAD2_ROOT);
+                await room.addLiveEvents([THREAD_REPLY_REACTION]);
+                await httpBackend.flushAllExpected();
+                await prom;
+                expect(thread.length).toBe(1); // reactions don't count towards the length of a thread
+                // Test thread order is unchanged
+                expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
+                    THREAD_ROOT.event_id,
+                    THREAD2_ROOT.event_id,
+                ]);
+            });
         });
 
         describe("without server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Experimental);
                 Thread.setServerSideListSupport(FeatureSupport.None);
             });
@@ -1539,7 +1788,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should add lazy loading filter", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             // @ts-ignore
@@ -1567,7 +1816,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should correctly pass pagination token", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
 
@@ -1803,73 +2052,7 @@ describe("MatrixClient event timelines", function () {
             expect(thread.initialEventsFetched).toBeTruthy();
             const timelineSet = thread.timelineSet;
 
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return {
-                        start: "start_token",
-                        events_before: [],
-                        event: THREAD_ROOT,
-                        events_after: [],
-                        end: "end_token",
-                        state: [],
-                    };
-                });
-            httpBackend
-                .when(
-                    "GET",
-                    "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                        encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, from: "start_token" }),
-                )
-                .respond(200, function () {
-                    return {
-                        chunk: [],
-                    };
-                });
-            httpBackend
-                .when(
-                    "GET",
-                    "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                        encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Forward, from: "end_token" }),
-                )
-                .respond(200, function () {
-                    return {
-                        chunk: [THREAD_REPLY],
-                    };
-                });
-
-            const timeline = await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+            const timeline = await client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!);
 
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_5",
@@ -1892,7 +2075,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in stable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1902,7 +2085,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible unstable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Experimental);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Experimental);
@@ -1912,7 +2095,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.None);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);

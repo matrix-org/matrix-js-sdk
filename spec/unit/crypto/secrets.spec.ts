@@ -17,7 +17,6 @@ limitations under the License.
 import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { IObject } from "../../../src/crypto/olmlib";
-import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
@@ -25,10 +24,10 @@ import { encryptAES } from "../../../src/crypto/aes";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
-import { ISecretStorageKeyInfo } from "../../../src/crypto/api";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
+import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -45,7 +44,7 @@ async function makeTestClient(
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue({});
+    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
 
     return client;
 }
@@ -149,22 +148,14 @@ describe("Secrets", function () {
     it("should throw if given a key that doesn't exist", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar", ["this secret does not exist"]);
-            // should be able to use expect(...).toThrow() but mocha still fails
-            // the test even when it throws for reasons I have no inclination to debug
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar", ["this secret does not exist"])).rejects.toBeTruthy();
         alice.stopClient();
     });
 
     it("should refuse to encrypt with zero keys", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar", []);
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar", [])).rejects.toBeTruthy();
         alice.stopClient();
     });
 
@@ -215,10 +206,7 @@ describe("Secrets", function () {
     it("should refuse to encrypt if no keys given and no default key", async function () {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
 
-        try {
-            await alice.storeSecret("foo", "bar");
-            expect(true).toBeFalsy();
-        } catch (e) {}
+        await expect(alice.storeSecret("foo", "bar")).rejects.toBeTruthy();
         alice.stopClient();
     });
 
@@ -274,7 +262,7 @@ describe("Secrets", function () {
             Object.values(otks)[0],
         );
 
-        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve(new Map());
         osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
         const request = await secretStorage.request("foo", ["VAX"]);
@@ -541,7 +529,9 @@ describe("Secrets", function () {
             await alice.bootstrapSecretStorage({});
 
             expect(alice.getAccountData("m.secret_storage.default_key")!.getContent()).toEqual({ key: "key_id" });
-            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")!.getContent<ISecretStorageKeyInfo>();
+            const keyInfo = alice
+                .getAccountData("m.secret_storage.key.key_id")!
+                .getContent<SecretStorageKeyDescription>();
             expect(keyInfo.algorithm).toEqual("m.secret_storage.v1.aes-hmac-sha2");
             expect(keyInfo.passphrase).toEqual({
                 algorithm: "m.pbkdf2",

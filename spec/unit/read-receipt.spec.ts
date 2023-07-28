@@ -16,10 +16,9 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { MAIN_ROOM_TIMELINE, ReceiptType } from "../../src/@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { Feature, ServerSupport } from "../../src/feature";
-import { EventType } from "../../src/matrix";
+import { EventType, MatrixEvent, Room } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
@@ -43,46 +42,46 @@ let httpBackend: MockHttpBackend;
 const THREAD_ID = "$thread_event_id";
 const ROOM_ID = "!123:matrix.org";
 
-const threadEvent = utils.mkEvent({
-    event: true,
-    type: EventType.RoomMessage,
-    user: "@bob:matrix.org",
-    room: ROOM_ID,
-    content: {
-        "body": "Hello from a thread",
-        "m.relates_to": {
-            "event_id": THREAD_ID,
-            "m.in_reply_to": {
-                event_id: THREAD_ID,
-            },
-            "rel_type": "m.thread",
-        },
-    },
-});
-
-const roomEvent = utils.mkEvent({
-    event: true,
-    type: EventType.RoomMessage,
-    user: "@bob:matrix.org",
-    room: ROOM_ID,
-    content: {
-        body: "Hello from a room",
-    },
-});
-
-function mockServerSideSupport(client: MatrixClient, serverSideSupport: ServerSupport) {
-    client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
-}
-
 describe("Read receipt", () => {
+    let threadEvent: MatrixEvent;
+    let roomEvent: MatrixEvent;
+
     beforeEach(() => {
         httpBackend = new MockHttpBackend();
         client = new MatrixClient({
+            userId: "@user:server",
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
             fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
         client.isGuest = () => false;
+        client.supportsThreads = () => true;
+
+        threadEvent = utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: "@bob:matrix.org",
+            room: ROOM_ID,
+            content: {
+                "body": "Hello from a thread",
+                "m.relates_to": {
+                    "event_id": THREAD_ID,
+                    "m.in_reply_to": {
+                        event_id: THREAD_ID,
+                    },
+                    "rel_type": "m.thread",
+                },
+            },
+        });
+        roomEvent = utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: "@bob:matrix.org",
+            room: ROOM_ID,
+            content: {
+                body: "Hello from a room",
+            },
+        });
     });
 
     describe("sendReceipt", () => {
@@ -101,7 +100,6 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
@@ -123,7 +121,6 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReadReceipt(threadEvent, ReceiptType.Read, true);
 
             await httpBackend.flushAllExpected();
@@ -145,52 +142,62 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(roomEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
             await flushPromises();
         });
 
-        it("sends a room read receipt when there's no server support", async () => {
+        it("should send a main timeline read receipt for a reaction to a thread root", async () => {
+            roomEvent.event.event_id = THREAD_ID;
+            const reaction = utils.mkReaction(roomEvent, client, client.getSafeUserId(), ROOM_ID);
+            const thread = new Room(ROOM_ID, client, client.getSafeUserId()).createThread(
+                THREAD_ID,
+                roomEvent,
+                [threadEvent],
+                false,
+            );
+            threadEvent.setThread(thread);
+            reaction.setThread(thread);
+
             httpBackend
                 .when(
                     "POST",
                     encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                         $roomId: ROOM_ID,
                         $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
+                        $eventId: reaction.getId()!,
                     }),
                 )
                 .check((request) => {
-                    expect(request.data.thread_id).toBeUndefined();
+                    expect(request.data.thread_id).toEqual(MAIN_ROOM_TIMELINE);
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Unsupported);
-            client.sendReceipt(threadEvent, ReceiptType.Read, {});
+            client.sendReceipt(reaction, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
             await flushPromises();
         });
 
-        it("sends a valid room read receipt even when body omitted", async () => {
+        it("should always send unthreaded receipts if threads support is disabled", async () => {
+            client.supportsThreads = () => false;
+
             httpBackend
                 .when(
                     "POST",
                     encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                         $roomId: ROOM_ID,
                         $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
+                        $eventId: roomEvent.getId()!,
                     }),
                 )
                 .check((request) => {
-                    expect(request.data).toEqual({});
+                    expect(request.data.thread_id).toEqual(undefined);
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Unsupported);
-            client.sendReceipt(threadEvent, ReceiptType.Read, undefined);
+            client.sendReceipt(roomEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
             await flushPromises();
@@ -199,9 +206,10 @@ describe("Read receipt", () => {
 
     describe("synthesizeReceipt", () => {
         it.each([
-            { event: roomEvent, destinationId: MAIN_ROOM_TIMELINE },
-            { event: threadEvent, destinationId: threadEvent.threadRootId! },
-        ])("adds the receipt to $destinationId", ({ event, destinationId }) => {
+            { getEvent: () => roomEvent, destinationId: MAIN_ROOM_TIMELINE },
+            { getEvent: () => threadEvent, destinationId: THREAD_ID },
+        ])("adds the receipt to $destinationId", ({ getEvent, destinationId }) => {
+            const event = getEvent();
             const userId = "@bob:example.org";
             const receiptType = ReceiptType.Read;
 
@@ -210,6 +218,44 @@ describe("Read receipt", () => {
             const content = fakeReadReceipt.getContent()[event.getId()!][receiptType][userId];
 
             expect(content.thread_id).toEqual(destinationId);
+        });
+    });
+
+    describe("addReceiptToStructure", () => {
+        it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
+            const userId = client.getSafeUserId();
+            const room = new Room(ROOM_ID, client, userId);
+
+            const unthreadedReceipt: WrappedReceipt = {
+                eventId: "$olderEvent",
+                data: {
+                    ts: 1234567880,
+                },
+            };
+            const mainTimelineReceipt: WrappedReceipt = {
+                eventId: "$newerEvent",
+                data: {
+                    ts: 1234567890,
+                },
+            };
+
+            room.addReceiptToStructure(
+                mainTimelineReceipt.eventId,
+                ReceiptType.ReadPrivate,
+                userId,
+                mainTimelineReceipt.data,
+                false,
+            );
+            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
+
+            room.addReceiptToStructure(
+                unthreadedReceipt.eventId,
+                ReceiptType.ReadPrivate,
+                userId,
+                unthreadedReceipt.data,
+                false,
+            );
+            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
         });
     });
 });

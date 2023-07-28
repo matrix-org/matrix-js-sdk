@@ -356,6 +356,77 @@ describe("SyncAccumulator", function () {
         });
     });
 
+    it("can handle large numbers of identical receipts", () => {
+        const testSize = 1000; // Make this big to check performance (e.g. 10 million ~= 10s)
+
+        const newReceipt = (ts: number) => {
+            return {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    "$event1:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts },
+                        },
+                    },
+                },
+            };
+        };
+
+        const receipts = [];
+        for (let i = 0; i < testSize; i++) {
+            receipts.push(newReceipt(testSize - i));
+        }
+
+        sa.accumulate(
+            syncSkeleton({
+                ephemeral: {
+                    events: receipts,
+                },
+            }),
+        );
+
+        const events = sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events;
+        expect(events.length).toEqual(1);
+        expect(events[0]).toEqual(newReceipt(1));
+    });
+
+    it("can handle large numbers of receipts for different users and events", () => {
+        const testSize = 100; // Make this big to check performance (e.g. 1 million ~= 10s)
+
+        const newReceipt = (ts: number) => {
+            return {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    [`$event${ts}:localhost`]: {
+                        [ReceiptType.Read]: {
+                            [`@alice${ts}:localhost`]: { ts },
+                        },
+                    },
+                },
+            };
+        };
+
+        const receipts = [];
+        for (let i = 0; i < testSize; i++) {
+            receipts.push(newReceipt(testSize - i));
+        }
+
+        sa.accumulate(
+            syncSkeleton({
+                ephemeral: {
+                    events: receipts,
+                },
+            }),
+        );
+
+        const events = sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events;
+        expect(events.length).toEqual(1);
+        expect(events[0]["content"]["$event1:localhost"]).toEqual({ "m.read": { "@alice1:localhost": { ts: 1 } } });
+        expect(Object.keys(events[0]["content"]).length).toEqual(testSize);
+    });
+
     it("should accumulate threaded read receipts", () => {
         const receipt1 = {
             type: "m.receipt",
@@ -472,6 +543,25 @@ describe("SyncAccumulator", function () {
             expect(summary["m.invited_member_count"]).toEqual(2);
             expect(summary["m.joined_member_count"]).toEqual(5);
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
+        });
+
+        it("should correctly update summary properties to zero", function () {
+            // When we receive updates of a summary property, the last of which is 0
+            sa.accumulate(
+                createSyncResponseWithSummary({
+                    "m.heroes": ["@alice:bar"],
+                    "m.invited_member_count": 2,
+                }),
+            );
+            sa.accumulate(
+                createSyncResponseWithSummary({
+                    "m.heroes": ["@alice:bar"],
+                    "m.invited_member_count": 0,
+                }),
+            );
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            // Then we give an answer of 0
+            expect(summary["m.invited_member_count"]).toEqual(0);
         });
 
         it("should return correctly adjusted age attributes", () => {

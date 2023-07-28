@@ -28,7 +28,14 @@ import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossS
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixClient } from "../../client";
 import { VerificationRequest } from "./request/VerificationRequest";
-import { ListenerMap, TypedEventEmitter } from "../../models/typed-event-emitter";
+import { TypedEventEmitter } from "../../models/typed-event-emitter";
+import {
+    ShowQrCodeCallbacks,
+    ShowSasCallbacks,
+    Verifier,
+    VerifierEvent,
+    VerifierEventHandlerMap,
+} from "../../crypto-api/verification";
 
 const timeoutException = new Error("Verification timed out");
 
@@ -40,18 +47,28 @@ export class SwitchStartEventError extends Error {
 
 export type KeyVerifier = (keyId: string, device: DeviceInfo, keyInfo: string) => void;
 
-export enum VerificationEvent {
-    Cancel = "cancel",
-}
+/** @deprecated use VerifierEvent */
+export type VerificationEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const VerificationEvent = VerifierEvent;
 
+/** @deprecated use VerifierEventHandlerMap */
 export type VerificationEventHandlerMap = {
     [VerificationEvent.Cancel]: (e: Error | MatrixEvent) => void;
 };
 
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
+// The type parameters of VerificationBase are no longer used, but we need some placeholders to maintain
+// backwards compatibility with applications that reference the class.
 export class VerificationBase<
-    Events extends string,
-    Arguments extends ListenerMap<Events | VerificationEvent>,
-> extends TypedEventEmitter<Events | VerificationEvent, Arguments, VerificationEventHandlerMap> {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        Events extends string = VerifierEvent,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        Arguments = VerifierEventHandlerMap,
+    >
+    extends TypedEventEmitter<VerifierEvent, VerifierEventHandlerMap>
+    implements Verifier
+{
     private cancelled = false;
     private _done = false;
     private promise: Promise<void> | null = null;
@@ -365,5 +382,25 @@ export class VerificationBase<
 
     public get events(): string[] | undefined {
         return undefined;
+    }
+
+    /**
+     * Get the details for an SAS verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for a SAS-based verification and we are waiting for the user to confirm
+     * the SAS matches.
+     */
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return null;
+    }
+
+    /**
+     * Get the details for reciprocating QR code verification, if one is in progress
+     *
+     * Returns `null`, unless this verifier is for reciprocating a QR-code-based verification (ie, the other user has
+     * already scanned our QR code), and we are waiting for the user to confirm.
+     */
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return null;
     }
 }

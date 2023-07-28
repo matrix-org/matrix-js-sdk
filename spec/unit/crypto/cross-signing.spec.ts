@@ -24,10 +24,11 @@ import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixError } from "../../../src/http-api";
 import { logger } from "../../../src/logger";
 import { ICrossSigningKey, ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
-import { CryptoEvent, IBootstrapCrossSigningOpts } from "../../../src/crypto";
+import { CryptoEvent } from "../../../src/crypto";
 import { IDevice } from "../../../src/crypto/deviceinfo";
 import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
+import { BootstrapCrossSigningOpts } from "../../../src/crypto-api";
 
 const PUSH_RULES_RESPONSE: Response = {
     method: "GET",
@@ -146,7 +147,7 @@ describe("Cross Signing", function () {
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
         alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({} as T);
-        const authUploadDeviceSigningKeys: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
+        const authUploadDeviceSigningKeys: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
             await func({});
         };
 
@@ -1148,6 +1149,6 @@ describe("userHasCrossSigningKeys", function () {
 
     it("throws an error if crypto is disabled", () => {
         aliceClient["cryptoBackend"] = undefined;
-        expect(() => aliceClient.userHasCrossSigningKeys()).toThrowError("encryption disabled");
+        expect(() => aliceClient.userHasCrossSigningKeys()).toThrow("encryption disabled");
     });
 });

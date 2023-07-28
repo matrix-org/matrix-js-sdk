@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,125 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
-import { MatrixEvent } from "../models/event";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
+import type { IEncryptedEventInfo } from "../crypto/api";
+import { IContent, MatrixEvent } from "../models/event";
+import { Room } from "../models/room";
+import { RoomMember } from "../models/room-member";
+import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { logger } from "../logger";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { UserTrustLevel } from "../crypto/CrossSigning";
+import { RoomEncryptor } from "./RoomEncryptor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { KeyClaimManager } from "./KeyClaimManager";
+import { MapWithDefault } from "../utils";
+import {
+    BackupTrustInfo,
+    BootstrapCrossSigningOpts,
+    CreateSecretStorageOpts,
+    CrossSigningKey,
+    CrossSigningStatus,
+    CryptoCallbacks,
+    DeviceVerificationStatus,
+    GeneratedSecretStorageKey,
+    ImportRoomKeyProgressData,
+    ImportRoomKeysOpts,
+    KeyBackupInfo,
+    VerificationRequest,
+    CrossSigningKeyInfo,
+} from "../crypto-api";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
+import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
+import { Device, DeviceMap } from "../models/device";
+import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
+import { CrossSigningIdentity } from "./CrossSigningIdentity";
+import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { keyFromPassphrase } from "../crypto/key_passphrase";
+import { encodeRecoveryKey } from "../crypto/recoverykey";
+import { crypto } from "../crypto/crypto";
+import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
+import { EventType } from "../@types/event";
+import { CryptoEvent } from "../crypto";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { RustBackupManager } from "./backup";
 
-// import { logger } from "../logger";
+const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
+ *
+ * @internal
  */
-export class RustCrypto implements CryptoBackend {
-    public globalBlacklistUnverifiedDevices = false;
+export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     public globalErrorOnUnknownDevices = false;
+    private _trustCrossSignedDevices = true;
 
-    /** whether stop() has been called */
+    /** whether {@link stop} has been called */
     private stopped = false;
 
-    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine, _userId: string, _deviceId: string) {}
+    /** whether {@link outgoingRequestLoop} is currently running */
+    private outgoingRequestLoopRunning = false;
+
+    /** mapping of roomId → encryptor class */
+    private roomEncryptors: Record<string, RoomEncryptor> = {};
+
+    private eventDecryptor: EventDecryptor;
+    private keyClaimManager: KeyClaimManager;
+    private outgoingRequestProcessor: OutgoingRequestProcessor;
+    private crossSigningIdentity: CrossSigningIdentity;
+
+    public readonly backupManager: RustBackupManager;
+
+    public constructor(
+        /** The `OlmMachine` from the underlying rust crypto sdk. */
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
+
+        /**
+         * Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
+         *
+         * We expect it to set the access token, etc.
+         */
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+
+        /** The local user's User ID. */
+        private readonly userId: string,
+
+        /** The local user's Device ID. */
+        _deviceId: string,
+
+        /** Interface to server-side secret storage */
+        private readonly secretStorage: ServerSideSecretStorage,
+
+        /** Crypto callbacks provided by the application */
+        private readonly cryptoCallbacks: CryptoCallbacks,
+    ) {
+        super();
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
+        this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.backupManager = new RustBackupManager(olmMachine);
+
+        // Fire if the cross signing keys are imported from the secret storage
+        const onCrossSigningKeysImport = (): void => {
+            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(this.userId));
+        };
+        this.crossSigningIdentity = new CrossSigningIdentity(
+            olmMachine,
+            this.outgoingRequestProcessor,
+            secretStorage,
+            onCrossSigningKeysImport,
+        );
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // CryptoBackend implementation
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
@@ -42,24 +142,1023 @@ export class RustCrypto implements CryptoBackend {
         }
         this.stopped = true;
 
+        this.keyClaimManager.stop();
+
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
         // can then be deleted.
         this.olmMachine.close();
     }
 
-    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        await this.olmMachine.decryptRoomEvent("event", new RustSdkCryptoJs.RoomId("room"));
-        throw new Error("not implemented");
+    public async encryptEvent(event: MatrixEvent, _room: Room): Promise<void> {
+        const roomId = event.getRoomId()!;
+        const encryptor = this.roomEncryptors[roomId];
+
+        if (!encryptor) {
+            throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
+        }
+
+        await encryptor.encryptEvent(event);
     }
 
-    public async userHasCrossSigningKeys(): Promise<boolean> {
+    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
+        const roomId = event.getRoomId();
+        if (!roomId) {
+            // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
+            // so the fact it has come back here suggests that decryption failed.
+            //
+            // once we drop support for the libolm crypto implementation, we can stop passing to-device messages
+            // through decryptEvent and hence get rid of this case.
+            throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
+        }
+        return await this.eventDecryptor.attemptEventDecryption(event);
+    }
+
+    public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
+        // TODO: make this work properly. Or better, replace it.
+
+        const ret: Partial<IEncryptedEventInfo> = {};
+
+        ret.senderKey = event.getSenderKey() ?? undefined;
+        ret.algorithm = event.getWireContent().algorithm;
+
+        if (!ret.senderKey || !ret.algorithm) {
+            ret.encrypted = false;
+            return ret as IEncryptedEventInfo;
+        }
+        ret.encrypted = true;
+        ret.authenticated = true;
+        ret.mismatchedSender = true;
+        return ret as IEncryptedEventInfo;
+    }
+
+    public checkUserTrust(userId: string): UserTrustLevel {
         // TODO
-        return false;
+        return new UserTrustLevel(false, false, false);
+    }
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getStoredCrossSigningForUser(userId: string): null {
+        // TODO
+        return null;
+    }
+
+    /**
+     * This function is unneeded for the rust-crypto.
+     * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
+     *
+     * The function is stub to keep the compatibility with the old crypto.
+     * More information: https://github.com/vector-im/element-web/issues/25648
+     *
+     *
+     * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
+     */
+    public async checkOwnCrossSigningTrust(): Promise<void> {
+        return;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // CryptoApi implementation
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public globalBlacklistUnverifiedDevices = false;
+
+    /**
+     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
+     */
+    public async userHasCrossSigningKeys(): Promise<boolean> {
+        const userId = new RustSdkCryptoJs.UserId(this.userId);
+        /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
+         * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
+         */
+        const request = this.olmMachine.queryKeysForUsers([userId]);
+        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+        const userIdentity = await this.olmMachine.getIdentity(userId);
+        return userIdentity !== undefined;
+    }
+
+    public prepareToEncrypt(room: Room): void {
+        const encryptor = this.roomEncryptors[room.roomId];
+
+        if (encryptor) {
+            encryptor.ensureEncryptionSession();
+        }
+    }
+
+    public forceDiscardSession(roomId: string): Promise<void> {
+        return this.roomEncryptors[roomId]?.forceDiscardSession();
     }
 
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
+        const raw = await this.olmMachine.exportRoomKeys(() => true);
+        return JSON.parse(raw);
+    }
+
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
+    }
+
+    /**
+     * Get the device information for the given list of users.
+     *
+     * @param userIds - The users to fetch.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case such users will not appear at all in the result map.
+     *
+     * @returns A map `{@link DeviceMap}`.
+     */
+    public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
+        const deviceMapByUserId = new Map<string, Map<string, Device>>();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+
+        // Convert RustSdkCryptoJs.UserId to a `Set<string>`
+        const trackedUsers = new Set<string>();
+        rustTrackedUsers.forEach((rustUserId) => trackedUsers.add(rustUserId.toString()));
+
+        // Keep untracked user to download their keys after
+        const untrackedUsers: Set<string> = new Set();
+
+        for (const userId of userIds) {
+            // if this is a tracked user, we can just fetch the device list from the rust-sdk
+            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
+            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
+            if (trackedUsers.has(userId)) {
+                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
+            } else {
+                untrackedUsers.add(userId);
+            }
+        }
+
+        // for any users whose device lists we are not tracking, fall back to downloading the device list
+        // over HTTP.
+        if (downloadUncached && untrackedUsers.size >= 1) {
+            const queryResult = await this.downloadDeviceList(untrackedUsers);
+            Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
+                deviceMapByUserId.set(userId, deviceKeysToDeviceMap(deviceKeys)),
+            );
+        }
+
+        return deviceMapByUserId;
+    }
+
+    /**
+     * Get the device list for the given user from the olm machine
+     * @param userId - Rust SDK UserId
+     */
+    private async getUserDevices(userId: string): Promise<Map<string, Device>> {
+        const rustUserId = new RustSdkCryptoJs.UserId(userId);
+
+        // For reasons I don't really understand, the Javascript FinalizationRegistry doesn't seem to run the
+        // registered callbacks when `userDevices` goes out of scope, nor when the individual devices in the array
+        // returned by `userDevices.devices` do so.
+        //
+        // This is particularly problematic, because each of those structures holds a reference to the
+        // VerificationMachine, which in turn holds a reference to the IndexeddbCryptoStore. Hence, we end up leaking
+        // open connections to the crypto store, which means the store can't be deleted on logout.
+        //
+        // To fix this, we explicitly call `.free` on each of the objects, which tells the rust code to drop the
+        // allocated memory and decrement the refcounts for the crypto store.
+
+        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        try {
+            const deviceArray: RustSdkCryptoJs.Device[] = userDevices.devices();
+            try {
+                return new Map(
+                    deviceArray.map((device) => [device.deviceId.toString(), rustDeviceToJsDevice(device, rustUserId)]),
+                );
+            } finally {
+                deviceArray.forEach((d) => d.free());
+            }
+        } finally {
+            userDevices.free();
+        }
+    }
+
+    /**
+     * Download the given user keys by calling `/keys/query` request
+     * @param untrackedUsers - download keys of these users
+     */
+    private async downloadDeviceList(untrackedUsers: Set<string>): Promise<IDownloadKeyResult> {
+        const queryBody: IQueryKeysRequest = { device_keys: {} };
+        untrackedUsers.forEach((user) => (queryBody.device_keys[user] = []));
+
+        return await this.http.authedRequest(Method.Post, "/_matrix/client/v3/keys/query", undefined, queryBody, {
+            prefix: "",
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getTrustCrossSignedDevices}.
+     */
+    public getTrustCrossSignedDevices(): boolean {
+        return this._trustCrossSignedDevices;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#setTrustCrossSignedDevices}.
+     */
+    public setTrustCrossSignedDevices(val: boolean): void {
+        this._trustCrossSignedDevices = val;
+        // TODO: legacy crypto goes through the list of known devices and emits DeviceVerificationChanged
+        //  events. Maybe we need to do the same?
+    }
+
+    /**
+     * Mark the given device as locally verified.
+     *
+     * Implementation of {@link CryptoApi#setDeviceVerified}.
+     */
+    public async setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) {
+            throw new Error(`Unknown device ${userId}|${deviceId}`);
+        }
+        await device.setLocalTrust(verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getDeviceVerificationStatus}.
+     */
+    public async getDeviceVerificationStatus(
+        userId: string,
+        deviceId: string,
+    ): Promise<DeviceVerificationStatus | null> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) return null;
+
+        return new DeviceVerificationStatus({
+            signedByOwner: device.isCrossSignedByOwner(),
+            crossSigningVerified: device.isCrossSigningTrusted(),
+            localVerified: device.isLocallyTrusted(),
+            trustCrossSignedDevices: this._trustCrossSignedDevices,
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isCrossSigningReady}
+     */
+    public async isCrossSigningReady(): Promise<boolean> {
+        const { publicKeysOnDevice, privateKeysInSecretStorage, privateKeysCachedLocally } =
+            await this.getCrossSigningStatus();
+        const hasKeysInCache =
+            Boolean(privateKeysCachedLocally.masterKey) &&
+            Boolean(privateKeysCachedLocally.selfSigningKey) &&
+            Boolean(privateKeysCachedLocally.userSigningKey);
+
+        // The cross signing is ready if the public and private keys are available
+        return publicKeysOnDevice && (hasKeysInCache || privateKeysInSecretStorage);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningKeyId}
+     */
+    public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const privateKeysOnDevice =
+            crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
+
+        if (!userIdentity || !privateKeysOnDevice) {
+            // The public or private keys are not available on this device
+            return null;
+        }
+
+        if (!userIdentity.isVerified()) {
+            // We have both public and private keys, but they don't match!
+            return null;
+        }
+
+        let key: string;
+        switch (type) {
+            case CrossSigningKey.Master:
+                key = userIdentity.masterKey;
+                break;
+            case CrossSigningKey.SelfSigning:
+                key = userIdentity.selfSigningKey;
+                break;
+            case CrossSigningKey.UserSigning:
+                key = userIdentity.userSigningKey;
+                break;
+            default:
+                // Unknown type
+                return null;
+        }
+
+        const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
+        // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+        // We assume only a single key, and we want the bare form without type
+        // prefix, so we select the values.
+        return Object.values(parsedKey.keys)[0];
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#boostrapCrossSigning}
+     */
+    public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
+        await this.crossSigningIdentity.bootstrapCrossSigning(opts);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isSecretStorageReady}
+     */
+    public async isSecretStorageReady(): Promise<boolean> {
+        return false;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#bootstrapSecretStorage}
+     */
+    public async bootstrapSecretStorage({
+        createSecretStorageKey,
+        setupNewSecretStorage,
+    }: CreateSecretStorageOpts = {}): Promise<void> {
+        // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
+        // we don't want to create a new key
+        const isNewSecretStorageKeyNeeded = setupNewSecretStorage || !(await this.secretStorageHasAESKey());
+
+        if (isNewSecretStorageKeyNeeded) {
+            if (!createSecretStorageKey) {
+                throw new Error("unable to create a new secret storage key, createSecretStorageKey is not set");
+            }
+
+            // Create a new storage key and add it to secret storage
+            const recoveryKey = await createSecretStorageKey();
+            await this.addSecretStorageKeyToSecretStorage(recoveryKey);
+        }
+
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const hasPrivateKeys =
+            crossSigningStatus.hasMaster && crossSigningStatus.hasSelfSigning && crossSigningStatus.hasUserSigning;
+
+        // If we have cross-signing private keys cached, store them in secret
+        // storage if they are not there already.
+        if (
+            hasPrivateKeys &&
+            (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
+        ) {
+            const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
+                await this.olmMachine.exportCrossSigningKeys();
+
+            if (!crossSigningPrivateKeys.masterKey) {
+                throw new Error("missing master key in cross signing private keys");
+            }
+
+            if (!crossSigningPrivateKeys.userSigningKey) {
+                throw new Error("missing user signing key in cross signing private keys");
+            }
+
+            if (!crossSigningPrivateKeys.self_signing_key) {
+                throw new Error("missing self signing key in cross signing private keys");
+            }
+
+            await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
+            await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
+            await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+        }
+    }
+
+    /**
+     * Add the secretStorage key to the secret storage
+     * - The secret storage key must have the `keyInfo` field filled
+     * - The secret storage key is set as the default key of the secret storage
+     * - Call `cryptoCallbacks.cacheSecretStorageKey` when done
+     *
+     * @param secretStorageKey - The secret storage key to add in the secret storage.
+     */
+    private async addSecretStorageKeyToSecretStorage(secretStorageKey: GeneratedSecretStorageKey): Promise<void> {
+        // keyInfo is required to continue
+        if (!secretStorageKey.keyInfo) {
+            throw new Error("missing keyInfo field in the secret storage key");
+        }
+
+        const secretStorageKeyObject = await this.secretStorage.addKey(
+            SECRET_STORAGE_ALGORITHM_V1_AES,
+            secretStorageKey.keyInfo,
+        );
+
+        await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
+
+        this.cryptoCallbacks.cacheSecretStorageKey?.(
+            secretStorageKeyObject.keyId,
+            secretStorageKeyObject.keyInfo,
+            secretStorageKey.privateKey,
+        );
+    }
+
+    /**
+     * Check if a secret storage AES Key is already added in secret storage
+     *
+     * @returns True if an AES key is in the secret storage
+     */
+    private async secretStorageHasAESKey(): Promise<boolean> {
+        // See if we already have an AES secret-storage key.
+        const secretStorageKeyTuple = await this.secretStorage.getKey();
+
+        if (!secretStorageKeyTuple) return false;
+
+        const [, keyInfo] = secretStorageKeyTuple;
+
+        // Check if the key is an AES key
+        return keyInfo.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     */
+    public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        const publicKeysOnDevice =
+            Boolean(userIdentity?.masterKey) &&
+            Boolean(userIdentity?.selfSigningKey) &&
+            Boolean(userIdentity?.userSigningKey);
+        const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
+        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
+            await this.olmMachine.crossSigningStatus();
+
+        return {
+            publicKeysOnDevice,
+            privateKeysInSecretStorage,
+            privateKeysCachedLocally: {
+                masterKey: Boolean(crossSigningStatus?.hasMaster),
+                userSigningKey: Boolean(crossSigningStatus?.hasUserSigning),
+                selfSigningKey: Boolean(crossSigningStatus?.hasSelfSigning),
+            },
+        };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
+     */
+    public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
+        let key: Uint8Array;
+
+        const keyInfo: AddSecretStorageKeyOpts = {};
+        if (password) {
+            // Generate the key from the passphrase
+            const derivation = await keyFromPassphrase(password);
+            keyInfo.passphrase = {
+                algorithm: "m.pbkdf2",
+                iterations: derivation.iterations,
+                salt: derivation.salt,
+            };
+            key = derivation.key;
+        } else {
+            // Using the navigator crypto API to generate the private key
+            key = new Uint8Array(32);
+            crypto.getRandomValues(key);
+        }
+
+        const encodedPrivateKey = encodeRecoveryKey(key);
+        return {
+            keyInfo,
+            encodedPrivateKey,
+            privateKey: key,
+        };
+    }
+
+    /**
+     * Returns to-device verification requests that are already in progress for the given user id.
+     *
+     * Implementation of {@link CryptoApi#getVerificationRequestsToDeviceInProgress}
+     *
+     * @param userId - the ID of the user to query
+     *
+     * @returns the VerificationRequests that are in progress
+     */
+    public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {
+        const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
+            new RustSdkCryptoJs.UserId(userId),
+        );
+        return requests
+            .filter((request) => request.roomId === undefined)
+            .map(
+                (request) =>
+                    new RustVerificationRequest(
+                        request,
+                        this.outgoingRequestProcessor,
+                        this._supportedVerificationMethods,
+                    ),
+            );
+    }
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room id
+     *
+     * Implementation of {@link CryptoApi#findVerificationRequestDMInProgress}
+     *
+     * @param roomId - the room to use for verification
+     *
+     * @returns the VerificationRequest that is in progress, if any
+     *
+     */
+    public findVerificationRequestDMInProgress(roomId: string): undefined {
         // TODO
-        return [];
+        return;
+    }
+
+    /**
+     * The verification methods we offer to the other side during an interactive verification.
+     */
+    private _supportedVerificationMethods: string[] = ALL_VERIFICATION_METHODS;
+
+    /**
+     * Set the verification methods we offer to the other side during an interactive verification.
+     *
+     * If `undefined`, we will offer all the methods supported by the Rust SDK.
+     */
+    public setSupportedVerificationMethods(methods: string[] | undefined): void {
+        // by default, the Rust SDK does not offer `m.qr_code.scan.v1`, but we do want to offer that.
+        this._supportedVerificationMethods = methods ?? ALL_VERIFICATION_METHODS;
+    }
+
+    /**
+     * Send a verification request to our other devices.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestOwnUserVerification}.
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public async requestOwnUserVerification(): Promise<VerificationRequest> {
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(this.userId),
+        );
+        if (userIdentity === undefined) {
+            throw new Error("cannot request verification for this device when there is no existing cross-signing key");
+        }
+
+        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+            await userIdentity.requestVerification(
+                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+            );
+        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+    }
+
+    /**
+     * Request an interactive verification with the given device.
+     *
+     * If a verification is already in flight, returns it. Otherwise, initiates a new one.
+     *
+     * Implementation of {@link CryptoApi#requestDeviceVerification}.
+     *
+     * @param userId - ID of the owner of the device to verify
+     * @param deviceId - ID of the device to verify
+     *
+     * @returns a VerificationRequest when the request has been sent to the other party.
+     */
+    public async requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) {
+            throw new Error("Not a known device");
+        }
+
+        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+            await device.requestVerification(
+                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+            );
+        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+    }
+
+    /**
+     * Fetch the backup decryption key we have saved in our store.
+     *
+     * Implementation of {@link CryptoApi#getSessionBackupPrivateKey}.
+     *
+     * @returns the key, if any, or null
+     */
+    public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (!backupKeys.decryptionKey) return null;
+        return Buffer.from(backupKeys.decryptionKey.toBase64(), "base64");
+    }
+
+    /**
+     * Store the backup decryption key.
+     *
+     * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
+     * @param key - the backup decryption key
+     */
+    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+        const base64Key = Buffer.from(key).toString("base64");
+
+        // TODO get version from backupManager
+        await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
+    }
+
+    /**
+     * Get the current status of key backup.
+     *
+     * Implementation of {@link CryptoApi#getActiveSessionBackupVersion}.
+     */
+    public async getActiveSessionBackupVersion(): Promise<string | null> {
+        return await this.backupManager.getActiveBackupVersion();
+    }
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * Implementation of {@link Crypto.CryptoApi.isKeyBackupTrusted}.
+     */
+    public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
+        return await this.backupManager.isKeyBackupTrusted(info);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // SyncCryptoCallbacks implementation
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Apply sync changes to the olm machine
+     * @param events - the received to-device messages
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     * @param devices - the received device list updates
+     * @returns A list of preprocessed to-device messages.
+     */
+    private async receiveSyncChanges({
+        events,
+        oneTimeKeysCounts = new Map<string, number>(),
+        unusedFallbackKeys,
+        devices = new RustSdkCryptoJs.DeviceLists(),
+    }: {
+        events?: IToDeviceEvent[];
+        oneTimeKeysCounts?: Map<string, number>;
+        unusedFallbackKeys?: Set<string>;
+        devices?: RustSdkCryptoJs.DeviceLists;
+    }): Promise<IToDeviceEvent[]> {
+        const result = await this.olmMachine.receiveSyncChanges(
+            events ? JSON.stringify(events) : "[]",
+            devices,
+            oneTimeKeysCounts,
+            unusedFallbackKeys,
+        );
+
+        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
+        return JSON.parse(result);
+    }
+
+    /** called by the sync loop to preprocess incoming to-device messages
+     *
+     * @param events - the received to-device messages
+     * @returns A list of preprocessed to-device messages.
+     */
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+        // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
+        // one-time-keys, or fallback keys, so just pass empty data.
+        const processed = await this.receiveSyncChanges({ events });
+
+        // look for interesting to-device messages
+        for (const message of processed) {
+            if (message.type === EventType.KeyVerificationRequest) {
+                this.onIncomingKeyVerificationRequest(message.sender, message.content);
+            }
+        }
+        return processed;
+    }
+
+    /** called by the sync loop to process one time key counts and unused fallback keys
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     */
+    public async processKeyCounts(
+        oneTimeKeysCounts?: Record<string, number>,
+        unusedFallbackKeys?: string[],
+    ): Promise<void> {
+        const mapOneTimeKeysCount = oneTimeKeysCounts && new Map<string, number>(Object.entries(oneTimeKeysCounts));
+        const setUnusedFallbackKeys = unusedFallbackKeys && new Set<string>(unusedFallbackKeys);
+
+        if (mapOneTimeKeysCount !== undefined || setUnusedFallbackKeys !== undefined) {
+            await this.receiveSyncChanges({
+                oneTimeKeysCounts: mapOneTimeKeysCount,
+                unusedFallbackKeys: setUnusedFallbackKeys,
+            });
+        }
+    }
+
+    /** called by the sync loop to process the notification that device lists have
+     * been changed.
+     *
+     * @param deviceLists - device_lists field from /sync
+     */
+    public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
+        const devices = new RustSdkCryptoJs.DeviceLists(
+            deviceLists.changed?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+            deviceLists.left?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
+        await this.receiveSyncChanges({ devices });
+    }
+
+    /** called by the sync loop on m.room.encrypted events
+     *
+     * @param room - in which the event was received
+     * @param event - encryption event to be processed
+     */
+    public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
+        const config = event.getContent();
+
+        const existingEncryptor = this.roomEncryptors[room.roomId];
+        if (existingEncryptor) {
+            existingEncryptor.onCryptoEvent(config);
+        } else {
+            this.roomEncryptors[room.roomId] = new RoomEncryptor(
+                this.olmMachine,
+                this.keyClaimManager,
+                this.outgoingRequestProcessor,
+                room,
+                config,
+            );
+        }
+
+        // start tracking devices for any users already known to be in this room.
+        const members = await room.getEncryptionTargetMembers();
+        logger.debug(
+            `[${room.roomId} encryption] starting to track devices for: `,
+            members.map((u) => `${u.userId} (${u.membership})`),
+        );
+        await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
+    }
+
+    /** called by the sync loop after processing each sync.
+     *
+     * TODO: figure out something equivalent for sliding sync.
+     *
+     * @param syncState - information on the completed sync.
+     */
+    public onSyncCompleted(syncState: OnSyncCompletedData): void {
+        // Processing the /sync may have produced new outgoing requests which need sending, so kick off the outgoing
+        // request loop, if it's not already running.
+        this.outgoingRequestLoop();
+    }
+
+    /**
+     * Handle an incoming m.key.verification request event
+     *
+     * @param sender - the sender of the event
+     * @param content - the content of the event
+     */
+    private onIncomingKeyVerificationRequest(sender: string, content: IContent): void {
+        const transactionId = content.transaction_id;
+        if (!transactionId || !sender) {
+            // not a valid request: ignore
+            return;
+        }
+
+        const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
+            new RustSdkCryptoJs.UserId(sender),
+            transactionId,
+        );
+
+        if (request) {
+            this.emit(
+                CryptoEvent.VerificationRequestReceived,
+                new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods),
+            );
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Other public functions
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /** called by the MatrixClient on a room membership event
+     *
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.membership changed.
+     * @param oldMembership - The previous membership state. Null if it's a new member.
+     */
+    public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {
+        const enc = this.roomEncryptors[event.getRoomId()!];
+        if (!enc) {
+            // not encrypting in this room
+            return;
+        }
+        enc.onRoomMembership(member);
+    }
+
+    /** Callback for OlmMachine.registerRoomKeyUpdatedCallback
+     *
+     * Called by the rust-sdk whenever there is an update to (megolm) room keys. We
+     * check if we have any events waiting for the given keys, and schedule them for
+     * a decryption retry if so.
+     *
+     * @param keys - details of the updated keys
+     */
+    public async onRoomKeysUpdated(keys: RustSdkCryptoJs.RoomKeyInfo[]): Promise<void> {
+        for (const key of keys) {
+            this.onRoomKeyUpdated(key);
+        }
+    }
+
+    private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
+        logger.debug(`Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`);
+        const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
+        if (pendingList.length === 0) return;
+
+        logger.debug(
+            "Retrying decryption on events:",
+            pendingList.map((e) => `${e.getId()}`),
+        );
+
+        // Have another go at decrypting events with this key.
+        //
+        // We don't want to end up blocking the callback from Rust, which could otherwise end up dropping updates,
+        // so we don't wait for the decryption to complete. In any case, there is no need to wait:
+        // MatrixEvent.attemptDecryption ensures that there is only one decryption attempt happening at once,
+        // and deduplicates repeated attempts for the same event.
+        for (const ev of pendingList) {
+            ev.attemptDecryption(this, { isRetry: true }).catch((_e) => {
+                logger.info(`Still unable to decrypt event ${ev.getId()} after receiving key`);
+            });
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Outgoing requests
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private async outgoingRequestLoop(): Promise<void> {
+        if (this.outgoingRequestLoopRunning) {
+            return;
+        }
+        this.outgoingRequestLoopRunning = true;
+        try {
+            while (!this.stopped) {
+                const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
+                if (outgoingRequests.length == 0 || this.stopped) {
+                    // no more messages to send (or we have been told to stop): exit the loop
+                    return;
+                }
+                for (const msg of outgoingRequests) {
+                    await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
+                }
+            }
+        } catch (e) {
+            logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
+        } finally {
+            this.outgoingRequestLoopRunning = false;
+        }
     }
 }
+
+class EventDecryptor {
+    /**
+     * Events which we couldn't decrypt due to unknown sessions / indexes.
+     *
+     * Map from senderKey to sessionId to Set of MatrixEvents
+     */
+    private eventsPendingKey = new MapWithDefault<string, MapWithDefault<string, Set<MatrixEvent>>>(
+        () => new MapWithDefault<string, Set<MatrixEvent>>(() => new Set()),
+    );
+
+    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine) {}
+
+    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
+        logger.info("Attempting decryption of event", event);
+        // add the event to the pending list *before* attempting to decrypt.
+        // then, if the key turns up while decryption is in progress (and
+        // decryption fails), we will schedule a retry.
+        // (fixes https://github.com/vector-im/element-web/issues/5001)
+        this.addEventToPendingList(event);
+
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as RustSdkCryptoJs.DecryptedRoomEvent;
+
+        // Success. We can remove the event from the pending list, if
+        // that hasn't already happened.
+        this.removeEventFromPendingList(event);
+
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
+    }
+
+    /**
+     * Look for events which are waiting for a given megolm session
+     *
+     * Returns a list of events which were encrypted by `session` and could not be decrypted
+     *
+     * @param session -
+     */
+    public getEventsPendingRoomKey(session: RustSdkCryptoJs.RoomKeyInfo): MatrixEvent[] {
+        const senderPendingEvents = this.eventsPendingKey.get(session.senderKey.toBase64());
+        if (!senderPendingEvents) return [];
+
+        const sessionPendingEvents = senderPendingEvents.get(session.sessionId);
+        if (!sessionPendingEvents) return [];
+
+        const roomId = session.roomId.toString();
+        return [...sessionPendingEvents].filter((ev) => ev.getRoomId() === roomId);
+    }
+
+    /**
+     * Add an event to the list of those awaiting their session keys.
+     */
+    private addEventToPendingList(event: MatrixEvent): void {
+        const content = event.getWireContent();
+        const senderKey = content.sender_key;
+        const sessionId = content.session_id;
+
+        const senderPendingEvents = this.eventsPendingKey.getOrCreate(senderKey);
+        const sessionPendingEvents = senderPendingEvents.getOrCreate(sessionId);
+        sessionPendingEvents.add(event);
+    }
+
+    /**
+     * Remove an event from the list of those awaiting their session keys.
+     */
+    private removeEventFromPendingList(event: MatrixEvent): void {
+        const content = event.getWireContent();
+        const senderKey = content.sender_key;
+        const sessionId = content.session_id;
+
+        const senderPendingEvents = this.eventsPendingKey.get(senderKey);
+        if (!senderPendingEvents) return;
+
+        const sessionPendingEvents = senderPendingEvents.get(sessionId);
+        if (!sessionPendingEvents) return;
+
+        sessionPendingEvents.delete(event);
+
+        // also clean up the higher-level maps if they are now empty
+        if (sessionPendingEvents.size === 0) {
+            senderPendingEvents.delete(sessionId);
+            if (senderPendingEvents.size === 0) {
+                this.eventsPendingKey.delete(senderKey);
+            }
+        }
+    }
+}
+
+type RustCryptoEvents = CryptoEvent.VerificationRequestReceived | CryptoEvent.UserTrustStatusChanged;
+
+type RustCryptoEventMap = {
+    /**
+     * Fires when a key verification request is received.
+     */
+    [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
+
+    /**
+     * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
+     */
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserTrustLevel) => void;
+};

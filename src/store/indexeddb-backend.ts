@@ -19,7 +19,7 @@ import { IEvent, IStateEventWithRoomId, IStoredClientOpts, ISyncResponse } from 
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export interface IIndexedDBBackend {
-    connect(): Promise<void>;
+    connect(onClose?: () => void): Promise<void>;
     syncToDatabase(userTuples: UserTuple[]): Promise<void>;
     isNewlyCreated(): Promise<boolean>;
     setSyncData(syncData: ISyncResponse): Promise<void>;
@@ -35,6 +35,7 @@ export interface IIndexedDBBackend {
     saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void>;
     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
+    destroy(): Promise<void>;
 }
 
 export type UserTuple = [userId: string, presenceEvent: Partial<IEvent>];

@@ -25,6 +25,7 @@ import { IContent, MatrixEvent } from "../../../../src/models/event";
 import { MatrixClient } from "../../../../src/client";
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
+import { MapWithDefault } from "../../../../src/utils";
 
 type MockClient = MatrixClient & {
     popEvents: () => MatrixEvent[];
@@ -33,7 +34,9 @@ type MockClient = MatrixClient & {
 function makeMockClient(userId: string, deviceId: string): MockClient {
     let counter = 1;
     let events: MatrixEvent[] = [];
-    const deviceEvents: Record<string, Record<string, MatrixEvent[]>> = {};
+    const deviceEvents: MapWithDefault<string, MapWithDefault<string, MatrixEvent[]>> = new MapWithDefault(
+        () => new MapWithDefault(() => []),
+    );
     return {
         getUserId() {
             return userId;
@@ -58,15 +61,11 @@ function makeMockClient(userId: string, deviceId: string): MockClient {
             return Promise.resolve({ event_id: eventId });
         },
 
-        sendToDevice(type: string, msgMap: Record<string, Record<string, IContent>>) {
-            for (const userId of Object.keys(msgMap)) {
-                const deviceMap = msgMap[userId];
-                for (const deviceId of Object.keys(deviceMap)) {
-                    const content = deviceMap[deviceId];
+        sendToDevice(type: string, msgMap: Map<string, Map<string, IContent>>) {
+            for (const [userId, deviceMessages] of msgMap) {
+                for (const [deviceId, content] of deviceMessages) {
                     const event = new MatrixEvent({ content, type });
-                    deviceEvents[userId] = deviceEvents[userId] || {};
-                    deviceEvents[userId][deviceId] = deviceEvents[userId][deviceId] || [];
-                    deviceEvents[userId][deviceId].push(event);
+                    deviceEvents.getOrCreate(userId).getOrCreate(deviceId).push(event);
                 }
             }
             return Promise.resolve({});
@@ -79,14 +78,9 @@ function makeMockClient(userId: string, deviceId: string): MockClient {
             return e;
         },
 
-        // @ts-ignore special testing fn
         popDeviceEvents(userId: string, deviceId: string): MatrixEvent[] {
-            const forDevice = deviceEvents[userId];
-            const events = forDevice && forDevice[deviceId];
-            const result = events || [];
-            if (events) {
-                delete forDevice[deviceId];
-            }
+            const result = deviceEvents.get(userId)?.get(deviceId) || [];
+            deviceEvents?.get(userId)?.delete(deviceId);
             return result;
         },
     } as unknown as MockClient;

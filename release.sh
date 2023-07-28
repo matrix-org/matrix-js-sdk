@@ -130,7 +130,7 @@ fi
 # global cache here to ensure we get the right thing.
 yarn cache clean
 # Ensure all dependencies are updated
-yarn install --ignore-scripts --pure-lockfile
+yarn install --ignore-scripts --frozen-lockfile
 
 # ignore leading v on release
 release="${1#v}"
@@ -180,7 +180,7 @@ yarn version --no-git-tag-version --new-version "$release"
 # they exist). This small bit of gymnastics allows us to use the TypeScript
 # source directly for development without needing to build before linting or
 # testing.
-for i in main typings
+for i in main typings browser
 do
     lib_value=$(jq -r ".matrix_lib_$i" package.json)
     if [ "$lib_value" != "null" ]; then
@@ -225,7 +225,7 @@ if [ $dodist -eq 0 ]; then
     pushd "$builddir"
     git clone "$projdir" .
     git checkout "$rel_branch"
-    yarn install --pure-lockfile
+    yarn install --frozen-lockfile
     # We haven't tagged yet, so tell the dist script what version
     # it's building
     DIST_VERSION="$tag" yarn dist

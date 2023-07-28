@@ -129,7 +129,7 @@ describe("DeviceList", function () {
         });
     });
 
-    it("should have an outdated devicelist on an invalidation while an " + "update is in progress", function () {
+    it("should have an outdated devicelist on an invalidation while an update is in progress", async function () {
         const dl = createTestDeviceList();
 
         dl.startTrackingDeviceList("@test1:sw1v.org");
@@ -148,7 +148,8 @@ describe("DeviceList", function () {
         dl.invalidateUserDeviceList("@test1:sw1v.org");
         dl.refreshOutdatedDeviceLists();
 
-        dl.saveIfDirty()
+        await dl
+            .saveIfDirty()
             .then(() => {
                 // the first request completes
                 queryDefer1.resolve({
@@ -159,12 +160,13 @@ describe("DeviceList", function () {
                 });
                 return prom1;
             })
-            .then(() => {
+            .then(async () => {
                 // uh-oh; user restarts before second request completes. The new instance
                 // should know we never got a complete device list.
                 logger.log("Creating new devicelist to simulate app reload");
                 downloadSpy.mockReset();
                 const dl2 = createTestDeviceList();
+                await dl2.load();
                 const queryDefer3 = utils.defer<IDownloadKeyResult>();
                 downloadSpy.mockReturnValue(queryDefer3.promise);
 
@@ -196,7 +198,7 @@ describe("DeviceList", function () {
         downloadSpy.mockReturnValueOnce(queryDefer2.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
-        expect(downloadSpy).toBeCalledTimes(2);
+        expect(downloadSpy).toHaveBeenCalledTimes(2);
         expect(downloadSpy).toHaveBeenNthCalledWith(1, ["@test1:sw1v.org"], {});
         expect(downloadSpy).toHaveBeenNthCalledWith(2, ["@test2:sw1v.org"], {});
         queryDefer1.resolve(utils.deepCopy(signedDeviceList));

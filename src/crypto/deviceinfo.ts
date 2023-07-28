@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { ISignatures } from "../@types/signed";
+import { DeviceVerification } from "../models/device";
 
 export interface IDevice {
     keys: Record<string, string>;
@@ -25,14 +26,10 @@ export interface IDevice {
     signatures?: ISignatures;
 }
 
-enum DeviceVerification {
-    Blocked = -1,
-    Unverified = 0,
-    Verified = 1,
-}
-
 /**
  * Information about a user's device
+ *
+ * Superceded by {@link Device}.
  */
 export class DeviceInfo {
     /**

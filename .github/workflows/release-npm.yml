@@ -20,22 +20,20 @@ jobs:
                   registry-url: "https://registry.npmjs.org"
 
             - name: 🔨 Install dependencies
-              run: "yarn install --pure-lockfile"
+              run: "yarn install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@v1
+              uses: JS-DevTools/npm-publish@5a85faf05d2ade2d5b6682bfe5359915d5159c6c # v2.2.1
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public
                   tag: next
+                  ignore-scripts: false
 
             - name: 🎖️ Add `latest` dist-tag to final releases
-              if: github.event.release.prerelease == false
-              run: |
-                  package=$(cat package.json | jq -er .name)
-                  npm dist-tag add "$package@$release" latest
+              if: github.event.release.prerelease == false && steps.npm-publish.outputs.id
+              run: npm dist-tag add "$release" latest
               env:
-                  # JS-DevTools/npm-publish overrides `NODE_AUTH_TOKEN` with `INPUT_TOKEN` in .npmrc
-                  INPUT_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  release: ${{ steps.npm-publish.outputs.version }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  release: ${{ steps.npm-publish.outputs.id }}

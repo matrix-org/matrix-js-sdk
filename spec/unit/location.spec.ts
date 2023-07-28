@@ -22,7 +22,7 @@ import {
     M_TIMESTAMP,
     LocationEventWireContent,
 } from "../../src/@types/location";
-import { TEXT_NODE_TYPE } from "../../src/@types/extensible_events";
+import { M_TEXT } from "../../src/@types/extensible_events";
 import { MsgType } from "../../src/@types/event";
 
 describe("Location", function () {
@@ -32,7 +32,7 @@ describe("Location", function () {
         geo_uri: "geo:-36.24484561954707,175.46884959563613;u=10",
         [M_LOCATION.name]: { uri: "geo:-36.24484561954707,175.46884959563613;u=10", description: null },
         [M_ASSET.name]: { type: "m.self" },
-        [TEXT_NODE_TYPE.name]: "Location geo:-36.24484561954707,175.46884959563613;u=10 at 2022-03-09T11:01:52.443Z",
+        [M_TEXT.name]: "Location geo:-36.24484561954707,175.46884959563613;u=10 at 2022-03-09T11:01:52.443Z",
         [M_TIMESTAMP.name]: 1646823712443,
     } as any;
 
@@ -59,7 +59,7 @@ describe("Location", function () {
             description: undefined,
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Self });
-        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
+        expect(M_TEXT.findIn(loc)).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235435);
     });
 
@@ -74,7 +74,7 @@ describe("Location", function () {
             description: "desc",
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Pin });
-        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual('Location "desc" geo:bar at 1970-01-02T13:17:15.436Z');
+        expect(M_TEXT.findIn(loc)).toEqual('Location "desc" geo:bar at 1970-01-02T13:17:15.436Z');
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235436);
     });
 

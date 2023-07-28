@@ -34,7 +34,7 @@ import { IStoredClientOpts } from "../client";
  * Construct a stub store. This does no-ops on most store methods.
  */
 export class StubStore implements IStore {
-    public readonly accountData = {}; // stub
+    public readonly accountData = new Map(); // stub
     private fromToken: string | null = null;
 
     /** @returns whether or not the database was newly created in this session. */
@@ -189,7 +189,9 @@ export class StubStore implements IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    public save(): void {}
+    public save(): Promise<void> {
+        return Promise.resolve();
+    }
 
     /**
      * Startup does nothing.
@@ -263,5 +265,9 @@ export class StubStore implements IStore {
 
     public async removeToDeviceBatch(id: number): Promise<void> {
         return Promise.resolve();
+    }
+
+    public async destroy(): Promise<void> {
+        // Nothing to do
     }
 }

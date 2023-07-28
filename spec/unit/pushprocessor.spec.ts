@@ -1,6 +1,7 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { EventType, IContent, MatrixClient, MatrixEvent } from "../../src";
+import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName, RuleId } from "../../src";
+import { mockClientMethodsUser } from "../test-utils/client";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -10,6 +11,23 @@ describe("NotificationService", function () {
     let testEvent: MatrixEvent;
 
     let pushProcessor: PushProcessor;
+
+    const msc3914RoomCallRule = {
+        rule_id: ".org.matrix.msc3914.rule.room.call",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: "event_match",
+                key: "type",
+                pattern: "org.matrix.msc3401.call",
+            },
+            {
+                kind: "call_started",
+            },
+        ],
+        actions: ["notify", { set_tweak: "sound", value: "default" }],
+    };
 
     // These would be better if individual rules were configured in the tests themselves.
     const matrixClient = {
@@ -28,9 +46,8 @@ describe("NotificationService", function () {
                 },
             };
         },
-        credentials: {
-            userId: testUserId,
-        },
+        ...mockClientMethodsUser(testUserId),
+        supportsIntentionalMentions: () => true,
         pushRules: {
             device: {},
             global: {
@@ -80,51 +97,6 @@ describe("NotificationService", function () {
                         pattern: "foo*bar",
                         rule_id: "foobar",
                     },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "p[io]ng",
-                        rule_id: "pingpong",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "I ate [0-9] pies",
-                        rule_id: "pies",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "b[!ai]ke",
-                        rule_id: "bakebike",
-                    },
                 ],
                 override: [
                     {
@@ -163,26 +135,11 @@ describe("NotificationService", function () {
                         enabled: true,
                         rule_id: ".m.rule.room_one_to_one",
                     },
-                    {
-                        rule_id: ".org.matrix.msc3914.rule.room.call",
-                        default: true,
-                        enabled: true,
-                        conditions: [
-                            {
-                                kind: "event_match",
-                                key: "type",
-                                pattern: "org.matrix.msc3401.call",
-                            },
-                            {
-                                kind: "call_started",
-                            },
-                        ],
-                        actions: ["notify", { set_tweak: "sound", value: "default" }],
-                    },
                 ],
                 room: [],
                 sender: [],
                 underride: [
+                    msc3914RoomCallRule,
                     {
                         actions: ["dont-notify"],
                         conditions: [
@@ -287,30 +244,6 @@ describe("NotificationService", function () {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it("should bing on character group ([abc]) bing words.", function () {
-        testEvent.event.content!.body = "Ping!";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "Pong!";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    it("should bing on character range ([a-z]) bing words.", function () {
-        testEvent.event.content!.body = "I ate 6 pies";
-        const actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-    });
-
-    it("should bing on character negation ([!a]) bing words.", function () {
-        testEvent.event.content!.body = "boke";
-        let actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content!.body = "bake";
-        actions = pushProcessor.actionsForEvent(testEvent);
-        expect(actions.tweaks.highlight).toEqual(false);
-    });
-
     it("should not bing on room server ACL changes", function () {
         testEvent = utils.mkEvent({
             type: EventType.RoomServerAcl,
@@ -330,6 +263,8 @@ describe("NotificationService", function () {
     // invalid
 
     it("should gracefully handle bad input.", function () {
+        // The following body is an object (not a string) and thus is invalid
+        // for matching against.
         testEvent.event.content!.body = { foo: "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
@@ -492,5 +427,275 @@ describe("NotificationService", function () {
                 );
             });
         });
+    });
+
+    describe("Test exact event matching", () => {
+        it.each([
+            // Simple string matching.
+            { value: "bar", eventValue: "bar", expected: true },
+            // Matches are case-sensitive.
+            { value: "bar", eventValue: "BAR", expected: false },
+            // Matches must match the full string.
+            { value: "bar", eventValue: "barbar", expected: false },
+            // Values should not be type-coerced.
+            { value: "bar", eventValue: true, expected: false },
+            { value: "bar", eventValue: 1, expected: false },
+            { value: "bar", eventValue: false, expected: false },
+            // Boolean matching.
+            { value: true, eventValue: true, expected: true },
+            { value: false, eventValue: false, expected: true },
+            // Types should not be coerced.
+            { value: true, eventValue: "true", expected: false },
+            { value: true, eventValue: 1, expected: false },
+            { value: false, eventValue: null, expected: false },
+            // Null matching.
+            { value: null, eventValue: null, expected: true },
+            // Types should not be coerced
+            { value: null, eventValue: false, expected: false },
+            { value: null, eventValue: 0, expected: false },
+            { value: null, eventValue: "", expected: false },
+            { value: null, eventValue: undefined, expected: false },
+            // Compound values should never be matched.
+            { value: "bar", eventValue: ["bar"], expected: false },
+            { value: "bar", eventValue: { bar: true }, expected: false },
+            { value: true, eventValue: [true], expected: false },
+            { value: true, eventValue: { true: true }, expected: false },
+            { value: null, eventValue: [], expected: false },
+            { value: null, eventValue: {}, expected: false },
+        ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
+            matrixClient.pushRules! = {
+                global: {
+                    override: [
+                        {
+                            actions: [PushRuleActionName.Notify],
+                            conditions: [
+                                {
+                                    kind: ConditionKind.EventPropertyIs,
+                                    key: "content.foo",
+                                    value: value,
+                                },
+                            ],
+                            default: true,
+                            enabled: true,
+                            rule_id: ".m.rule.test",
+                        },
+                    ],
+                },
+            };
+
+            testEvent = utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    foo: eventValue,
+                },
+            });
+
+            const actions = pushProcessor.actionsForEvent(testEvent);
+            expect(!!actions?.notify).toBe(expected);
+        });
+    });
+
+    describe("Test event property contains", () => {
+        it.each([
+            // Simple string matching.
+            { value: "bar", eventValue: ["bar"], expected: true },
+            // Matches are case-sensitive.
+            { value: "bar", eventValue: ["BAR"], expected: false },
+            // Values should not be type-coerced.
+            { value: "bar", eventValue: [true], expected: false },
+            { value: "bar", eventValue: [1], expected: false },
+            { value: "bar", eventValue: [false], expected: false },
+            // Boolean matching.
+            { value: true, eventValue: [true], expected: true },
+            { value: false, eventValue: [false], expected: true },
+            // Types should not be coerced.
+            { value: true, eventValue: ["true"], expected: false },
+            { value: true, eventValue: [1], expected: false },
+            { value: false, eventValue: [null], expected: false },
+            // Null matching.
+            { value: null, eventValue: [null], expected: true },
+            // Types should not be coerced
+            { value: null, eventValue: [false], expected: false },
+            { value: null, eventValue: [0], expected: false },
+            { value: null, eventValue: [""], expected: false },
+            { value: null, eventValue: [undefined], expected: false },
+            // Non-array or empty values should never be matched.
+            { value: "bar", eventValue: "bar", expected: false },
+            { value: "bar", eventValue: { bar: true }, expected: false },
+            { value: true, eventValue: { true: true }, expected: false },
+            { value: true, eventValue: true, expected: false },
+            { value: null, eventValue: [], expected: false },
+            { value: null, eventValue: {}, expected: false },
+            { value: null, eventValue: null, expected: false },
+            { value: null, eventValue: undefined, expected: false },
+        ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
+            matrixClient.pushRules! = {
+                global: {
+                    override: [
+                        {
+                            actions: [PushRuleActionName.Notify],
+                            conditions: [
+                                {
+                                    kind: ConditionKind.EventPropertyContains,
+                                    key: "content.foo",
+                                    value: value,
+                                },
+                            ],
+                            default: true,
+                            enabled: true,
+                            rule_id: ".m.rule.test",
+                        },
+                    ],
+                },
+            };
+
+            testEvent = utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    foo: eventValue,
+                },
+            });
+
+            const actions = pushProcessor.actionsForEvent(testEvent);
+            expect(actions?.notify).toBe(expected ? true : undefined);
+        });
+    });
+
+    it.each([
+        // The properly escaped key works.
+        { key: "content.m\\.test.foo", pattern: "bar", expected: true },
+        // An unescaped version does not match.
+        { key: "content.m.test.foo", pattern: "bar", expected: false },
+        // Over escaping does not match.
+        { key: "content.m\\.test\\.foo", pattern: "bar", expected: false },
+        // Escaping backslashes should match.
+        { key: "content.m\\\\example", pattern: "baz", expected: true },
+        // An unnecessary escape sequence leaves the backslash and still matches.
+        { key: "content.m\\example", pattern: "baz", expected: true },
+    ])("test against escaped dotted paths '$key'", ({ key, pattern, expected }) => {
+        testEvent = utils.mkEvent({
+            type: "m.room.message",
+            room: testRoomId,
+            user: "@alfred:localhost",
+            event: true,
+            content: {
+                // A dot in the field name.
+                "m.test": { foo: "bar" },
+                // A backslash in a field name.
+                "m\\example": "baz",
+            },
+        });
+
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: key,
+                            pattern: pattern,
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(expected);
+    });
+
+    describe("getPushRuleById()", () => {
+        it("returns null when rule id is not in rule set", () => {
+            expect(pushProcessor.getPushRuleById("non-existant-rule")).toBeNull();
+        });
+
+        it("returns push rule when it is found in rule set", () => {
+            expect(pushProcessor.getPushRuleById(".org.matrix.msc3914.rule.room.call")).toEqual(msc3914RoomCallRule);
+        });
+    });
+
+    describe("getPushRuleAndKindById()", () => {
+        it("returns null when rule id is not in rule set", () => {
+            expect(pushProcessor.getPushRuleAndKindById("non-existant-rule")).toBeNull();
+        });
+
+        it("returns push rule when it is found in rule set", () => {
+            expect(pushProcessor.getPushRuleAndKindById(".org.matrix.msc3914.rule.room.call")).toEqual({
+                kind: "underride",
+                rule: msc3914RoomCallRule,
+            });
+        });
+    });
+
+    describe("test intentional mentions behaviour", () => {
+        it.each([RuleId.ContainsUserName, RuleId.ContainsDisplayName, RuleId.AtRoomNotification])(
+            "Rule %s matches unless intentional mentions are enabled",
+            (ruleId) => {
+                const rule = {
+                    rule_id: ruleId,
+                    actions: [],
+                    conditions: [],
+                    default: false,
+                    enabled: true,
+                };
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(true);
+
+                // Add the mentions property to the event and the rule is now disabled.
+                testEvent = utils.mkEvent({
+                    type: "m.room.message",
+                    room: testRoomId,
+                    user: "@alfred:localhost",
+                    event: true,
+                    content: {
+                        "body": "",
+                        "msgtype": "m.text",
+                        "m.mentions": {},
+                    },
+                });
+
+                expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(false);
+            },
+        );
+    });
+});
+
+describe("Test PushProcessor.partsForDottedKey", function () {
+    it.each([
+        // A field with no dots.
+        ["m", ["m"]],
+        // Simple dotted fields.
+        ["m.foo", ["m", "foo"]],
+        ["m.foo.bar", ["m", "foo", "bar"]],
+        // Backslash is used as an escape character.
+        ["m\\.foo", ["m.foo"]],
+        ["m\\\\.foo", ["m\\", "foo"]],
+        ["m\\\\\\.foo", ["m\\.foo"]],
+        ["m\\\\\\\\.foo", ["m\\\\", "foo"]],
+        ["m\\foo", ["m\\foo"]],
+        ["m\\\\foo", ["m\\foo"]],
+        ["m\\\\\\foo", ["m\\\\foo"]],
+        ["m\\\\\\\\foo", ["m\\\\foo"]],
+        // Ensure that escapes at the end don't cause issues.
+        ["m.foo\\", ["m", "foo\\"]],
+        ["m.foo\\\\", ["m", "foo\\"]],
+        ["m.foo\\.", ["m", "foo."]],
+        ["m.foo\\\\.", ["m", "foo\\", ""]],
+        ["m.foo\\\\\\.", ["m", "foo\\."]],
+        // Empty parts (corresponding to properties which are an empty string) are allowed.
+        [".m", ["", "m"]],
+        ["..m", ["", "", "m"]],
+        ["m.", ["m", ""]],
+        ["m..", ["m", "", ""]],
+        ["m..foo", ["m", "", "foo"]],
+    ])("partsFotDottedKey for %s", (path: string, expected: string[]) => {
+        expect(PushProcessor.partsForDottedKey(path)).toStrictEqual(expected);
     });
 });

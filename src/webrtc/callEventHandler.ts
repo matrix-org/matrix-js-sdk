@@ -131,7 +131,7 @@ export class CallEventHandler {
             try {
                 await this.handleCallEvent(event);
             } catch (e) {
-                logger.error("Caught exception handling call event", e);
+                logger.error("CallEventHandler evaluateEventBuffer() caught exception handling call event", e);
             }
         }
     }
@@ -207,20 +207,26 @@ export class CallEventHandler {
             groupCall = this.client.groupCallEventHandler!.getGroupCallById(groupCallId);
 
             if (!groupCall) {
-                logger.warn(`Cannot find a group call ${groupCallId} for event ${type}. Ignoring event.`);
+                logger.warn(
+                    `CallEventHandler handleCallEvent() could not find a group call - ignoring event (groupCallId=${groupCallId}, type=${type})`,
+                );
                 return;
             }
 
             opponentDeviceId = content.device_id;
 
             if (!opponentDeviceId) {
-                logger.warn(`Cannot find a device id for ${senderId}. Ignoring event.`);
+                logger.warn(
+                    `CallEventHandler handleCallEvent() could not find a device id - ignoring event (senderId=${senderId})`,
+                );
                 groupCall.emit(GroupCallEvent.Error, new GroupCallUnknownDeviceError(senderId));
                 return;
             }
 
             if (content.dest_session_id !== this.client.getSessionId()) {
-                logger.warn("Call event does not match current session id, ignoring.");
+                logger.warn(
+                    "CallEventHandler handleCallEvent() call event does not match current session id - ignoring",
+                );
                 return;
             }
         }
@@ -240,8 +246,8 @@ export class CallEventHandler {
             if (call && call.state === CallState.Ended) return;
 
             if (call) {
-                logger.log(
-                    `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` + `invite. Clobbering.`,
+                logger.warn(
+                    `CallEventHandler handleCallEvent() already has a call but got an invite - clobbering (callId=${content.call_id})`,
                 );
             }
 
@@ -250,7 +256,9 @@ export class CallEventHandler {
             }
 
             const timeUntilTurnCresExpire = (this.client.getTurnServersExpiry() ?? 0) - Date.now();
-            logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
+            logger.info(
+                "CallEventHandler handleCallEvent() current turn creds expire in " + timeUntilTurnCresExpire + " ms",
+            );
             call =
                 createNewMatrixCall(this.client, callRoomId, {
                     forceTURN: this.client.forceTURN,
@@ -259,7 +267,9 @@ export class CallEventHandler {
                     opponentSessionId: content.sender_session_id,
                 }) ?? undefined;
             if (!call) {
-                logger.log("Incoming call ID " + content.call_id + " but this client " + "doesn't support WebRTC");
+                logger.log(
+                    `CallEventHandler handleCallEvent() this client does not support WebRTC (callId=${content.call_id})`,
+                );
                 // don't hang up the call: there could be other clients
                 // connected that do support WebRTC and declining the
                 // the call on their behalf would be really annoying.
@@ -267,6 +277,11 @@ export class CallEventHandler {
             }
 
             call.callId = content.call_id;
+            const stats = groupCall?.getGroupCallStats();
+            if (stats) {
+                call.initStats(stats);
+            }
+
             try {
                 await call.initWithInvite(event);
             } catch (e) {
@@ -308,18 +323,12 @@ export class CallEventHandler {
             if (existingCall) {
                 if (existingCall.callId > call.callId) {
                     logger.log(
-                        "Glare detected: answering incoming call " +
-                            call.callId +
-                            " and canceling outgoing call " +
-                            existingCall.callId,
+                        `CallEventHandler handleCallEvent() detected glare - answering incoming call and canceling outgoing call (incomingId=${call.callId}, outgoingId=${existingCall.callId})`,
                     );
                     existingCall.replacedBy(call);
                 } else {
                     logger.log(
-                        "Glare detected: rejecting incoming call " +
-                            call.callId +
-                            " and keeping outgoing call " +
-                            existingCall.callId,
+                        `CallEventHandler handleCallEvent() detected glare - hanging up incoming call (incomingId=${call.callId}, outgoingId=${existingCall.callId})`,
                     );
                     call.hangup(CallErrorCode.Replaced, true);
                 }
@@ -376,7 +385,9 @@ export class CallEventHandler {
 
         // The following events need a call and a peer connection
         if (!call || !call.hasPeerConnection) {
-            logger.info(`Discarding possible call event ${event.getId()} as we don't have a call/peerConn`, type);
+            logger.info(
+                `CallEventHandler handleCallEvent() discarding possible call event as we don't have a call (type=${type})`,
+            );
             return;
         }
         // Ignore remote echo

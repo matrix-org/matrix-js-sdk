@@ -15,9 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig } from "./client";
+import { SigningKey } from "oidc-client-ts";
+
+import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions, M_AUTHENTICATION } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
+import { discoverAndValidateAuthenticationConfig } from "./oidc/discovery";
+import {
+    ValidatedIssuerConfig,
+    ValidatedIssuerMetadata,
+    validateOIDCIssuerWellKnown,
+    validateWellKnownAuthentication,
+} from "./oidc/validate";
+import { OidcError } from "./oidc/error";
 import { MINIMUM_MATRIX_VERSION } from "./version-support";
 
 // Dev note: Auto discovery is part of the spec.
@@ -46,14 +56,32 @@ enum AutoDiscoveryError {
     //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
 
-interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
+interface AutoDiscoveryState {
     state: AutoDiscoveryAction;
     error?: IWellKnownConfig["error"] | null;
 }
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error">, AutoDiscoveryState {}
 
-interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
+/**
+ * @deprecated in favour of OidcClientConfig
+ */
+interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig, AutoDiscoveryState {}
+
+/**
+ * @experimental
+ */
+export interface OidcClientConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
+    metadata: ValidatedIssuerMetadata;
+    signingKeys?: SigningKey[];
+}
+
+export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
+    /**
+     * @experimental
+     */
+    "m.authentication"?: (OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState;
 }
 
 /**
@@ -148,7 +176,7 @@ export class AutoDiscovery {
             },
         };
 
-        if (!wellknown || !wellknown["m.homeserver"]) {
+        if (!wellknown?.["m.homeserver"]) {
             logger.error("No m.homeserver key in config");
 
             clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
@@ -176,7 +204,7 @@ export class AutoDiscovery {
         }
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
+        const hsVersions = await this.fetchWellKnownObject<IServerVersions>(`${hsUrl}/_matrix/client/versions`);
         if (!hsVersions || !Array.isArray(hsVersions.raw?.["versions"])) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
@@ -232,9 +260,9 @@ export class AutoDiscovery {
 
             // Step 5b: Verify there is an identity server listening on the provided
             // URL.
-            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/api/v1`);
+            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/v2`);
             if (!isResponse?.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
-                logger.error("Invalid /api/v1 response");
+                logger.error("Invalid /v2 response");
                 failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
 
                 // Supply the base_url to the caller because they may be ignoring
@@ -274,8 +302,105 @@ export class AutoDiscovery {
             }
         });
 
+        const authConfig = await this.discoverAndValidateAuthenticationConfig(wellknown);
+        clientConfig[M_AUTHENTICATION.stable!] = authConfig;
+
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
+    }
+
+    /**
+     * Validate delegated auth configuration
+     * @deprecated use discoverAndValidateAuthenticationConfig
+     * - m.authentication config is present and valid
+     * - delegated auth issuer openid-configuration is reachable
+     * - delegated auth issuer openid-configuration is configured correctly for us
+     * When successful, DelegatedAuthConfig will be returned with endpoints used for delegated auth
+     * Any errors are caught, and AutoDiscoveryState returned with error
+     * @param wellKnown - configuration object as returned
+     * by the .well-known auto-discovery endpoint
+     * @returns Config or failure result
+     */
+    public static async validateDiscoveryAuthenticationConfig(
+        wellKnown: IClientWellKnown,
+    ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {
+        try {
+            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
+            const homeserverAuthenticationConfig = validateWellKnownAuthentication(authentication);
+
+            const issuerOpenIdConfigUrl = `${this.sanitizeWellKnownUrl(
+                homeserverAuthenticationConfig.issuer,
+            )}/.well-known/openid-configuration`;
+            const issuerWellKnown = await this.fetchWellKnownObject<unknown>(issuerOpenIdConfigUrl);
+
+            if (issuerWellKnown.action !== AutoDiscoveryAction.SUCCESS) {
+                logger.error("Failed to fetch issuer openid configuration");
+                throw new Error(OidcError.General);
+            }
+
+            const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown.raw);
+
+            const delegatedAuthConfig: DelegatedAuthConfig = {
+                state: AutoDiscoveryAction.SUCCESS,
+                error: null,
+                ...homeserverAuthenticationConfig,
+                ...validatedIssuerConfig,
+            };
+            return delegatedAuthConfig;
+        } catch (error) {
+            const errorMessage = (error as Error).message as unknown as OidcError;
+            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
+
+            const state =
+                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
+
+            return {
+                state,
+                error: errorType,
+            };
+        }
+    }
+
+    /**
+     * Validate delegated auth configuration
+     * - m.authentication config is present and valid
+     * - delegated auth issuer openid-configuration is reachable
+     * - delegated auth issuer openid-configuration is configured correctly for us
+     * When successful, validated authentication metadata and optionally signing keys will be returned
+     * Any errors are caught, and AutoDiscoveryState returned with error
+     * @param wellKnown - configuration object as returned
+     * by the .well-known auto-discovery endpoint
+     * @returns Config or failure result
+     */
+    public static async discoverAndValidateAuthenticationConfig(
+        wellKnown: IClientWellKnown,
+    ): Promise<(OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState> {
+        try {
+            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
+            const result = await discoverAndValidateAuthenticationConfig(authentication);
+
+            // include this for backwards compatibility
+            const validatedIssuerConfig = validateOIDCIssuerWellKnown(result.metadata);
+
+            const response = {
+                state: AutoDiscoveryAction.SUCCESS,
+                error: null,
+                ...validatedIssuerConfig,
+                ...result,
+            };
+            return response;
+        } catch (error) {
+            const errorMessage = (error as Error).message as unknown as OidcError;
+            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
+
+            const state =
+                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
+
+            return {
+                state,
+                error: errorType,
+            };
+        }
     }
 
     /**
@@ -326,7 +451,8 @@ export class AutoDiscovery {
 
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
-        const wellknown = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
+        const domainWithProtocol = domain.includes("://") ? domain : `https://${domain}`;
+        const wellknown = await this.fetchWellKnownObject(`${domainWithProtocol}/.well-known/matrix/client`);
         if (!wellknown || wellknown.action !== AutoDiscoveryAction.SUCCESS) {
             logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
@@ -363,7 +489,7 @@ export class AutoDiscovery {
 
         const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!response) return {};
-        return response.raw || {};
+        return response.raw ?? {};
     }
 
     /**
@@ -430,7 +556,9 @@ export class AutoDiscovery {
      * @returns Promise which resolves to the returned state.
      * @internal
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+    private static async fetchWellKnownObject<T = IWellKnownConfig>(
+        url: string,
+    ): Promise<IWellKnownConfig<Partial<T>>> {
         let response: Response;
 
         try {

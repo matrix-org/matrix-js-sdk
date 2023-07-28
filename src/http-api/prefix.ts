@@ -35,11 +35,6 @@ export enum ClientPrefix {
 
 export enum IdentityPrefix {
     /**
-     * URI path for v1 of the identity API
-     * @deprecated Use v2.
-     */
-    V1 = "/_matrix/identity/api/v1",
-    /**
      * URI path for the v2 identity API
      */
     V2 = "/_matrix/identity/v2",

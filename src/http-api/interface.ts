@@ -16,6 +16,8 @@ limitations under the License.
 
 import { MatrixError } from "./errors";
 
+export type Body = Record<string, any> | BodyInit;
+
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 
@@ -31,7 +33,7 @@ export interface IHttpOpts {
     localTimeoutMs?: number;
 }
 
-export interface IRequestOpts {
+export interface IRequestOpts extends Pick<RequestInit, "priority"> {
     /**
      * The alternative base url to use.
      * If not specified, uses this.opts.baseUrl

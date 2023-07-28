@@ -456,6 +456,7 @@ describe("MegolmBackup", function () {
                     client.http.authedRequest = function (method, path, queryParams, data, opts): any {
                         ++numCalls;
                         expect(numCalls).toBeLessThanOrEqual(2);
+                        /* eslint-disable jest/no-conditional-expect */
                         if (numCalls === 1) {
                             expect(method).toBe("POST");
                             expect(path).toBe("/room_keys/version");
@@ -482,6 +483,7 @@ describe("MegolmBackup", function () {
                             reject(new Error("authedRequest called too many times"));
                             return Promise.resolve({});
                         }
+                        /* eslint-enable jest/no-conditional-expect */
                     };
                 }),
                 client.createKeyBackupVersion({

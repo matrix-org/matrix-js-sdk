@@ -33,6 +33,7 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
+    RoomPredecessor = "org.matrix.msc3946.room_predecessor",
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
@@ -61,11 +62,12 @@ export enum EventType {
     KeyVerificationDone = "m.key.verification.done",
     KeyVerificationKey = "m.key.verification.key",
     KeyVerificationAccept = "m.key.verification.accept",
-    // XXX this event is not yet supported by js-sdk
+    // Not used directly - see READY_TYPE in VerificationRequest.
     KeyVerificationReady = "m.key.verification.ready",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
     Reaction = "m.reaction",
+    PollStart = "org.matrix.msc3381.poll.start",
 
     // Room ephemeral events
     Typing = "m.typing",
@@ -166,11 +168,11 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
 
 /**
- * Name of the "with_relations" request property for relation based redactions.
+ * Name of the request property for relation based redactions.
  * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
  */
 export const MSC3912_RELATION_BASED_REDACTIONS_PROP = new UnstableValue(
-    "with_relations",
+    "with_rel_types",
     "org.matrix.msc3912.with_relations",
 );
 
@@ -232,6 +234,13 @@ export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
     "m.local_notification_settings",
     "org.matrix.msc3890.local_notification_settings",
 );
+
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/4023
+ *
+ * @experimental
+ */
+export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matrix.msc4023.thread_id");
 
 export interface IEncryptedFile {
     url: string;

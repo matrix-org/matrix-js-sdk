@@ -721,13 +721,17 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 
+        const eventId = event.getId()!;
+        this.relations.aggregateParentEvent(event);
+        this.relations.aggregateChildEvent(event, this);
+
         // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
         // threaded message should not be in the main timeline).
         //
         // We can only run this check for timelines with a `room` because `canContain`
         // requires it
         if (this.room && !this.canContain(event)) {
-            let eventDebugString = `event=${event.getId()}`;
+            let eventDebugString = `event=${eventId}`;
             if (event.threadRootId) {
                 eventDebugString += `(belongs to thread=${event.threadRootId})`;
             }
@@ -738,7 +742,6 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return;
         }
 
-        const eventId = event.getId()!;
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,
@@ -746,14 +749,99 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         });
         this._eventIdToTimeline.set(eventId, timeline);
 
-        this.relations.aggregateParentEvent(event);
-        this.relations.aggregateChildEvent(event, this);
-
         const data: IRoomTimelineData = {
             timeline: timeline,
             liveEvent: !toStartOfTimeline && timeline == this.liveTimeline && !fromCache,
         };
         this.emit(RoomEvent.Timeline, event, this.room, Boolean(toStartOfTimeline), false, data);
+    }
+
+    /**
+     * Insert event to the given timeline, and emit Room.timeline. Assumes
+     * we have already checked we don't know about this event.
+     *
+     * TEMPORARY: until we have recursive relations, we need this function
+     * to exist to allow us to insert events in timeline order, which is our
+     * best guess for Sync Order.
+     * This is a copy of addEventToTimeline above, modified to insert the event
+     * after the event it relates to, and before any event with a later
+     * timestamp. This is our best guess at Sync Order.
+     *
+     * Will fire "Room.timeline" for each event added.
+     *
+     * @internal
+     *
+     * @param options - addEventToTimeline options
+     *
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
+     */
+    public insertEventIntoTimeline(event: MatrixEvent, timeline: EventTimeline, roomState: RoomState): void {
+        if (timeline.getTimelineSet() !== this) {
+            throw new Error(`EventTimelineSet.insertEventIntoTimeline: Timeline=${timeline.toString()} does not belong " +
+                "in timelineSet(threadId=${this.thread?.id})`);
+        }
+
+        const eventId = event.getId()!;
+        this.relations.aggregateParentEvent(event);
+        this.relations.aggregateChildEvent(event, this);
+
+        // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
+        // threaded message should not be in the main timeline).
+        //
+        // We can only run this check for timelines with a `room` because `canContain`
+        // requires it
+        if (this.room && !this.canContain(event)) {
+            let eventDebugString = `event=${eventId}`;
+            if (event.threadRootId) {
+                eventDebugString += `(belongs to thread=${event.threadRootId})`;
+            }
+            logger.warn(
+                `EventTimelineSet.insertEventIntoTimeline: Ignoring ${eventDebugString} that does not belong ` +
+                    `in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`,
+            );
+            return;
+        }
+
+        // Find the event that this event is related to - the "parent"
+        const parentEventId = event.relationEventId;
+        if (!parentEventId) {
+            // Not related to anything - we just append
+            this.addEventToTimeline(event, timeline, {
+                toStartOfTimeline: false,
+                fromCache: false,
+                timelineWasEmpty: false,
+                roomState,
+            });
+            return;
+        }
+
+        const parentEvent = this.findEventById(parentEventId);
+
+        const timelineEvents = timeline.getEvents();
+
+        // Start searching from the parent event, or if it's not loaded, start
+        // at the beginning and insert purely using timestamp order.
+        const parentIndex = parentEvent !== undefined ? timelineEvents.indexOf(parentEvent) : 0;
+        let insertIndex = parentIndex;
+        for (; insertIndex < timelineEvents.length; insertIndex++) {
+            const nextEvent = timelineEvents[insertIndex];
+            if (nextEvent.getTs() > event.getTs()) {
+                // We found an event later than ours, so insert before that.
+                break;
+            }
+        }
+        // If we got to the end of the loop, insertIndex points at the end of
+        // the list.
+
+        timeline.insertEvent(event, insertIndex, roomState);
+        this._eventIdToTimeline.set(eventId, timeline);
+
+        const data: IRoomTimelineData = {
+            timeline: timeline,
+            liveEvent: timeline == this.liveTimeline,
+        };
+        this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }
 
     /**
@@ -896,11 +984,20 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const { threadId, shouldLiveInRoom } = this.room.eventShouldLiveIn(event);
+        const { threadId, shouldLiveInRoom, shouldLiveInThread } = this.room.eventShouldLiveIn(event);
 
         if (this.thread) {
             return this.thread.id === threadId;
         }
+
+        if (!shouldLiveInRoom && !shouldLiveInThread) {
+            logger.warn(
+                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${
+                    this.room?.roomId
+                } eventId=${event.getId()} threadId=${event.threadRootId}`,
+            );
+        }
+
         return shouldLiveInRoom;
     }
 }

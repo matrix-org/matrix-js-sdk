@@ -25,6 +25,7 @@ import {
     CallType,
     CallState,
     CallParty,
+    CallDirection,
 } from "../../../src/webrtc/call";
 import {
     MCallAnswer,
@@ -40,7 +41,9 @@ import {
     MockMediaStreamTrack,
     installWebRTCMocks,
     MockRTCPeerConnection,
+    MockRTCRtpTransceiver,
     SCREENSHARE_STREAM_ID,
+    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
@@ -429,6 +432,58 @@ describe("Call", function () {
         expect(transceivers.get("m.usermedia:video")!.sender.track!.id).toBe("usermedia_video_track");
     });
 
+    it("should handle error on call upgrade", async () => {
+        const onError = jest.fn();
+        call.on(CallEvent.Error, onError);
+
+        await startVoiceCall(client, call);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        const mockGetUserMediaStream = jest.fn().mockRejectedValue(new Error("Test error"));
+        client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        expect(onError).toHaveBeenCalled();
+    });
+
+    it("should unmute video after upgrading to video call", async () => {
+        // Regression test for https://github.com/vector-im/element-call/issues/925
+        await startVoiceCall(client, call);
+        // start off with video muted
+        await call.setLocalVideoMuted(true);
+
+        await call.onAnswerReceived(
+            makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: "party_id",
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+                [SDPStreamMetadataKey]: {},
+            }),
+        );
+
+        // then unmute which should cause an upgrade
+        await call.setLocalVideoMuted(false);
+
+        // video should now be unmuted
+        expect(call.isLocalVideoMuted()).toBe(false);
+    });
+
     it("should handle SDPStreamMetadata changes", async () => {
         await startVoiceCall(client, call);
 
@@ -536,8 +591,15 @@ describe("Call", function () {
         it("if local video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
+            // since this is testing for the presence of a local sender, we need to add a transciever
+            // rather than just a source track
+            const mockTrack = new MockMediaStreamTrack("track_id", "video");
+            const mockTransceiver = new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection);
+            mockTransceiver.sender = new MockRTCRtpSender(mockTrack) as unknown as RTCRtpSender;
+            (call as any).transceivers.set("m.usermedia:video", mockTransceiver);
+
             (call as any).pushNewLocalFeed(
-                new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
+                new MockMediaStream("remote_stream1", [mockTrack]),
                 SDPStreamMetadataPurpose.Usermedia,
                 false,
             );
@@ -703,9 +765,20 @@ describe("Call", function () {
 
         const dataChannel = call.createDataChannel("data_channel_label", { id: 123 });
 
-        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel);
+        expect(dataChannelCallback).toHaveBeenCalledWith(dataChannel, call);
         expect(dataChannel.label).toBe("data_channel_label");
         expect(dataChannel.id).toBe(123);
+    });
+
+    it("should emit a data channel event when the other side adds a data channel", async () => {
+        await startVoiceCall(client, call);
+
+        const dataChannelCallback = jest.fn();
+        call.on(CallEvent.DataChannel, dataChannelCallback);
+
+        (call.peerConn as unknown as MockRTCPeerConnection).triggerIncomingDataChannel();
+
+        expect(dataChannelCallback).toHaveBeenCalled();
     });
 
     describe("supportsMatrixCall", () => {
@@ -829,6 +902,55 @@ describe("Call", function () {
             await startVideoCall(client, call);
         });
 
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should not remove video sender on video mute", async () => {
+            await call.setLocalVideoMuted(true);
+            expect((call as any).hasUserMediaVideoSender).toBe(true);
+        });
+
+        it("should release camera after short delay on video mute", async () => {
+            jest.useFakeTimers();
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            expect(call.hasLocalUserMediaVideoTrack).toBe(false);
+        });
+
+        it("should re-request video feed on video unmute if it doesn't have one", async () => {
+            jest.useFakeTimers();
+
+            const mockGetUserMediaStream = jest
+                .fn()
+                .mockReturnValue(client.client.getMediaHandler().getUserMediaStream(true, true));
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).toHaveBeenCalled();
+        });
+
+        it("should not release camera on fast mute and unmute", async () => {
+            const mockGetUserMediaStream = jest.fn();
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).not.toHaveBeenCalled();
+            expect(call.hasLocalUserMediaVideoTrack).toBe(true);
+        });
+
         describe("sending sdp_stream_metadata_changed events", () => {
             it("should send sdp_stream_metadata_changed when muting audio", async () => {
                 await call.setMicrophoneMuted(true);
@@ -932,14 +1054,7 @@ describe("Call", function () {
 
             mockSendEvent.mockReset();
 
-            let caught = false;
-            try {
-                call.reject();
-            } catch (e) {
-                caught = true;
-            }
-
-            expect(caught).toEqual(true);
+            expect(() => call.reject()).toThrow();
             expect(client.client.sendEvent).not.toHaveBeenCalled();
 
             call.hangup(CallErrorCode.UserHangup, true);
@@ -1385,7 +1500,7 @@ describe("Call", function () {
                 }),
             );
             // @ts-ignore Mock
-            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
+            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transferred, true);
         });
     });
 
@@ -1492,7 +1607,7 @@ describe("Call", function () {
     it("throws when there is no error listener", async () => {
         call.off(CallEvent.Error, errorListener);
 
-        expect(call.placeVoiceCall()).rejects.toThrow();
+        await expect(call.placeVoiceCall()).rejects.toThrow();
     });
 
     describe("hasPeerConnection()", () => {
@@ -1521,7 +1636,7 @@ describe("Call", function () {
             hasAdvancedBy += advanceBy;
 
             expect(lengthChangedListener).toHaveBeenCalledTimes(hasAdvancedBy);
-            expect(lengthChangedListener).toBeCalledWith(hasAdvancedBy);
+            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy, call);
         }
     });
 
@@ -1531,16 +1646,36 @@ describe("Call", function () {
         beforeEach(async () => {
             jest.useFakeTimers();
             jest.spyOn(call, "hangup");
-
             await fakeIncomingCall(client, call, "1");
 
             mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
             mockPeerConn.iceConnectionState = "disconnected";
             mockPeerConn.iceConnectionStateChangeListener!();
+            jest.spyOn(mockPeerConn, "restartIce");
+        });
+
+        it("should restart ICE gathering after being disconnected for 2 seconds", () => {
+            jest.advanceTimersByTime(3 * 1000);
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
         });
 
         it("should hang up after being disconnected for 30 seconds", () => {
             jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
+        it("should restart ICE gathering once again after ICE being failed", () => {
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
+        });
+
+        it("should call hangup after ICE being failed and if there not exists a restartIce method", () => {
+            // @ts-ignore
+            mockPeerConn.restartIce = null;
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
             expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
         });
 
@@ -1549,6 +1684,132 @@ describe("Call", function () {
             mockPeerConn.iceConnectionStateChangeListener!();
             jest.advanceTimersByTime(31 * 1000);
             expect(call.hangup).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("Call replace", () => {
+        it("Fires event when call replaced", async () => {
+            const onReplace = jest.fn();
+            call.on(CallEvent.Replaced, onReplace);
+
+            await call.placeVoiceCall();
+
+            const call2 = new MatrixCall({
+                client: client.client,
+                roomId: FAKE_ROOM_ID,
+            });
+            call2.on(CallEvent.Error, errorListener);
+            await fakeIncomingCall(client, call2);
+
+            call.replacedBy(call2);
+
+            expect(onReplace).toHaveBeenCalled();
+        });
+    });
+    describe("should handle glare in negotiation process", () => {
+        beforeEach(async () => {
+            // cut methods not want to test
+            call.hangup = () => null;
+            call.isLocalOnHold = () => true;
+            // @ts-ignore
+            call.updateRemoteSDPStreamMetadata = jest.fn();
+            // @ts-ignore
+            call.getRidOfRTXCodecs = jest.fn();
+            // @ts-ignore
+            call.createAnswer = jest.fn().mockResolvedValue({});
+            // @ts-ignore
+            call.sendVoipEvent = jest.fn();
+        });
+
+        it("and reject remote offer if not polite and have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).not.toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do have pending answer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have not a local offer
+            // @ts-ignore
+            call.makingOffer = false;
+
+            // If we have a setRemoteDescription() answer operation pending, then
+            // we will be "stable" by the time the next setRemoteDescription() is
+            // executed, so we count this being readyForOffer when deciding whether to
+            // ignore the offer.
+            // @ts-ignore
+            call.isSettingRemoteAnswerPending = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do not have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have no local offer
+            // @ts-ignore
+            call.makingOffer = false;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "stable",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and if polite do rollback pending local offer", async () => {
+            // polite user == CallDirection.Inbound
+            call.direction = CallDirection.Inbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
         });
     });
 });

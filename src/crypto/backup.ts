@@ -25,7 +25,7 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
-import { sleep } from "../utils";
+import { safeSet, sleep } from "../utils";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { encodeRecoveryKey } from "./recoverykey";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
@@ -40,6 +40,7 @@ import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
+import { BackupTrustInfo } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -54,6 +55,7 @@ type SigInfo = {
     deviceTrust?: DeviceTrustLevel;
 };
 
+/** @deprecated Prefer {@link BackupTrustInfo} */
 export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
@@ -118,10 +120,19 @@ export class BackupManager {
     public checkedForBackup: boolean; // Have we checked the server for a backup we can use?
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+    // The backup manager will schedule backup of keys when active (`scheduleKeyBackupSend`), this allows cancel when client is stopped
+    private clientRunning = true;
 
     public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
+    }
+
+    /**
+     * Stop the backup manager from backing up keys and allow a clean shutdown.
+     */
+    public stop(): void {
+        this.clientRunning = false;
     }
 
     public get version(): string | undefined {
@@ -439,6 +450,10 @@ export class BackupManager {
             // the same time when a new key is sent
             const delay = Math.random() * maxDelay;
             await sleep(delay);
+            if (!this.clientRunning) {
+                logger.debug("Key backup send aborted, client stopped");
+                return;
+            }
             let numFailures = 0; // number of consecutive failures
             for (;;) {
                 if (!this.algorithm) {
@@ -473,6 +488,11 @@ export class BackupManager {
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
+
+                if (!this.clientRunning) {
+                    logger.debug("Key backup send loop aborted, client stopped");
+                    return;
+                }
             }
         } finally {
             this.sendingBackups = false;
@@ -498,9 +518,7 @@ export class BackupManager {
         const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
             const roomId = session.sessionData!.room_id;
-            if (rooms[roomId] === undefined) {
-                rooms[roomId] = { sessions: {} };
-            }
+            safeSet(rooms, roomId, rooms[roomId] || { sessions: {} });
 
             const sessionData = this.baseApis.crypto!.olmDevice.exportInboundGroupSession(
                 session.senderKey,
@@ -517,12 +535,12 @@ export class BackupManager {
                 undefined;
             const verified = this.baseApis.crypto!.checkDeviceInfoTrust(userId!, device).isVerified();
 
-            rooms[roomId]["sessions"][session.sessionId] = {
+            safeSet(rooms[roomId]["sessions"], session.sessionId, {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
                 session_data: await this.algorithm!.encryptSession(sessionData),
-            };
+            });
         }
 
         await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo!.version, { rooms });
@@ -813,3 +831,15 @@ export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
 };
 
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
+
+/**
+ * Map a legacy {@link TrustInfo} into a new-style {@link BackupTrustInfo}.
+ *
+ * @param trustInfo - trustInfo to convert
+ */
+export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): BackupTrustInfo {
+    return {
+        trusted: trustInfo.usable,
+        matchesDecryptionKey: trustInfo.trusted_locally ?? false,
+    };
+}

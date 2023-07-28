@@ -102,9 +102,10 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
             const info = new CrossSigningInfo(userId, { getCrossSigningKey }, { getCrossSigningKeyCache });
             const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
             expect(pubKey).toEqual(masterKeyPub);
-            expect(getCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
+            expect(getCrossSigningKeyCache).toHaveBeenCalledTimes(shouldCache ? 1 : 0);
             if (shouldCache) {
-                expect(getCrossSigningKeyCache.mock.calls[0][0]).toBe(type);
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(getCrossSigningKeyCache).toHaveBeenLastCalledWith(type, expect.any(String));
             }
         },
     );
@@ -115,10 +116,10 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
         const info = new CrossSigningInfo(userId, { getCrossSigningKey }, { storeCrossSigningKeyCache });
         const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
-        expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(shouldCache ? 1 : 0);
+        expect(storeCrossSigningKeyCache).toHaveBeenCalledTimes(shouldCache ? 1 : 0);
         if (shouldCache) {
-            expect(storeCrossSigningKeyCache.mock.calls[0][0]).toBe(type);
-            expect(storeCrossSigningKeyCache.mock.calls[0][1]).toBe(testKey);
+            // eslint-disable-next-line jest/no-conditional-expect
+            expect(storeCrossSigningKeyCache).toHaveBeenLastCalledWith(type, testKey);
         }
     });
 

@@ -204,9 +204,14 @@ describe("RoomWidgetClient", () => {
     });
 
     describe("to-device messages", () => {
-        const unencryptedContentMap = {
-            "@alice:example.org": { "*": { hello: "alice!" } },
-            "@bob:example.org": { bobDesktop: { hello: "bob!" } },
+        const unencryptedContentMap = new Map([
+            ["@alice:example.org", new Map([["*", { hello: "alice!" }]])],
+            ["@bob:example.org", new Map([["bobDesktop", { hello: "bob!" }]])],
+        ]);
+
+        const expectedRequestData = {
+            ["@alice:example.org"]: { ["*"]: { hello: "alice!" } },
+            ["@bob:example.org"]: { ["bobDesktop"]: { hello: "bob!" } },
         };
 
         it("sends unencrypted (sendToDevice)", async () => {
@@ -214,7 +219,7 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
 
             await client.sendToDevice("org.example.foo", unencryptedContentMap);
-            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, unencryptedContentMap);
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, expectedRequestData);
         });
 
         it("sends unencrypted (queueToDevice)", async () => {
@@ -229,7 +234,7 @@ describe("RoomWidgetClient", () => {
                 ],
             };
             await client.queueToDevice(batch);
-            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, unencryptedContentMap);
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, expectedRequestData);
         });
 
         it("sends encrypted (encryptAndSendToDevices)", async () => {

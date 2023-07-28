@@ -128,12 +128,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.emit(CallFeedEvent.ConnectedChanged, this.connected);
     }
 
-    private get hasAudioTrack(): boolean {
+    public get hasAudioTrack(): boolean {
         return this.stream.getAudioTracks().length > 0;
     }
 
     private updateStream(oldStream: MediaStream | null, newStream: MediaStream): void {
         if (newStream === oldStream) return;
+
+        const wasMeasuringVolumeActivity = this.measuringVolumeActivity;
 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
@@ -145,6 +147,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
+            if (wasMeasuringVolumeActivity) this.measureVolumeActivity(true);
         } else {
             this.measureVolumeActivity(false);
         }
@@ -223,7 +226,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     /**
      * Replaces the current MediaStream with a new one.
-     * The stream will be different and new stream as remore parties are
+     * The stream will be different and new stream as remote parties are
      * concerned, but this can be used for convenience locally to set up
      * volume listeners automatically on the new stream etc.
      * @param newStream - new stream with which to replace the current one
@@ -309,7 +312,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public clone(): CallFeed {
         const mediaHandler = this.client.getMediaHandler();
         const stream = this.stream.clone();
-        logger.log(`callFeed cloning stream ${this.stream.id} newStream ${stream.id}`);
+        logger.log(`CallFeed clone() cloning stream (originalStreamId=${this.stream.id}, newStreamId${stream.id})`);
 
         if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
             mediaHandler.userMediaStreams.push(stream);

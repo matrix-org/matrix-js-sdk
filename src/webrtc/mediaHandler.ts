@@ -57,6 +57,9 @@ export class MediaHandler extends TypedEventEmitter<
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
 
+    // Promise chain to serialise calls to getMediaStream
+    private getMediaStreamPromise?: Promise<MediaStream>;
+
     public constructor(private client: MatrixClient) {
         super();
     }
@@ -72,7 +75,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
-        logger.info("Setting audio input to", deviceId);
+        logger.info(`MediaHandler setAudioInput() running (deviceId=${deviceId})`);
 
         if (this.audioInput === deviceId) return;
 
@@ -85,7 +88,7 @@ export class MediaHandler extends TypedEventEmitter<
      * @param opts - audio options to set
      */
     public async setAudioSettings(opts: AudioSettings): Promise<void> {
-        logger.info("Setting audio settings to", opts);
+        logger.info(`MediaHandler setAudioSettings() running (opts=${JSON.stringify(opts)})`);
 
         this.audioSettings = Object.assign({}, opts) as AudioSettings;
         await this.updateLocalUsermediaStreams();
@@ -97,7 +100,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
-        logger.info("Setting video input to", deviceId);
+        logger.info(`MediaHandler setVideoInput() running (deviceId=${deviceId})`);
 
         if (this.videoInput === deviceId) return;
 
@@ -112,7 +115,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setMediaInputs(audioInput: string, videoInput: string): Promise<void> {
-        logger.log(`mediaHandler setMediaInputs audioInput: ${audioInput} videoInput: ${videoInput}`);
+        logger.log(`MediaHandler setMediaInputs() running (audioInput: ${audioInput} videoInput: ${videoInput})`);
         this.audioInput = audioInput;
         this.videoInput = videoInput;
         await this.updateLocalUsermediaStreams();
@@ -133,7 +136,7 @@ export class MediaHandler extends TypedEventEmitter<
         }
 
         for (const stream of this.userMediaStreams) {
-            logger.log(`mediaHandler stopping all tracks for stream ${stream.id}`);
+            logger.log(`MediaHandler updateLocalUsermediaStreams() stopping all tracks (streamId=${stream.id})`);
             for (const track of stream.getTracks()) {
                 track.stop();
             }
@@ -149,7 +152,9 @@ export class MediaHandler extends TypedEventEmitter<
 
             const { audio, video } = callMediaStreamParams.get(call.callId)!;
 
-            logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream call ${call.callId}`);
+            logger.log(
+                `MediaHandler updateLocalUsermediaStreams() calling getUserMediaStream() (callId=${call.callId})`,
+            );
             const stream = await this.getUserMediaStream(audio, video);
 
             if (call.callHasEnded()) {
@@ -165,7 +170,7 @@ export class MediaHandler extends TypedEventEmitter<
             }
 
             logger.log(
-                `mediaHandler updateLocalUsermediaStreams getUserMediaStream groupCall ${groupCall.groupCallId}`,
+                `MediaHandler updateLocalUsermediaStreams() calling getUserMediaStream() (groupCallId=${groupCall.groupCallId})`,
             );
             const stream = await this.getUserMediaStream(true, groupCall.type === GroupCallType.Video);
 
@@ -180,13 +185,23 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     public async hasAudioDevice(): Promise<boolean> {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter((device) => device.kind === "audioinput").length > 0;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter((device) => device.kind === "audioinput").length > 0;
+        } catch (err) {
+            logger.log(`MediaHandler hasAudioDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
+            return false;
+        }
     }
 
     public async hasVideoDevice(): Promise<boolean> {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter((device) => device.kind === "videoinput").length > 0;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter((device) => device.kind === "videoinput").length > 0;
+        } catch (err) {
+            logger.log(`MediaHandler hasVideoDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
+            return false;
+        }
     }
 
     /**
@@ -196,6 +211,19 @@ export class MediaHandler extends TypedEventEmitter<
      * @returns based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
+        // Serialise calls, othertwise we can't sensibly re-use the stream
+        if (this.getMediaStreamPromise) {
+            this.getMediaStreamPromise = this.getMediaStreamPromise.then(() => {
+                return this.getUserMediaStreamInternal(audio, video, reusable);
+            });
+        } else {
+            this.getMediaStreamPromise = this.getUserMediaStreamInternal(audio, video, reusable);
+        }
+
+        return this.getMediaStreamPromise;
+    }
+
+    private async getUserMediaStreamInternal(audio: boolean, video: boolean, reusable: boolean): Promise<MediaStream> {
         const shouldRequestAudio = audio && (await this.hasAudioDevice());
         const shouldRequestVideo = video && (await this.hasVideoDevice());
 
@@ -203,24 +231,30 @@ export class MediaHandler extends TypedEventEmitter<
 
         let canReuseStream = true;
         if (this.localUserMediaStream) {
+            // This figures out if we can reuse the current localUsermediaStream
+            // based on whether or not the "mute state" (presence of tracks of a
+            // given kind) matches what is being requested
+            if (shouldRequestAudio !== this.localUserMediaStream.getAudioTracks().length > 0) {
+                canReuseStream = false;
+            }
+            if (shouldRequestVideo !== this.localUserMediaStream.getVideoTracks().length > 0) {
+                canReuseStream = false;
+            }
+
             // This code checks that the device ID is the same as the localUserMediaStream stream, but we update
             // the localUserMediaStream whenever the device ID changes (apart from when restoring) so it's not
             // clear why this would ever be different, unless there's a race.
-            if (shouldRequestAudio) {
-                if (
-                    this.localUserMediaStream.getAudioTracks().length === 0 ||
-                    this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
-                ) {
-                    canReuseStream = false;
-                }
+            if (
+                shouldRequestAudio &&
+                this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
+            ) {
+                canReuseStream = false;
             }
-            if (shouldRequestVideo) {
-                if (
-                    this.localUserMediaStream.getVideoTracks().length === 0 ||
-                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
-                ) {
-                    canReuseStream = false;
-                }
+            if (
+                shouldRequestVideo &&
+                this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
+            ) {
+                canReuseStream = false;
             }
         } else {
             canReuseStream = false;
@@ -230,8 +264,11 @@ export class MediaHandler extends TypedEventEmitter<
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             logger.log(
-                `mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`,
-                constraints,
+                `MediaHandler getUserMediaStreamInternal() calling getUserMediaStream (streamId=${
+                    stream.id
+                }, shouldRequestAudio=${shouldRequestAudio}, shouldRequestVideo=${shouldRequestVideo}, constraints=${JSON.stringify(
+                    constraints,
+                )})`,
             );
 
             for (const track of stream.getTracks()) {
@@ -250,7 +287,7 @@ export class MediaHandler extends TypedEventEmitter<
         } else {
             stream = this.localUserMediaStream!.clone();
             logger.log(
-                `mediaHandler clone userMediaStream ${this.localUserMediaStream?.id} new stream ${stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`,
+                `MediaHandler getUserMediaStreamInternal() cloning (oldStreamId=${this.localUserMediaStream?.id} newStreamId=${stream.id} shouldRequestAudio=${shouldRequestAudio} shouldRequestVideo=${shouldRequestVideo})`,
             );
 
             if (!shouldRequestAudio) {
@@ -279,7 +316,7 @@ export class MediaHandler extends TypedEventEmitter<
      * Stops all tracks on the provided usermedia stream
      */
     public stopUserMediaStream(mediaStream: MediaStream): void {
-        logger.log(`mediaHandler stopUserMediaStream stopping stream ${mediaStream.id}`);
+        logger.log(`MediaHandler stopUserMediaStream() stopping (streamId=${mediaStream.id})`);
         for (const track of mediaStream.getTracks()) {
             track.stop();
         }
@@ -287,14 +324,29 @@ export class MediaHandler extends TypedEventEmitter<
         const index = this.userMediaStreams.indexOf(mediaStream);
 
         if (index !== -1) {
-            logger.debug("Splicing usermedia stream out stream array", mediaStream.id);
+            logger.debug(
+                `MediaHandler stopUserMediaStream() splicing usermedia stream out stream array (streamId=${mediaStream.id})`,
+                mediaStream.id,
+            );
             this.userMediaStreams.splice(index, 1);
         }
 
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
 
         if (this.localUserMediaStream === mediaStream) {
+            // if we have this stream cahced, remove it, because we've stopped it
             this.localUserMediaStream = undefined;
+        } else {
+            // If it's not the same stream. remove any tracks from the cached stream that
+            // we have just stopped, and if we do stop any, call the same method on the
+            // cached stream too in order to stop all its tracks (in case they are different)
+            // and un-cache it.
+            for (const track of mediaStream.getTracks()) {
+                if (this.localUserMediaStream?.getTrackById(track.id)) {
+                    this.stopUserMediaStream(this.localUserMediaStream);
+                    break;
+                }
+            }
         }
     }
 
@@ -311,16 +363,20 @@ export class MediaHandler extends TypedEventEmitter<
 
             if (opts.desktopCapturerSourceId) {
                 // We are using Electron
-                logger.debug("Getting screensharing stream using getUserMedia()", opts);
+                logger.debug(
+                    `MediaHandler getScreensharingStream() calling getUserMedia() (opts=${JSON.stringify(opts)})`,
+                );
                 stream = await navigator.mediaDevices.getUserMedia(screenshareConstraints);
             } else {
                 // We are not using Electron
-                logger.debug("Getting screensharing stream using getDisplayMedia()", opts);
+                logger.debug(
+                    `MediaHandler getScreensharingStream() calling getDisplayMedia() (opts=${JSON.stringify(opts)})`,
+                );
                 stream = await navigator.mediaDevices.getDisplayMedia(screenshareConstraints);
             }
         } else {
             const matchingStream = this.screensharingStreams[this.screensharingStreams.length - 1];
-            logger.log("Cloning screensharing stream", matchingStream.id);
+            logger.log(`MediaHandler getScreensharingStream() cloning (streamId=${matchingStream.id})`);
             stream = matchingStream.clone();
         }
 
@@ -337,7 +393,7 @@ export class MediaHandler extends TypedEventEmitter<
      * Stops all tracks on the provided screensharing stream
      */
     public stopScreensharingStream(mediaStream: MediaStream): void {
-        logger.debug("Stopping screensharing stream", mediaStream.id);
+        logger.debug(`MediaHandler stopScreensharingStream() stopping stream (streamId=${mediaStream.id})`);
         for (const track of mediaStream.getTracks()) {
             track.stop();
         }
@@ -345,7 +401,7 @@ export class MediaHandler extends TypedEventEmitter<
         const index = this.screensharingStreams.indexOf(mediaStream);
 
         if (index !== -1) {
-            logger.debug("Splicing screensharing stream out stream array", mediaStream.id);
+            logger.debug(`MediaHandler stopScreensharingStream() splicing stream out (streamId=${mediaStream.id})`);
             this.screensharingStreams.splice(index, 1);
         }
 
@@ -357,7 +413,7 @@ export class MediaHandler extends TypedEventEmitter<
      */
     public stopAllStreams(): void {
         for (const stream of this.userMediaStreams) {
-            logger.log(`mediaHandler stopAllStreams stopping stream ${stream.id}`);
+            logger.log(`MediaHandler stopAllStreams() stopping (streamId=${stream.id})`);
             for (const track of stream.getTracks()) {
                 track.stop();
             }
@@ -406,7 +462,6 @@ export class MediaHandler extends TypedEventEmitter<
     private getScreenshareContraints(opts: IScreensharingOpts): DesktopCapturerConstraints {
         const { desktopCapturerSourceId, audio } = opts;
         if (desktopCapturerSourceId) {
-            logger.debug("Using desktop capturer source", desktopCapturerSourceId);
             return {
                 audio: audio ?? false,
                 video: {
@@ -417,7 +472,6 @@ export class MediaHandler extends TypedEventEmitter<
                 },
             };
         } else {
-            logger.debug("Not using desktop capturer source");
             return {
                 audio: audio ?? false,
                 video: true,

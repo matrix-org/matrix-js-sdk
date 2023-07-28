@@ -14,27 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
+import { Room } from "../models/room";
+import { CryptoApi } from "../crypto-api";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
+import { IEncryptedEventInfo } from "../crypto/api";
+import { IEventDecryptionResult } from "../@types/crypto";
 
 /**
  * Common interface for the crypto implementations
+ *
+ * @internal
  */
-export interface CryptoBackend {
-    /**
-     * Global override for whether the client should ever send encrypted
-     * messages to unverified devices. This provides the default for rooms which
-     * do not specify a value.
-     *
-     * If true, all unverified devices will be blacklisted by default
-     */
-    globalBlacklistUnverifiedDevices: boolean;
-
+export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
      * Whether sendMessage in a room with unknown and unverified devices
      * should throw an error and not send the message. This has 'Global' for
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
+     *
+     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
+     * going to support it in the rust crypto implementation.
      */
     globalErrorOnUnknownDevices: boolean;
 
@@ -44,14 +45,25 @@ export interface CryptoBackend {
     stop(): void;
 
     /**
-     * Checks if the user has previously published cross-signing keys
+     * Get the verification level for a given user
      *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
-
-     * @returns true if the user has previously published cross-signing keys
+     * TODO: define this better
+     *
+     * @param userId - user to be checked
      */
-    userHasCrossSigningKeys(): Promise<boolean>;
+    checkUserTrust(userId: string): UserTrustLevel;
+
+    /**
+     * Encrypt an event according to the configuration of the room.
+     *
+     * @param event -  event to be sent
+     *
+     * @param room - destination room.
+     *
+     * @returns Promise which resolves when the event has been
+     *     encrypted, or null if nothing was needed
+     */
+    encryptEvent(event: MatrixEvent, room: Room): Promise<void>;
 
     /**
      * Decrypt a received event
@@ -62,12 +74,110 @@ export interface CryptoBackend {
     decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
 
     /**
-     * Get a list containing all of the room keys
+     * Get information about the encryption of an event
      *
-     * This should be encrypted before returning it to the user.
-     *
-     * @returns a promise which resolves to a list of
-     *    session export objects
+     * @param event - event to be checked
      */
-    exportRoomKeys(): Promise<IMegolmSessionData[]>;
+    getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
+
+    /**
+     * Check the cross signing trust of the current user
+     *
+     * @param opts - Options object.
+     *
+     * @deprecated Unneeded for the new crypto
+     */
+    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
+}
+
+/** The methods which crypto implementations should expose to the Sync api
+ *
+ * @internal
+ */
+export interface SyncCryptoCallbacks {
+    /**
+     * Called by the /sync loop whenever there are incoming to-device messages.
+     *
+     * The implementation may preprocess the received messages (eg, decrypt them) and return an
+     * updated list of messages for dispatch to the rest of the system.
+     *
+     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
+     * messages, rather than the results of any decryption attempts.
+     *
+     * @param events - the received to-device messages
+     * @returns A list of preprocessed to-device messages.
+     */
+    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop when one time key counts and unused fallback key details are received.
+     *
+     * @param oneTimeKeysCounts - the received one time key counts
+     * @param unusedFallbackKeys - the received unused fallback keys
+     */
+    processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
+
+    /**
+     * Handle the notification from /sync that device lists have
+     * been changed.
+     *
+     * @param deviceLists - device_lists field from /sync
+     */
+    processDeviceLists(deviceLists: IDeviceLists): Promise<void>;
+
+    /**
+     * Called by the /sync loop whenever an m.room.encryption event is received.
+     *
+     * This is called before RoomStateEvents are emitted for any of the events in the /sync
+     * response (even if the other events technically happened first). This works around a problem
+     * if the client uses a RoomStateEvent (typically a membership event) as a trigger to send a message
+     * in a new room (or one where encryption has been newly enabled): that would otherwise leave the
+     * crypto layer confused because it expects crypto to be set up, but it has not yet been.
+     *
+     * @param room - in which the event was received
+     * @param event - encryption event to be processed
+     */
+    onCryptoEvent(room: Room, event: MatrixEvent): Promise<void>;
+
+    /**
+     * Called by the /sync loop after each /sync response is processed.
+     *
+     * Used to complete batch processing, or to initiate background processes
+     *
+     * @param syncState - information about the completed sync.
+     */
+    onSyncCompleted(syncState: OnSyncCompletedData): void;
+}
+
+/**
+ * @internal
+ */
+export interface OnSyncCompletedData {
+    /**
+     * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.
+     */
+    nextSyncToken?: string;
+
+    /**
+     * True if we are working our way through a backlog of events after connecting.
+     */
+    catchingUp?: boolean;
+}
+
+/**
+ * Options object for {@link CryptoBackend#checkOwnCrossSigningTrust}.
+ */
+export interface CheckOwnCrossSigningTrustOpts {
+    allowPrivateKeyRequests?: boolean;
 }

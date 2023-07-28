@@ -12,7 +12,7 @@
     },
     "include": ["./src/**/*.ts", "./spec/**/*.ts"],
     "typedocOptions": {
-        "entryPoints": ["src/index.ts"],
+        "entryPoints": ["src/matrix.ts"],
         "excludeExternals": true,
         "out": "_docs"
     }

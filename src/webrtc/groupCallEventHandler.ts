@@ -61,7 +61,7 @@ export class GroupCallEventHandler {
         // we create a group call for the room so we can be fairly sure that
         // the group call we create is really the latest one.
         if (this.client.getSyncState() !== SyncState.Syncing) {
-            logger.debug("Waiting for client to start syncing...");
+            logger.debug("GroupCallEventHandler start() waiting for client to start syncing");
             await new Promise<void>((resolve) => {
                 const onSync = (): void => {
                     if (this.client.getSyncState() === SyncState.Syncing) {
@@ -118,20 +118,21 @@ export class GroupCallEventHandler {
         for (const callEvent of sortedCallEvents) {
             const content = callEvent.getContent();
 
-            if (content["m.terminated"]) {
+            if (content["m.terminated"] || callEvent.isRedacted()) {
                 continue;
             }
 
             logger.debug(
-                `Choosing group call ${callEvent.getStateKey()} with TS ` +
-                    `${callEvent.getTs()} for room ${room.roomId} from ${callEvents.length} possible calls.`,
+                `GroupCallEventHandler createGroupCallForRoom() choosing group call from possible calls (stateKey=${callEvent.getStateKey()}, ts=${callEvent.getTs()}, roomId=${
+                    room.roomId
+                }, numOfPossibleCalls=${callEvents.length})`,
             );
 
             this.createGroupCallFromRoomStateEvent(callEvent);
             break;
         }
 
-        logger.info("Group call event handler processed room", room.roomId);
+        logger.info(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
         this.getRoomDeferred(room.roomId).resolve!();
     }
 
@@ -142,7 +143,9 @@ export class GroupCallEventHandler {
         const room = this.client.getRoom(roomId);
 
         if (!room) {
-            logger.warn(`Couldn't find room ${roomId} for GroupCall`);
+            logger.warn(
+                `GroupCallEventHandler createGroupCallFromRoomStateEvent() couldn't find room for call (roomId=${roomId})`,
+            );
             return;
         }
 
@@ -151,14 +154,16 @@ export class GroupCallEventHandler {
         const callType = content["m.type"];
 
         if (!Object.values(GroupCallType).includes(callType)) {
-            logger.warn(`Received invalid group call type ${callType} for room ${roomId}.`);
+            logger.warn(
+                `GroupCallEventHandler createGroupCallFromRoomStateEvent() received invalid call type (type=${callType}, roomId=${roomId})`,
+            );
             return;
         }
 
         const callIntent = content["m.intent"];
 
         if (!Object.values(GroupCallIntent).includes(callIntent)) {
-            logger.warn(`Received invalid group call intent ${callType} for room ${roomId}.`);
+            logger.warn(`Received invalid group call intent (type=${callType}, roomId=${roomId})`);
             return;
         }
 
@@ -179,8 +184,11 @@ export class GroupCallEventHandler {
             isPtt,
             callIntent,
             groupCallId,
-            content?.dataChannelsEnabled,
+            // Because without Media section a WebRTC connection is not possible, so need a RTCDataChannel to set up a
+            // no media WebRTC connection anyway.
+            content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
+            this.client.isVoipWithNoMediaAllowed,
         );
 
         this.groupCalls.set(room.roomId, groupCall);
@@ -202,21 +210,21 @@ export class GroupCallEventHandler {
 
             const currentGroupCall = this.groupCalls.get(state.roomId);
 
-            if (!currentGroupCall && !content["m.terminated"]) {
+            if (!currentGroupCall && !content["m.terminated"] && !event.isRedacted()) {
                 this.createGroupCallFromRoomStateEvent(event);
             } else if (currentGroupCall && currentGroupCall.groupCallId === groupCallId) {
-                if (content["m.terminated"]) {
+                if (content["m.terminated"] || event.isRedacted()) {
                     currentGroupCall.terminate(false);
                 } else if (content["m.type"] !== currentGroupCall.type) {
                     // TODO: Handle the callType changing when the room state changes
                     logger.warn(
-                        `The group call type changed for room: ${state.roomId}. Changing the group call type is currently unsupported.`,
+                        `GroupCallEventHandler onRoomStateChanged() currently does not support changing type (roomId=${state.roomId})`,
                     );
                 }
             } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
                 // TODO: Handle new group calls and multiple group calls
                 logger.warn(
-                    `Multiple group calls detected for room: ${state.roomId}. Multiple group calls are currently unsupported.`,
+                    `GroupCallEventHandler onRoomStateChanged() currently does not support multiple calls (roomId=${state.roomId})`,
                 );
             }
         }

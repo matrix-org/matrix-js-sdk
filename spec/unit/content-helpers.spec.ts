@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { REFERENCE_RELATION } from "matrix-events-sdk";
-
 import { LocationAssetType, M_ASSET, M_LOCATION, M_TIMESTAMP } from "../../src/@types/location";
 import { M_TOPIC } from "../../src/@types/topic";
 import {
@@ -25,6 +23,7 @@ import {
     parseBeaconContent,
     parseTopicContent,
 } from "../../src/content-helpers";
+import { REFERENCE_RELATION } from "../../src/@types/extensible_events";
 
 describe("Beacon content helpers", () => {
     describe("makeBeaconInfoContent()", () => {

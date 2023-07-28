@@ -19,9 +19,9 @@ import MockHttpBackend from "matrix-mock-request";
 import "../../olm-loader";
 import { MSC3906Rendezvous, RendezvousCode, RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
 import {
-    ECDHv1RendezvousCode,
+    ECDHv2RendezvousCode as ECDHRendezvousCode,
     MSC3903ECDHPayload,
-    MSC3903ECDHv1RendezvousChannel,
+    MSC3903ECDHv2RendezvousChannel as MSC3903ECDHRendezvousChannel,
 } from "../../../src/rendezvous/channels";
 import { MatrixClient } from "../../../src";
 import {
@@ -38,6 +38,7 @@ function makeMockClient(opts: {
     deviceId: string;
     deviceKey?: string;
     msc3882Enabled: boolean;
+    msc3882r0Only: boolean;
     msc3886Enabled: boolean;
     devices?: Record<string, Partial<DeviceInfo>>;
     verificationFunction?: (
@@ -57,6 +58,17 @@ function makeMockClient(opts: {
                     "org.matrix.msc3886": opts.msc3886Enabled,
                 },
             };
+        },
+        getCapabilities() {
+            return opts.msc3882r0Only
+                ? {}
+                : {
+                      capabilities: {
+                          "org.matrix.msc3882.get_login_token": {
+                              enabled: opts.msc3882Enabled,
+                          },
+                      },
+                  };
         },
         getUserId() {
             return opts.userId;
@@ -111,6 +123,7 @@ describe("Rendezvous", function () {
             deviceId: "DEVICEID",
             msc3886Enabled: false,
             msc3882Enabled: true,
+            msc3882r0Only: true,
         });
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
@@ -126,7 +139,7 @@ describe("Rendezvous", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
 
         expect(aliceRz.code).toBeUndefined();
@@ -143,7 +156,7 @@ describe("Rendezvous", function () {
         const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
         expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256");
+        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v2.curve25519-aes-sha256");
         expect(code.rendezvous?.transport.type).toEqual("org.matrix.msc3886.http.v1");
         expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri).toEqual(
             "https://fallbackserver/rz/123",
@@ -159,14 +172,20 @@ describe("Rendezvous", function () {
 
         const cancelPromise = aliceRz.cancel(RendezvousFailureReason.UserDeclined);
         await httpBackend.flush("");
-        expect(cancelPromise).resolves.toBeUndefined();
+        await expect(cancelPromise).resolves.toBeUndefined();
         httpBackend.verifyNoOutstandingExpectation();
         httpBackend.verifyNoOutstandingRequests();
 
         await aliceRz.close();
     });
 
-    it("no protocols", async function () {
+    async function testNoProtocols({
+        msc3882Enabled,
+        msc3882r0Only,
+    }: {
+        msc3882Enabled: boolean;
+        msc3882r0Only: boolean;
+    }) {
         const aliceTransport = makeTransport("Alice");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -178,14 +197,15 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: false,
             msc3886Enabled: false,
+            msc3882Enabled,
+            msc3882r0Only,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -193,7 +213,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -218,9 +238,17 @@ describe("Rendezvous", function () {
 
         await aliceStartProm;
         await bobStartPromise;
+    }
+
+    it("no protocols - r0", async function () {
+        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: true });
     });
 
-    it("new device declines protocol", async function () {
+    it("no protocols - r1", async function () {
+        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: false });
+    });
+
+    it("new device declines protocol with outcome unsupported", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -233,13 +261,14 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -247,7 +276,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -278,7 +307,7 @@ describe("Rendezvous", function () {
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
-    it("new device declines protocol", async function () {
+    it("new device requests an invalid protocol", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -291,13 +320,14 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -305,7 +335,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -349,13 +379,14 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -363,7 +394,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -409,13 +440,14 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -423,7 +455,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -477,6 +509,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3882Enabled: true,
+            msc3882r0Only: false,
             msc3886Enabled: false,
             devices,
             deviceKey: "aaaa",
@@ -485,11 +518,11 @@ describe("Rendezvous", function () {
                 master: "mmmmm",
             },
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -497,7 +530,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -570,7 +603,7 @@ describe("Rendezvous", function () {
 
     it("device not online within timeout", async function () {
         const { aliceRz } = await completeLogin({});
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("device appears online within timeout", async function () {
@@ -594,7 +627,7 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "bbbb",
             };
         }, 1500);
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("mismatched device key", async function () {
@@ -603,6 +636,6 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "XXXX",
             },
         });
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError(/different key/);
+        await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow(/different key/);
     });
 });

@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
-import * as utils from "../utils";
-import * as IndexedDBHelpers from "../indexeddb-helpers";
+import { deepCopy, promiseTry } from "../utils";
+import { exists as idbExists } from "../indexeddb-helpers";
 import { logger } from "../logger";
 import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix";
 import { ISavedSync } from "./index";
@@ -122,7 +122,7 @@ function reqAsCursorPromise<T>(req: IDBRequest<T>): Promise<T> {
 export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         dbName = "matrix-js-sdk:" + (dbName || "default");
-        return IndexedDBHelpers.exists(indexedDB, dbName);
+        return idbExists(indexedDB, dbName);
     }
 
     private readonly dbName: string;
@@ -130,7 +130,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private db?: IDBDatabase;
     private disconnected = true;
     private _isNewlyCreated = false;
-    private isPersisting = false;
+    private syncToDatabasePromise?: Promise<void>;
     private pendingUserPresenceData: UserTuple[] = [];
 
     /**
@@ -153,7 +153,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * grant permission.
      * @returns Promise which resolves if successfully connected.
      */
-    public connect(): Promise<void> {
+    public connect(onClose?: () => void): Promise<void> {
         if (!this.disconnected) {
             logger.log(`LocalIndexedDBStoreBackend.connect: already connected or connecting`);
             return Promise.resolve();
@@ -188,7 +188,15 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             // add a poorly-named listener for when deleteDatabase is called
             // so we can close our db connections.
             this.db.onversionchange = (): void => {
-                this.db?.close();
+                this.db?.close(); // this does not call onclose
+                this.disconnected = true;
+                this.db = undefined;
+                onClose?.();
+            };
+            this.db.onclose = (): void => {
+                this.disconnected = true;
+                this.db = undefined;
+                onClose?.();
             };
 
             await this.init();
@@ -330,12 +338,16 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Clear the entire database. This should be used when logging out of a client
-     * to prevent mixing data between accounts.
+     * to prevent mixing data between accounts. Closes the database.
      * @returns Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
         return new Promise((resolve) => {
             logger.log(`Removing indexeddb instance: ${this.dbName}`);
+
+            // Close the database first to avoid firing unexpected close events
+            this.db?.close();
+
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
             req.onblocked = (): void => {
@@ -372,7 +384,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         if (copy) {
             // We must deep copy the stored data so that the /sync processing code doesn't
             // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
-            return Promise.resolve(utils.deepCopy(data));
+            return Promise.resolve(deepCopy(data));
         } else {
             return Promise.resolve(data);
         }
@@ -388,26 +400,34 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
+    /**
+     * Sync users and all accumulated sync data to the database.
+     * If a previous sync is in flight, the new data will be added to the
+     * next sync and the current sync's promise will be returned.
+     * @param userTuples - The user tuples
+     * @returns Promise which resolves if the data was persisted.
+     */
     public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
-        if (this.isPersisting) {
+        if (this.syncToDatabasePromise) {
             logger.warn("Skipping syncToDatabase() as persist already in flight");
             this.pendingUserPresenceData.push(...userTuples);
-            return;
-        } else {
-            userTuples.unshift(...this.pendingUserPresenceData);
-            this.isPersisting = true;
+            return this.syncToDatabasePromise;
         }
+        userTuples.unshift(...this.pendingUserPresenceData);
+        this.syncToDatabasePromise = this.doSyncToDatabase(userTuples);
+        return this.syncToDatabasePromise;
+    }
 
+    private async doSyncToDatabase(userTuples: UserTuple[]): Promise<void> {
         try {
             const syncData = this.syncAccumulator.getJSON(true);
-
             await Promise.all([
                 this.persistUserPresenceEvents(userTuples),
                 this.persistAccountData(syncData.accountData),
                 this.persistSyncData(syncData.nextBatch, syncData.roomsData),
             ]);
         } finally {
-            this.isPersisting = false;
+            this.syncToDatabasePromise = undefined;
         }
     }
 
@@ -419,7 +439,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     private persistSyncData(nextBatch: string, roomsData: ISyncResponse["rooms"]): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
-        return utils.promiseTry<void>(() => {
+        return promiseTry<void>(() => {
             const txn = this.db!.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
@@ -440,7 +460,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns Promise which resolves if the events were persisted.
      */
     private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
-        return utils.promiseTry<void>(() => {
+        return promiseTry<void>(() => {
             const txn = this.db!.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (const event of accountData) {
@@ -459,7 +479,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns Promise which resolves if the users were persisted.
      */
     private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
-        return utils.promiseTry<void>(() => {
+        return promiseTry<void>(() => {
             const txn = this.db!.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
@@ -479,7 +499,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns A list of presence events in their raw form.
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
-        return utils.promiseTry<UserTuple[]>(() => {
+        return promiseTry<UserTuple[]>(() => {
             const txn = this.db!.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
@@ -494,7 +514,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     private loadAccountData(): Promise<IMinimalEvent[]> {
         logger.log(`LocalIndexedDBStoreBackend: loading account data...`);
-        return utils.promiseTry<IMinimalEvent[]>(() => {
+        return promiseTry<IMinimalEvent[]>(() => {
             const txn = this.db!.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
@@ -512,7 +532,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     private loadSyncData(): Promise<ISyncData> {
         logger.log(`LocalIndexedDBStoreBackend: loading sync data...`);
-        return utils.promiseTry<ISyncData>(() => {
+        return promiseTry<ISyncData>(() => {
             const txn = this.db!.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
@@ -577,5 +597,12 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const store = txn.objectStore("to_device_queue");
         store.delete(id);
         await txnAsPromise(txn);
+    }
+
+    /*
+     * Close the database
+     */
+    public async destroy(): Promise<void> {
+        this.db?.close();
     }
 }

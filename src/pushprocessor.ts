@@ -25,6 +25,8 @@ import {
     ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
+    IEventPropertyIsCondition,
+    IEventPropertyContainsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -34,6 +36,7 @@ import {
     PushRuleCondition,
     PushRuleKind,
     PushRuleSet,
+    RuleId,
     TweakName,
 } from "./@types/PushRules";
 import { EventType } from "./@types/event";
@@ -67,6 +70,36 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [PushRuleActionName.DontNotify],
+    },
+    {
+        rule_id: RuleId.IsUserMention,
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyContains,
+                key: "content.m\\.mentions.user_ids",
+                value: "", // The user ID is dynamically added in rewriteDefaultRules.
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
+    },
+    {
+        rule_id: RuleId.IsRoomMention,
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyIs,
+                key: "content.m\\.mentions.room",
+                value: true,
+            },
+            {
+                kind: ConditionKind.SenderNotificationPermission,
+                key: "room",
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
     },
     {
         // For homeservers which don't support MSC3786 yet
@@ -124,6 +157,12 @@ export class PushProcessor {
     public constructor(private readonly client: MatrixClient) {}
 
     /**
+     * Maps the original key from the push rules to a list of property names
+     * after unescaping.
+     */
+    private readonly parsedKeys = new Map<string, string[]>();
+
+    /**
      * Convert a list of actions into a object with the actions as keys and their values
      * @example
      * eg. `[ 'notify', { set_tweak: 'sound', value: 'default' } ]`
@@ -152,9 +191,10 @@ export class PushProcessor {
      * where applicable. Useful for upgrading push rules to more strict
      * conditions when the server is falling behind on defaults.
      * @param incomingRules - The client's existing push rules
+     * @param userId - The Matrix ID of the client.
      * @returns The rewritten rules
      */
-    public static rewriteDefaultRules(incomingRules: IPushRules): IPushRules {
+    public static rewriteDefaultRules(incomingRules: IPushRules, userId: string | undefined = undefined): IPushRules {
         let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
 
         // These lines are mostly to make the tests happy. We shouldn't run into these
@@ -162,12 +202,26 @@ export class PushProcessor {
         if (!newRules) newRules = {} as IPushRules;
         if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
-        if (!newRules.global.override) newRules.global.underride = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
-        for (const override of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
+        for (const originalOverride of DEFAULT_OVERRIDE_RULES) {
+            const existingRule = globalOverrides.find((r) => r.rule_id === originalOverride.rule_id);
+
+            // Dynamically add the user ID as the value for the is_user_mention rule.
+            let override: IPushRule;
+            if (originalOverride.rule_id === RuleId.IsUserMention) {
+                // If the user ID wasn't provided, skip the rule.
+                if (!userId) {
+                    continue;
+                }
+
+                override = JSON.parse(JSON.stringify(originalOverride)); // deep clone
+                override.conditions![0].value = userId;
+            } else {
+                override = originalOverride;
+            }
 
             if (existingRule) {
                 // Copy over the actions, default, and conditions. Don't touch the user's preference.
@@ -200,6 +254,53 @@ export class PushProcessor {
         }
 
         return newRules;
+    }
+
+    /**
+     * Pre-caches the parsed keys for push rules and cleans out any obsolete cache
+     * entries. Should be called after push rules are updated.
+     * @param newRules - The new push rules.
+     */
+    public updateCachedPushRuleKeys(newRules: IPushRules): void {
+        // These lines are mostly to make the tests happy. We shouldn't run into these
+        // properties missing in practice.
+        if (!newRules) newRules = {} as IPushRules;
+        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global.override) newRules.global.override = [];
+        if (!newRules.global.room) newRules.global.room = [];
+        if (!newRules.global.sender) newRules.global.sender = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
+
+        // Process the 'key' property on event_match conditions pre-cache the
+        // values and clean-out any unused values.
+        const toRemoveKeys = new Set(this.parsedKeys.keys());
+        for (const ruleset of [
+            newRules.global.override,
+            newRules.global.room,
+            newRules.global.sender,
+            newRules.global.underride,
+        ]) {
+            for (const rule of ruleset) {
+                if (!rule.conditions) {
+                    continue;
+                }
+
+                for (const condition of rule.conditions) {
+                    if (condition.kind !== ConditionKind.EventMatch) {
+                        continue;
+                    }
+
+                    // Ensure we keep this key.
+                    toRemoveKeys.delete(condition.key);
+
+                    // Pre-process the key.
+                    this.parsedKeys.set(condition.key, PushProcessor.partsForDottedKey(condition.key));
+                }
+            }
+        }
+        // Any keys that were previously cached, but are no longer needed should
+        // be removed.
+        toRemoveKeys.forEach((k) => this.parsedKeys.delete(k));
     }
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
@@ -284,6 +385,10 @@ export class PushProcessor {
         switch (cond.kind) {
             case ConditionKind.EventMatch:
                 return this.eventFulfillsEventMatchCondition(cond, ev);
+            case ConditionKind.EventPropertyIs:
+                return this.eventFulfillsEventPropertyIsCondition(cond, ev);
+            case ConditionKind.EventPropertyContains:
+                return this.eventFulfillsEventPropertyContains(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -382,6 +487,13 @@ export class PushProcessor {
         return content.body.search(pat) > -1;
     }
 
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing against the condition's glob-based
+     * pattern.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
     private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
         if (!cond.key) {
             return false;
@@ -392,6 +504,9 @@ export class PushProcessor {
             return false;
         }
 
+        // XXX This does not match in a case-insensitive manner.
+        //
+        // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1
         if (cond.value) {
             return cond.value === val;
         }
@@ -406,6 +521,38 @@ export class PushProcessor {
                 : this.createCachedRegex("^", cond.pattern, "$");
 
         return !!val.match(regex);
+    }
+
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsEventPropertyIsCondition(cond: IEventPropertyIsCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        return cond.value === this.valueForDottedKey(cond.key, ev);
+    }
+
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsEventPropertyContains(cond: IEventPropertyContainsCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        const val = this.valueForDottedKey(cond.key, ev);
+        if (!Array.isArray(val)) {
+            return false;
+        }
+        return val.includes(cond.value);
     }
 
     private eventFulfillsCallStartedCondition(
@@ -433,28 +580,105 @@ export class PushProcessor {
         return PushProcessor.cachedGlobToRegex[glob];
     }
 
+    /**
+     * Parse the key into the separate fields to search by splitting on
+     * unescaped ".", and then removing any escape characters.
+     *
+     * @param str - The key of the push rule condition: a dotted field.
+     * @returns The unescaped parts to fetch.
+     * @internal
+     */
+    public static partsForDottedKey(str: string): string[] {
+        const result: string[] = [];
+
+        // The current field and whether the previous character was the escape
+        // character (a backslash).
+        let part = "";
+        let escaped = false;
+
+        // Iterate over each character, and decide whether to append to the current
+        // part (following the escape rules) or to start a new part (based on the
+        // field separator).
+        for (const c of str) {
+            // If the previous character was the escape character (a backslash)
+            // then decide what to append to the current part.
+            if (escaped) {
+                if (c === "\\" || c === ".") {
+                    // An escaped backslash or dot just gets added.
+                    part += c;
+                } else {
+                    // A character that shouldn't be escaped gets the backslash prepended.
+                    part += "\\" + c;
+                }
+                // This always resets being escaped.
+                escaped = false;
+                continue;
+            }
+
+            if (c == ".") {
+                // The field separator creates a new part.
+                result.push(part);
+                part = "";
+            } else if (c == "\\") {
+                // A backslash adds no characters, but starts an escape sequence.
+                escaped = true;
+            } else {
+                // Otherwise, just add the current character.
+                part += c;
+            }
+        }
+
+        // Ensure the final part is included. If there's an open escape sequence
+        // it should be included.
+        if (escaped) {
+            part += "\\";
+        }
+        result.push(part);
+
+        return result;
+    }
+
+    /**
+     * For a dotted field and event, fetch the value at that position, if one
+     * exists.
+     *
+     * @param key - The key of the push rule condition: a dotted field to fetch.
+     * @param ev - The matrix event to fetch the field from.
+     * @returns The value at the dotted path given by key.
+     */
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        const parts = key.split(".");
+        // The key should already have been parsed via updateCachedPushRuleKeys,
+        // but if it hasn't (maybe via an old consumer of the SDK which hasn't
+        // been updated?) then lazily calculate it here.
+        let parts = this.parsedKeys.get(key);
+        if (parts === undefined) {
+            parts = PushProcessor.partsForDottedKey(key);
+            this.parsedKeys.set(key, parts);
+        }
         let val: any;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
+        let currentIndex = 0;
         if (firstPart === "content") {
             val = ev.getContent();
-            parts.shift();
+            ++currentIndex;
         } else if (firstPart === "type") {
             val = ev.getType();
-            parts.shift();
+            ++currentIndex;
         } else {
             // use the raw event for any other fields
             val = ev.event;
         }
 
-        while (parts.length > 0) {
-            const thisPart = parts.shift()!;
-            if (isNullOrUndefined(val[thisPart])) {
-                return null;
+        for (; currentIndex < parts.length; ++currentIndex) {
+            // The previous iteration resulted in null or undefined, bail (and
+            // avoid the type error of attempting to retrieve a property).
+            if (isNullOrUndefined(val)) {
+                return undefined;
             }
+
+            const thisPart = parts[currentIndex];
             val = val[thisPart];
         }
         return val;
@@ -464,17 +688,24 @@ export class PushProcessor {
         if (!rulesets) {
             return null;
         }
-        if (ev.getSender() === this.client.credentials.userId) {
+
+        if (ev.getSender() === this.client.getSafeUserId()) {
             return null;
         }
 
         return this.matchingRuleFromKindSet(ev, rulesets.global);
     }
 
-    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets?: IPushRules): IActionsObject {
+    private pushActionsForEventAndRulesets(
+        ev: MatrixEvent,
+        rulesets?: IPushRules,
+    ): {
+        actions?: IActionsObject;
+        rule?: IAnnotatedPushRule;
+    } {
         const rule = this.matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
-            return {} as IActionsObject;
+            return {};
         }
 
         const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
@@ -486,10 +717,21 @@ export class PushProcessor {
             actionObj.tweaks.highlight = rule.kind == PushRuleKind.ContentSpecific;
         }
 
-        return actionObj;
+        return { actions: actionObj, rule };
     }
 
     public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
+        // Disable the deprecated mentions push rules if the new mentions property exists.
+        if (
+            this.client.supportsIntentionalMentions() &&
+            ev.getContent()["m.mentions"] !== undefined &&
+            (rule.rule_id === RuleId.ContainsUserName ||
+                rule.rule_id === RuleId.ContainsDisplayName ||
+                rule.rule_id === RuleId.AtRoomNotification)
+        ) {
+            return false;
+        }
+
         return !rule.conditions?.some((cond) => !this.eventFulfillsCondition(cond, ev));
     }
 
@@ -497,6 +739,14 @@ export class PushProcessor {
      * Get the user's push actions for the given event
      */
     public actionsForEvent(ev: MatrixEvent): IActionsObject {
+        const { actions } = this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
+        return actions || ({} as IActionsObject);
+    }
+
+    public actionsAndRuleForEvent(ev: MatrixEvent): {
+        actions?: IActionsObject;
+        rule?: IAnnotatedPushRule;
+    } {
         return this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
     }
 
@@ -507,6 +757,18 @@ export class PushProcessor {
      * @returns The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule | null {
+        const result = this.getPushRuleAndKindById(ruleId);
+        return result?.rule ?? null;
+    }
+
+    /**
+     * Get one of the users push rules by its ID
+     *
+     * @param ruleId - The ID of the rule to search for
+     * @returns rule The push rule, or null if no such rule was found
+     * @returns kind - The PushRuleKind of the rule to search for
+     */
+    public getPushRuleAndKindById(ruleId: string): { rule: IPushRule; kind: PushRuleKind } | null {
         for (const scope of ["global"] as const) {
             if (this.client.pushRules?.[scope] === undefined) continue;
 
@@ -514,7 +776,7 @@ export class PushProcessor {
                 if (this.client.pushRules[scope][kind] === undefined) continue;
 
                 for (const rule of this.client.pushRules[scope][kind]!) {
-                    if (rule.rule_id === ruleId) return rule;
+                    if (rule.rule_id === ruleId) return { rule, kind };
                 }
             }
         }

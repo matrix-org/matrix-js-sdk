@@ -1,3 +1,19 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import * as utils from "../../src/utils";
 import {
     alphabetPad,
@@ -8,16 +24,19 @@ import {
     lexicographicCompare,
     nextString,
     prevString,
+    recursiveMapToObject,
     simpleRetryOperation,
     stringToBase,
     sortEventsByLatestContentTimestamp,
+    safeSet,
+    MapWithDefault,
+    globToRegexp,
+    escapeRegExp,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 import { mkMessage } from "../test-utils/test-utils";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import { ReceiptType } from "../../src/@types/read_receipts";
-
-// TODO: Fix types throughout
 
 describe("utils", function () {
     describe("encodeParams", function () {
@@ -129,9 +148,11 @@ describe("utils", function () {
     describe("deepCompare", function () {
         const assert = {
             isTrue: function (x: any) {
+                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(true);
             },
             isFalse: function (x: any) {
+                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(false);
             },
         };
@@ -585,6 +606,138 @@ describe("utils", function () {
 
         it("should not support other receipt types", () => {
             expect(utils.isSupportedReceiptType("this is a receipt type")).toBeFalsy();
+        });
+    });
+
+    describe("recursiveMapToObject", () => {
+        it.each([
+            // empty map
+            {
+                map: new Map(),
+                expected: {},
+            },
+            // one level map
+            {
+                map: new Map<any, any>([
+                    ["key1", "value 1"],
+                    ["key2", 23],
+                    ["key3", undefined],
+                    ["key4", null],
+                    ["key5", [1, 2, 3]],
+                ]),
+                expected: { key1: "value 1", key2: 23, key3: undefined, key4: null, key5: [1, 2, 3] },
+            },
+            // two level map
+            {
+                map: new Map<any, any>([
+                    [
+                        "key1",
+                        new Map<any, any>([
+                            ["key1_1", "value 1"],
+                            ["key1_2", "value 1.2"],
+                        ]),
+                    ],
+                    ["key2", "value 2"],
+                ]),
+                expected: { key1: { key1_1: "value 1", key1_2: "value 1.2" }, key2: "value 2" },
+            },
+            // multi level map
+            {
+                map: new Map<any, any>([
+                    ["key1", new Map<any, any>([["key1_1", new Map<any, any>([["key1_1_1", "value 1.1.1"]])]])],
+                ]),
+                expected: { key1: { key1_1: { key1_1_1: "value 1.1.1" } } },
+            },
+            // list of maps
+            {
+                map: new Map<any, any>([
+                    [
+                        "key1",
+                        [new Map<any, any>([["key1_1", "value 1.1"]]), new Map<any, any>([["key1_2", "value 1.2"]])],
+                    ],
+                ]),
+                expected: { key1: [{ key1_1: "value 1.1" }, { key1_2: "value 1.2" }] },
+            },
+            // map → array → array → map
+            {
+                map: new Map<any, any>([["key1", [[new Map<any, any>([["key2", "value 2"]])]]]]),
+                expected: {
+                    key1: [
+                        [
+                            {
+                                key2: "value 2",
+                            },
+                        ],
+                    ],
+                },
+            },
+        ])("%# should convert the value", ({ map, expected }) => {
+            expect(recursiveMapToObject(map)).toStrictEqual(expected);
+        });
+    });
+
+    describe("safeSet", () => {
+        it("should set a value", () => {
+            const obj: Record<string, string> = {};
+            safeSet(obj, "testProp", "test value");
+            expect(obj).toEqual({ testProp: "test value" });
+        });
+
+        it.each(["__proto__", "prototype", "constructor"])("should raise an error when setting »%s«", (prop) => {
+            expect(() => {
+                safeSet(<Record<string, string>>{}, prop, "teset value");
+            }).toThrow("Trying to modify prototype or constructor");
+        });
+    });
+
+    describe("MapWithDefault", () => {
+        it("getOrCreate should create the value if it does not exist", () => {
+            const newValue = {};
+            const map = new MapWithDefault(() => newValue);
+
+            // undefined before getOrCreate
+            expect(map.get("test")).toBeUndefined();
+
+            expect(map.getOrCreate("test")).toBe(newValue);
+
+            // default value after getOrCreate
+            expect(map.get("test")).toBe(newValue);
+
+            // test that it always returns the same value
+            expect(map.getOrCreate("test")).toBe(newValue);
+        });
+    });
+
+    describe("sleep", () => {
+        it("resolves", async () => {
+            await utils.sleep(0);
+        });
+
+        it("resolves with the provided value", async () => {
+            const expected = Symbol("hi");
+            const result = await utils.sleep(0, expected);
+            expect(result).toBe(expected);
+        });
+    });
+
+    describe("immediate", () => {
+        it("resolves", async () => {
+            await utils.immediate();
+        });
+    });
+
+    describe("escapeRegExp", () => {
+        it("should escape XYZ", () => {
+            expect(escapeRegExp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]")).toMatchInlineSnapshot(
+                `"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`,
+            );
+        });
+    });
+
+    describe("globToRegexp", () => {
+        it("should not explode when given regexes as globs", () => {
+            const result = globToRegexp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]");
+            expect(result).toMatchInlineSnapshot(`"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`);
         });
     });
 });
