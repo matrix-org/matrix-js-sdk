@@ -299,7 +299,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
-            expect(result?.trustInfo).toEqual({ trusted: true, matchesDecryptionKey: false });
+            expect(result).toBeTruthy();
+            expect(result!.trustInfo).toEqual({ trusted: true, matchesDecryptionKey: false });
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
         });
 
@@ -311,8 +312,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await aliceClient.startClient();
             await waitForDeviceList();
 
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
             const result = await aliceCrypto.checkKeyBackupAndEnable();
-            expect(result?.trustInfo).toEqual({ trusted: false, matchesDecryptionKey: false });
+            expect(result).toBeTruthy();
+            expect(result!.trustInfo).toEqual({ trusted: false, matchesDecryptionKey: false });
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
     });
