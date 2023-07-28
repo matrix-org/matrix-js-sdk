@@ -49,7 +49,7 @@ export function getHttpUriForMxc(
         }
     }
     let serverAndMediaId = mxc.slice(6); // strips mxc://
-    let prefix = "/_matrix/media/r0/download/";
+    let prefix = "/_matrix/media/v3/download/";
     const params: Record<string, string> = {};
 
     if (width) {
@@ -64,7 +64,7 @@ export function getHttpUriForMxc(
     if (Object.keys(params).length > 0) {
         // these are thumbnailing params so they probably want the
         // thumbnailing API...
-        prefix = "/_matrix/media/r0/thumbnail/";
+        prefix = "/_matrix/media/v3/thumbnail/";
     }
 
     const fragmentOffset = serverAndMediaId.indexOf("#");

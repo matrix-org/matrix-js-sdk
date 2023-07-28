@@ -44,5 +44,5 @@ export enum MediaPrefix {
     /**
      * URI path for the media repo API
      */
-    R0 = "/_matrix/media/r0",
+    V3 = "/_matrix/media/v3",
 }

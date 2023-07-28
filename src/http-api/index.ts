@@ -110,7 +110,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 });
             };
 
-            const url = this.getUrl("/upload", undefined, MediaPrefix.R0);
+            const url = this.getUrl("/upload", undefined, MediaPrefix.V3);
 
             if (includeFilename && fileName) {
                 url.searchParams.set("filename", encodeURIComponent(fileName));
@@ -139,7 +139,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             const headers: Record<string, string> = { "Content-Type": contentType };
 
             this.authedRequest<UploadResponse>(Method.Post, "/upload", queryParams, file, {
-                prefix: MediaPrefix.R0,
+                prefix: MediaPrefix.V3,
                 headers,
                 abortSignal: abortController.signal,
             })
@@ -182,7 +182,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     public getContentUri(): IContentUri {
         return {
             base: this.opts.baseUrl,
-            path: MediaPrefix.R0 + "/upload",
+            path: MediaPrefix.V3 + "/upload",
             params: {
                 access_token: this.opts.accessToken!,
             },

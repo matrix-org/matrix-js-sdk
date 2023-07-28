@@ -3920,7 +3920,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getMediaConfig(): Promise<IMediaConfig> {
         return this.http.authedRequest(Method.Get, "/config", undefined, undefined, {
-            prefix: MediaPrefix.R0,
+            prefix: MediaPrefix.V3,
         });
     }
 
@@ -5147,7 +5147,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             },
             undefined,
             {
-                prefix: MediaPrefix.R0,
+                prefix: MediaPrefix.V3,
                 priority: "low",
             },
         );

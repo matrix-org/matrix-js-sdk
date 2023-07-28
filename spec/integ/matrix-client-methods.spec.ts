@@ -73,7 +73,7 @@ describe("MatrixClient", function () {
 
         it("should upload the file", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     expect(req.queryParams?.filename).toEqual("hi.txt");
@@ -108,7 +108,7 @@ describe("MatrixClient", function () {
 
         it("should parse errors into a MatrixError", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     // @ts-ignore private property
