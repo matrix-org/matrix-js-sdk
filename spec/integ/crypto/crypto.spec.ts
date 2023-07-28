@@ -2379,6 +2379,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("Incoming verification in a DM", () => {
         beforeEach(async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+
             keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addKeyReceiver(TEST_USER_ID, keyReceiver);
 
