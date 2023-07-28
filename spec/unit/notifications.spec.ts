@@ -54,7 +54,7 @@ describe("fixNotificationCountOnDecryption", () => {
         mockClient = getMockClientWithEventEmitter({
             ...mockClientMethodsUser(),
             isInitialSyncComplete: jest.fn().mockReturnValue(false),
-            getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
+            getPushActionsForEvent: jest.fn((ev) => event.getPushActions() ?? mkPushAction(true, true)),
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
             supportsThreads: jest.fn().mockReturnValue(true),
@@ -125,15 +125,15 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 1);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
-        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(false, false));
-        threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(false, false));
+        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, true));
+        threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, true));
     });
 
     it("changes the room count to highlight on decryption", () => {
         expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
 
-        fixNotificationCountOnDecryption(mockClient, event);
+        fixNotificationCountOnDecryption(mockClient, event, {});
 
         expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(3);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
@@ -143,7 +143,7 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setUnreadNotificationCount(NotificationCountType.Total, 0);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
-        fixNotificationCountOnDecryption(mockClient, event);
+        fixNotificationCountOnDecryption(mockClient, event, {});
 
         expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
         expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
@@ -153,7 +153,7 @@ describe("fixNotificationCountOnDecryption", () => {
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
 
-        fixNotificationCountOnDecryption(mockClient, threadEvent);
+        fixNotificationCountOnDecryption(mockClient, threadEvent, {});
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(2);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
@@ -163,7 +163,7 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
-        fixNotificationCountOnDecryption(mockClient, event);
+        fixNotificationCountOnDecryption(mockClient, event, {});
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
@@ -187,7 +187,7 @@ describe("fixNotificationCountOnDecryption", () => {
             event: true,
         });
 
-        fixNotificationCountOnDecryption(mockClient, unknownThreadEvent);
+        fixNotificationCountOnDecryption(mockClient, unknownThreadEvent, {});
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
@@ -201,7 +201,7 @@ describe("fixNotificationCountOnDecryption", () => {
         event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
         mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
 
-        fixNotificationCountOnDecryption(mockClient, event);
+        fixNotificationCountOnDecryption(mockClient, event, {});
         expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
     });
@@ -213,7 +213,7 @@ describe("fixNotificationCountOnDecryption", () => {
         threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
         mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
 
-        fixNotificationCountOnDecryption(mockClient, event);
+        fixNotificationCountOnDecryption(mockClient, event, {});
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
     });
@@ -230,5 +230,16 @@ describe("fixNotificationCountOnDecryption", () => {
 
         room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 5);
         expect(cb).toHaveBeenLastCalledWith({ highlight: 5 }, "$123");
+    });
+
+    it("should not increment notification count where event was already contributing notification", () => {
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
+
+        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
+        fixNotificationCountOnDecryption(mockClient, event, { actions: { notify: true, tweaks: {} } });
+
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
     });
 });
