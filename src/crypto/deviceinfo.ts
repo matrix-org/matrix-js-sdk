@@ -28,6 +28,8 @@ export interface IDevice {
 
 /**
  * Information about a user's device
+ *
+ * Superceded by {@link Device}.
  */
 export class DeviceInfo {
     /**

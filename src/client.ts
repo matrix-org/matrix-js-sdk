@@ -3282,6 +3282,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param info - key backup info dict from getKeyBackupVersion()
+     *
+     * @deprecated Prefer {@link CryptoApi.isKeyBackupTrusted | `CryptoApi.isKeyBackupTrusted`}.
      */
     public isKeyBackupTrusted(info: IKeyBackupInfo): Promise<TrustInfo> {
         if (!this.crypto) {

@@ -50,7 +50,7 @@ import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { DehydrationManager } from "./dehydration";
-import { BackupManager } from "./backup";
+import { BackupManager, backupTrustInfoFromLegacyTrustInfo } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
@@ -87,10 +87,12 @@ import {
 } from "../secret-storage";
 import { ISecretRequest } from "./SecretSharing";
 import {
+    BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
     DeviceVerificationStatus,
     ImportRoomKeysOpts,
+    KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
@@ -1290,6 +1292,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return this.backupManager.version ?? null;
         }
         return null;
+    }
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * Implementation of {@link Crypto.CryptoApi.isKeyBackupTrusted}.
+     */
+    public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
+        const trustInfo = await this.backupManager.isKeyBackupTrusted(info);
+        return backupTrustInfoFromLegacyTrustInfo(trustInfo);
     }
 
     /**
