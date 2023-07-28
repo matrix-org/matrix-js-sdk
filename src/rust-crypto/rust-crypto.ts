@@ -1059,7 +1059,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // 5 mins
             const TIMEOUT_DELAY = 5 * 60 * 1000;
 
-            let timeoutId: number;
+            const timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
+
             const onDecrypted = (decryptedEvent: MatrixEvent, error?: Error): void => {
                 if (error) return;
 
@@ -1068,7 +1069,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 processEvent(decryptedEvent);
             };
             // After 5mins, we are not expecting the event to be decrypted
-            timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
 
             event.on(MatrixEventEvent.Decrypted, onDecrypted);
         } else {
