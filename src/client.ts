@@ -133,7 +133,6 @@ import {
     IFilterResponse,
     ITagsResponse,
     IStatusResponse,
-    IAddThreePidBody,
 } from "./@types/requests";
 import {
     EventType,
