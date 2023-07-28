@@ -7886,18 +7886,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param relayState - URL Callback after SAML2 Authentication
-     * @returns Promise which resolves to a LoginResponse object
-     * @returns Rejects: with an error response.
-     * @deprecated this isn't in the Matrix spec anymore
-     */
-    public loginWithSAML2(relayState: string): Promise<LoginResponse> {
-        return this.login("m.login.saml2", {
-            relay_state: relayState,
-        });
-    }
-
-    /**
      * @param redirectUrl - The URL to redirect to after the HS
      * authenticates with CAS.
      * @returns The HS URL to hit to begin the CAS login process.
@@ -7926,7 +7914,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
-        return this.http.getUrl(url, params, ClientPrefix.R0).href;
+        return this.http.getUrl(url, params).href;
     }
 
     /**
@@ -8044,13 +8032,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $loginType: loginType,
         });
 
-        return this.http.getUrl(
-            path,
-            {
-                session: authSessionId,
-            },
-            ClientPrefix.R0,
-        ).href;
+        return this.http.getUrl(path, {
+            session: authSessionId,
+        }).href;
     }
 
     /**
@@ -8429,30 +8413,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set the visbility of a room bridged to a 3rd party network in
-     * the current HS's room directory.
-     * @param networkId - the network ID of the 3rd party
-     *                 instance under which this room is published under.
-     * @param visibility - "public" to make the room visible
-     *                 in the public directory, or "private" to make
-     *                 it invisible.
-     * @returns Promise which resolves: result object
-     * @returns Rejects: with an error response.
-     * @deprecated missing from the spec
-     */
-    public setRoomDirectoryVisibilityAppService(
-        networkId: string,
-        roomId: string,
-        visibility: "public" | "private",
-    ): Promise<any> {
-        const path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
-            $networkId: networkId,
-            $roomId: roomId,
-        });
-        return this.http.authedRequest(Method.Put, path, undefined, { visibility: visibility });
-    }
-
-    /**
      * Query the user directory with a term matching user IDs, display names and domains.
      * @param term - the term with which to search.
      * @param limit - the maximum number of results to return. The server will
@@ -8535,24 +8495,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Add a 3PID to your homeserver account and optionally bind it to an identity
-     * server as well. An identity server is required as part of the `creds` object.
-     *
-     * @deprecated this API is deprecated, and you should instead use `addThreePidOnly` for homeservers that support it.
-     *
-     * @returns Promise which resolves: on success
-     * @returns Rejects: with an error response.
-     */
-    public addThreePid(creds: IAddThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
-        const path = "/account/3pid";
-        const data = {
-            threePidCreds: creds,
-            bind: bind,
-        };
-        return this.http.authedRequest(Method.Post, path, undefined, data);
-    }
-
-    /**
      * Add a 3PID to your homeserver account. This API does not use an identity
      * server, as the homeserver is expected to handle 3PID ownership validation.
      *
@@ -8566,8 +8508,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
@@ -8586,8 +8527,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
         const path = "/account/3pid/bind";
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
@@ -8612,8 +8552,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             address,
             id_server: this.getIdentityServerUrl(true),
         };
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
