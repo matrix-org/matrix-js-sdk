@@ -351,7 +351,7 @@ describe("AutoDiscovery", function () {
         function () {
             const httpBackend = getHttpBackend();
             httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                not_matrix_versions: ["r0.0.1"],
+                not_matrix_versions: ["v1.1"],
             });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -388,7 +388,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.1"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -428,7 +428,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.1"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -469,7 +469,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.1"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -515,7 +515,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.1"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -560,7 +560,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.1"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -606,7 +606,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.1"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(404, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -653,7 +653,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.1"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(500, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -697,7 +697,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.1"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -747,7 +747,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.1"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -879,7 +879,7 @@ describe("AutoDiscovery", function () {
 
         beforeEach(() => {
             fetchMock.resetBehavior();
-            fetchMock.get(`${homeserverUrl}_matrix/client/versions`, { versions: ["r0.0.1"] });
+            fetchMock.get(`${homeserverUrl}_matrix/client/versions`, { versions: ["v1.1"] });
 
             fetchMock.get("https://example.org/.well-known/matrix/client", {
                 "m.homeserver": {
