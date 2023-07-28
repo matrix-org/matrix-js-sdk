@@ -9859,14 +9859,6 @@ export function fixNotificationCountOnDecryption(
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
-    const currentHighlightCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
-
-    // Ensure the unread counts are kept up to date if the event is encrypted
-    // We also want to make sure that the notification count goes up if we already
-    // have encrypted events to avoid other code from resetting 'highlight' to zero.
-    const oldHighlight = !!oldActions?.tweaks?.highlight;
-    const newHighlight = !!actions?.tweaks?.highlight;
-
     let hasReadEvent;
     if (isThreadEvent) {
         const thread = room.getThread(event.threadRootId);
@@ -9888,36 +9880,35 @@ export function fixNotificationCountOnDecryption(
         return;
     }
 
-    if (oldHighlight !== newHighlight || currentHighlightCount > 0) {
-        // TODO: Handle mentions received while the client is offline
-        // See also https://github.com/vector-im/element-web/issues/9069
-        let newCount = currentHighlightCount;
-        if (newHighlight && !oldHighlight) newCount++;
-        if (!newHighlight && oldHighlight) newCount--;
+    // Ensure the unread counts are kept up to date if the event is encrypted
+    // We also want to make sure that the notification count goes up if we already
+    // have encrypted events to avoid other code from resetting 'highlight' to zero.
+    // TODO: Handle mentions received while the client is offline
+    // See also https://github.com/vector-im/element-web/issues/9069
+    for (const type of [NotificationCountType.Highlight, NotificationCountType.Total]) {
+        let count = room.getUnreadCountForEventContext(type, event);
 
-        if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight, newCount);
+        let oldValue: boolean;
+        let newValue: boolean;
+        if (type === NotificationCountType.Total) {
+            // Total count is used to typically increment a room notification counter, but not loudly highlight it.
+            // `notify` is used in practice for incrementing the total count
+            oldValue = !!oldActions?.notify;
+            newValue = !!actions?.notify;
         } else {
-            room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
+            oldValue = !!oldActions?.tweaks?.highlight;
+            newValue = !!actions?.tweaks?.highlight;
         }
-    }
 
-    // Total count is used to typically increment a room notification counter, but not loudly highlight it.
-    const currentTotalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
+        if (oldValue !== newValue || count > 0) {
+            if (newValue && !oldValue) count++;
+            if (!newValue && oldValue) count--;
 
-    // `notify` is used in practice for incrementing the total count
-    const oldNotify = !!oldActions?.notify;
-    const newNotify = !!actions?.notify;
-
-    if (oldNotify !== newNotify || currentTotalCount > 0) {
-        let newCount = currentTotalCount;
-        if (newHighlight && !oldHighlight) newCount++;
-        if (!newHighlight && oldHighlight) newCount--;
-
-        if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, newCount);
-        } else {
-            room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
+            if (isThreadEvent) {
+                room.setThreadUnreadNotificationCount(event.threadRootId, type, count);
+            } else {
+                room.setUnreadNotificationCount(type, count);
+            }
         }
     }
 }
