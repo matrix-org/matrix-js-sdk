@@ -49,9 +49,9 @@ type AuthData = IKeyBackupInfo["auth_data"];
 
 type SigInfo = {
     deviceId: string;
-    valid: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
-    device: DeviceInfo | null;
-    crossSigningId: boolean;
+    valid?: boolean | null; // true: valid, false: invalid, null: cannot attempt validation
+    device?: DeviceInfo | null;
+    crossSigningId?: boolean;
     deviceTrust?: DeviceTrustLevel;
 };
 
@@ -60,7 +60,7 @@ export type TrustInfo = {
     usable: boolean; // is the backup trusted, true iff there is a sig that is valid & from a trusted device
     sigs: SigInfo[];
     // eslint-disable-next-line camelcase
-    trusted_locally: boolean;
+    trusted_locally?: boolean;
 };
 
 export interface IKeyBackupCheck {
@@ -326,7 +326,7 @@ export class BackupManager {
      * @param backupInfo - key backup info dict from /room_keys/version
      */
     public async isKeyBackupTrusted(backupInfo?: IKeyBackupInfo): Promise<TrustInfo> {
-        const ret: TrustInfo = {
+        const ret = {
             usable: false,
             trusted_locally: false,
             sigs: [] as SigInfo[],
@@ -366,7 +366,7 @@ export class BackupManager {
             }
             // Could be a cross-signing master key, but just say this is the device
             // ID for backwards compat
-            const sigInfo: SigInfo = { deviceId: keyIdParts[1], valid: null, crossSigningId: false, device: null };
+            const sigInfo: SigInfo = { deviceId: keyIdParts[1] };
 
             // first check to see if it's from our cross-signing key
             const crossSigningId = this.baseApis.crypto!.crossSigningInfo.getId();
@@ -421,7 +421,7 @@ export class BackupManager {
                     sigInfo.valid = false;
                 }
             } else {
-                // Can't determine validity because we don't have the signing device
+                sigInfo.valid = null; // Can't determine validity because we don't have the signing device
                 logger.info("Ignoring signature from unknown key " + keyId);
             }
             ret.sigs.push(sigInfo);
@@ -840,6 +840,6 @@ export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
 export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): BackupTrustInfo {
     return {
         trusted: trustInfo.usable,
-        matchesDecryptionKey: trustInfo.trusted_locally,
+        matchesDecryptionKey: trustInfo.trusted_locally ?? false,
     };
 }
