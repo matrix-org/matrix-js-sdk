@@ -9768,6 +9768,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param toStartOfTimeline - the direction
      */
     public processThreadRoots(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
+        if (!this.supportsThreads()) return;
         room.processThreadRoots(threadedEvents, toStartOfTimeline);
     }
 
