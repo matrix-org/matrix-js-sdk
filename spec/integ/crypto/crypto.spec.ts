@@ -2447,7 +2447,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
-        it("Verification request from Bob to Alice", async () => {
+        newBackendOnly("Verification request from Bob to Alice", async () => {
             // Tell alice she is sharing a room with bob
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -2464,7 +2464,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(request?.otherUserId).toBe("@bob:xyz");
         });
 
-        it("Verification request not found", async () => {
+        newBackendOnly("Verification request not found", async () => {
             // Tell alice she is sharing a room with bob
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             // Wait for the sync response to be processed
