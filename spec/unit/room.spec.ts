@@ -3428,13 +3428,13 @@ describe("Room", function () {
             expect(room.polls.get(pollStartEventId)).toBeUndefined();
 
             // now emit a Decrypted event but keep the decryption failure
-            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent, undefined, pollStartEvent.getPushDetails());
+            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent);
             // still do not expect a poll to show up for the room
             expect(room.polls.get(pollStartEventId)).toBeUndefined();
 
             // clear decryption failure and emit a Decrypted event again
             isDecryptionFailureSpy.mockRestore();
-            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent, undefined, pollStartEvent.getPushDetails());
+            pollStartEvent.emit(MatrixEventEvent.Decrypted, pollStartEvent);
 
             // the poll should now show up in the room's polls
             const poll = room.polls.get(pollStartEventId);
