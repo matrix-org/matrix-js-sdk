@@ -686,8 +686,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      */
     public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
-        // TODO raise an error
-        if (!userId) return;
+        if (!userId) throw new Error("missing userId");
 
         const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
             new RustSdkCryptoJs.UserId(userId),
