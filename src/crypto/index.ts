@@ -2380,8 +2380,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return deviceObj;
     }
 
-    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
-        return this.inRoomVerificationRequests.findRequestInProgress(roomId);
+    public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
+        return this.inRoomVerificationRequests.findRequestInProgress(roomId, userId);
     }
 
     public getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[] {

@@ -11,6 +11,7 @@ import { KeyBackupInfo } from "../../../src/crypto-api";
 
 export const TEST_USER_ID = "@alice:localhost";
 export const TEST_DEVICE_ID = "test_device";
+export const TEST_ROOM_ID = "!room:id";
 
 /** The base64-encoded public ed25519 key for this device */
 export const TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64 = "YI/7vbGVLpGdYtuceQR8MSsKB/QjgfMXM1xqnn+0NWU";

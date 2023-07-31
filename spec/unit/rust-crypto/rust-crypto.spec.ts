@@ -576,6 +576,13 @@ describe("RustCrypto", () => {
             expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
     });
+
+    describe("findVerificationRequestDMInProgress", () => {
+        it("returns undefined if the userId is not provided", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            expect(rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).not.toBeDefined();
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

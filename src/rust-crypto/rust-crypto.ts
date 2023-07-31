@@ -19,7 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
-import { IContent, MatrixEvent } from "../models/event";
+import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
@@ -35,6 +35,7 @@ import {
     BootstrapCrossSigningOpts,
     CreateSecretStorageOpts,
     CrossSigningKey,
+    CrossSigningKeyInfo,
     CrossSigningStatus,
     CryptoCallbacks,
     DeviceVerificationStatus,
@@ -43,7 +44,6 @@ import {
     ImportRoomKeysOpts,
     KeyBackupInfo,
     VerificationRequest,
-    CrossSigningKeyInfo,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
@@ -55,7 +55,7 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupManager } from "./backup";
@@ -680,13 +680,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#findVerificationRequestDMInProgress}
      *
      * @param roomId - the room to use for verification
+     * @param userId - search the verification request for the given user
      *
      * @returns the VerificationRequest that is in progress, if any
      *
      */
-    public findVerificationRequestDMInProgress(roomId: string): undefined {
-        // TODO
-        return;
+    public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
+        // TODO raise an error
+        if (!userId) return;
+
+        const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
+            new RustSdkCryptoJs.UserId(userId),
+        );
+
+        // Search for the verification request for the given room id
+        const request = requests.find((request) => request.roomId?.toString() === roomId);
+
+        if (request) {
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
+            );
+        }
     }
 
     /**
@@ -1016,6 +1032,73 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 logger.info(`Still unable to decrypt event ${ev.getId()} after receiving key`);
             });
         }
+    }
+
+    /**
+     * Handle a live event received via /sync.
+     * See {@link ClientEventHandlerMap#event}
+     *
+     * @param event - live event
+     */
+    public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
+        // Ignore state event
+        if (event.isState()) return;
+
+        const processEvent = async (evt: MatrixEvent): Promise<void> => {
+            // Process only key validation request
+            if (
+                evt.getType() === EventType.RoomMessage &&
+                evt.getContent().msgtype === MsgType.KeyVerificationRequest
+            ) {
+                await this.onKeyVerificationRequest(evt);
+            }
+        };
+
+        // If the event is encrypted of in failure, we wait for decryption
+        if (event.isDecryptionFailure() || event.isEncrypted()) {
+            // 5 mins
+            const TIMEOUT_DELAY = 5 * 60 * 1000;
+
+            const timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
+
+            const onDecrypted = (decryptedEvent: MatrixEvent, error?: Error): void => {
+                if (error) return;
+
+                clearTimeout(timeoutId);
+                event.off(MatrixEventEvent.Decrypted, onDecrypted);
+                processEvent(decryptedEvent);
+            };
+            // After 5mins, we are not expecting the event to be decrypted
+
+            event.on(MatrixEventEvent.Decrypted, onDecrypted);
+        } else {
+            await processEvent(event);
+        }
+    }
+
+    /**
+     * Handle key verification request.
+     *
+     * @param event - a key validation request event.
+     */
+    private async onKeyVerificationRequest(event: MatrixEvent): Promise<void> {
+        const roomId = event.getRoomId();
+
+        if (!roomId) {
+            throw new Error("missing roomId in the event");
+        }
+
+        await this.olmMachine.receiveVerificationEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
