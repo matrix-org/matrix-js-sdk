@@ -54,10 +54,15 @@ import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
-import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
+import {
+    RustVerificationRequest,
+    verificationMethodIdentifierToMethod,
+    verificationMethodsByIdentifier,
+} from "./verification";
 import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { randomString } from "../randomstring";
 import { RustBackupManager } from "./backup";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
@@ -703,6 +708,60 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this._supportedVerificationMethods,
             );
         }
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#requestVerificationDM}
+     */
+    public async requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(userId),
+        );
+
+        if (!userIdentity) throw new Error(`unknown userId ${userId}`);
+
+        // Transform the verification methods into rust objects
+        const methods = this._supportedVerificationMethods.map((method) => verificationMethodsByIdentifier[method]);
+        // Get the request content to send to the DM room
+        const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+
+        // Send the request content to send to the DM room
+        const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
+
+        // Get a verification request
+        const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
+            new RustSdkCryptoJs.RoomId(roomId),
+            new RustSdkCryptoJs.EventId(eventId),
+            methods,
+        );
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+    }
+
+    /**
+     * Send the verification content to a room
+     * See https://spec.matrix.org/v1.7/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+     *
+     * Prefer to use {@link OutgoingRequestProcessor.makeOutgoingRequest} when dealing with {@link RustSdkCryptoJs.RoomMessageRequest}
+     *
+     * @param roomId - the targeted room
+     * @param verificationEventContent - the request body.
+     *
+     * @returns the event id
+     */
+    private async sendVerificationRequestContent(roomId: string, verificationEventContent: string): Promise<string> {
+        const txId = randomString(32);
+        // Send the verification request content to the DM room
+        const { event_id: eventId } = await this.http.authedRequest<{ event_id: string }>(
+            Method.Put,
+            `/_matrix/client/v3/room/${encodeURIComponent(roomId)}/send/m.room.message/${encodeURIComponent(txId)}`,
+            undefined,
+            verificationEventContent,
+            {
+                prefix: "",
+            },
+        );
+
+        return eventId;
     }
 
     /**

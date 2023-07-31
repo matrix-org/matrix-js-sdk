@@ -282,6 +282,16 @@ export interface CryptoApi {
     findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined;
 
     /**
+     * Request a key verification from another user, using a DM.
+     *
+     * @param userId - the user to request verification with.
+     * @param roomId - the room to use for verification.
+     *
+     * @returns resolves to a VerificationRequest when the request has been sent to the other party.
+     */
+    requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest>;
+
+    /**
      * Send a verification request to our other devices.
      *
      * This is normally used when the current device is new, and we want to ask another of our devices to cross-sign.

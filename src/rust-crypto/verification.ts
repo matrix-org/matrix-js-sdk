@@ -677,7 +677,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
 }
 
 /** For each specced verification method, the rust-side `VerificationMethod` corresponding to it */
-const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.VerificationMethod> = {
+export const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.VerificationMethod> = {
     "m.sas.v1": RustSdkCryptoJs.VerificationMethod.SasV1,
     "m.qr_code.scan.v1": RustSdkCryptoJs.VerificationMethod.QrCodeScanV1,
     "m.qr_code.show.v1": RustSdkCryptoJs.VerificationMethod.QrCodeShowV1,

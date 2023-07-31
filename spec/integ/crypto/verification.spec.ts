@@ -22,7 +22,7 @@ import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 
-import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, IContent, ICreateClientOpts, IDownloadKeyResult, MatrixClient } from "../../../src";
 import {
     canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
@@ -34,7 +34,7 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, emitPromise, InitCrypto } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, emitPromise, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
@@ -42,11 +42,13 @@ import {
     SIGNED_TEST_DEVICE_DATA,
     TEST_DEVICE_ID,
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
+    TEST_ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { IDeviceKeys } from "../../../src/@types/crypto";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -805,6 +807,115 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
             expect(toDeviceMessage.transaction_id).toEqual(TRANSACTION_ID);
+        });
+    });
+
+    describe("Send verification request in DM", () => {
+        const crossSingingKeys: Partial<IDownloadKeyResult> = {
+            master_keys: {
+                "@bob:xyz": {
+                    keys: {
+                        "ed25519:i2y3s50NUzxxtIdyxEc9yFybLIq6qgBSb9r7k9yICBY":
+                            "i2y3s50NUzxxtIdyxEc9yFybLIq6qgBSb9r7k9yICBY",
+                    },
+                    user_id: "@bob:xyz",
+                    usage: ["master"],
+                },
+            },
+            self_signing_keys: {
+                "@bob:xyz": {
+                    keys: {
+                        "ed25519:cyTNi7Z7LZHlV1qnirzRypdsIWNLAH/z7Jc9PAIkf1g":
+                            "cyTNi7Z7LZHlV1qnirzRypdsIWNLAH/z7Jc9PAIkf1g",
+                    },
+                    user_id: "@bob:xyz",
+                    usage: ["self_signing"],
+                    signatures: {
+                        "@bob:xyz": {
+                            "ed25519:i2y3s50NUzxxtIdyxEc9yFybLIq6qgBSb9r7k9yICBY":
+                                "SrAMqvGSkwzxXoLZAcmuMl+gbQBlHbWObY1IX1wZ9ADlOJkeEzzjxzsyah25I29TLFHrTG+dFphreItE3pGQAA",
+                        },
+                    },
+                },
+            },
+            user_signing_keys: {
+                "@bob:xyz": {
+                    keys: {
+                        "ed25519:mdF9bCRhssc1OTWqsmSdS4usif2PboaT/cAJMNqykbA":
+                            "mdF9bCRhssc1OTWqsmSdS4usif2PboaT/cAJMNqykbA",
+                    },
+                    user_id: "@bob:xyz",
+                    usage: ["user_signing"],
+                    signatures: {
+                        "@bob:xyz": {
+                            "ed25519:i2y3s50NUzxxtIdyxEc9yFybLIq6qgBSb9r7k9yICBY":
+                                "7DoXVLc4iNvQQOSR9G9QQEot93M7CM76z0fUtraIo/hnMH1/M96DIskLl9MBONOL5nEekw2LXXFWh55AANMMCg",
+                        },
+                    },
+                },
+            },
+        };
+
+        const deviceKeys: IDeviceKeys = {
+            algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+            device_id: "bob_device",
+            keys: {
+                "curve25519:bob_device": "F4uCNNlcbRvc7CfBz95ZGWBvY1ALniG1J8+6rhVoKS0",
+                "ed25519:bob_device": "PNsWknI+bXfeeV7GFfnuBX3sATD+/riD0gvvv8Ynd5s",
+            },
+            user_id: "@bob:xyz",
+            signatures: {
+                "@bob:xyz": {
+                    "ed25519:bob_device":
+                        "T+UUApQlgZHNfM4gdkcrJcjTmeF7wEYAZH2OS99gKKizEgEFL89acAC7yuLfm2MI5J9Ks2AGkQJp3jjNjC/kBA",
+                },
+            },
+        };
+
+        const bobId = "@bob:xyz";
+
+        beforeEach(async () => {
+            aliceClient = await startTestClient();
+
+            e2eKeyResponder.addCrossSigningData(crossSingingKeys);
+            e2eKeyResponder.addDeviceKeys(deviceKeys);
+
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([bobId]));
+
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+        });
+
+        function awaitRoomMessageRequest(): Promise<IContent> {
+            return new Promise((resolve) => {
+                fetchMock.put(
+                    "express:/_matrix/client/v3/room/:roomId/send/m.room.message/:txId",
+                    (url: string, options: RequestInit) => {
+                        resolve(JSON.parse(options.body as string));
+                        return { event_id: "$YUwRidLecu:example.com" };
+                    },
+                );
+            });
+        }
+
+        newBackendOnly("alice send verification request in a DM to bob", async () => {
+            const messageRequestPromise = awaitRoomMessageRequest();
+            const verificationRequest = await aliceClient.getCrypto()!.requestVerificationDM(bobId, TEST_ROOM_ID);
+            const requestContent = await messageRequestPromise;
+
+            expect(requestContent.from_device).toBe(aliceClient.getDeviceId());
+            expect(requestContent.methods).toStrictEqual([
+                "m.sas.v1",
+                "m.qr_code.scan.v1",
+                "m.qr_code.show.v1",
+                "m.reciprocate.v1",
+            ]);
+            expect(requestContent.msgtype).toBe("m.key.verification.request");
+            expect(requestContent.to).toBe(bobId);
+
+            expect(verificationRequest.roomId).toBe(TEST_ROOM_ID);
+            expect(verificationRequest.isSelfVerification).toBe(false);
+            expect(verificationRequest.otherUserId).toBe(bobId);
         });
     });
 
