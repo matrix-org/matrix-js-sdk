@@ -38,6 +38,7 @@ import {
     Room,
     IndexedDBStore,
     RelationType,
+    EventType,
 } from "../../src";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
@@ -1589,6 +1590,68 @@ describe("MatrixClient syncing", () => {
                     eventId: "$event1:localhost",
                 });
             });
+        });
+
+        it("should apply encrypted notification logic for events within the same sync blob", async () => {
+            const roomId = "!room123:server";
+            const syncData = {
+                rooms: {
+                    join: {
+                        [roomId]: {
+                            ephemeral: {
+                                events: [],
+                            },
+                            timeline: {
+                                events: [
+                                    utils.mkEvent({
+                                        room: roomId,
+                                        event: true,
+                                        skey: "",
+                                        type: EventType.RoomEncryption,
+                                        content: {},
+                                    }),
+                                    utils.mkMessage({
+                                        room: roomId,
+                                        user: otherUserId,
+                                        msg: "hello",
+                                    }),
+                                ],
+                            },
+                            state: {
+                                events: [
+                                    utils.mkMembership({
+                                        room: roomId,
+                                        mship: "join",
+                                        user: otherUserId,
+                                    }),
+                                    utils.mkMembership({
+                                        room: roomId,
+                                        mship: "join",
+                                        user: selfUserId,
+                                    }),
+                                    utils.mkEvent({
+                                        type: "m.room.create",
+                                        room: roomId,
+                                        user: selfUserId,
+                                        content: {
+                                            creator: selfUserId,
+                                        },
+                                    }),
+                                ],
+                            },
+                        },
+                    },
+                },
+            } as unknown as ISyncResponse;
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+            client!.startClient();
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeInstanceOf(Room);
+            expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
         });
     });
 
