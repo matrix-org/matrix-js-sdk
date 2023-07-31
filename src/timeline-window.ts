@@ -35,10 +35,13 @@ const debuglog = DEBUG ? logger.log.bind(logger) : function (): void {};
 
 /**
  * the number of times we ask the server for more events before giving up
+ * this is currently higher than it needs to be to workaround lack of a filter
+ * for excluding thread responses from main timeline pagination which can cause
+ * giving up incorrectly - https://github.com/matrix-org/matrix-spec-proposals/pull/3874
  *
  * @internal
  */
-const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
+const DEFAULT_PAGINATE_LOOP_LIMIT = 10;
 
 interface IOpts {
     /**
