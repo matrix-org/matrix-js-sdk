@@ -576,6 +576,15 @@ describe("RustCrypto", () => {
             expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
     });
+
+    describe("findVerificationRequestDMInProgress", () => {
+        it("throws an error if the userId is not provided", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            expect(() => rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).toThrow(
+                "missing userId",
+            );
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
