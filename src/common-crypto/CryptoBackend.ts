@@ -18,9 +18,10 @@ import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
-import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
+import { UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
+import { CrossSigningInfo } from "../crypto-api/crosssigning";
 
 /**
  * Common interface for the crypto implementations
@@ -89,7 +90,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      *
      * @returns the cross signing information for the user.
      */
-    getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
+    getStoredCrossSigningForUser(userId: string): Promise<CrossSigningInfo | null>;
 
     /**
      * Check the cross signing trust of the current user

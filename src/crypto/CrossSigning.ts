@@ -31,6 +31,7 @@ import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 import { DeviceVerificationStatus } from "../crypto-api";
+import { CrossSigningInfo as NewCrossSigningInfo } from "../crypto-api/crosssigning";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -52,7 +53,7 @@ export interface ICrossSigningInfo {
     crossSigningVerifiedBefore: boolean;
 }
 
-export class CrossSigningInfo {
+export class CrossSigningInfo implements NewCrossSigningInfo {
     public keys: Record<string, ICrossSigningKey> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.

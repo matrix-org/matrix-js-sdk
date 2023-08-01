@@ -1490,8 +1490,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns the cross signing information for the user.
      */
-    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
-        return this.deviceList.getStoredCrossSigningForUser(userId);
+    public getStoredCrossSigningForUser(userId: string): Promise<CrossSigningInfo | null> {
+        return Promise.resolve(this.deviceList.getStoredCrossSigningForUser(userId));
     }
 
     /**
