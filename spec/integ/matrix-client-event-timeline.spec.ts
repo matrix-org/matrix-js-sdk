@@ -207,7 +207,7 @@ function startClient(httpBackend: HttpBackend, client: MatrixClient) {
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
 
-    client.startClient();
+    client.startClient({ threadSupport: true });
 
     // set up a promise which will resolve once the client is initialised
     const prom = new Promise<void>((resolve) => {
