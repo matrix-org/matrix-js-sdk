@@ -1877,6 +1877,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Takes the given thread root events and creates threads for them.
      */
     public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
+        if (!this.client.supportsThreads()) return;
         for (const rootEvent of events) {
             EventTimeline.setEventMetadata(rootEvent, this.currentState, toStartOfTimeline);
             if (!this.getThread(rootEvent.getId()!)) {
@@ -2031,6 +2032,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
+        if (!this.client.supportsThreads()) return;
         if (this.threadsTimelineSets.length === 0) return;
 
         const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];

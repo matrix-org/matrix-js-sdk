@@ -350,11 +350,11 @@ export class InRoomRequests implements IRequestsMap {
         }
     }
 
-    public findRequestInProgress(roomId: string): VerificationRequest | undefined {
+    public findRequestInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
         const requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             for (const request of requestsByTxnId.values()) {
-                if (request.pending) {
+                if (request.pending && (userId === undefined || request.requestingUserId === userId)) {
                     return request;
                 }
             }
