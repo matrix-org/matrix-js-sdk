@@ -319,6 +319,93 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result!.trustInfo).toEqual({ trusted: false, matchesDecryptionKey: false });
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
+
+        it("disables backup when a new untrusted backup is available", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            const unsignedBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            delete unsignedBackup.auth_data.signatures;
+            unsignedBackup.version = "2";
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", unsignedBackup, {
+                overwriteRoutes: true,
+            });
+
+            await aliceCrypto.checkKeyBackupAndEnable();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
+
+        it("switches backup when a new trusted backup is available", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            const newBackupVersion = "2";
+            const unsignedBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            unsignedBackup.version = newBackupVersion;
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", unsignedBackup, {
+                overwriteRoutes: true,
+            });
+
+            await aliceCrypto.checkKeyBackupAndEnable();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(newBackupVersion);
+        });
+
+        it("Disables when backup is deleted", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            fetchMock.get(
+                "path:/_matrix/client/v3/room_keys/version",
+                {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                },
+                {
+                    overwriteRoutes: true,
+                },
+            );
+            const noResult = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(noResult).toBeNull();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
     });
 
     /** make sure that the client knows about the dummy device */
