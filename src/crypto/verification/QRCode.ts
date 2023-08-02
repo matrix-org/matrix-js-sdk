@@ -166,16 +166,16 @@ export class QRCodeData {
         let otherDeviceKey: string | null = null;
         let myMasterKey: string | null = null;
         if (mode === Mode.VerifyOtherUser) {
-            const otherUserCrossSigningInfo = client.getStoredCrossSigningForUser(request.otherUserId);
-            otherUserMasterKey = otherUserCrossSigningInfo!.getId("master");
+            const otherUserCrossSigningInfo = await client.getStoredCrossSigningForUser(request.otherUserId);
+            otherUserMasterKey = otherUserCrossSigningInfo!.getId();
         } else if (mode === Mode.VerifySelfTrusted) {
             otherDeviceKey = await QRCodeData.getOtherDeviceKey(request, client);
         } else if (mode === Mode.VerifySelfUntrusted) {
             const myUserId = client.getUserId()!;
-            const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
-            myMasterKey = myCrossSigningInfo!.getId("master");
+            const myCrossSigningInfo = await client.getStoredCrossSigningForUser(myUserId);
+            myMasterKey = myCrossSigningInfo!.getId();
         }
-        const qrData = QRCodeData.generateQrData(
+        const qrData = await QRCodeData.generateQrData(
             request,
             client,
             mode,
@@ -232,7 +232,7 @@ export class QRCodeData {
         return mode;
     }
 
-    private static generateQrData(
+    private static async generateQrData(
         request: VerificationRequest,
         client: MatrixClient,
         mode: Mode,
@@ -240,7 +240,7 @@ export class QRCodeData {
         otherUserMasterKey?: string,
         otherDeviceKey?: string,
         myMasterKey?: string,
-    ): IQrData {
+    ): Promise<IQrData> {
         const myUserId = client.getUserId()!;
         const transactionId = request.channel.transactionId;
         const qrData: IQrData = {
@@ -253,16 +253,16 @@ export class QRCodeData {
             secretB64: encodedSharedSecret,
         };
 
-        const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
+        const myCrossSigningInfo = await client.getStoredCrossSigningForUser(myUserId);
 
         if (mode === Mode.VerifyOtherUser) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo!.getId("master")!;
+            qrData.firstKeyB64 = myCrossSigningInfo!.getId()!;
             // Second key is the other user's master cross signing key
             qrData.secondKeyB64 = otherUserMasterKey!;
         } else if (mode === Mode.VerifySelfTrusted) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo!.getId("master")!;
+            qrData.firstKeyB64 = myCrossSigningInfo!.getId()!;
             qrData.secondKeyB64 = otherDeviceKey!;
         } else if (mode === Mode.VerifySelfUntrusted) {
             // First key is our device's key
