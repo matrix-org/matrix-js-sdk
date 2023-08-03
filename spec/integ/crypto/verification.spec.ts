@@ -889,7 +889,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         function awaitRoomMessageRequest(): Promise<IContent> {
             return new Promise((resolve) => {
                 fetchMock.put(
-                    "express:/_matrix/client/v3/room/:roomId/send/m.room.message/:txId",
+                    "express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId",
                     (url: string, options: RequestInit) => {
                         resolve(JSON.parse(options.body as string));
                         return { event_id: "$YUwRidLecu:example.com" };

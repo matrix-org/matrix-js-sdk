@@ -752,7 +752,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // Send the verification request content to the DM room
         const { event_id: eventId } = await this.http.authedRequest<{ event_id: string }>(
             Method.Put,
-            `/_matrix/client/v3/room/${encodeURIComponent(roomId)}/send/m.room.message/${encodeURIComponent(txId)}`,
+            `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${encodeURIComponent(txId)}`,
             undefined,
             verificationEventContent,
             {
