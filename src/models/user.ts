@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event";
+import type { MatrixEvent } from "./event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum UserEvent {

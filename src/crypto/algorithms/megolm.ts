@@ -245,7 +245,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         cancel: () => void;
     };
 
-    protected readonly roomId: string;
+    protected declare readonly roomId: string;
     private readonly prefixedLogger: PrefixedLogger;
 
     public constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
@@ -1290,7 +1290,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
     // this gets stubbed out by the unit tests.
     private olmlib = olmlib;
 
-    protected readonly roomId: string;
+    protected declare readonly roomId: string;
     private readonly prefixedLogger: PrefixedLogger;
 
     public constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {

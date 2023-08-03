@@ -5,16 +5,16 @@
             "@babel/preset-env",
             {
                 "targets": {
-                    "node": 10
+                    "node": 18
                 },
-                "modules": "commonjs"
+                "modules": "commonjs",
+                "include": ["@babel/plugin-proposal-class-properties"]
             }
         ],
-        "@babel/preset-typescript"
+        ["@babel/preset-typescript", { "allowDeclareFields": true }]
     ],
     "plugins": [
         "@babel/plugin-proposal-numeric-separator",
-        "@babel/plugin-proposal-class-properties",
         "@babel/plugin-proposal-object-rest-spread",
         "@babel/plugin-syntax-dynamic-import",
         "@babel/plugin-transform-runtime"
