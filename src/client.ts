@@ -134,6 +134,7 @@ import {
     ITagsResponse,
     IStatusResponse,
     IAddThreePidBody,
+    KnockRoomOpts,
 } from "./@types/requests";
 import {
     EventType,
@@ -4156,6 +4157,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // return syncApi.syncRoom(room);
         }
         return syncRoom;
+    }
+
+    /**
+     * Knock a room. If you have already knocked the room, this will no-op.
+     * @param roomIdOrAlias - The room ID or room alias to knock.
+     * @param opts - Options when knocking the room.
+     * @returns Promise which resolves: `{room_id: {string}}`
+     * @returns Rejects: with an error response.
+     */
+    public knockRoom(roomIdOrAlias: string, opts: KnockRoomOpts = {}): Promise<{ room_id: string }> {
+        const room = this.getRoom(roomIdOrAlias);
+        if (room?.hasMembershipState(this.credentials.userId!, "knock")) {
+            return Promise.resolve({ room_id: room.roomId });
+        }
+
+        const path = utils.encodeUri("/knock/$roomIdOrAlias", { $roomIdOrAlias: roomIdOrAlias });
+
+        const queryParams: Record<string, string | string[]> = {};
+        if (opts.viaServers) {
+            queryParams.server_name = opts.viaServers;
+        }
+
+        const body: Record<string, string> = {};
+        if (opts.reason) {
+            body.reason = opts.reason;
+        }
+
+        return this.http.authedRequest(Method.Post, path, queryParams, body);
     }
 
     /**
