@@ -24,7 +24,7 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
@@ -45,8 +45,7 @@ import {
     KeyBackupInfo,
     VerificationRequest,
 } from "../crypto-api";
-import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
-import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
+import { rustDeviceToJsDevice } from "./device-converter";
 import { Device, DeviceMap } from "../models/device";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
@@ -96,7 +95,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
          *
          * We expect it to set the access token, etc.
          */
-        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
 
         /** The local user's User ID. */
         private readonly userId: string,
@@ -295,27 +294,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const trackedUsers = new Set<string>();
         rustTrackedUsers.forEach((rustUserId) => trackedUsers.add(rustUserId.toString()));
 
-        // Keep untracked user to download their keys after
-        const untrackedUsers: Set<string> = new Set();
+        const untrackedUsers = userIds.filter((userId) => !trackedUsers.has(userId));
 
-        for (const userId of userIds) {
-            // if this is a tracked user, we can just fetch the device list from the rust-sdk
-            // (NB: this is probably ok even if we race with a leave event such that we stop tracking the user's
-            // devices: the rust-sdk will return the last-known device list, which will be good enough.)
-            if (trackedUsers.has(userId)) {
-                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
-            } else {
-                untrackedUsers.add(userId);
-            }
+        // Track and download device list of untracked users
+        if (downloadUncached && untrackedUsers.length > 0) {
+            const rustUntrackedUsers = untrackedUsers.map((user) => new RustSdkCryptoJs.UserId(user));
+            // Add the untracked users to the olm machine to track them
+            await this.olmMachine.updateTrackedUsers(rustUntrackedUsers);
+            // Get the keys of the previous untracked users
+            const keyQueryRequest = this.olmMachine.queryKeysForUsers(rustUntrackedUsers);
+            await this.outgoingRequestProcessor.makeOutgoingRequest(keyQueryRequest);
         }
 
-        // for any users whose device lists we are not tracking, fall back to downloading the device list
-        // over HTTP.
-        if (downloadUncached && untrackedUsers.size >= 1) {
-            const queryResult = await this.downloadDeviceList(untrackedUsers);
-            Object.entries(queryResult.device_keys).forEach(([userId, deviceKeys]) =>
-                deviceMapByUserId.set(userId, deviceKeysToDeviceMap(deviceKeys)),
-            );
+        for (const userId of userIds) {
+            // In case of downloadUncached set at true, we previously updated the list of tracked users with the unknown users
+            // in the other case, we only get the devices of the tracked users
+            if (downloadUncached || (!downloadUncached && trackedUsers.has(userId))) {
+                deviceMapByUserId.set(userId, await this.getUserDevices(userId));
+            }
         }
 
         return deviceMapByUserId;
@@ -352,19 +348,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         } finally {
             userDevices.free();
         }
-    }
-
-    /**
-     * Download the given user keys by calling `/keys/query` request
-     * @param untrackedUsers - download keys of these users
-     */
-    private async downloadDeviceList(untrackedUsers: Set<string>): Promise<IDownloadKeyResult> {
-        const queryBody: IQueryKeysRequest = { device_keys: {} };
-        untrackedUsers.forEach((user) => (queryBody.device_keys[user] = []));
-
-        return await this.http.authedRequest(Method.Post, "/_matrix/client/v3/keys/query", undefined, queryBody, {
-            prefix: "",
-        });
     }
 
     /**
