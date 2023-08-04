@@ -54,8 +54,8 @@ import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
-import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType, MsgType } from "../@types/event";
+import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
+import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupManager } from "./backup";
@@ -1040,15 +1040,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param event - live event
      */
     public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
-        // Ignore state event
-        if (event.isState()) return;
+        // Ignore state event or remote echo
+        if (event.isState() || event.getUnsigned().transaction_id === null) return;
 
         const processEvent = async (evt: MatrixEvent): Promise<void> => {
-            // Process only key validation request
-            if (
-                evt.getType() === EventType.RoomMessage &&
-                evt.getContent().msgtype === MsgType.KeyVerificationRequest
-            ) {
+            // Process only verification event
+            if (isVerificationEvent(event)) {
                 await this.onKeyVerificationRequest(evt);
             }
         };
@@ -1058,6 +1055,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // 5 mins
             const TIMEOUT_DELAY = 5 * 60 * 1000;
 
+            // After 5mins, we are not expecting the event to be decrypted
             const timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
 
             const onDecrypted = (decryptedEvent: MatrixEvent, error?: Error): void => {
@@ -1067,7 +1065,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 event.off(MatrixEventEvent.Decrypted, onDecrypted);
                 processEvent(decryptedEvent);
             };
-            // After 5mins, we are not expecting the event to be decrypted
 
             event.on(MatrixEventEvent.Decrypted, onDecrypted);
         } else {
