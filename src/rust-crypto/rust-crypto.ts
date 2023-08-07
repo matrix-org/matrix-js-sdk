@@ -95,7 +95,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
          *
          * We expect it to set the access token, etc.
          */
-        readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
 
         /** The local user's User ID. */
         private readonly userId: string,
