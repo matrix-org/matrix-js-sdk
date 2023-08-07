@@ -585,6 +585,27 @@ describe("RustCrypto", () => {
             );
         });
     });
+
+    describe("getUserDeviceInfo", () => {
+        it("Add unknown users to tracked users", async () => {
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+            const keysQueryMock = fetchMock.post("path:/_matrix/client/v3/keys/query", {});
+
+            const rustCrypto = await makeTestRustCrypto(mockHttpApi);
+
+            // Bob is not tracked, we expect bob to be added to tracked users and to download manually his keys
+            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
+            expect(keysQueryMock.calls().length).toBe(1);
+
+            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
+            // We expect bob to be tracked, we don't manually download bob keys
+            expect(keysQueryMock.calls().length).toBe(1);
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
