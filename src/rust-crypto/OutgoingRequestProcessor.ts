@@ -75,7 +75,12 @@ export class OutgoingRequestProcessor {
         } else if (msg instanceof SignatureUploadRequest) {
             resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
         } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(Method.Put, "/_matrix/client/v3/room_keys/keys", {}, msg.body);
+            resp = await this.rawJsonRequest(
+                Method.Put,
+                "/_matrix/client/v3/room_keys/keys",
+                { version: msg.version },
+                msg.body,
+            );
         } else if (msg instanceof ToDeviceRequest) {
             const path =
                 `/_matrix/client/v3/sendToDevice/${encodeURIComponent(msg.event_type)}/` +

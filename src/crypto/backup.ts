@@ -440,6 +440,7 @@ export class BackupManager {
      * @param maxDelay - Maximum delay to wait in ms. 0 means no delay.
      */
     public async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
+        logger.debug(`Key backup: scheduleKeyBackupSend currentSending:${this.sendingBackups} delay:${maxDelay}`);
         if (this.sendingBackups) return;
 
         this.sendingBackups = true;
@@ -474,6 +475,9 @@ export class BackupManager {
                             (<MatrixError>err).data.errcode == "M_NOT_FOUND" ||
                             (<MatrixError>err).data.errcode == "M_WRONG_ROOM_KEYS_VERSION"
                         ) {
+                            // fix do it now as the await check might trigger a new call to the loop before
+                            // the finally is called
+                            this.sendingBackups = false;
                             // Re-check key backup status on error, so we can be
                             // sure to present the current situation when asked.
                             await this.checkKeyBackup();
@@ -494,6 +498,10 @@ export class BackupManager {
                     return;
                 }
             }
+        } catch (err) {
+            // No one actually check errors on this promise, it's spawned internally.
+            // Just log, apps/client should use events to check status
+            logger.log(`Backup loop failed ${err}`);
         } finally {
             this.sendingBackups = false;
         }

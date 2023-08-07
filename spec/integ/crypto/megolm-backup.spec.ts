@@ -17,9 +17,10 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import EventEmitter from "events";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient, TypedEventEmitter } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -27,6 +28,8 @@ import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
+import { IKeyBackup } from "../../../src/crypto/backup";
+import { sleep } from "../../../src/utils";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -82,6 +85,58 @@ afterEach(() => {
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
+
+enum MockKeyUploadEvent {
+    KeyUploaded = "KeyUploaded",
+}
+
+type MockKeyUploadEventHandlerMap = {
+    [MockKeyUploadEvent.KeyUploaded]: (roomId: string, sessionId: string, backupVersion: string) => void;
+};
+
+/*
+ * Test helper. Will emit an event everytime fetchmock sees a request to backup a key.
+ */
+function mockUploadEmitter(
+    expectedVersion: string,
+): TypedEventEmitter<MockKeyUploadEvent, MockKeyUploadEventHandlerMap> {
+    const emitter = new TypedEventEmitter();
+    fetchMock.put(
+        "path:/_matrix/client/v3/room_keys/keys",
+        (url, request) => {
+            const version = new URLSearchParams(new URL(url).search).get("version");
+            if (version != expectedVersion) {
+                return {
+                    status: 403,
+                    body: {
+                        current_version: expectedVersion,
+                        errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                        error: "Wrong backup version.",
+                    },
+                };
+            }
+            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+            let count = 0;
+            for (const [roomId, value] of Object.entries(uploadPayload.rooms)) {
+                for (const sessionId of Object.keys(value.sessions)) {
+                    emitter.emit(MockKeyUploadEvent.KeyUploaded, roomId, sessionId, version);
+                    count++;
+                }
+            }
+            return {
+                status: 200,
+                body: {
+                    count: count,
+                    etag: "abcdefg",
+                },
+            };
+        },
+        {
+            overwriteRoutes: true,
+        },
+    );
+    return emitter;
+}
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
@@ -174,6 +229,267 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         const event = room.getLiveTimeline().getEvents()[0];
         await awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(event.getContent()).toEqual("testytest");
+    });
+
+    describe("backupLoop", () => {
+        it("Alice should upload known keys when backup is enabled", async function () {
+            // 404 means that there is no active backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // check that signalling is working
+            const remainingZeroPromise = new Promise<void>((resolve, reject) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve();
+                    }
+                });
+            });
+
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+
+            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+
+            const uploadPromises = someRoomKeys.map((data) => {
+                new Promise<void>((resolve) => {
+                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                        if (
+                            data.room_id == roomId &&
+                            data.session_id == sessionId &&
+                            version == testData.SIGNED_BACKUP_DATA.version
+                        ) {
+                            resolve();
+                        }
+                    });
+                });
+            });
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
+            jest.runAllTimers();
+
+            await Promise.all(uploadPromises);
+
+            // Wait until all keys are backed up to ensure that when a new key is received the loop is restarted
+            await remainingZeroPromise;
+
+            // A new key import should trigger a new upload.
+            const newKey = testData.MEGOLM_SESSION_DATA;
+
+            const newKeyUploadPromise = new Promise<void>((resolve) => {
+                uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                    if (
+                        newKey.room_id == roomId &&
+                        newKey.session_id == sessionId &&
+                        version == testData.SIGNED_BACKUP_DATA.version
+                    ) {
+                        resolve();
+                    }
+                });
+            });
+
+            await aliceCrypto.importRoomKeys([newKey]);
+
+            jest.runAllTimers();
+            await newKeyUploadPromise;
+        });
+
+        it("Alice should re-upload all keys if a new trusted backup is available", async function () {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // check that signalling is working
+            const remainingZeroPromise = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve();
+                    }
+                });
+            });
+
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+
+            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
+            jest.runAllTimers();
+
+            // wait for all keys to be backed up
+            await remainingZeroPromise;
+
+            const newBackupVersion = "2";
+            const uploadMockEmitter = mockUploadEmitter(newBackupVersion);
+            const newBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            newBackup.version = newBackupVersion;
+
+            // Let's simulate that a new backup is available by returning error code on key upload
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", newBackup, {
+                overwriteRoutes: true,
+            });
+
+            // If we import a new key the loop will try to upload to old version, it will
+            // fail then check the current version and switch if trusted
+            const uploadPromises = someRoomKeys.map((data) => {
+                new Promise<void>((resolve) => {
+                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                        if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
+                            resolve();
+                        }
+                    });
+                });
+            });
+
+            const disableOldBackup = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupFailed, (errCode) => {
+                    if (errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+                        resolve();
+                    }
+                });
+            });
+
+            const enableNewBackup = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            // A new key import should trigger a new upload.
+            const newKey = testData.MEGOLM_SESSION_DATA;
+
+            const newKeyUploadPromise = new Promise<void>((resolve) => {
+                uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                    if (newKey.room_id == roomId && newKey.session_id == sessionId && version == newBackupVersion) {
+                        resolve();
+                    }
+                });
+            });
+
+            await aliceCrypto.importRoomKeys([newKey]);
+
+            jest.runAllTimers();
+
+            await disableOldBackup;
+            await enableNewBackup;
+
+            jest.runAllTimers();
+
+            await Promise.all(uploadPromises);
+            await newKeyUploadPromise;
+        });
+
+        it("Backup loop should resist to network failures", async function () {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            const failureTestEmitter = new EventEmitter();
+            let networkFailureCount = 0;
+
+            // Simulate network failures on keys upload, then a succesfull upload
+            fetchMock.put(
+                "path:/_matrix/client/v3/room_keys/keys",
+                () => {
+                    if (networkFailureCount < 1) {
+                        networkFailureCount++;
+                        failureTestEmitter.emit("NetworkFailure");
+                        throw TypeError(`Failed to fetch`);
+                    }
+                    failureTestEmitter.emit("NetworkResolved");
+                    return {
+                        status: 200,
+                        body: {
+                            count: 2,
+                            etag: "abcdefg",
+                        },
+                    };
+                },
+                {
+                    overwriteRoutes: true,
+                },
+            );
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            const failurePrmoise = new Promise<void>((resolve) => {
+                failureTestEmitter.on("NetworkFailure", () => {
+                    // Can't just use a fake time here, if I use a fake one
+                    // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
+                    // not sure how to do better here
+                    jest.useRealTimers();
+                    setTimeout(resolve, 200);
+                    jest.useFakeTimers();
+                });
+            });
+
+            const resolvePrmoise = new Promise<void>((resolve) => {
+                failureTestEmitter.on("NetworkResolved", () => {
+                    // Can't just use a fake time here, if I use a fake one
+                    // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
+                    // not sure how to do better here
+                    jest.useRealTimers();
+                    setTimeout(resolve, 200);
+                    jest.useFakeTimers();
+                });
+            });
+
+            const allKeyUploadedPromise = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve();
+                    }
+                });
+            });
+
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            jest.runAllTimers();
+
+            await failurePrmoise;
+            jest.runAllTimers();
+            await resolvePrmoise;
+            jest.runAllTimers();
+
+            await allKeyUploadedPromise;
+        });
     });
 
     it("getActiveSessionBackupVersion() should give correct result", async function () {
@@ -363,10 +679,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
 
             const newBackupVersion = "2";
-            const unsignedBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
-            unsignedBackup.version = newBackupVersion;
+            const newBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            newBackup.version = newBackupVersion;
 
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", unsignedBackup, {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", newBackup, {
                 overwriteRoutes: true,
             });
 
