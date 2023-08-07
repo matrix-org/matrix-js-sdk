@@ -296,12 +296,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const untrackedUsers = userIds.filter((userId) => !trackedUsers.has(userId));
 
-        // Track and download device list of untracked users
+        // Track and download the keys of the untracked users
         if (downloadUncached && untrackedUsers.length > 0) {
             const rustUntrackedUsers = untrackedUsers.map((user) => new RustSdkCryptoJs.UserId(user));
-            // Add the untracked users to the olm machine to track them
+            // Add the untracked users to the olm machine
             await this.olmMachine.updateTrackedUsers(rustUntrackedUsers);
-            // Get the keys of the previous untracked users
+            // Get the keys of the untracked users
             const keyQueryRequest = this.olmMachine.queryKeysForUsers(rustUntrackedUsers);
             await this.outgoingRequestProcessor.makeOutgoingRequest(keyQueryRequest);
         }
