@@ -520,35 +520,60 @@ describe("RustCrypto", () => {
         });
     });
 
-    it("should wait for a keys/query before returning devices", async () => {
-        jest.useFakeTimers();
-
-        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-            baseUrl: "http://server/",
-            prefix: "",
-            onlyData: true,
+    describe("getUserDeviceInfo", () => {
+        afterEach(() => {
+            jest.useRealTimers();
         });
-        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
-        fetchMock.post("path:/_matrix/client/v3/keys/query", {
-            device_keys: {
-                [testData.TEST_USER_ID]: {
-                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+
+        it("should wait for a keys/query before returning devices", async () => {
+            jest.useFakeTimers();
+
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: {
+                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                    },
                 },
-            },
+            });
+
+            const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+
+            // an attempt to fetch the device list should block
+            const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
+            // ... until a /sync completes, and we trigger the outgoingRequests.
+            rustCrypto.onSyncCompleted({});
+
+            const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
+            expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
+            expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+            rustCrypto.stop();
         });
 
-        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+        it("should add unknown users to tracked users", async () => {
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+            const keysQueryMock = fetchMock.post("path:/_matrix/client/v3/keys/query", {});
 
-        // an attempt to fetch the device list should block
-        const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+            const rustCrypto = await makeTestRustCrypto(mockHttpApi);
 
-        // ... until a /sync completes, and we trigger the outgoingRequests.
-        rustCrypto.onSyncCompleted({});
+            // Bob is not tracked, we expect bob to be added to tracked users and to download manually his keys
+            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
+            expect(keysQueryMock.calls().length).toBe(1);
 
-        const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
-        expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
-        expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
-        rustCrypto.stop();
+            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
+            // We expect bob to be tracked, we don't manually download bob keys
+            expect(keysQueryMock.calls().length).toBe(1);
+        });
     });
 
     describe("requestDeviceVerification", () => {
@@ -583,27 +608,6 @@ describe("RustCrypto", () => {
             expect(() => rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).toThrow(
                 "missing userId",
             );
-        });
-    });
-
-    describe("getUserDeviceInfo", () => {
-        it("Add unknown users to tracked users", async () => {
-            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                baseUrl: "http://server/",
-                prefix: "",
-                onlyData: true,
-            });
-            const keysQueryMock = fetchMock.post("path:/_matrix/client/v3/keys/query", {});
-
-            const rustCrypto = await makeTestRustCrypto(mockHttpApi);
-
-            // Bob is not tracked, we expect bob to be added to tracked users and to download manually his keys
-            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
-            expect(keysQueryMock.calls().length).toBe(1);
-
-            await rustCrypto.getUserDeviceInfo(["@box:xyz"], true);
-            // We expect bob to be tracked, we don't manually download bob keys
-            expect(keysQueryMock.calls().length).toBe(1);
         });
     });
 });
