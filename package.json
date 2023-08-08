@@ -23,7 +23,8 @@
         "lint:types": "tsc --noEmit",
         "test": "jest",
         "test:watch": "jest --watch",
-        "coverage": "yarn test --coverage"
+        "coverage": "yarn test --coverage",
+        "fetch-openapi": "openapi-typescript https://spec.matrix.org/latest/client-server-api/api.json --output src/@types/matrix-client-server.d.ts"
     },
     "repository": {
         "type": "git",
