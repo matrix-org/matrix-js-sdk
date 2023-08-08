@@ -207,9 +207,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
-                logger.log(`Before olm.backupRoomKeys()`);
                 const request: RustSdkCryptoJs.KeysBackupRequest | null = await this.olmMachine.backupRoomKeys();
-                logger.log(`After olm.backupRoomKeys() ${request?.body}`);
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
                     logger.log(`Ending loop for ${this.activeBackupVersion}.`);

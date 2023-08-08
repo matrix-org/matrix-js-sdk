@@ -29,7 +29,6 @@ import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../..
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
-import { sleep } from "../../../src/utils";
 
 const ROOM_ID = "!ROOM:ID";
 
