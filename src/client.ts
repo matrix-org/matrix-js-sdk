@@ -134,6 +134,7 @@ import {
     ITagsResponse,
     IStatusResponse,
     IAddThreePidBody,
+    KnockRoomOpts,
 } from "./@types/requests";
 import {
     EventType,
@@ -4157,6 +4158,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // return syncApi.syncRoom(room);
         }
         return syncRoom;
+    }
+
+    /**
+     * Knock a room. If you have already knocked the room, this will no-op.
+     * @param roomIdOrAlias - The room ID or room alias to knock.
+     * @param opts - Options when knocking the room.
+     * @returns Promise which resolves: `{room_id: {string}}`
+     * @returns Rejects: with an error response.
+     */
+    public knockRoom(roomIdOrAlias: string, opts: KnockRoomOpts = {}): Promise<{ room_id: string }> {
+        const room = this.getRoom(roomIdOrAlias);
+        if (room?.hasMembershipState(this.credentials.userId!, "knock")) {
+            return Promise.resolve({ room_id: room.roomId });
+        }
+
+        const path = utils.encodeUri("/knock/$roomIdOrAlias", { $roomIdOrAlias: roomIdOrAlias });
+
+        const queryParams: Record<string, string | string[]> = {};
+        if (opts.viaServers) {
+            queryParams.server_name = opts.viaServers;
+        }
+
+        const body: Record<string, string> = {};
+        if (opts.reason) {
+            body.reason = opts.reason;
+        }
+
+        return this.http.authedRequest(Method.Post, path, queryParams, body);
     }
 
     /**
@@ -9863,18 +9892,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
 
-    const oldActions = event.getPushActions();
-    const actions = cli.getPushActionsForEvent(event, true);
-
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
-
-    const currentHighlightCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
-
-    // Ensure the unread counts are kept up to date if the event is encrypted
-    // We also want to make sure that the notification count goes up if we already
-    // have encrypted events to avoid other code from resetting 'highlight' to zero.
-    const oldHighlight = !!oldActions?.tweaks?.highlight;
-    const newHighlight = !!actions?.tweaks?.highlight;
 
     let hasReadEvent;
     if (isThreadEvent) {
@@ -9897,13 +9915,17 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         return;
     }
 
-    if (oldHighlight !== newHighlight || currentHighlightCount > 0) {
+    const actions = cli.getPushActionsForEvent(event, true);
+
+    // Ensure the unread counts are kept up to date if the event is encrypted
+    // We also want to make sure that the notification count goes up if we already
+    // have encrypted events to avoid other code from resetting 'highlight' to zero.
+    const newHighlight = !!actions?.tweaks?.highlight;
+
+    if (newHighlight) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
-        let newCount = currentHighlightCount;
-        if (newHighlight && !oldHighlight) newCount++;
-        if (!newHighlight && oldHighlight) newCount--;
-
+        const newCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event) + 1;
         if (isThreadEvent) {
             room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight, newCount);
         } else {
@@ -9911,23 +9933,18 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         }
     }
 
-    // Total count is used to typically increment a room notification counter, but not loudly highlight it.
-    const currentTotalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
-
     // `notify` is used in practice for incrementing the total count
     const newNotify = !!actions?.notify;
 
     // The room total count is NEVER incremented by the server for encrypted rooms. We basically ignore
     // the server here as it's always going to tell us to increment for encrypted events.
     if (newNotify) {
+        // Total count is used to typically increment a room notification counter, but not loudly highlight it.
+        const newCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event) + 1;
         if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(
-                event.threadRootId,
-                NotificationCountType.Total,
-                currentTotalCount + 1,
-            );
+            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, newCount);
         } else {
-            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount + 1);
+            room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
         }
     }
 }
