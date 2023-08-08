@@ -1652,6 +1652,82 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+
+    describe("getFallbackAuthUrl", () => {
+        it("should return fallback url", () => {
+            expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
+                `"http://alice.localhost.test.server/_matrix/client/r0/auth/loginType/fallback/web?session=authSessionId"`,
+            );
+        });
+    });
+
+    describe("addThreePidOnly", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/r0/account/3pid/add")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.addThreePidOnly({
+                    client_secret: "secret",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("bindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/r0/account/3pid/bind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        id_server: "server",
+                        id_access_token: "token",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.bindThreePid({
+                    client_secret: "secret",
+                    id_server: "server",
+                    id_access_token: "token",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("unbindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/r0/account/3pid/unbind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        medium: "email",
+                        address: "alice@server.com",
+                        id_server: "identity.localhost",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
