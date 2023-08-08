@@ -17,7 +17,6 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import EventEmitter from "events";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient, TypedEventEmitter } from "../../../src";
@@ -416,7 +415,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
-            const failureTestEmitter = new EventEmitter();
+            enum TestEmitterEvent {
+                NetworkFailure = "NetworkFailure",
+                NetworkResolved = "NetworkResolved",
+            }
+
+            type TestEmitterEventHandlerMap = {
+                [TestEmitterEvent.NetworkFailure]: () => void;
+                [TestEmitterEvent.NetworkResolved]: () => void;
+            };
+
+            const failureTestEmitter = new TypedEventEmitter<TestEmitterEvent, TestEmitterEventHandlerMap>();
             let networkFailureCount = 0;
 
             // Simulate network failures on keys upload, then a succesfull upload
@@ -425,10 +434,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 () => {
                     if (networkFailureCount < 1) {
                         networkFailureCount++;
-                        failureTestEmitter.emit("NetworkFailure");
-                        throw TypeError(`Failed to fetch`);
+                        failureTestEmitter.emit(TestEmitterEvent.NetworkFailure);
+                        throw new TypeError(`Failed to fetch`);
                     }
-                    failureTestEmitter.emit("NetworkResolved");
+                    failureTestEmitter.emit(TestEmitterEvent.NetworkResolved);
                     return {
                         status: 200,
                         body: {
@@ -446,7 +455,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             const failurePrmoise = new Promise<void>((resolve) => {
-                failureTestEmitter.on("NetworkFailure", () => {
+                failureTestEmitter.on(TestEmitterEvent.NetworkFailure, () => {
                     // Can't just use a fake time here, if I use a fake one
                     // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
                     // not sure how to do better here
@@ -457,7 +466,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             const resolvePrmoise = new Promise<void>((resolve) => {
-                failureTestEmitter.on("NetworkResolved", () => {
+                failureTestEmitter.on(TestEmitterEvent.NetworkResolved, () => {
                     // Can't just use a fake time here, if I use a fake one
                     // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
                     // not sure how to do better here
