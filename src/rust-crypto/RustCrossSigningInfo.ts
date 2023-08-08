@@ -26,7 +26,7 @@ export class RustCrossSigningInfo implements CrossSigningInfo {
     /**
      * Create an instance of {@link RustCrossSigningInfo} for the given user
      *
-     * @param userId -
+     * @param userId - the owner of the cross signing info
      * @param olmMachine - the `OlmMachine` from the underlying rust crypto sdk
      */
     public static async getCrossSigningInfo(
