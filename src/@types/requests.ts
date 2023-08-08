@@ -45,6 +45,18 @@ export interface IJoinRoomOpts {
     viaServers?: string[];
 }
 
+export interface KnockRoomOpts {
+    /**
+     * The reason for the knock.
+     */
+    reason?: string;
+
+    /**
+     * The server names to try and knock through in addition to those that are automatically chosen.
+     */
+    viaServers?: string | string[];
+}
+
 export interface IRedactOpts {
     reason?: string;
     /**
