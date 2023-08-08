@@ -157,7 +157,8 @@ export interface ICreateRoomOpts {
     room_version?: string;
 }
 
-export type IRoomDirectoryOptions = operations["queryPublicRooms"]["parameters"]["body"]["body"];
+export type IRoomDirectoryOptions = operations["queryPublicRooms"]["parameters"]["body"]["body"] &
+    operations["queryPublicRooms"]["parameters"]["query"];
 
 export interface IAddThreePidOnlyBody {
     auth?: {
