@@ -16,6 +16,16 @@ limitations under the License.
 
 import { CrossSigningKey } from "../crypto-api";
 
+/**
+ * Information about a user's cross-signing keys
+ */
 export interface CrossSigningInfo {
-    getId(crossSigningKey?: CrossSigningKey): string | null;
+    /**
+     * Return the public key of the cross singing key
+     *
+     * @param crossSigningKey - `master` or `self_signing`
+     *
+     * @returns
+     */
+    getId(crossSigningKey?: Exclude<CrossSigningKey, CrossSigningKey.UserSigning>): string | null;
 }

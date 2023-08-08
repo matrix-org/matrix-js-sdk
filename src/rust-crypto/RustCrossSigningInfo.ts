@@ -16,10 +16,19 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { CrossSigningInfo } from "../crypto-api/crosssigning";
+import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 import { CrossSigningKey, CrossSigningKeyInfo } from "../crypto-api";
 
+/**
+ * Implementation of {@link CrossSigningInfo}
+ */
 export class RustCrossSigningInfo implements CrossSigningInfo {
+    /**
+     * Create an instance of {@link RustCrossSigningInfo} for the given user
+     *
+     * @param userId -
+     * @param olmMachine - the `OlmMachine` from the underlying rust crypto sdk
+     */
     public static async getCrossSigningInfo(
         userId: string,
         olmMachine: RustSdkCryptoJs.OlmMachine,
@@ -28,19 +37,21 @@ export class RustCrossSigningInfo implements CrossSigningInfo {
             new RustSdkCryptoJs.UserId(userId),
         );
 
-        if (userIdentity) {
-            return new RustCrossSigningInfo(userIdentity);
-        }
-        // if (userIdentity?.isVerified()) {
-        //     // We have both public and private keys, but they don't match!
-        //     return new RustCrossSigningInfo(userIdentity);
-        // }
-
-        return null;
+        return userIdentity ? new RustCrossSigningInfo(userIdentity) : null;
     }
 
+    /**
+     * Information about a user's cross-signing keys
+     *
+     * @param userIdentity - rust user identity
+     */
     public constructor(public readonly userIdentity: RustSdkCryptoJs.UserIdentity) {}
 
+    /**
+     * Implementation of {@link CrossSigningKeyInfo#getId}
+     *
+     * `crossSigningKeyType` has `master` as default value
+     */
     public getId(crossSigningKeyType = CrossSigningKey.Master): string | null {
         let key: string;
         switch (crossSigningKeyType) {

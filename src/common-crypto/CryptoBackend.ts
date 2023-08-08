@@ -21,7 +21,7 @@ import { CryptoApi } from "../crypto-api";
 import { UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { IEventDecryptionResult } from "../@types/crypto";
-import { CrossSigningInfo } from "../crypto-api/crosssigning";
+import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 
 /**
  * Common interface for the crypto implementations

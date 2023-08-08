@@ -31,7 +31,7 @@ import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 import { DeviceVerificationStatus } from "../crypto-api";
-import { CrossSigningInfo as NewCrossSigningInfo } from "../crypto-api/crosssigning";
+import { CrossSigningInfo as NewCrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 

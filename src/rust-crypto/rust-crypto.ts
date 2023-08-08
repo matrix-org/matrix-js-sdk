@@ -59,8 +59,8 @@ import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupManager } from "./backup";
-import { CrossSigningInfo } from "../crypto-api/crosssigning";
-import { RustCrossSigningInfo } from "./crosssigning";
+import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
+import { RustCrossSigningInfo } from "./RustCrossSigningInfo";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 

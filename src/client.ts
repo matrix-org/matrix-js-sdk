@@ -219,7 +219,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
-import { CrossSigningInfo } from "./crypto-api/crosssigning";
+import { CrossSigningInfo } from "./crypto-api/CrossSigningInfo";
 
 export type Store = IStore;
 
