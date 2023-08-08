@@ -6663,20 +6663,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<T> {
         const postParams = Object.assign({}, params);
 
-        // If the HS supports separate add and bind, then requestToken endpoints
-        // don't need an IS as they are all validated by the HS directly.
-        if (!(await this.doesServerSupportSeparateAddAndBind()) && this.idBaseUrl) {
-            const idServerUrl = new URL(this.idBaseUrl);
-            postParams.id_server = idServerUrl.host;
-
-            if (this.identityServer?.getAccessToken && (await this.doesServerAcceptIdentityAccessToken())) {
-                const identityAccessToken = await this.identityServer.getAccessToken();
-                if (identityAccessToken) {
-                    postParams.id_access_token = identityAccessToken;
-                }
-            }
-        }
-
         return this.http.request(Method.Post, endpoint, undefined, postParams);
     }
 
@@ -7435,22 +7421,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const versions = response["versions"];
         const unstableFeatures = response["unstable_features"];
         return (versions && versions.includes("r0.6.0")) || (unstableFeatures && unstableFeatures["m.id_access_token"]);
-    }
-
-    /**
-     * Query the server to see if it supports separate 3PID add and bind functions.
-     * This affects the sequence of API calls clients should use for these operations,
-     * so it's helpful to be able to check for support.
-     * @returns true if separate functions are supported
-     */
-    public async doesServerSupportSeparateAddAndBind(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-
-        return versions?.includes("r0.6.0") || unstableFeatures?.["m.separate_add_and_bind"];
     }
 
     /**
@@ -8529,9 +8499,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Add a 3PID to your homeserver account. This API does not use an identity
      * server, as the homeserver is expected to handle 3PID ownership validation.
      *
-     * You can check whether a homeserver supports this API via
-     * `doesServerSupportSeparateAddAndBind`.
-     *
      * @param data - A object with 3PID validation data from having called
      * `account/3pid/<medium>/requestToken` on the homeserver.
      * @returns Promise which resolves: to an empty object `{}`
@@ -8546,9 +8513,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Bind a 3PID for discovery onto an identity server via the homeserver. The
      * identity server handles 3PID ownership validation and the homeserver records
      * the new binding to track where all 3PIDs for the account are bound.
-     *
-     * You can check whether a homeserver supports this API via
-     * `doesServerSupportSeparateAddAndBind`.
      *
      * @param data - A object with 3PID validation data from having called
      * `validate/<medium>/requestToken` on the identity server. It should also
