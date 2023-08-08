@@ -16,6 +16,7 @@ limitations under the License.
 
 import { UnstableValue } from "../NamespacedValue";
 import { IClientWellKnown } from "../client";
+import { operations } from "./matrix-client-server";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -23,11 +24,7 @@ import { IClientWellKnown } from "../client";
 /**
  * Represents a response to the CSAPI `/refresh` endpoint.
  */
-export interface IRefreshTokenResponse {
-    access_token: string;
-    expires_in_ms: number;
-    refresh_token: string;
-}
+export type IRefreshTokenResponse = operations["refresh"]["responses"]["200"]["schema"];
 
 /* eslint-enable camelcase */
 

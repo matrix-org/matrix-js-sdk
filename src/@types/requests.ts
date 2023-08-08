@@ -21,7 +21,8 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
-import { EventType, RelationType, RoomType } from "./event";
+import { EventType, RelationType } from "./event";
+import { operations } from "./matrix-client-server";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -76,12 +77,7 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export interface IPresenceOpts {
-    // One of "online", "offline" or "unavailable"
-    presence: "online" | "offline" | "unavailable";
-    // The status message to attach.
-    status_msg?: string;
-}
+export type IPresenceOpts = operations["setPresence"]["parameters"]["body"]["presenceState"];
 
 export interface IPaginateOpts {
     // true to fill backwards, false to go forwards
@@ -161,20 +157,7 @@ export interface ICreateRoomOpts {
     room_version?: string;
 }
 
-export interface IRoomDirectoryOptions {
-    server?: string;
-    limit?: number;
-    since?: string;
-
-    // Filter parameters
-    filter?: {
-        // String to search for
-        generic_search_term?: string;
-        room_types?: Array<RoomType | null>;
-    };
-    include_all_networks?: boolean;
-    third_party_instance_id?: string;
-}
+export type IRoomDirectoryOptions = operations["queryPublicRooms"]["parameters"]["body"]["body"];
 
 export interface IAddThreePidOnlyBody {
     auth?: {
@@ -242,17 +225,9 @@ export interface INotificationsResponse {
     notifications: INotification[];
 }
 
-export interface IFilterResponse {
-    filter_id: string;
-}
+export type IFilterResponse = operations["defineFilter"]["responses"]["200"]["schema"];
 
-export interface ITagsResponse {
-    tags: {
-        [tagId: string]: {
-            order: number;
-        };
-    };
-}
+export type ITagsResponse = operations["getRoomTags"]["responses"]["200"]["schema"];
 
 export interface IStatusResponse extends IPresenceOpts {
     currently_active?: boolean;
