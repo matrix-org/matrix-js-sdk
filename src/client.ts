@@ -5345,7 +5345,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             address: address,
         };
 
-        if (this.identityServer?.getAccessToken && (await this.doesServerAcceptIdentityAccessToken())) {
+        if (this.identityServer?.getAccessToken) {
             const identityAccessToken = await this.identityServer.getAccessToken();
             if (identityAccessToken) {
                 params["id_access_token"] = identityAccessToken;
@@ -7368,62 +7368,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Query the server to see if it supports members lazy loading
-     * @returns true if server supports lazy loading
-     */
-    public async doesServerSupportLazyLoading(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-
-        return (
-            (versions && versions.includes("r0.5.0")) || (unstableFeatures && unstableFeatures["m.lazy_load_members"])
-        );
-    }
-
-    /**
-     * Query the server to see if the `id_server` parameter is required
-     * when registering with an 3pid, adding a 3pid or resetting password.
-     * @returns true if id_server parameter is required
-     */
-    public async doesServerRequireIdServerParam(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return true;
-
-        const versions = response["versions"];
-
-        // Supporting r0.6.0 is the same as having the flag set to false
-        if (versions && versions.includes("r0.6.0")) {
-            return false;
-        }
-
-        const unstableFeatures = response["unstable_features"];
-        if (!unstableFeatures) return true;
-        if (unstableFeatures["m.require_identity_server"] === undefined) {
-            return true;
-        } else {
-            return unstableFeatures["m.require_identity_server"];
-        }
-    }
-
-    /**
-     * Query the server to see if the `id_access_token` parameter can be safely
-     * passed to the homeserver. Some homeservers may trigger errors if they are not
-     * prepared for the new parameter.
-     * @returns true if id_access_token can be sent
-     */
-    public async doesServerAcceptIdentityAccessToken(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-        return (versions && versions.includes("r0.6.0")) || (unstableFeatures && unstableFeatures["m.id_access_token"]);
-    }
-
-    /**
      * Query the server to see if it lists support for an unstable feature
      * in the /versions response
      * @param feature - the feature name
@@ -8050,11 +7994,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // inject the id_access_token if inviting 3rd party addresses
         const invitesNeedingToken = (options.invite_3pid || []).filter((i) => !i.id_access_token);
-        if (
-            invitesNeedingToken.length > 0 &&
-            this.identityServer?.getAccessToken &&
-            (await this.doesServerAcceptIdentityAccessToken())
-        ) {
+        if (invitesNeedingToken.length > 0 && this.identityServer?.getAccessToken) {
             const identityAccessToken = await this.identityServer.getAccessToken();
             if (identityAccessToken) {
                 for (const invite of invitesNeedingToken) {

@@ -1102,10 +1102,6 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
             httpBackend
                 .when("POST", "/register/email/requestToken")
@@ -1125,10 +1121,6 @@ describe("MatrixClient", function () {
     describe("inviteByThreePid", () => {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/invite")
@@ -1164,10 +1156,6 @@ describe("MatrixClient", function () {
                     },
                 ],
             };
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/createRoom")
