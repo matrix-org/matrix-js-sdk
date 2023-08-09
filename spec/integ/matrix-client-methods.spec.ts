@@ -19,7 +19,7 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import { Filter, KnockRoomOpts, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -202,6 +202,84 @@ describe("MatrixClient", function () {
             });
             await httpBackend.flushAllExpected();
             expect((await prom).roomId).toBe(roomId);
+        });
+    });
+
+    describe("knockRoom", function () {
+        const roomId = "!some-room-id:example.org";
+        const reason = "some reason";
+        const viaServers = "example.com";
+
+        type TestCase = [string, KnockRoomOpts];
+        const testCases: TestCase[] = [
+            ["should knock a room", {}],
+            ["should knock a room for a reason", { reason }],
+            ["should knock a room via given servers", { viaServers }],
+            ["should knock a room for a reason via given servers", { reason, viaServers }],
+        ];
+
+        it.each(testCases)("%s", async (_, opts) => {
+            httpBackend
+                .when("POST", "/knock/" + encodeURIComponent(roomId))
+                .check((request) => {
+                    expect(request.data).toEqual({ reason: opts.reason });
+                    expect(request.queryParams).toEqual({ server_name: opts.viaServers });
+                })
+                .respond(200, { room_id: roomId });
+
+            const prom = client.knockRoom(roomId, opts);
+            await httpBackend.flushAllExpected();
+            expect((await prom).room_id).toBe(roomId);
+        });
+
+        it("should no-op if you've already knocked a room", function () {
+            const room = new Room(roomId, client, userId);
+
+            client.fetchRoomEvent = () =>
+                Promise.resolve({
+                    type: "test",
+                    content: {},
+                });
+
+            room.addLiveEvents([
+                utils.mkMembership({
+                    user: userId,
+                    room: roomId,
+                    mship: "knock",
+                    event: true,
+                }),
+            ]);
+
+            httpBackend.verifyNoOutstandingRequests();
+            store.storeRoom(room);
+            client.knockRoom(roomId);
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        describe("errors", function () {
+            type TestCase = [number, { errcode: string; error?: string }, string];
+            const testCases: TestCase[] = [
+                [
+                    403,
+                    { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
+                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                ],
+                [
+                    500,
+                    { errcode: "INTERNAL_SERVER_ERROR" },
+                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
+                ],
+            ];
+
+            it.each(testCases)("should handle %s error", async (code, { errcode, error }, snapshot) => {
+                httpBackend.when("POST", "/knock/" + encodeURIComponent(roomId)).respond(code, { errcode, error });
+
+                const prom = client.knockRoom(roomId);
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    expect(prom).rejects.toMatchInlineSnapshot(snapshot),
+                ]);
+            });
         });
     });
 

@@ -1119,7 +1119,7 @@ export class OlmDevice {
                                 }
                             }
 
-                            logger.info(
+                            logger.debug(
                                 `Storing megolm session ${senderKey}|${sessionId} with first index ` +
                                     session.first_known_index(),
                             );

@@ -20,7 +20,7 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { BackupTrustInfo, KeyBackupInfo } from "./crypto-api/keybackup";
+import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
 
 /**
@@ -360,6 +360,17 @@ export interface CryptoApi {
      * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
+
+    /**
+     * Force a re-check of the key backup and enable/disable it as appropriate.
+     *
+     * Fetches the current backup information from the server. If there is a backup, and it is trusted, starts
+     * backing up to it; otherwise, disables backups.
+     *
+     * @returns `null` if there is no backup on the server. Otherwise, data on the backup as returned by the server,
+     *   and trust information (as returned by {@link isKeyBackupTrusted}).
+     */
+    checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null>;
 }
 
 /**
