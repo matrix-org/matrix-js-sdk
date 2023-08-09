@@ -1042,7 +1042,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
         // Ignore state event or remote echo
         // transaction_id is provided in case of remote echo {@link https://spec.matrix.org/v1.7/client-server-api/#local-echo}
-        if (event.isState() || "transaction_id" in event.getUnsigned()) return;
+        if (event.isState() || !!event.getUnsigned().transaction_id) return;
 
         const processEvent = async (evt: MatrixEvent): Promise<void> => {
             // Process only verification event
