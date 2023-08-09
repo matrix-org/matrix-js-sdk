@@ -456,23 +456,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const failurePrmoise = new Promise<void>((resolve) => {
                 failureTestEmitter.on(TestEmitterEvent.NetworkFailure, () => {
-                    // Can't just use a fake time here, if I use a fake one
-                    // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
-                    // not sure how to do better here
-                    jest.useRealTimers();
-                    setTimeout(resolve, 200);
-                    jest.useFakeTimers();
+                    resolve();
                 });
             });
 
             const resolvePrmoise = new Promise<void>((resolve) => {
                 failureTestEmitter.on(TestEmitterEvent.NetworkResolved, () => {
-                    // Can't just use a fake time here, if I use a fake one
-                    // the backoff timer of the loop won't be created yet thus the runAllTimers will do nothing.
-                    // not sure how to do better here
-                    jest.useRealTimers();
-                    setTimeout(resolve, 200);
-                    jest.useFakeTimers();
+                    resolve();
                 });
             });
 
@@ -492,9 +482,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             jest.runAllTimers();
 
             await failurePrmoise;
-            jest.runAllTimers();
+            await jest.runAllTimersAsync();
             await resolvePrmoise;
-            jest.runAllTimers();
+            await jest.runAllTimersAsync();
 
             await allKeyUploadedPromise;
         });
