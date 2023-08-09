@@ -406,7 +406,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await newKeyUploadPromise;
         });
 
-        it("Backup loop should resist to network failures", async function () {
+        it("Backup loop should be resistant to network failures", async function () {
             aliceClient = await initTestClient();
             const aliceCrypto = aliceClient.getCrypto()!;
             await aliceClient.startClient();
@@ -415,78 +415,66 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
-            enum TestEmitterEvent {
-                NetworkFailure = "NetworkFailure",
-                NetworkResolved = "NetworkResolved",
-            }
-
-            type TestEmitterEventHandlerMap = {
-                [TestEmitterEvent.NetworkFailure]: () => void;
-                [TestEmitterEvent.NetworkResolved]: () => void;
-            };
-
-            const failureTestEmitter = new TypedEventEmitter<TestEmitterEvent, TestEmitterEventHandlerMap>();
-            let networkFailureCount = 0;
-
-            // Simulate network failures on keys upload, then a succesfull upload
-            fetchMock.put(
-                "path:/_matrix/client/v3/room_keys/keys",
-                () => {
-                    if (networkFailureCount < 1) {
-                        networkFailureCount++;
-                        failureTestEmitter.emit(TestEmitterEvent.NetworkFailure);
-                        throw new TypeError(`Failed to fetch`);
-                    }
-                    failureTestEmitter.emit(TestEmitterEvent.NetworkResolved);
-                    return {
-                        status: 200,
-                        body: {
-                            count: 2,
-                            etag: "abcdefg",
-                        },
-                    };
-                },
-                {
-                    overwriteRoutes: true,
-                },
-            );
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
                 overwriteRoutes: true,
             });
 
-            const failurePrmoise = new Promise<void>((resolve) => {
-                failureTestEmitter.on(TestEmitterEvent.NetworkFailure, () => {
-                    resolve();
-                });
+            // on the first key upload attempt, simulate a network failure
+            const failurePromise = new Promise((resolve) => {
+                fetchMock.put(
+                    "path:/_matrix/client/v3/room_keys/keys",
+                    () => {
+                        resolve(undefined);
+                        throw new TypeError(`Failed to fetch`);
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
             });
 
-            const resolvePrmoise = new Promise<void>((resolve) => {
-                failureTestEmitter.on(TestEmitterEvent.NetworkResolved, () => {
-                    resolve();
-                });
-            });
-
-            const allKeyUploadedPromise = new Promise<void>((resolve) => {
-                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
-                    if (remaining == 0) {
-                        resolve();
-                    }
-                });
-            });
-
+            // kick the import loop off and wait for the failed request
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
             jest.runAllTimers();
+            await failurePromise;
 
-            await failurePrmoise;
-            await jest.runAllTimersAsync();
-            await resolvePrmoise;
-            await jest.runAllTimersAsync();
+            // Fix the endpoint to do successful uploads
+            const successPromise = new Promise((resolve) => {
+                fetchMock.put(
+                    "path:/_matrix/client/v3/room_keys/keys",
+                    () => {
+                        resolve(undefined);
+                        return {
+                            status: 200,
+                            body: {
+                                count: 2,
+                                etag: "abcdefg",
+                            },
+                        };
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
 
-            await allKeyUploadedPromise;
+            // check that a `KeyBackupSessionsRemaining` event is emitted with `remaining == 0`
+            const allKeysUploadedPromise = new Promise((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve(undefined);
+                    }
+                });
+            });
+
+            // run the timers, which will make the backup loop redo the request
+            await jest.runAllTimersAsync();
+            await successPromise;
+            await allKeysUploadedPromise;
         });
     });
 
