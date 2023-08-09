@@ -704,7 +704,7 @@ export function verificationMethodIdentifierToMethod(method: string): RustSdkCry
 }
 
 /**
- * Return true if the event is a verification event
+ * Return true if the event's type matches that of an in-room verification event
  *
  * @param event - MatrixEvent
  * @returns
@@ -719,14 +719,11 @@ export function isVerificationEvent(event: MatrixEvent): boolean {
         case EventType.KeyVerificationStart:
         case EventType.KeyVerificationKey:
         case EventType.KeyVerificationReady:
-        case EventType.KeyVerificationAccept: {
+        case EventType.KeyVerificationAccept:
             return true;
-        }
-        case EventType.RoomMessage: {
+        case EventType.RoomMessage:
             return event.getContent().msgtype === MsgType.KeyVerificationRequest;
-        }
-        default: {
+        default:
             return false;
-        }
     }
 }
