@@ -2082,9 +2082,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     return queryResponseBody;
                 };
 
-                for (const path of ["/_matrix/client/v3/keys/query", "/_matrix/client/v3/keys/query"]) {
-                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
-                }
+                fetchMock.post(
+                    new URL("/_matrix/client/v3/keys/query", aliceClient.getHomeserverUrl()).toString(),
+                    listener,
+                );
             });
         }
 
