@@ -811,7 +811,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     });
 
     describe("Send verification request in DM", () => {
-        const crossSingingKeys: Partial<IDownloadKeyResult> = {
+        const crossSigningKeys: Partial<IDownloadKeyResult> = {
             master_keys: {
                 "@bob:xyz": {
                     keys: {
@@ -877,7 +877,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             aliceClient = await startTestClient();
 
-            e2eKeyResponder.addCrossSigningData(crossSingingKeys);
+            e2eKeyResponder.addCrossSigningData(crossSigningKeys);
             e2eKeyResponder.addDeviceKeys(deviceKeys);
 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([bobId]));
@@ -898,7 +898,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             });
         }
 
-        newBackendOnly("alice send verification request in a DM to bob", async () => {
+        newBackendOnly("alice sends a verification request in a DM to bob", async () => {
             const messageRequestPromise = awaitRoomMessageRequest();
             const verificationRequest = await aliceClient.getCrypto()!.requestVerificationDM(bobId, TEST_ROOM_ID);
             const requestContent = await messageRequestPromise;
