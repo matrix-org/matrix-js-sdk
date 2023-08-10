@@ -708,7 +708,7 @@ describe("MatrixClient", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
             httpBackend
-                .when("DELETE", "/_matrix/client/r0/devices/my_device")
+                .when("DELETE", "/_matrix/client/v3/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
@@ -1644,7 +1644,7 @@ describe("MatrixClient", function () {
     describe("getFallbackAuthUrl", () => {
         it("should return fallback url", () => {
             expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
-                `"http://alice.localhost.test.server/_matrix/client/r0/auth/loginType/fallback/web?session=authSessionId"`,
+                `"http://alice.localhost.test.server/_matrix/client/v3/auth/loginType/fallback/web?session=authSessionId"`,
             );
         });
     });
@@ -1652,7 +1652,7 @@ describe("MatrixClient", function () {
     describe("addThreePidOnly", () => {
         it("should make expected POST request", async () => {
             httpBackend
-                .when("POST", "/_matrix/client/r0/account/3pid/add")
+                .when("POST", "/_matrix/client/v3/account/3pid/add")
                 .check(function (req) {
                     expect(req.data).toEqual({
                         client_secret: "secret",
@@ -1675,7 +1675,7 @@ describe("MatrixClient", function () {
     describe("bindThreePid", () => {
         it("should make expected POST request", async () => {
             httpBackend
-                .when("POST", "/_matrix/client/r0/account/3pid/bind")
+                .when("POST", "/_matrix/client/v3/account/3pid/bind")
                 .check(function (req) {
                     expect(req.data).toEqual({
                         client_secret: "secret",
@@ -1702,7 +1702,7 @@ describe("MatrixClient", function () {
     describe("unbindThreePid", () => {
         it("should make expected POST request", async () => {
             httpBackend
-                .when("POST", "/_matrix/client/r0/account/3pid/unbind")
+                .when("POST", "/_matrix/client/v3/account/3pid/unbind")
                 .check(function (req) {
                     expect(req.data).toEqual({
                         medium: "email",

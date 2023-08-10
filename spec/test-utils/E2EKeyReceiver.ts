@@ -76,7 +76,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
                 this.onKeyUploadRequest(resolveOneTimeKeys, options);
 
             // catch both r0 and v3 variants
-            fetchMock.post(new URL("/_matrix/client/r0/keys/upload", homeserverUrl).toString(), listener);
+            fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
             fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
         });
     }

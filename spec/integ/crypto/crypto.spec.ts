@@ -1945,7 +1945,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     };
                 };
 
-                for (const path of ["/_matrix/client/r0/keys/upload", "/_matrix/client/v3/keys/upload"]) {
+                for (const path of ["/_matrix/client/v3/keys/upload", "/_matrix/client/v3/keys/upload"]) {
                     fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener, {
                         // These routes are already defined in the E2EKeyReceiver
                         // We want to overwrite the behaviour of the E2EKeyReceiver
@@ -2082,7 +2082,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     return queryResponseBody;
                 };
 
-                for (const path of ["/_matrix/client/r0/keys/query", "/_matrix/client/v3/keys/query"]) {
+                for (const path of ["/_matrix/client/v3/keys/query", "/_matrix/client/v3/keys/query"]) {
                     fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener);
                 }
             });
@@ -2175,7 +2175,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         /**
-         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)`
+         * Create a mock to respond to the PUT request `/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)`
          * Resolved when a key is uploaded (ie in `body.content.key`)
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
@@ -2184,7 +2184,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // This url is called multiple times during the secret storage bootstrap process
                 // When we received the newly generated key, we return it
                 fetchMock.put(
-                    "express:/_matrix/client/r0/user/:userId/account_data/:type(m.secret_storage.*)",
+                    "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
 
@@ -2200,7 +2200,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         /**
-         * Create a mock to respond to the PUT request `/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`
+         * Create a mock to respond to the PUT request `/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`
          * Resolved when the cross signing key is uploaded
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
@@ -2208,7 +2208,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return new Promise((resolve) => {
                 // Called when the cross signing key is uploaded
                 fetchMock.put(
-                    `express:/_matrix/client/r0/user/:userId/account_data/m.cross_signing.${key}`,
+                    `express:/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`,
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
                         resolve(content.encrypted);

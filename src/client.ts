@@ -1286,7 +1286,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
-            prefix: ClientPrefix.R0,
+            prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
             localTimeoutMs: opts.localTimeoutMs,
@@ -3424,9 +3424,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             await this.crypto.crossSigningInfo.signObject(data.auth_data, "master");
         }
 
-        const res = await this.http.authedRequest<IKeyBackupInfo>(Method.Post, "/room_keys/version", undefined, data, {
-            prefix: ClientPrefix.V3,
-        });
+        const res = await this.http.authedRequest<IKeyBackupInfo>(Method.Post, "/room_keys/version", undefined, data);
 
         // We could assume everything's okay and enable directly, but this ensures
         // we run the same signature verification that will be used for future
@@ -6137,7 +6135,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const opts = {
             prefix:
                 Thread.hasServerSideListSupport === FeatureSupport.Stable
-                    ? "/_matrix/client/v1"
+                    ? ClientPrefix.V1
                     : "/_matrix/client/unstable/org.matrix.msc3856",
         };
 
@@ -8795,9 +8793,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public uploadKeySignatures(content: KeySignatures): Promise<IUploadKeySignaturesResponse> {
-        return this.http.authedRequest(Method.Post, "/keys/signatures/upload", undefined, content, {
-            prefix: ClientPrefix.V3,
-        });
+        return this.http.authedRequest(Method.Post, "/keys/signatures/upload", undefined, content);
     }
 
     /**
