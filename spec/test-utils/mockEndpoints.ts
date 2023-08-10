@@ -22,7 +22,7 @@ import fetchMock from "fetch-mock-jest";
  * @param homeserverUrl - the homeserver url for the client under test
  */
 export function mockInitialApiRequests(homeserverUrl: string) {
-    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["r0.5.0"] });
+    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["v1.1"] });
     fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
     fetchMock.postOnce(new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
         filter_id: "fid",
