@@ -18,7 +18,7 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import MockHttpBackend from "matrix-mock-request";
 
-import { M_AUTHENTICATION } from "../../src";
+import { AutoDiscoveryAction, M_AUTHENTICATION } from "../../src";
 import { AutoDiscovery } from "../../src/autodiscovery";
 import { OidcError } from "../../src/oidc/error";
 import { makeDelegatedAuthConfig } from "../test-utils/oidc";
@@ -854,6 +854,37 @@ describe("AutoDiscovery", function () {
                         state: "FAIL_PROMPT",
                         error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should FAIL_ERROR for unsupported Matrix version", () => {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                base_url: "https://example.org",
+            },
+        });
+        httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+            versions: ["r0.6.0"],
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: AutoDiscoveryAction.FAIL_ERROR,
+                        error: AutoDiscovery.ERROR_HOMESERVER_TOO_OLD,
+                        base_url: "https://example.org",
                     },
                     "m.identity_server": {
                         state: "PROMPT",
