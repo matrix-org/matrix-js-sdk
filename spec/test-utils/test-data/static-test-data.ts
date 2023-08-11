@@ -1,4 +1,4 @@
-/* 
+/*
  * Static Test data for cryptography tests
  */
 
@@ -32,14 +32,15 @@ export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
 ];
 
 export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
-        algorithm: "m.megolm.v1.aes-sha2",
-        sender_key: "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-        sender_claimed_keys: {
-            "ed25519": "vEjK0zoE/flKjhAbzzOePv5AWXUjzcfkKdTjLpyKuhI"
-        },
-        room_id: "!EclSXmduSDvVcwKLnn:example.org",
-        session_id: "QYiBwpB7nf0lcLMR7T9DPaQA5ml4Mhh0WfjAWrDWyOY",
-        session_key: "AQAAAAAkbP0ON4cmpKBZuUXBDlfz0iSowKc/9FYzWIQVmdQM3tk5YDUaO+9kmp0T00XImkgbKCq2CFcoaQAITVU5qqNTi04P9ntakp6A3RoLn7VCiJd9RPfwaiSMeKQakGyFotkXkaiUKcPCHgEslVo1SmnaEcKLuxn9gEueHCK3hYvwTUGIgcKQe539JXCzEe0/Qz2kAOZpeDIYdFn4wFqw1sjm",
-        forwarding_curve25519_key_chain: [],
-        first_known_index: 0,    
+    algorithm: "m.megolm.v1.aes-sha2",
+    sender_key: "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
+    sender_claimed_keys: {
+        ed25519: "vEjK0zoE/flKjhAbzzOePv5AWXUjzcfkKdTjLpyKuhI",
+    },
+    room_id: "!EclSXmduSDvVcwKLnn:example.org",
+    session_id: "QYiBwpB7nf0lcLMR7T9DPaQA5ml4Mhh0WfjAWrDWyOY",
+    session_key:
+        "AQAAAAAkbP0ON4cmpKBZuUXBDlfz0iSowKc/9FYzWIQVmdQM3tk5YDUaO+9kmp0T00XImkgbKCq2CFcoaQAITVU5qqNTi04P9ntakp6A3RoLn7VCiJd9RPfwaiSMeKQakGyFotkXkaiUKcPCHgEslVo1SmnaEcKLuxn9gEueHCK3hYvwTUGIgcKQe539JXCzEe0/Qz2kAOZpeDIYdFn4wFqw1sjm",
+    forwarding_curve25519_key_chain: [],
+    first_known_index: 0,
 };
