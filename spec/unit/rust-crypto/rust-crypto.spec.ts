@@ -40,6 +40,7 @@ import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingReque
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
+import * as staticTestData from "../../test-utils/test-data/static-test-data";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -61,7 +62,7 @@ describe("RustCrypto", () => {
         );
 
         it("should import and export keys", async () => {
-            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            const someRoomKeys = staticTestData.MEGOLM_SESSION_DATA_ARRAY;
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (stage) => {
