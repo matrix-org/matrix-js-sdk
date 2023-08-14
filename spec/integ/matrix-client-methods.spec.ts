@@ -73,7 +73,7 @@ describe("MatrixClient", function () {
 
         it("should upload the file", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     expect(req.queryParams?.filename).toEqual("hi.txt");
@@ -108,7 +108,7 @@ describe("MatrixClient", function () {
 
         it("should parse errors into a MatrixError", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     // @ts-ignore private property
@@ -708,7 +708,7 @@ describe("MatrixClient", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
             httpBackend
-                .when("DELETE", "/_matrix/client/r0/devices/my_device")
+                .when("DELETE", "/_matrix/client/v3/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
@@ -1102,10 +1102,6 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
             httpBackend
                 .when("POST", "/register/email/requestToken")
@@ -1125,10 +1121,6 @@ describe("MatrixClient", function () {
     describe("inviteByThreePid", () => {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/invite")
@@ -1164,10 +1156,6 @@ describe("MatrixClient", function () {
                     },
                 ],
             };
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/createRoom")
@@ -1650,6 +1638,82 @@ describe("MatrixClient", function () {
                 client.searchUserDirectory({ term: "This is my query" }),
                 httpBackend.flushAllExpected(),
             ]);
+        });
+    });
+
+    describe("getFallbackAuthUrl", () => {
+        it("should return fallback url", () => {
+            expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
+                `"http://alice.localhost.test.server/_matrix/client/v3/auth/loginType/fallback/web?session=authSessionId"`,
+            );
+        });
+    });
+
+    describe("addThreePidOnly", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/add")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.addThreePidOnly({
+                    client_secret: "secret",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("bindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/bind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        id_server: "server",
+                        id_access_token: "token",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.bindThreePid({
+                    client_secret: "secret",
+                    id_server: "server",
+                    id_access_token: "token",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("unbindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/unbind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        medium: "email",
+                        address: "alice@server.com",
+                        id_server: "identity.localhost",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
         });
     });
 });

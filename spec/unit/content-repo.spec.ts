@@ -33,7 +33,7 @@ describe("ContentRepo", function () {
         it("should return a download URL if no width/height/resize are specified", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
-                baseUrl + "/_matrix/media/r0/download/server.name/resourceid",
+                baseUrl + "/_matrix/media/v3/download/server.name/resourceid",
             );
         });
 
@@ -44,21 +44,21 @@ describe("ContentRepo", function () {
         it("should return a thumbnail URL if a width/height/resize is specified", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32, 64, "crop")).toEqual(
-                baseUrl + "/_matrix/media/r0/thumbnail/server.name/resourceid" + "?width=32&height=64&method=crop",
+                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32&height=64&method=crop",
             );
         });
 
         it("should put fragments from mxc:// URIs after any query parameters", function () {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32)).toEqual(
-                baseUrl + "/_matrix/media/r0/thumbnail/server.name/resourceid" + "?width=32#automade",
+                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32#automade",
             );
         });
 
         it("should put fragments from mxc:// URIs at the end of the HTTP URI", function () {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
-                baseUrl + "/_matrix/media/r0/download/server.name/resourceid#automade",
+                baseUrl + "/_matrix/media/v3/download/server.name/resourceid#automade",
             );
         });
     });

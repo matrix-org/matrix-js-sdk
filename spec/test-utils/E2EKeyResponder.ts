@@ -43,8 +43,6 @@ export class E2EKeyResponder {
     public constructor(homeserverUrl: string) {
         // set up a listener for /keys/query.
         const listener = (url: string, options: RequestInit) => this.onKeyQueryRequest(options);
-        // catch both r0 and v3 variants
-        fetchMock.post(new URL("/_matrix/client/r0/keys/query", homeserverUrl).toString(), listener);
         fetchMock.post(new URL("/_matrix/client/v3/keys/query", homeserverUrl).toString(), listener);
     }
 

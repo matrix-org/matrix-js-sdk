@@ -90,7 +90,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
         logger.log(this + ": starting");
         this.httpBackend.when("GET", "/versions").respond(200, {
             // we have tests that rely on support for lazy-loading members
-            versions: ["r0.5.0"],
+            versions: ["v1.1"],
         });
         this.httpBackend.when("GET", "/pushrules").respond(200, {});
         this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });

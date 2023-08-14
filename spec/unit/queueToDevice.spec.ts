@@ -195,7 +195,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
 
     it("retries on retryImmediately()", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-            versions: ["r0.0.1"],
+            versions: ["v1.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush(undefined, 1, 20)]);
@@ -219,7 +219,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
 
     it("retries on when client is started", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-            versions: ["r0.0.1"],
+            versions: ["v1.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
@@ -243,7 +243,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
 
     it("retries when a message is retried", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-            versions: ["r0.0.1"],
+            versions: ["v1.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush(undefined, 1, 20)]);
