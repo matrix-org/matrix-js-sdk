@@ -55,11 +55,7 @@ import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
-import {
-    RustVerificationRequest,
-    verificationMethodIdentifierToMethod,
-    verificationMethodsByIdentifier
-} from "./verification";
+import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
 import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
@@ -725,7 +721,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (!userIdentity) throw new Error(`unknown userId ${userId}`);
 
         // Transform the verification methods into rust objects
-        const methods = this._supportedVerificationMethods.map((method) => verificationMethodsByIdentifier[method]);
+        const methods = this._supportedVerificationMethods.map((method) =>
+            verificationMethodIdentifierToMethod(method),
+        );
         // Get the request content to send to the DM room
         const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
 
