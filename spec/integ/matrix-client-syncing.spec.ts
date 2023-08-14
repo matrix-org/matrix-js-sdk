@@ -224,8 +224,6 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should honour lazyLoadMembers if user is not a guest", () => {
-            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
-
             httpBackend!
                 .when("GET", "/sync")
                 .check((req) => {
@@ -242,8 +240,6 @@ describe("MatrixClient syncing", () => {
         it("should not honour lazyLoadMembers if user is a guest", () => {
             httpBackend!.expectedRequests = [];
             httpBackend!.when("GET", "/versions").respond(200, {});
-            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
-
             httpBackend!
                 .when("GET", "/sync")
                 .check((req) => {

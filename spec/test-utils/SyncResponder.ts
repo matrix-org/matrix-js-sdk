@@ -75,7 +75,7 @@ export class SyncResponder implements ISyncResponder {
      */
     public constructor(homeserverUrl: string) {
         this.debug = debugFunc(`sync-responder:[${homeserverUrl}]`);
-        fetchMock.get("begin:" + new URL("/_matrix/client/r0/sync?", homeserverUrl).toString(), (_url, _options) =>
+        fetchMock.get("begin:" + new URL("/_matrix/client/v3/sync?", homeserverUrl).toString(), (_url, _options) =>
             this.onSyncRequest(),
         );
     }

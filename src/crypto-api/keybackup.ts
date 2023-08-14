@@ -60,3 +60,11 @@ export interface BackupTrustInfo {
      */
     readonly matchesDecryptionKey: boolean;
 }
+
+/**
+ * The result of {@link CryptoApi.checkKeyBackupAndEnable}.
+ */
+export interface KeyBackupCheck {
+    backupInfo: KeyBackupInfo;
+    trustInfo: BackupTrustInfo;
+}

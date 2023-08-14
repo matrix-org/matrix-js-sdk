@@ -649,18 +649,11 @@ export class SyncApi {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
-            debuglog("Checking server lazy load support...");
-            const supported = await this.client.doesServerSupportLazyLoading();
-            if (supported) {
-                debuglog("Enabling lazy load on sync filter...");
-                if (!this.opts.filter) {
-                    this.opts.filter = this.buildDefaultFilter();
-                }
-                this.opts.filter.setLazyLoadMembers(true);
-            } else {
-                debuglog("LL: lazy loading requested but not supported " + "by server, so disabling");
-                this.opts.lazyLoadMembers = false;
+            debuglog("Enabling lazy load on sync filter...");
+            if (!this.opts.filter) {
+                this.opts.filter = this.buildDefaultFilter();
             }
+            this.opts.filter.setLazyLoadMembers(true);
         }
         // need to vape the store when enabling LL and wasn't enabled before
         debuglog("Checking whether lazy loading has changed in store...");

@@ -22,9 +22,9 @@ import fetchMock from "fetch-mock-jest";
  * @param homeserverUrl - the homeserver url for the client under test
  */
 export function mockInitialApiRequests(homeserverUrl: string) {
-    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["r0.5.0"] });
-    fetchMock.getOnce(new URL("/_matrix/client/r0/pushrules/", homeserverUrl).toString(), {});
-    fetchMock.postOnce(new URL("/_matrix/client/r0/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
+    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["v1.1"] });
+    fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
+    fetchMock.postOnce(new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
         filter_id: "fid",
     });
 }
@@ -32,13 +32,13 @@ export function mockInitialApiRequests(homeserverUrl: string) {
 /**
  * Mock the requests needed to set up cross signing
  *
- * Return 404 error for `GET _matrix/client/r0/user/:userId/account_data/:type` request
+ * Return 404 error for `GET _matrix/client/v3/user/:userId/account_data/:type` request
  * Return `{}` for `POST _matrix/client/v3/keys/signatures/upload` request (named `upload-sigs` for fetchMock check)
  * Return `{}` for `POST /_matrix/client/(unstable|v3)/keys/device_signing/upload` request (named `upload-keys` for fetchMock check)
  */
 export function mockSetupCrossSigningRequests(): void {
     // have account_data requests return an empty object
-    fetchMock.get("express:/_matrix/client/r0/user/:userId/account_data/:type", {
+    fetchMock.get("express:/_matrix/client/v3/user/:userId/account_data/:type", {
         status: 404,
         body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
     });

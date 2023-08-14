@@ -42,6 +42,7 @@ import {
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
+    KeyBackupCheck,
     KeyBackupInfo,
     VerificationRequest,
 } from "../crypto-api";
@@ -54,10 +55,12 @@ import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
-import { RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType, MsgType } from "../@types/event";
+import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
+import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
+import { TypedReEmitter } from "../ReEmitter";
 import { RustBackupManager } from "./backup";
 import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 import { RustCrossSigningInfo } from "./RustCrossSigningInfo";
@@ -86,8 +89,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
     private crossSigningIdentity: CrossSigningIdentity;
+    private readonly backupManager: RustBackupManager;
 
-    public readonly backupManager: RustBackupManager;
+    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
     public constructor(
         /** The `OlmMachine` from the underlying rust crypto sdk. */
@@ -116,7 +120,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
-        this.backupManager = new RustBackupManager(olmMachine);
+
+        this.backupManager = new RustBackupManager(olmMachine, http);
+        this.reemitter.reEmit(this.backupManager, [CryptoEvent.KeyBackupStatus]);
 
         // Fire if the cross signing keys are imported from the secret storage
         const onCrossSigningKeysImport = (): void => {
@@ -820,6 +826,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.backupManager.isKeyBackupTrusted(info);
     }
 
+    /**
+     * Force a re-check of the key backup and enable/disable it as appropriate.
+     *
+     * Implementation of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
+     */
+    public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
+        return await this.backupManager.checkKeyBackupAndEnable(true);
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -1041,15 +1056,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param event - live event
      */
     public async onLiveEventFromSync(event: MatrixEvent): Promise<void> {
-        // Ignore state event
-        if (event.isState()) return;
+        // Ignore state event or remote echo
+        // transaction_id is provided in case of remote echo {@link https://spec.matrix.org/v1.7/client-server-api/#local-echo}
+        if (event.isState() || !!event.getUnsigned().transaction_id) return;
 
         const processEvent = async (evt: MatrixEvent): Promise<void> => {
-            // Process only key validation request
-            if (
-                evt.getType() === EventType.RoomMessage &&
-                evt.getContent().msgtype === MsgType.KeyVerificationRequest
-            ) {
+            // Process only verification event
+            if (isVerificationEvent(event)) {
                 await this.onKeyVerificationRequest(evt);
             }
         };
@@ -1059,6 +1072,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // 5 mins
             const TIMEOUT_DELAY = 5 * 60 * 1000;
 
+            // After 5mins, we are not expecting the event to be decrypted
             const timeoutId = setTimeout(() => event.off(MatrixEventEvent.Decrypted, onDecrypted), TIMEOUT_DELAY);
 
             const onDecrypted = (decryptedEvent: MatrixEvent, error?: Error): void => {
@@ -1068,7 +1082,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 event.off(MatrixEventEvent.Decrypted, onDecrypted);
                 processEvent(decryptedEvent);
             };
-            // After 5mins, we are not expecting the event to be decrypted
 
             event.on(MatrixEventEvent.Decrypted, onDecrypted);
         } else {
@@ -1232,7 +1245,10 @@ class EventDecryptor {
     }
 }
 
-type RustCryptoEvents = CryptoEvent.VerificationRequestReceived | CryptoEvent.UserTrustStatusChanged;
+type RustCryptoEvents =
+    | CryptoEvent.VerificationRequestReceived
+    | CryptoEvent.UserTrustStatusChanged
+    | RustBackupCryptoEvents;
 
 type RustCryptoEventMap = {
     /**
@@ -1244,4 +1260,4 @@ type RustCryptoEventMap = {
      * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserTrustLevel) => void;
-};
+} & RustBackupCryptoEventMap;
