@@ -50,6 +50,7 @@ export * from "./service-types";
 export * from "./store/memory";
 export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
+export * from "./crypto/store/localStorage-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
 export * from "./content-repo";

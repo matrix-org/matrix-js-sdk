@@ -1342,7 +1342,7 @@ describe("MatrixClient event timelines", function () {
         function respondToContext(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/context/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1360,7 +1360,7 @@ describe("MatrixClient event timelines", function () {
         function respondToEvent(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/event/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/event/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1371,7 +1371,7 @@ describe("MatrixClient event timelines", function () {
         function respondToMessagesRequest(): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/messages", {
                     $roomId: roomId,
                 }),
             );

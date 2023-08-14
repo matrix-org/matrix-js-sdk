@@ -133,7 +133,6 @@ import {
     IFilterResponse,
     ITagsResponse,
     IStatusResponse,
-    IAddThreePidBody,
     KnockRoomOpts,
 } from "./@types/requests";
 import {
@@ -1287,7 +1286,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
-            prefix: ClientPrefix.R0,
+            prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
             localTimeoutMs: opts.localTimeoutMs,
@@ -3432,9 +3431,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             await this.crypto.crossSigningInfo.signObject(data.auth_data, "master");
         }
 
-        const res = await this.http.authedRequest<IKeyBackupInfo>(Method.Post, "/room_keys/version", undefined, data, {
-            prefix: ClientPrefix.V3,
-        });
+        const res = await this.http.authedRequest<IKeyBackupInfo>(Method.Post, "/room_keys/version", undefined, data);
 
         // We could assume everything's okay and enable directly, but this ensures
         // we run the same signature verification that will be used for future
@@ -3931,7 +3928,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getMediaConfig(): Promise<IMediaConfig> {
         return this.http.authedRequest(Method.Get, "/config", undefined, undefined, {
-            prefix: MediaPrefix.R0,
+            prefix: MediaPrefix.V3,
         });
     }
 
@@ -5186,7 +5183,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             },
             undefined,
             {
-                prefix: MediaPrefix.R0,
+                prefix: MediaPrefix.V3,
                 priority: "low",
             },
         );
@@ -5353,7 +5350,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             address: address,
         };
 
-        if (this.identityServer?.getAccessToken && (await this.doesServerAcceptIdentityAccessToken())) {
+        if (this.identityServer?.getAccessToken) {
             const identityAccessToken = await this.identityServer.getAccessToken();
             if (identityAccessToken) {
                 params["id_access_token"] = identityAccessToken;
@@ -6145,7 +6142,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const opts = {
             prefix:
                 Thread.hasServerSideListSupport === FeatureSupport.Stable
-                    ? "/_matrix/client/v1"
+                    ? ClientPrefix.V1
                     : "/_matrix/client/unstable/org.matrix.msc3856",
         };
 
@@ -6670,20 +6667,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         params: QueryDict,
     ): Promise<T> {
         const postParams = Object.assign({}, params);
-
-        // If the HS supports separate add and bind, then requestToken endpoints
-        // don't need an IS as they are all validated by the HS directly.
-        if (!(await this.doesServerSupportSeparateAddAndBind()) && this.idBaseUrl) {
-            const idServerUrl = new URL(this.idBaseUrl);
-            postParams.id_server = idServerUrl.host;
-
-            if (this.identityServer?.getAccessToken && (await this.doesServerAcceptIdentityAccessToken())) {
-                const identityAccessToken = await this.identityServer.getAccessToken();
-                if (identityAccessToken) {
-                    postParams.id_access_token = identityAccessToken;
-                }
-            }
-        }
 
         return this.http.request(Method.Post, endpoint, undefined, postParams);
     }
@@ -7390,78 +7373,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Query the server to see if it supports members lazy loading
-     * @returns true if server supports lazy loading
-     */
-    public async doesServerSupportLazyLoading(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-
-        return (
-            (versions && versions.includes("r0.5.0")) || (unstableFeatures && unstableFeatures["m.lazy_load_members"])
-        );
-    }
-
-    /**
-     * Query the server to see if the `id_server` parameter is required
-     * when registering with an 3pid, adding a 3pid or resetting password.
-     * @returns true if id_server parameter is required
-     */
-    public async doesServerRequireIdServerParam(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return true;
-
-        const versions = response["versions"];
-
-        // Supporting r0.6.0 is the same as having the flag set to false
-        if (versions && versions.includes("r0.6.0")) {
-            return false;
-        }
-
-        const unstableFeatures = response["unstable_features"];
-        if (!unstableFeatures) return true;
-        if (unstableFeatures["m.require_identity_server"] === undefined) {
-            return true;
-        } else {
-            return unstableFeatures["m.require_identity_server"];
-        }
-    }
-
-    /**
-     * Query the server to see if the `id_access_token` parameter can be safely
-     * passed to the homeserver. Some homeservers may trigger errors if they are not
-     * prepared for the new parameter.
-     * @returns true if id_access_token can be sent
-     */
-    public async doesServerAcceptIdentityAccessToken(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-        return (versions && versions.includes("r0.6.0")) || (unstableFeatures && unstableFeatures["m.id_access_token"]);
-    }
-
-    /**
-     * Query the server to see if it supports separate 3PID add and bind functions.
-     * This affects the sequence of API calls clients should use for these operations,
-     * so it's helpful to be able to check for support.
-     * @returns true if separate functions are supported
-     */
-    public async doesServerSupportSeparateAddAndBind(): Promise<boolean> {
-        const response = await this.getVersions();
-        if (!response) return false;
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-
-        return versions?.includes("r0.6.0") || unstableFeatures?.["m.separate_add_and_bind"];
-    }
-
-    /**
      * Query the server to see if it lists support for an unstable feature
      * in the /versions response
      * @param feature - the feature name
@@ -7530,14 +7441,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 fwdPagination: FeatureSupport.None,
             };
         }
-    }
-
-    /**
-     * Query the server to see if it supports the MSC2457 `logout_devices` parameter when setting password
-     * @returns true if server supports the `logout_devices` parameter
-     */
-    public doesServerSupportLogoutDevices(): Promise<boolean> {
-        return this.isVersionSupported("r0.6.1");
     }
 
     /**
@@ -7925,18 +7828,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param relayState - URL Callback after SAML2 Authentication
-     * @returns Promise which resolves to a LoginResponse object
-     * @returns Rejects: with an error response.
-     * @deprecated this isn't in the Matrix spec anymore
-     */
-    public loginWithSAML2(relayState: string): Promise<LoginResponse> {
-        return this.login("m.login.saml2", {
-            relay_state: relayState,
-        });
-    }
-
-    /**
      * @param redirectUrl - The URL to redirect to after the HS
      * authenticates with CAS.
      * @returns The HS URL to hit to begin the CAS login process.
@@ -7965,7 +7856,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
-        return this.http.getUrl(url, params, ClientPrefix.R0).href;
+        return this.http.getUrl(url, params).href;
     }
 
     /**
@@ -8083,13 +7974,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $loginType: loginType,
         });
 
-        return this.http.getUrl(
-            path,
-            {
-                session: authSessionId,
-            },
-            ClientPrefix.R0,
-        ).href;
+        return this.http.getUrl(path, {
+            session: authSessionId,
+        }).href;
     }
 
     /**
@@ -8104,11 +7991,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // inject the id_access_token if inviting 3rd party addresses
         const invitesNeedingToken = (options.invite_3pid || []).filter((i) => !i.id_access_token);
-        if (
-            invitesNeedingToken.length > 0 &&
-            this.identityServer?.getAccessToken &&
-            (await this.doesServerAcceptIdentityAccessToken())
-        ) {
+        if (invitesNeedingToken.length > 0 && this.identityServer?.getAccessToken) {
             const identityAccessToken = await this.identityServer.getAccessToken();
             if (identityAccessToken) {
                 for (const invite of invitesNeedingToken) {
@@ -8468,30 +8351,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set the visbility of a room bridged to a 3rd party network in
-     * the current HS's room directory.
-     * @param networkId - the network ID of the 3rd party
-     *                 instance under which this room is published under.
-     * @param visibility - "public" to make the room visible
-     *                 in the public directory, or "private" to make
-     *                 it invisible.
-     * @returns Promise which resolves: result object
-     * @returns Rejects: with an error response.
-     * @deprecated missing from the spec
-     */
-    public setRoomDirectoryVisibilityAppService(
-        networkId: string,
-        roomId: string,
-        visibility: "public" | "private",
-    ): Promise<any> {
-        const path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
-            $networkId: networkId,
-            $roomId: roomId,
-        });
-        return this.http.authedRequest(Method.Put, path, undefined, { visibility: visibility });
-    }
-
-    /**
      * Query the user directory with a term matching user IDs, display names and domains.
      * @param term - the term with which to search.
      * @param limit - the maximum number of results to return. The server will
@@ -8574,29 +8433,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Add a 3PID to your homeserver account and optionally bind it to an identity
-     * server as well. An identity server is required as part of the `creds` object.
-     *
-     * @deprecated this API is deprecated, and you should instead use `addThreePidOnly` for homeservers that support it.
-     *
-     * @returns Promise which resolves: on success
-     * @returns Rejects: with an error response.
-     */
-    public addThreePid(creds: IAddThreePidBody, bind: boolean): Promise<{ submit_url?: string }> {
-        const path = "/account/3pid";
-        const data = {
-            threePidCreds: creds,
-            bind: bind,
-        };
-        return this.http.authedRequest(Method.Post, path, undefined, data);
-    }
-
-    /**
      * Add a 3PID to your homeserver account. This API does not use an identity
      * server, as the homeserver is expected to handle 3PID ownership validation.
-     *
-     * You can check whether a homeserver supports this API via
-     * `doesServerSupportSeparateAddAndBind`.
      *
      * @param data - A object with 3PID validation data from having called
      * `account/3pid/<medium>/requestToken` on the homeserver.
@@ -8605,17 +8443,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
      * Bind a 3PID for discovery onto an identity server via the homeserver. The
      * identity server handles 3PID ownership validation and the homeserver records
      * the new binding to track where all 3PIDs for the account are bound.
-     *
-     * You can check whether a homeserver supports this API via
-     * `doesServerSupportSeparateAddAndBind`.
      *
      * @param data - A object with 3PID validation data from having called
      * `validate/<medium>/requestToken` on the identity server. It should also
@@ -8625,8 +8459,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
         const path = "/account/3pid/bind";
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
@@ -8651,8 +8484,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             address,
             id_server: this.getIdentityServerUrl(true),
         };
-        const prefix = (await this.isVersionSupported("r0.6.0")) ? ClientPrefix.R0 : ClientPrefix.Unstable;
-        return this.http.authedRequest(Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(Method.Post, path, undefined, data);
     }
 
     /**
@@ -8960,9 +8792,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public uploadKeySignatures(content: KeySignatures): Promise<IUploadKeySignaturesResponse> {
-        return this.http.authedRequest(Method.Post, "/keys/signatures/upload", undefined, content, {
-            prefix: ClientPrefix.V3,
-        });
+        return this.http.authedRequest(Method.Post, "/keys/signatures/upload", undefined, content);
     }
 
     /**

@@ -6,6 +6,6 @@ exports[`MatrixHttpApi should return expected object from \`getContentUri\` 1`] 
   "params": {
     "access_token": "token",
   },
-  "path": "/_matrix/media/r0/upload",
+  "path": "/_matrix/media/v3/upload",
 }
 `;
