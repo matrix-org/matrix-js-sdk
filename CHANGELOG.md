@@ -1,5 +1,5 @@
-Changes in [27.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.2.0-rc.1) (2023-08-08)
-============================================================================================================
+Changes in [27.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.2.0) (2023-08-15)
+==================================================================================================
 
 ## 🦖 Deprecations
  * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
