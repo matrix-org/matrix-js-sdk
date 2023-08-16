@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
@@ -29,7 +30,7 @@ import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault } from "../utils";
+import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -61,8 +62,14 @@ import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
+import { ISignatures } from "../@types/signed";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
+interface ISignableObject {
+    signatures?: ISignatures;
+    unsigned?: object;
+}
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -507,6 +514,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage,
+        setupNewKeyBackup,
     }: CreateSecretStorageOpts = {}): Promise<void> {
         // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
         // we don't want to create a new key
@@ -550,7 +558,45 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+
+            if (setupNewKeyBackup) {
+                await this.resetKeyBackup();
+            }
         }
+    }
+
+    public async resetKeyBackup(): Promise<void> {
+        // check if there is already an existing backup
+        const backupInfo = await this.backupManager.setUpKeyBackup(this.signObject.bind(this));
+
+        // we want to store the private key in 4S
+        // need to check if 4S setup?
+        if (await this.secretStorageHasAESKey()) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
+        }
+
+        // we can check and start async
+        this.checkKeyBackupAndEnable();
+    }
+
+    public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+        const sigs = new Map(Object.entries(obj.signatures || {}));
+        const unsigned = obj.unsigned;
+
+        delete obj.signatures;
+        delete obj.unsigned;
+
+        const userSignatures = sigs.get(this.userId) || {};
+
+        const canonalizedJson = anotherjson.stringify(obj);
+        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
+
+        const map = JSON.parse(signatures.asJSON());
+
+        sigs.set(this.userId, { ...userSignatures, ...map[this.userId] });
+
+        if (unsigned !== undefined) obj.unsigned = unsigned;
+        obj.signatures = recursiveMapToObject(sigs);
     }
 
     /**

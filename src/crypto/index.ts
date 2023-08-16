@@ -98,6 +98,7 @@ import {
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
+import { ClientPrefix, Method } from "../http-api";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -1143,6 +1144,33 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await builder.persist(this);
 
         logger.log("Secure Secret Storage ready");
+    }
+
+    public async resetKeyBackup(): Promise<void> {
+        // Delete existing ones
+        await this.backupManager.deleteKeyBackup();
+
+        // eslint-disable-next-line camelcase
+        const info = await this.backupManager.prepareKeyBackupVersion();
+
+        await this.signObject(info.auth_data);
+
+        // add new key backup
+        const { version } = await this.baseApis.http.authedRequest<{ version: string }>(
+            Method.Post,
+            "/room_keys/version",
+            undefined,
+            info,
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        // write the key ourselves to 4S
+        const privateKey = decodeRecoveryKey(info.recovery_key);
+        await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+
+        logger.log(`Created backup version ${version}`);
     }
 
     /**

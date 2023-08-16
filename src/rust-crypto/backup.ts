@@ -22,6 +22,27 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { encodeUri } from "../utils";
+
+/* eslint-disable camelcase */
+interface PreparedKeyBackupVersion {
+    algorithm: string;
+    auth_data: AuthData;
+    decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
+}
+
+type AuthData = KeyBackupInfo["auth_data"];
+
+interface BackupCreateResponse {
+    version: string;
+}
+
+export interface KeyBackupCreationInfo {
+    version: string;
+    algorithm: string;
+    authData: AuthData;
+    decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
+}
 
 /**
  * @internal
@@ -192,6 +213,76 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 throw e;
             }
         }
+    }
+
+    public async setUpKeyBackup(signer: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        // check first if there is an existing backup
+        // TODO should it be an option? like if there is already a backup we throw unless it's forced?
+        if (this.activeBackupVersion || (await this.requestKeyBackupVersion()) != null) {
+            // we want to delete?
+            await this.deleteKeyBackup();
+        }
+
+        const version = await this.prepareKeyBackupVersion();
+        await signer(version.auth_data);
+
+        const res = await this.http.authedRequest<BackupCreateResponse>(
+            Method.Post,
+            "/room_keys/version",
+            undefined,
+            {
+                algorithm: version.algorithm,
+                auth_data: version.auth_data,
+            },
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        this.olmMachine.saveBackupDecryptionKey(version.decryptionKey, res.version);
+
+        return {
+            version: res.version,
+            algorithm: version.algorithm,
+            authData: version.auth_data,
+            decryptionKey: version.decryptionKey,
+        };
+    }
+
+    public async deleteKeyBackup(): Promise<void> {
+        // there could be several backup versions, delete all to be safe.
+        let current = (await this.requestKeyBackupVersion())?.version ?? null;
+        while (current != null) {
+            this.deleteKeyBackupVersion(current);
+            current = (await this.requestKeyBackupVersion())?.version ?? null;
+        }
+
+        // Should this also update Secret Storage and delete any existing keys?
+    }
+
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.disableKeyBackup();
+        const path = encodeUri("/room_keys/version/$version", { $version: version });
+        await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    }
+
+    /**
+     * Prepare the keybackup version data, auth_data not signed at this point
+     * @returns P
+     */
+    private async prepareKeyBackupVersion(): Promise<PreparedKeyBackupVersion> {
+        const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
+        const pubKey = randomKey.megolmV1PublicKey;
+
+        const authData = { public_key: pubKey.publicKeyBase64 };
+
+        return {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+            decryptionKey: randomKey,
+        };
     }
 }
 

@@ -25,7 +25,7 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
-import { safeSet, sleep } from "../utils";
+import { encodeUri, safeSet, sleep } from "../utils";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { encodeRecoveryKey } from "./recoverykey";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
@@ -39,7 +39,7 @@ import {
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
-import { HTTPError, MatrixError } from "../http-api";
+import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api";
 import { BackupTrustInfo } from "../crypto-api/keybackup";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
@@ -222,6 +222,23 @@ export class BackupManager {
 
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
+    }
+
+    public async deleteKeyBackup(): Promise<void> {
+        // there could be several backup versions, delete all to be safe.
+        let current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
+        while (current != null) {
+            await this.deleteKeyBackupVersion(current);
+            current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
+        }
+    }
+
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        this.disableKeyBackup();
+        const path = encodeUri("/room_keys/version/$version", { $version: version });
+        await this.baseApis.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
     }
 
     /**
