@@ -46,7 +46,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Tell the RustBackupManager to immediately stop.
+     * Tells the RustBackupManager to stop.
+     * The RustBackupManager is scheduling background uploads of keys to the backup, this
+     * call allows to cancel the process when the client is stoppped.
      */
     public stop(): void {
         this.stopped = true;
@@ -224,11 +226,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 } catch (err) {
                     numFailures++;
                     logger.error("Error processing backup request for rust crypto-sdk", err);
-                    if ((<MatrixError>err).data) {
-                        const errCode = (<MatrixError>err).data.errcode;
+                    if (err instanceof MatrixError) {
+                        const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
                             await this.disableKeyBackup();
-                            this.emit(CryptoEvent.KeyBackupFailed, (<MatrixError>err).data.errcode!);
+                            this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
                             // There was an active backup and we are out of sync with the server
                             // force a check server side
                             this.backupKeysLoopRunning = false;
@@ -236,7 +238,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             return;
                         } else if (errCode == "M_LIMIT_EXCEEDED") {
                             // wait for that and then continue?
-                            const waitTime = (<MatrixError>err).data.retry_after_ms;
+                            const waitTime = err.data.retry_after_ms;
                             if (waitTime > 0) {
                                 sleep(waitTime);
                                 continue;
@@ -244,7 +246,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         }
                     }
 
-                    // Someo other error (mx, network, or CORS or invalid urls?) anyhow backoff
+                    // Some other errors (mx, network, or CORS or invalid urls?) anyhow backoff
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
