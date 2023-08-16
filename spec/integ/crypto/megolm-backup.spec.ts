@@ -26,7 +26,6 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
-import * as staticTestData from "../../test-utils/test-data/static-test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
 
@@ -252,7 +251,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 });
             });
 
-            const someRoomKeys = staticTestData.MEGOLM_SESSION_DATA_ARRAY;
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
 
             const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
 
@@ -288,7 +287,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await remainingZeroPromise;
 
             // A new key import should trigger a new upload.
-            const newKey = staticTestData.MEGOLM_SESSION_DATA;
+            const newKey = testData.MEGOLM_SESSION_DATA;
 
             const newKeyUploadPromise = new Promise<void>((resolve) => {
                 uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
@@ -326,7 +325,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 });
             });
 
-            const someRoomKeys = staticTestData.MEGOLM_SESSION_DATA_ARRAY;
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
                 overwriteRoutes: true,
@@ -384,7 +383,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             // A new key import should trigger a new upload.
-            const newKey = staticTestData.MEGOLM_SESSION_DATA;
+            const newKey = testData.MEGOLM_SESSION_DATA;
 
             const newKeyUploadPromise = new Promise<void>((resolve) => {
                 uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
@@ -435,7 +434,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             // kick the import loop off and wait for the failed request
-            const someRoomKeys = staticTestData.MEGOLM_SESSION_DATA_ARRAY;
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
