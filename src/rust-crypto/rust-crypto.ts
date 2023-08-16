@@ -139,6 +139,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             onCrossSigningKeysImport,
         );
     }
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
