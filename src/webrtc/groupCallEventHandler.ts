@@ -84,6 +84,7 @@ export class GroupCallEventHandler {
     }
 
     public stop(): void {
+        this.client.removeListener(ClientEvent.Room, this.onRoomsChanged);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 

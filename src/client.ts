@@ -220,6 +220,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
+import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessonManager";
 
 export type Store = IStore;
 
@@ -1264,6 +1265,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // A manager for determining which invites should be ignored.
     public readonly ignoredInvites: IgnoredInvites;
 
+    public readonly matrixRTC: MatrixRTCSessionManager;
+
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1343,6 +1346,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // with encrypted events that might never get decrypted
             this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
+
+        // NB. We initialise MatrixRTC whether we have call support or not: this is just
+        // the underlying session management and doesn't use any actual media capabilities
+        this.matrixRTC = new MatrixRTCSessionManager(this);
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1519,6 +1526,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.start();
+
+        this.matrixRTC.start();
     }
 
     /**
@@ -1568,6 +1577,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.stop();
+
+        this.matrixRTC.stop();
     }
 
     /**
