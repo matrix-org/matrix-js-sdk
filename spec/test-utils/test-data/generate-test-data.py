@@ -285,8 +285,8 @@ def sign_json(json_object: dict, private_key: ed25519.Ed25519PrivateKey) -> str:
 
 def build_exported_megolm_key() -> dict:
     """
-        Creates an exported megolm room key, as per https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md#session-export-format
-        that can be imported via importRoomKeys API.
+    Creates an exported megolm room key, as per https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md#session-export-format
+    that can be imported via importRoomKeys API.
     """
     index = int(0)
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32))
