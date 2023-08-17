@@ -457,6 +457,7 @@ export class BackupManager {
      * @param maxDelay - Maximum delay to wait in ms. 0 means no delay.
      */
     public async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
+        logger.debug(`Key backup: scheduleKeyBackupSend currentSending:${this.sendingBackups} delay:${maxDelay}`);
         if (this.sendingBackups) return;
 
         this.sendingBackups = true;
@@ -469,6 +470,7 @@ export class BackupManager {
             await sleep(delay);
             if (!this.clientRunning) {
                 logger.debug("Key backup send aborted, client stopped");
+                this.sendingBackups = false;
                 return;
             }
             let numFailures = 0; // number of consecutive failures
@@ -480,24 +482,26 @@ export class BackupManager {
                     const numBackedUp = await this.backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
                     if (numBackedUp === 0) {
                         // no sessions left needing backup: we're done
+                        this.sendingBackups = false;
                         return;
                     }
                     numFailures = 0;
                 } catch (err) {
                     numFailures++;
                     logger.log("Key backup request failed", err);
-                    if ((<MatrixError>err).data) {
-                        if (
-                            (<MatrixError>err).data.errcode == "M_NOT_FOUND" ||
-                            (<MatrixError>err).data.errcode == "M_WRONG_ROOM_KEYS_VERSION"
-                        ) {
-                            // Re-check key backup status on error, so we can be
-                            // sure to present the current situation when asked.
-                            await this.checkKeyBackup();
+                    if (err instanceof MatrixError) {
+                        const errCode = err.data.errcode;
+                        if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+                            // Set to false now as `checkKeyBackup` might schedule a backupsend before this one ends.
+                            this.sendingBackups = false;
                             // Backup version has changed or this backup version
                             // has been deleted
-                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, (<MatrixError>err).data.errcode!);
-                            throw err;
+                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, errCode);
+                            // Re-check key backup status on error, so we can be
+                            // sure to present the current situation when asked.
+                            // This call might restart the backup loop if new backup version is trusted
+                            await this.checkKeyBackup();
+                            return;
                         }
                     }
                 }
@@ -508,10 +512,14 @@ export class BackupManager {
 
                 if (!this.clientRunning) {
                     logger.debug("Key backup send loop aborted, client stopped");
+                    this.sendingBackups = false;
                     return;
                 }
             }
-        } finally {
+        } catch (err) {
+            // No one actually checks errors on this promise, it's spawned internally.
+            // Just log, apps/client should use events to check status
+            logger.log(`Backup loop failed ${err}`);
             this.sendingBackups = false;
         }
     }
