@@ -117,29 +117,30 @@ export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
     }
 };
 
+/** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!roomA:example.org",
         "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-        "session_id": "B/1owFh7K0r8cAVzQJnYxVpSmR+Cutiy7DTLRPsIsOI",
-        "session_key": "AQAAAADdFxBB2aZSfIHX9uOy1k9RHAtOYavhB2xBG1BiN5fXLTnFj9WMNGw1puBHbc9Xz1OiO79AUHOj/Yz1aiqn/PQBoBY7n7onN3vRrEUOk8PXpUfKGMwDN6IX1eyXD9jg36CQCTp2rtGZIitT4uO1rEC1vyI1F/9FQ+zFS1FKBTnAoQf9aMBYeytK/HAFc0CZ2MVaUpkfgrrYsuw0y0T7CLDi",
+        "session_id": "FYOoKQSwe4d9jhTZ/LQCZFJINjPEqZ7Or4Z08reP92M",
+        "session_key": "AQAAAABZ0jXQOprFfXe41tIFmAtHxflJp4O2hM/vzQQpOazOCFeWSoW5P3Z9Q+voU3eXehMwyP8/hm/Q8xLP6/PmJdy+71se/17kdFwcDGgLxBWfa4ODM9zlI4EjKbNqmiii5loJ7rBhA/XXaw80m0hfU6zTDX/KrO55J0Pt4vJ0LDa3LBWDqCkEsHuHfY4U2fy0AmRSSDYzxKmezq+GdPK3j/dj",
         "sender_claimed_keys": {
-                "ed25519": "0Z+1+PWGErCmWx9fszojigz8Axh51Hgu9l8apPKU80k"
+            "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0"
         },
         "forwarding_curve25519_key_chain": []
-},
+    },
     {
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!roomA:example.org",
         "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-        "session_id": "mG/goAa0BeALT2sjRL8bVTvYow1RfTFmcVRU22S1W4k",
-        "session_key": "AQAAAADlTISccgGBYg/MSQnMlBve5GWzxckGQ0tpiDSKARDF8JhOC7GJxhanJtBT/qbiiEdo/b+cfNjLM2p5fld1R+6v1vzPCrOD2wDH99n46FJAncHXZWjiaNKy35EdZK+v75BkTqfoNluawv4n3qgHa8Z8DK0jLFOfwXG3okTZX28fDJhv4KAGtAXgC09rI0S/G1U72KMNUX0xZnFUVNtktVuJ",
+        "session_id": "mPYSGA2l1tOQiipEDEVYhDSdTSFh2lDW1qpGKYZRxTc",
+        "session_key": "AQAAAAAHwgkB49BTPAEGTCK6degxUIbl8GPG2ugPRYhNtOpNic63u11+baXFfjDw5fmVfD1gJXpQQjGsqrIYioxrB1xzl7mfb942UHhYdaMQZowpp1fSpJVsxR5TddUU2EWifYD9EQsoz8mY1zqoazm4vUP4v9yxaTcUBj2c6HMJCY0gCJj2EhgNpdbTkIoqRAxFWIQ0nU0hYdpQ1taqRimGUcU3",
         "sender_claimed_keys": {
-                "ed25519": "XXGabP9k45NJ1cWRcZ3NyLAkQ7BKNmSoW5MjhfsnqYY"
+            "ed25519": "IrkbT6H+0urDf6wKDSyVC1fh1t84Vz6T62snni86Cog"
         },
         "forwarding_curve25519_key_chain": []
-},
+    }
 ];
 
 /** An exported megolm session */
@@ -147,10 +148,10 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!roomA:example.org",
     "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-    "session_id": "0GDRENodidyou+W+od+Y8AyHLJe+7Jo+rzDwjSPDFH8",
-    "session_key": "AQAAAAB+5PGbWI5AOqKXrwGYd8pDOFVbiL4vzLSzVqMm2IrlR6SUxC6zYS2FUxKTaJLnnZKblsSOwMj5Uz7L7ld9FhZ4JTKpb+KtekVmohGjmzEvWKNBnPoqZRRg6gD25FnnxYImXwAhuBl04TG76P4FRzMCb4AlHIOYiQf5b8EIGU6h3tBg0RDaHYncqLvlvqHfmPAMhyyXvuyaPq8w8I0jwxR/",
+    "session_id": "ipdI6Zs/7DzFTEhiA2iGaMDfHkIYCleqXT6L+5e1/co",
+    "session_key": "AQAAAABXGO+Z9jlQJhIL6ByhXrv2BwCIxkhh7MXpKLsYmXkJcWrQlirmXmD79ga1zo+I4DCtEZzyGSpDWXBC6G7ez3H4gDMBam1RE3Jm5tc+oTlIri32UkYgSL0kBkcEnttqmIXBlK8tAfJo3cJnlh7F4ltEOAqrdME6dU0zXTkqXmURqYqXSOmbP+w8xUxIYgNohmjA3x5CGApXql0+i/uXtf3K",
     "sender_claimed_keys": {
-        "ed25519": "zFsHIa5597r9zods42B3KD1laMBdlaTBgwp+rgkh14o"
+        "ed25519": "Bhbpt6hqMZlSH4sJV7xiEEEiPVeTWz4Vkujl1EMdIPI"
     },
     "forwarding_curve25519_key_chain": []
 };

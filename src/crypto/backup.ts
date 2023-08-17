@@ -499,7 +499,7 @@ export class BackupManager {
                 }
             }
         } catch (err) {
-            // No one actually check errors on this promise, it's spawned internally.
+            // No one actually checks errors on this promise, it's spawned internally.
             // Just log, apps/client should use events to check status
             logger.log(`Backup loop failed ${err}`);
         } finally {

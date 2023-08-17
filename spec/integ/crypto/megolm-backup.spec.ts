@@ -93,7 +93,7 @@ type MockKeyUploadEventHandlerMap = {
 };
 
 /*
- * Test helper. Will emit an event everytime fetchmock sees a request to backup a key.
+ * Test helper. Returns an event emitter that will emit an event every time fetchmock sees a request to backup a key.
  */
 function mockUploadEmitter(
     expectedVersion: string,

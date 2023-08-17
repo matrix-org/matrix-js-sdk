@@ -30,7 +30,7 @@ import json
 from canonicaljson import encode_canonical_json
 from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from random import randbytes
+from random import randbytes, seed
 
 # input data
 TEST_USER_ID = "@alice:localhost"
@@ -117,6 +117,10 @@ def main() -> None:
         TEST_USER_ID: {f"ed25519:{TEST_DEVICE_ID}": sig}
     }
 
+    set_of_exported_room_keys = [build_exported_megolm_key(), build_exported_megolm_key()]
+
+    additional_exported_room_key = build_exported_megolm_key()
+
     print(
         f"""\
 /* Test data for cryptography tests
@@ -169,23 +173,22 @@ export const BACKUP_DECRYPTION_KEY_BASE64 = "{ B64_BACKUP_DECRYPTION_KEY }";
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 
-export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
-    { 
-        json.dumps(build_exported_megolm_key(), indent=8)
-    },
-    { 
-        json.dumps(build_exported_megolm_key(), indent=8)
-    },
-];
+/** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
+export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = {
+    json.dumps(set_of_exported_room_keys, indent=4)
+};
 
 /** An exported megolm session */
 export const MEGOLM_SESSION_DATA: IMegolmSessionData = { 
-        json.dumps(build_exported_megolm_key(), indent=4)
+        json.dumps(additional_exported_room_key, indent=4)
 };
 """,
         end="",
     )
 
+
+# Use static seed to have stable random test data upon new generation
+seed(10)
 
 def build_cross_signing_keys_data() -> dict:
     """Build the signed cross-signing-keys data for return from /keys/query"""
@@ -281,8 +284,12 @@ def sign_json(json_object: dict, private_key: ed25519.Ed25519PrivateKey) -> str:
     return signature_base64
 
 def build_exported_megolm_key() -> dict:
+    """
+        Creates an exported megolm room key, as per https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md#session-export-format
+        that can be imported via importRoomKeys API.
+    """
     index = int(0)
-    private_key = ed25519.Ed25519PrivateKey.generate()
+    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32))
     # Just use radom bytes for the ratchet parts
     ratchet = randbytes(32 * 4)
     # exported key, start with version byte
@@ -302,7 +309,7 @@ def build_exported_megolm_key() -> dict:
         ),
         "session_key": encode_base64(exported_key),
         "sender_claimed_keys": {
-            "ed25519": encode_base64(ed25519.Ed25519PrivateKey.generate().public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
+            "ed25519": encode_base64(ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32)).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
         },
         "forwarding_curve25519_key_chain": [],
     }
