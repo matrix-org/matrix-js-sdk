@@ -2252,6 +2252,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.VerificationRequestReceived,
             CryptoEvent.UserTrustStatusChanged,
             CryptoEvent.KeyBackupStatus,
+            CryptoEvent.KeyBackupSessionsRemaining,
+            CryptoEvent.KeyBackupFailed,
         ]);
     }
 

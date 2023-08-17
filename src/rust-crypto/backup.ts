@@ -22,6 +22,8 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { sleep } from "../utils";
 
 /**
  * @internal
@@ -30,12 +32,26 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /** Have we checked if there is a backup on the server which we can use */
     private checkedForBackup = false;
     private activeBackupVersion: string | null = null;
+    private stopped = false;
+
+    /** whether {@link backupKeysLoop} is currently running */
+    private backupKeysLoopRunning = false;
 
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
+    }
+
+    /**
+     * Tells the RustBackupManager to stop.
+     * The RustBackupManager is scheduling background uploads of keys to the backup, this
+     * call allows to cancel the process when the client is stoppped.
+     */
+    public stop(): void {
+        this.stopped = true;
     }
 
     /**
@@ -129,14 +145,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 await this.enableKeyBackup(backupInfo);
             } else if (activeVersion !== backupInfo.version) {
                 logger.log(`On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`);
+                // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
                 await this.disableKeyBackup();
+                // Enabling will now trigger re-upload of all the keys
                 await this.enableKeyBackup(backupInfo);
-                // We're now using a new backup, so schedule all the keys we have to be
-                // uploaded to the new backup. This is a bit of a workaround to upload
-                // keys to a new backup in *most* cases, but it won't cover all cases
-                // because we don't remember what backup version we uploaded keys to:
-                // see https://github.com/vector-im/element-web/issues/14833
-                await this.scheduleAllGroupSessionsForBackup();
             } else {
                 logger.log(`Backup version ${backupInfo.version} still current`);
             }
@@ -157,7 +169,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
 
-        // TODO: kick off an upload loop
+        this.backupKeysLoop();
+    }
+
+    /**
+     * Restart the backup key loop if there is an active trusted backup.
+     * Doesn't try to check the backup server side. To be called when a new
+     * megolm key is known locally.
+     */
+    public async maybeUploadKey(): Promise<void> {
+        if (this.activeBackupVersion != null) {
+            this.backupKeysLoop();
+        }
     }
 
     private async disableKeyBackup(): Promise<void> {
@@ -166,9 +189,73 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         this.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
-    private async scheduleAllGroupSessionsForBackup(): Promise<void> {
-        // TODO stub
+    private async backupKeysLoop(maxDelay = 10000): Promise<void> {
+        if (this.backupKeysLoopRunning) {
+            logger.log(`Backup loop already running`);
+            return;
+        }
+        this.backupKeysLoopRunning = true;
+
+        logger.log(`Starting loop for ${this.activeBackupVersion}.`);
+
+        // wait between 0 and `maxDelay` seconds, to avoid backup
+        // requests from different clients hitting the server all at
+        // the same time when a new key is sent
+        const delay = Math.random() * maxDelay;
+        await sleep(delay);
+
+        try {
+            let numFailures = 0; // number of consecutive network failures for exponential backoff
+
+            while (!this.stopped) {
+                // Get a batch of room keys to upload
+                const request: RustSdkCryptoJs.KeysBackupRequest | null = await this.olmMachine.backupRoomKeys();
+
+                if (!request || this.stopped || !this.activeBackupVersion) {
+                    logger.log(`Ending loop for ${this.activeBackupVersion}.`);
+                    return;
+                }
+
+                try {
+                    await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                    numFailures = 0;
+
+                    const keyCount: RustSdkCryptoJs.RoomKeyCounts = await this.olmMachine.roomKeyCounts();
+                    const remaining = keyCount.total - keyCount.backedUp;
+                    this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
+                } catch (err) {
+                    numFailures++;
+                    logger.error("Error processing backup request for rust crypto-sdk", err);
+                    if (err instanceof MatrixError) {
+                        const errCode = err.data.errcode;
+                        if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+                            await this.disableKeyBackup();
+                            this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
+                            // There was an active backup and we are out of sync with the server
+                            // force a check server side
+                            this.backupKeysLoopRunning = false;
+                            this.checkKeyBackupAndEnable(true);
+                            return;
+                        } else if (errCode == "M_LIMIT_EXCEEDED") {
+                            // wait for that and then continue?
+                            const waitTime = err.data.retry_after_ms;
+                            if (waitTime > 0) {
+                                sleep(waitTime);
+                                continue;
+                            } // else go to the normal backoff
+                        }
+                    }
+
+                    // Some other errors (mx, network, or CORS or invalid urls?) anyhow backoff
+                    // exponential backoff if we have failures
+                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                }
+            }
+        } finally {
+            this.backupKeysLoopRunning = false;
+        }
     }
+
     /**
      * Get information about the current key backup from the server
      *
@@ -195,8 +282,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 }
 
-export type RustBackupCryptoEvents = CryptoEvent.KeyBackupStatus;
+export type RustBackupCryptoEvents =
+    | CryptoEvent.KeyBackupStatus
+    | CryptoEvent.KeyBackupSessionsRemaining
+    | CryptoEvent.KeyBackupFailed;
 
 export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
+    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+    [CryptoEvent.KeyBackupFailed]: (errCode: string) => void;
 };
