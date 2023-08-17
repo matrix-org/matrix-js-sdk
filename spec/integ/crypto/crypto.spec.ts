@@ -45,6 +45,7 @@ import {
     RoomMember,
     RoomStateEvent,
     IRoomEvent,
+    CryptoEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -54,7 +55,7 @@ import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-conver
 import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CryptoCallbacks } from "../../../src/crypto-api";
+import { CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -2219,6 +2220,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
+        function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
+            return new Promise((resolve) => {
+                // Called when the cross signing key is uploaded
+                fetchMock.put(
+                    `express:/_matrix/client/v3/user/:userId/account_data/m.megolm_backup.v1`,
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+                        resolve(content.encrypted);
+                        return {};
+                    },
+                );
+            });
+        }
+
         /**
          * Send in the sync response the provided `secretStorageKey` into the account_data field
          * The key is set for the `m.secret_storage.default_key` and `m.secret_storage.key.${secretStorageKey}` events
@@ -2375,6 +2390,75 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(masterKey[secretStorageKey]).toBeDefined();
             expect(userSigningKey[secretStorageKey]).toBeDefined();
             expect(selfSigningKey[secretStorageKey]).toBeDefined();
+        });
+
+        newBackendOnly("should create a new megolm backup", async () => {
+            mockSetupCrossSigningRequests();
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "No current backup version",
+                },
+            });
+
+            const backupVersion = "abc";
+
+            fetchMock.post("path:/_matrix/client/v3/room_keys/version", (url, request) => {
+                const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+                backupData.version = backupVersion;
+                backupData.count = 0;
+                backupData.etag = "zer";
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData, {
+                    overwriteRoutes: true,
+                });
+                return {
+                    version: backupVersion,
+                };
+            });
+
+            const backupStatusUpdate = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            // Before setting up secret-storage, bootstrap cross-signing, so that the client has cross-signing keys.
+            await aliceClient.getCrypto()?.bootstrapCrossSigning({});
+
+            // Now, when we bootstrap secret-storage, the cross-signing keys should be uploaded.
+            const bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({
+                    setupNewSecretStorage: true,
+                    createSecretStorageKey,
+                    setupNewKeyBackup: true,
+                });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Wait for the cross signing keys to be uploaded
+            await Promise.all([
+                awaitCrossSigningKeyUpload("master"),
+                awaitCrossSigningKeyUpload("user_signing"),
+                awaitCrossSigningKeyUpload("self_signing"),
+            ]);
+            await awaitMegolmBackupKeyUpload();
+
+            // Finally, wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+            await backupStatusUpdate;
+
+            // Expect a backup to be available and used
+            const activeBackup = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
+            expect(activeBackup).toStrictEqual(backupVersion);
         });
     });
 
