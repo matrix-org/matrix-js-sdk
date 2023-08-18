@@ -36,7 +36,6 @@ describe("MatrixRTCSessionManager", () => {
 
     afterEach(() => {
         client.matrixRTC.stop();
-        client.stopClient();
     });
 
     it("Gets active MatrixRTC sessions accross multiple rooms", () => {

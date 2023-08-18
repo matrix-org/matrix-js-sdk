@@ -39,7 +39,7 @@ describe("MatrixRTCSession", () => {
     });
 
     afterEach(() => {
-        client.stopClient();
+        client.matrixRTC.stop();
     });
 
     it("Creates a room-scoped session from room state", () => {
