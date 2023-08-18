@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, MatrixClient } from "../../../src";
+import { EventType, MatrixClient, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession } from "../../../src/matrixrtc/MatrixRTCSession";
 import { makeMockRoom } from "./mocks";
@@ -120,44 +120,50 @@ describe("MatrixRTCSession", () => {
         expect(sess.memberships).toHaveLength(0);
     });
 
-    describe("isJoined", () => {
+    describe("joining", () => {
+        let sess: MatrixRTCSession;
+        let mockRoom: Room;
+
+        beforeEach(() => {
+            mockRoom = makeMockRoom([]);
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        });
+
+        afterEach(() => {
+            sess!.leaveRoomSession();
+        });
+
         it("starts un-joined", () => {
-            const mockRoom = makeMockRoom([]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess.isJoined()).toEqual(false);
+            expect(sess!.isJoined()).toEqual(false);
         });
 
         it("shows joined once join is called", () => {
-            const mockRoom = makeMockRoom([]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            sess.joinRoomSession([mockFocus]);
-            expect(sess.isJoined()).toEqual(true);
+            sess!.joinRoomSession([mockFocus]);
+            expect(sess!.isJoined()).toEqual(true);
         });
-    });
 
-    it("sends a membership event when joining a call", () => {
-        client.sendStateEvent = jest.fn();
+        it("sends a membership event when joining a call", () => {
+            client.sendStateEvent = jest.fn();
 
-        const mockRoom = makeMockRoom([]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-        sess.joinRoomSession([mockFocus]);
+            sess!.joinRoomSession([mockFocus]);
 
-        expect(client.sendStateEvent).toHaveBeenCalledWith(
-            mockRoom.roomId,
-            EventType.GroupCallMemberPrefix,
-            {
-                memberships: [
-                    {
-                        application: "m.call",
-                        scope: "m.room",
-                        call_id: "",
-                        device_id: "AAAAAAA",
-                        expires: 3600000,
-                        foci_active: [{ type: "mock" }],
-                    },
-                ],
-            },
-            "@alice:example.org",
-        );
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    memberships: [
+                        {
+                            application: "m.call",
+                            scope: "m.room",
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            expires: 3600000,
+                            foci_active: [{ type: "mock" }],
+                        },
+                    ],
+                },
+                "@alice:example.org",
+            );
+        });
     });
 });
