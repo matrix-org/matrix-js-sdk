@@ -17,6 +17,7 @@ limitations under the License.
 import { EventType, MatrixClient, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession } from "../../../src/matrixrtc/MatrixRTCSession";
+import { randomString } from "../../../src/randomstring";
 import { makeMockRoom } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
@@ -80,7 +81,49 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships).toHaveLength(0);
     });
 
-    it("ignores events with no expires_ts", () => {
+    it("safely ignores events with no memberships section", () => {
+        const mockRoom = {
+            roomId: randomString(8),
+            getLiveTimeline: jest.fn().mockReturnValue({
+                getState: jest.fn().mockReturnValue({
+                    getStateEvents: (_type: string, _stateKey: string) => [
+                        {
+                            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+                            getContent: jest.fn().mockReturnValue({}),
+                            getSender: jest.fn().mockReturnValue("@mock:user.example"),
+                            getTs: jest.fn().mockReturnValue(1000),
+                            getLocalAge: jest.fn().mockReturnValue(0),
+                        },
+                    ],
+                }),
+            }),
+        };
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
+        expect(sess.memberships).toHaveLength(0);
+    });
+
+    it("safely ignores events with junk memberships section", () => {
+        const mockRoom = {
+            roomId: randomString(8),
+            getLiveTimeline: jest.fn().mockReturnValue({
+                getState: jest.fn().mockReturnValue({
+                    getStateEvents: (_type: string, _stateKey: string) => [
+                        {
+                            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+                            getContent: jest.fn().mockReturnValue({ memberships: "i am a fish" }),
+                            getSender: jest.fn().mockReturnValue("@mock:user.example"),
+                            getTs: jest.fn().mockReturnValue(1000),
+                            getLocalAge: jest.fn().mockReturnValue(0),
+                        },
+                    ],
+                }),
+            }),
+        };
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
+        expect(sess.memberships).toHaveLength(0);
+    });
+
+    it("ignores memberships with no expires_ts", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         (expiredMembership.expires as number | undefined) = undefined;
         const mockRoom = makeMockRoom([expiredMembership]);
@@ -88,7 +131,7 @@ describe("MatrixRTCSession", () => {
         expect(sess.memberships).toHaveLength(0);
     });
 
-    it("ignores events with no device_id", () => {
+    it("ignores memberships with no device_id", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         (testMembership.device_id as string | undefined) = undefined;
         const mockRoom = makeMockRoom([testMembership]);
@@ -96,7 +139,7 @@ describe("MatrixRTCSession", () => {
         expect(sess.memberships).toHaveLength(0);
     });
 
-    it("ignores events with no call_id", () => {
+    it("ignores memberships with no call_id", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         (testMembership.call_id as string | undefined) = undefined;
         const mockRoom = makeMockRoom([testMembership]);
@@ -104,7 +147,7 @@ describe("MatrixRTCSession", () => {
         expect(sess.memberships).toHaveLength(0);
     });
 
-    it("ignores events with no scope", () => {
+    it("ignores memberships with no scope", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         (testMembership.scope as string | undefined) = undefined;
         const mockRoom = makeMockRoom([testMembership]);
