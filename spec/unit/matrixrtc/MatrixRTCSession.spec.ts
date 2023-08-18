@@ -81,12 +81,6 @@ describe("MatrixRTCSession", () => {
     });
 
     describe("activeRoomSessionForRoom", () => {
-        it("returns no session if no membership events are present", () => {
-            const mockRoom = makeMockRoom([]);
-            const sess = MatrixRTCSession.activeRoomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
-
         it("ignores events with no expires_ts", () => {
             const expiredMembership = Object.assign({}, membershipTemplate);
             (expiredMembership.expires as number | undefined) = undefined;

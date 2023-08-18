@@ -37,13 +37,20 @@ describe("MatrixRTCSessionManager", () => {
         client.stopClient();
     });
 
-    it("Gets MatrixRTC sessions accross multiple rooms", () => {
+    it("Gets active MatrixRTC sessions accross multiple rooms", () => {
         jest.spyOn(client, "getRooms").mockReturnValue([
             makeMockRoom([membershipTemplate]),
             makeMockRoom([membershipTemplate]),
         ]);
 
-        const sessions = client.matrixRTC.getAllSessions();
+        const sessions = client.matrixRTC.getActiveSessions();
         expect(sessions).toHaveLength(2);
+    });
+
+    it("Ignores inactive sessions", () => {
+        jest.spyOn(client, "getRooms").mockReturnValue([makeMockRoom([membershipTemplate]), makeMockRoom([])]);
+
+        const sessions = client.matrixRTC.getActiveSessions();
+        expect(sessions).toHaveLength(1);
     });
 });
