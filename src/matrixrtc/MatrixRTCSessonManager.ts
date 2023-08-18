@@ -15,8 +15,11 @@ limitations under the License.
 */
 
 import { logger } from "../logger";
-import { ClientEvent, MatrixClient, MatrixEvent, Room, RoomState, RoomStateEvent } from "../matrix";
+import { MatrixClient, ClientEvent } from "../client";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { Room } from "../models/room";
+import { RoomState, RoomStateEvent } from "../models/room-state";
+import { MatrixEvent } from "../models/event";
 import { MatrixRTCSession } from "./MatrixRTCSession";
 
 enum MatrixRTCSessionManagerEvents {

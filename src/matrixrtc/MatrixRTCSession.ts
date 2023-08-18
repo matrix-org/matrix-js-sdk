@@ -15,8 +15,11 @@ limitations under the License.
 */
 
 import { logger } from "../logger";
-import { EventTimeline, EventType, MatrixClient, Room } from "../matrix";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { EventTimeline } from "../models/event-timeline";
+import { Room } from "../models/room";
+import { MatrixClient } from "../client";
+import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 

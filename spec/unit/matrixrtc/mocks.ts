@@ -16,9 +16,11 @@ limitations under the License.
 
 import { EventType, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { randomString } from "../../../src/randomstring";
 
 export function makeMockRoom(memberships: CallMembershipData[]): Room {
     return {
+        roomId: randomString(8),
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(makeMockRoomState(memberships)),
         }),

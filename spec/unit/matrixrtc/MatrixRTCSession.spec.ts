@@ -80,45 +80,43 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships).toHaveLength(0);
     });
 
-    describe("activeRoomSessionForRoom", () => {
-        it("ignores events with no expires_ts", () => {
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            (expiredMembership.expires as number | undefined) = undefined;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
+    it("ignores events with no expires_ts", () => {
+        const expiredMembership = Object.assign({}, membershipTemplate);
+        (expiredMembership.expires as number | undefined) = undefined;
+        const mockRoom = makeMockRoom([expiredMembership]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess.memberships).toHaveLength(0);
+    });
 
-        it("ignores events with no device_id", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.device_id as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
+    it("ignores events with no device_id", () => {
+        const testMembership = Object.assign({}, membershipTemplate);
+        (testMembership.device_id as string | undefined) = undefined;
+        const mockRoom = makeMockRoom([testMembership]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess.memberships).toHaveLength(0);
+    });
 
-        it("ignores events with no call_id", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.call_id as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
+    it("ignores events with no call_id", () => {
+        const testMembership = Object.assign({}, membershipTemplate);
+        (testMembership.call_id as string | undefined) = undefined;
+        const mockRoom = makeMockRoom([testMembership]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess.memberships).toHaveLength(0);
+    });
 
-        it("ignores events with no scope", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.scope as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
+    it("ignores events with no scope", () => {
+        const testMembership = Object.assign({}, membershipTemplate);
+        (testMembership.scope as string | undefined) = undefined;
+        const mockRoom = makeMockRoom([testMembership]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess.memberships).toHaveLength(0);
+    });
 
-        it("ignores anything that's not a room-scoped call (for now)", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            testMembership.scope = "m.user";
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess).toBeUndefined();
-        });
+    it("ignores anything that's not a room-scoped call (for now)", () => {
+        const testMembership = Object.assign({}, membershipTemplate);
+        testMembership.scope = "m.user";
+        const mockRoom = makeMockRoom([testMembership]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess.memberships).toHaveLength(0);
     });
 });
