@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, MatrixClient } from "../../../src";
+import { EventType, MatrixClient } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession } from "../../../src/matrixrtc/MatrixRTCSession";
 import { makeMockRoom } from "./mocks";
@@ -27,11 +27,15 @@ const membershipTemplate: CallMembershipData = {
     expires: 60 * 60 * 1000,
 };
 
+const mockFocus = { type: "mock" };
+
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
 
     beforeEach(() => {
         client = new MatrixClient({ baseUrl: "base_url" });
+        client.getUserId = jest.fn().mockReturnValue("@alice:example.org");
+        client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
     });
 
     afterEach(() => {
@@ -54,11 +58,7 @@ describe("MatrixRTCSession", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         expiredMembership.expires = 1000;
         expiredMembership.device_id = "EXPIRED";
-        const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
-        // make this event older by adjusting the age param
-        mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!.getStateEvents("")[0].getLocalAge = jest
-            .fn()
-            .mockReturnValue(10000);
+        const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], 10000);
 
         const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(1);
@@ -118,5 +118,46 @@ describe("MatrixRTCSession", () => {
         const mockRoom = makeMockRoom([testMembership]);
         const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
+    });
+
+    describe("isJoined", () => {
+        it("starts un-joined", () => {
+            const mockRoom = makeMockRoom([]);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            expect(sess.isJoined()).toEqual(false);
+        });
+
+        it("shows joined once join is called", () => {
+            const mockRoom = makeMockRoom([]);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            sess.joinRoomSession([mockFocus]);
+            expect(sess.isJoined()).toEqual(true);
+        });
+    });
+
+    it("sends a membership event when joining a call", () => {
+        client.sendStateEvent = jest.fn();
+
+        const mockRoom = makeMockRoom([]);
+        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.joinRoomSession([mockFocus]);
+
+        expect(client.sendStateEvent).toHaveBeenCalledWith(
+            mockRoom.roomId,
+            EventType.GroupCallMemberPrefix,
+            {
+                memberships: [
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        expires: 3600000,
+                        foci_active: [{ type: "mock" }],
+                    },
+                ],
+            },
+            "@alice:example.org",
+        );
     });
 });

@@ -18,27 +18,30 @@ import { EventType, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-export function makeMockRoom(memberships: CallMembershipData[]): Room {
+export function makeMockRoom(memberships: CallMembershipData[], localAge: number | undefined = undefined): Room {
     return {
         roomId: randomString(8),
         getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships)),
+            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, localAge)),
         }),
     } as unknown as Room;
 }
 
-function makeMockRoomState(memberships: CallMembershipData[]) {
+function makeMockRoomState(memberships: CallMembershipData[], localAge = 10) {
     return {
-        getStateEvents: jest.fn().mockReturnValue([
-            {
+        getStateEvents: (_: string, stateKey: string) => {
+            const event = {
                 getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
                 getContent: jest.fn().mockReturnValue({
                     memberships: memberships,
                 }),
                 getSender: jest.fn().mockReturnValue("@mock:user.example"),
                 getTs: jest.fn().mockReturnValue(1000),
-                getLocalAge: jest.fn().mockReturnValue(10),
-            },
-        ]),
+                getLocalAge: jest.fn().mockReturnValue(localAge),
+            };
+
+            if (stateKey !== undefined) return event;
+            return [event];
+        },
     };
 }
