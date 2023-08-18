@@ -32,8 +32,10 @@ type EventHandlerMap = {
 };
 
 export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionManagerEvents, EventHandlerMap> {
-    // Room-scoped sessions that have active members
-    private activeRoomSessions = new Map<string, MatrixRTCSession>();
+    // All the room-scoped sessions we know about. This will include any where the app
+    // has queried for the MatrixRTC sessions in a room, whether it's ever had any members
+    // or not)
+    private roomSessions = new Map<string, MatrixRTCSession>();
 
     public constructor(private client: MatrixClient) {
         super();
@@ -50,18 +52,12 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     /**
-     * Get a list of all ongoing MatrixRTC sessions the client knows about
+     * Get a list of all ongoing MatrixRTC sessions that have 1 or more active
+     * members
      * (whether the client is joined to them or not)
      */
-    public getAllSessions(): MatrixRTCSession[] {
-        const sessions: MatrixRTCSession[] = [];
-
-        for (const room of this.client.getRooms()) {
-            const session = this.getRoomSession(room);
-            if (session) sessions.push(session);
-        }
-
-        return sessions;
+    public getActiveSessions(): MatrixRTCSession[] {
+        return Array.from(this.roomSessions.values()).filter((m) => m.memberships.length > 0);
     }
 
     /**
@@ -69,7 +65,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
      * no current session
      */
     public getActiveRoomSession(room: Room): MatrixRTCSession | undefined {
-        return MatrixRTCSession.activeRoomSessionForRoom(this.client, room);
+        return this.roomSessions.get(room.roomId)!;
     }
 
     /**
@@ -77,7 +73,11 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
      * if no members are currently participating
      */
     public getRoomSession(room: Room): MatrixRTCSession {
-        return MatrixRTCSession.roomSessionForRoom(this.client, room);
+        if (!this.roomSessions.has(room.roomId)) {
+            this.roomSessions.set(room.roomId, MatrixRTCSession.roomSessionForRoom(this.client, room));
+        }
+
+        return this.roomSessions.get(room.roomId)!;
     }
 
     private onRoom = (room: Room): void => {
@@ -95,23 +95,18 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private refreshRoom(room: Room): void {
-        const sess = this.getActiveRoomSession(room);
-        if (sess == undefined && this.activeRoomSessions.has(room.roomId)) {
-            this.emit(
-                MatrixRTCSessionManagerEvents.SessionEnded,
-                room.roomId,
-                this.activeRoomSessions.get(room.roomId)!,
-            );
-            this.activeRoomSessions.delete(room.roomId);
-        } else if (sess !== undefined && !this.activeRoomSessions.has(room.roomId)) {
-            this.activeRoomSessions.set(room.roomId, sess);
-            this.emit(
-                MatrixRTCSessionManagerEvents.SessionStarted,
-                room.roomId,
-                this.activeRoomSessions.get(room.roomId)!,
-            );
-        } else if (sess) {
-            sess.onMembershipUpdate();
+        const sess = this.getRoomSession(room);
+
+        const wasActive = sess.memberships.length > 0;
+
+        sess.onMembershipUpdate();
+
+        const nowActive = sess.memberships.length > 0;
+
+        if (wasActive && !nowActive) {
+            this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
+        } else if (!wasActive && nowActive) {
+            this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
         }
     }
 }

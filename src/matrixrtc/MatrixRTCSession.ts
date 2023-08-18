@@ -69,9 +69,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
-            if (eventMemberships === undefined) throw new Error("Malformed member event: no memberships section");
+            if (eventMemberships === undefined) {
+                logger.warn("Ignoring malformed member event: no memberships section");
+                continue;
+            }
             if (!Array.isArray(eventMemberships)) {
-                throw new Error("Malformed member event: memberships is not an array");
+                logger.warn("Malformed member event: memberships is not an array");
+                continue;
             }
 
             for (const membershipData of eventMemberships) {
@@ -115,13 +119,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Given the state of a room, find the active MatrixRTC Room-scoped session (if any) any return it
      * or return undefined if no members are currently joined to the room's MatrixRTC session
      */
-    public static activeRoomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession | undefined {
+    /*public static activeRoomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession | undefined {
         const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
 
         if (callMemberships.length === 0) return undefined;
 
         return new MatrixRTCSession(client, room, callMemberships);
-    }
+    }*/
 
     private constructor(
         private readonly client: MatrixClient,
@@ -305,13 +309,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // Filter our any invalid or expired memberships, and also our own - we'll add that back in next
         let newMemberships = memberships.filter(filterExpired).filter((m) => m.device_id !== localDeviceId);
 
+        // Fix up any memberships that need their created_ts adding
+        newMemberships = newMemberships.map(transformMemberships);
+
         // If we're joined, add our own
         if (this.isJoined()) {
             newMemberships.push(this.makeMyMembership(myPrevMembership));
         }
-
-        // Fix up any memberships that need their created_ts adding
-        newMemberships = newMemberships.map(transformMemberships);
 
         const newContent = {
             memberships: newMemberships,
