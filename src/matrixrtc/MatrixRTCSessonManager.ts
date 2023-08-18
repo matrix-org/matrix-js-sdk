@@ -50,6 +50,11 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     public stop(): void {
+        for (const sess of this.roomSessions.values()) {
+            sess.stop();
+        }
+        this.roomSessions.clear();
+
         this.client.removeListener(ClientEvent.Room, this.onRoom);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
     }
@@ -98,9 +103,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private refreshRoom(room: Room): void {
+        const hadSession = this.roomSessions.has(room.roomId);
         const sess = this.getRoomSession(room);
 
-        const wasActive = sess.memberships.length > 0;
+        const wasActive = sess.memberships.length > 0 && hadSession;
 
         sess.onMembershipUpdate();
 

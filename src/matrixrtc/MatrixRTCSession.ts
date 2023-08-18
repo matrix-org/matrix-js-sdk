@@ -60,6 +60,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
+     * Performs cleanup & removes timers for client shutdown
+     */
+    public stop(): void {
+        this.leaveRoomSession();
+        if (this.expiryTimeout) {
+            clearTimeout(this.expiryTimeout);
+            this.expiryTimeout = undefined;
+        }
+    }
+
+    /**
      * Returns all the call memberships for a room, oldest first
      */
     public static callMembershipsForRoom(room: Room): CallMembership[] {
@@ -196,7 +207,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         if (soonestExpiry != undefined) {
-            setTimeout(this.onMembershipUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(this.onMembershipUpdate, soonestExpiry);
         }
     }
 

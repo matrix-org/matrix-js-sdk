@@ -38,7 +38,7 @@ describe("MatrixRTCSessionManager", () => {
         client.matrixRTC.stop();
     });
 
-    it.skip("Gets active MatrixRTC sessions accross multiple rooms", () => {
+    it("Gets active MatrixRTC sessions accross multiple rooms", () => {
         const room1 = makeMockRoom([membershipTemplate]);
         const room2 = makeMockRoom([membershipTemplate]);
 
@@ -51,7 +51,7 @@ describe("MatrixRTCSessionManager", () => {
         expect(sessions).toHaveLength(2);
     });
 
-    it.skip("Ignores inactive sessions", () => {
+    it("Ignores inactive sessions", () => {
         const room1 = makeMockRoom([membershipTemplate]);
         const room2 = makeMockRoom([]);
 
