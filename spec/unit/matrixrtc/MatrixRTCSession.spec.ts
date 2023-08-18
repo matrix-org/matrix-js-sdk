@@ -138,12 +138,12 @@ describe("MatrixRTCSession", () => {
             expect(sess!.isJoined()).toEqual(false);
         });
 
-        it.skip("shows joined once join is called", () => {
+        it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus]);
             expect(sess!.isJoined()).toEqual(true);
         });
 
-        it.skip("sends a membership event when joining a call", () => {
+        it("sends a membership event when joining a call", () => {
             client.sendStateEvent = jest.fn();
 
             sess!.joinRoomSession([mockFocus]);
