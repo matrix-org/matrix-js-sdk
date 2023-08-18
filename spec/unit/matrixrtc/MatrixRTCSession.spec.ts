@@ -166,5 +166,17 @@ describe("MatrixRTCSession", () => {
                 "@alice:example.org",
             );
         });
+
+        it("does nothing if join called when already joined", () => {
+            const sendStateEventMock = jest.fn();
+            client.sendStateEvent = sendStateEventMock;
+
+            sess!.joinRoomSession([mockFocus]);
+
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+
+            sess!.joinRoomSession([mockFocus]);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+        });
     });
 });
