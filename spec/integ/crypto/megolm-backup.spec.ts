@@ -19,7 +19,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient, TypedEventEmitter } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -27,6 +27,7 @@ import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
+import { IKeyBackup } from "../../../src/crypto/backup";
 
 const ROOM_ID = "!ROOM:ID";
 
@@ -82,6 +83,58 @@ afterEach(() => {
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
+
+enum MockKeyUploadEvent {
+    KeyUploaded = "KeyUploaded",
+}
+
+type MockKeyUploadEventHandlerMap = {
+    [MockKeyUploadEvent.KeyUploaded]: (roomId: string, sessionId: string, backupVersion: string) => void;
+};
+
+/*
+ * Test helper. Returns an event emitter that will emit an event every time fetchmock sees a request to backup a key.
+ */
+function mockUploadEmitter(
+    expectedVersion: string,
+): TypedEventEmitter<MockKeyUploadEvent, MockKeyUploadEventHandlerMap> {
+    const emitter = new TypedEventEmitter();
+    fetchMock.put(
+        "path:/_matrix/client/v3/room_keys/keys",
+        (url, request) => {
+            const version = new URLSearchParams(new URL(url).search).get("version");
+            if (version != expectedVersion) {
+                return {
+                    status: 403,
+                    body: {
+                        current_version: expectedVersion,
+                        errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                        error: "Wrong backup version.",
+                    },
+                };
+            }
+            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+            let count = 0;
+            for (const [roomId, value] of Object.entries(uploadPayload.rooms)) {
+                for (const sessionId of Object.keys(value.sessions)) {
+                    emitter.emit(MockKeyUploadEvent.KeyUploaded, roomId, sessionId, version);
+                    count++;
+                }
+            }
+            return {
+                status: 200,
+                body: {
+                    count: count,
+                    etag: "abcdefg",
+                },
+            };
+        },
+        {
+            overwriteRoutes: true,
+        },
+    );
+    return emitter;
+}
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
@@ -176,7 +229,256 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         expect(event.getContent()).toEqual("testytest");
     });
 
-    oldBackendOnly("getActiveSessionBackupVersion() should give correct result", async function () {
+    describe("backupLoop", () => {
+        it("Alice should upload known keys when backup is enabled", async function () {
+            // 404 means that there is no active backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // check that signalling is working
+            const remainingZeroPromise = new Promise<void>((resolve, reject) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve();
+                    }
+                });
+            });
+
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+
+            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+
+            const uploadPromises = someRoomKeys.map((data) => {
+                new Promise<void>((resolve) => {
+                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                        if (
+                            data.room_id == roomId &&
+                            data.session_id == sessionId &&
+                            version == testData.SIGNED_BACKUP_DATA.version
+                        ) {
+                            resolve();
+                        }
+                    });
+                });
+            });
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
+            jest.runAllTimers();
+
+            await Promise.all(uploadPromises);
+
+            // Wait until all keys are backed up to ensure that when a new key is received the loop is restarted
+            await remainingZeroPromise;
+
+            // A new key import should trigger a new upload.
+            const newKey = testData.MEGOLM_SESSION_DATA;
+
+            const newKeyUploadPromise = new Promise<void>((resolve) => {
+                uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                    if (
+                        newKey.room_id == roomId &&
+                        newKey.session_id == sessionId &&
+                        version == testData.SIGNED_BACKUP_DATA.version
+                    ) {
+                        resolve();
+                    }
+                });
+            });
+
+            await aliceCrypto.importRoomKeys([newKey]);
+
+            jest.runAllTimers();
+            await newKeyUploadPromise;
+        });
+
+        it("Alice should re-upload all keys if a new trusted backup is available", async function () {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            // check that signalling is working
+            const remainingZeroPromise = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve();
+                    }
+                });
+            });
+
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+
+            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
+            jest.runAllTimers();
+
+            // wait for all keys to be backed up
+            await remainingZeroPromise;
+
+            const newBackupVersion = "2";
+            const uploadMockEmitter = mockUploadEmitter(newBackupVersion);
+            const newBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            newBackup.version = newBackupVersion;
+
+            // Let's simulate that a new backup is available by returning error code on key upload
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", newBackup, {
+                overwriteRoutes: true,
+            });
+
+            // If we import a new key the loop will try to upload to old version, it will
+            // fail then check the current version and switch if trusted
+            const uploadPromises = someRoomKeys.map((data) => {
+                new Promise<void>((resolve) => {
+                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                        if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
+                            resolve();
+                        }
+                    });
+                });
+            });
+
+            const disableOldBackup = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupFailed, (errCode) => {
+                    if (errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+                        resolve();
+                    }
+                });
+            });
+
+            const enableNewBackup = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            // A new key import should trigger a new upload.
+            const newKey = testData.MEGOLM_SESSION_DATA;
+
+            const newKeyUploadPromise = new Promise<void>((resolve) => {
+                uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                    if (newKey.room_id == roomId && newKey.session_id == sessionId && version == newBackupVersion) {
+                        resolve();
+                    }
+                });
+            });
+
+            await aliceCrypto.importRoomKeys([newKey]);
+
+            jest.runAllTimers();
+
+            await disableOldBackup;
+            await enableNewBackup;
+
+            jest.runAllTimers();
+
+            await Promise.all(uploadPromises);
+            await newKeyUploadPromise;
+        });
+
+        it("Backup loop should be resistant to network failures", async function () {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
+
+            // on the first key upload attempt, simulate a network failure
+            const failurePromise = new Promise((resolve) => {
+                fetchMock.put(
+                    "path:/_matrix/client/v3/room_keys/keys",
+                    () => {
+                        resolve(undefined);
+                        throw new TypeError(`Failed to fetch`);
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
+
+            // kick the import loop off and wait for the failed request
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            await aliceCrypto.importRoomKeys(someRoomKeys);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            jest.runAllTimers();
+            await failurePromise;
+
+            // Fix the endpoint to do successful uploads
+            const successPromise = new Promise((resolve) => {
+                fetchMock.put(
+                    "path:/_matrix/client/v3/room_keys/keys",
+                    () => {
+                        resolve(undefined);
+                        return {
+                            status: 200,
+                            body: {
+                                count: 2,
+                                etag: "abcdefg",
+                            },
+                        };
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
+
+            // check that a `KeyBackupSessionsRemaining` event is emitted with `remaining == 0`
+            const allKeysUploadedPromise = new Promise((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupSessionsRemaining, (remaining) => {
+                    if (remaining == 0) {
+                        resolve(undefined);
+                    }
+                });
+            });
+
+            // run the timers, which will make the backup loop redo the request
+            await jest.runAllTimersAsync();
+            await successPromise;
+            await allKeysUploadedPromise;
+        });
+    });
+
+    it("getActiveSessionBackupVersion() should give correct result", async function () {
         // 404 means that there is no active backup
         fetchMock.get("express:/_matrix/client/v3/room_keys/version", 404);
 
@@ -187,7 +489,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         // tell Alice to trust the dummy device that signed the backup
         await waitForDeviceList();
         await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-        await aliceClient.checkKeyBackup();
+        await aliceCrypto.checkKeyBackupAndEnable();
 
         // At this point there is no backup
         let backupStatus: string | null;
@@ -201,9 +503,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             overwriteRoutes: true,
         });
 
-        const checked = await aliceClient.checkKeyBackup();
+        const checked = await aliceCrypto.checkKeyBackupAndEnable();
         expect(checked?.backupInfo?.version).toStrictEqual(unsignedBackup.version);
-        expect(checked?.trustInfo?.usable).toBeFalsy();
+        expect(checked?.trustInfo?.trusted).toBeFalsy();
 
         backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toBeNull();
@@ -222,8 +524,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
         });
 
-        const validCheck = await aliceClient.checkKeyBackup();
-        expect(validCheck?.trustInfo?.usable).toStrictEqual(true);
+        const validCheck = await aliceCrypto.checkKeyBackupAndEnable();
+        expect(validCheck?.trustInfo?.trusted).toStrictEqual(true);
 
         await backupPromise;
 
@@ -283,6 +585,128 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             backup.algorithm = "m.megolm_backup.v1.aes-hmac-sha2";
             const result = await aliceCrypto.isKeyBackupTrusted(backup);
             expect(result).toEqual({ trusted: false, matchesDecryptionKey: false });
+        });
+    });
+
+    describe("checkKeyBackupAndEnable", () => {
+        it("enables a backup signed by a trusted device", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(result!.trustInfo).toEqual({ trusted: true, matchesDecryptionKey: false });
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+        });
+
+        it("does not enable a backup signed by an untrusted device", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // download the device list, to match the trusted case
+            await aliceClient.startClient();
+            await waitForDeviceList();
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(result!.trustInfo).toEqual({ trusted: false, matchesDecryptionKey: false });
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
+
+        it("disables backup when a new untrusted backup is available", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            const unsignedBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            delete unsignedBackup.auth_data.signatures;
+            unsignedBackup.version = "2";
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", unsignedBackup, {
+                overwriteRoutes: true,
+            });
+
+            await aliceCrypto.checkKeyBackupAndEnable();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
+
+        it("switches backup when a new trusted backup is available", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            const newBackupVersion = "2";
+            const newBackup = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
+            newBackup.version = newBackupVersion;
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", newBackup, {
+                overwriteRoutes: true,
+            });
+
+            await aliceCrypto.checkKeyBackupAndEnable();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(newBackupVersion);
+        });
+
+        it("Disables when backup is deleted", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // tell Alice to trust the dummy device that signed the backup
+            await aliceClient.startClient();
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+
+            fetchMock.get(
+                "path:/_matrix/client/v3/room_keys/version",
+                {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                },
+                {
+                    overwriteRoutes: true,
+                },
+            );
+            const noResult = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(noResult).toBeNull();
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
         });
     });
 

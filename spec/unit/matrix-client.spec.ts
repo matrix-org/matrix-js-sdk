@@ -201,7 +201,7 @@ describe("MatrixClient", function () {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: unstableFeatures,
-                versions: ["r0.6.0", "r0.6.1"],
+                versions: ["v1.1"],
             });
         }
         const next = httpLookups.shift();

@@ -193,12 +193,6 @@ export interface IBindThreePidBody {
     sid: string;
 }
 
-export interface IAddThreePidBody {
-    client_secret: string;
-    id_server: string;
-    sid: string;
-}
-
 export interface IRelationsRequestOpts {
     from?: string;
     to?: string;

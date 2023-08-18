@@ -1,3 +1,20 @@
+Changes in [27.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.2.0) (2023-08-15)
+==================================================================================================
+
+## 🦖 Deprecations
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * Allow knocking rooms ([\#3647](https://github.com/matrix-org/matrix-js-sdk/pull/3647)). Contributed by @charlynguyen.
+ * Bump pagination limit to account for threaded events ([\#3638](https://github.com/matrix-org/matrix-js-sdk/pull/3638)).
+ * ElementR: Add `CryptoApi.findVerificationRequestDMInProgress` ([\#3601](https://github.com/matrix-org/matrix-js-sdk/pull/3601)). Contributed by @florianduros.
+ * Export more into the public interface ([\#3614](https://github.com/matrix-org/matrix-js-sdk/pull/3614)).
+
+## 🐛 Bug Fixes
+ * Fix wrong handling of encrypted rooms when loading them from sync accumulator ([\#3640](https://github.com/matrix-org/matrix-js-sdk/pull/3640)). Fixes vector-im/element-web#25803.
+ * Skip processing thread roots and fetching threads list when support is disabled ([\#3642](https://github.com/matrix-org/matrix-js-sdk/pull/3642)).
+ * Ensure we don't overinflate the total notification count ([\#3634](https://github.com/matrix-org/matrix-js-sdk/pull/3634)). Fixes vector-im/element-web#25803.
+
 Changes in [27.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.1.0) (2023-08-01)
 ==================================================================================================
 
