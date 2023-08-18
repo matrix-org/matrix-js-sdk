@@ -1173,7 +1173,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // write the key ourselves to 4S
         const privateKey = decodeRecoveryKey(info.recovery_key);
         await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+        await this.storeSessionBackupPrivateKey(privateKey);
 
+        await this.backupManager.checkAndStart();
         logger.log(`Created backup version ${version}`);
     }
 

@@ -340,7 +340,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // there could be several backup versions, delete all to be safe.
         let current = (await this.requestKeyBackupVersion())?.version ?? null;
         while (current != null) {
-            this.deleteKeyBackupVersion(current);
+            await this.deleteKeyBackupVersion(current);
             current = (await this.requestKeyBackupVersion())?.version ?? null;
         }
 
@@ -348,6 +348,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     public async deleteKeyBackupVersion(version: string): Promise<void> {
+        logger.debug(`deleteKeyBackupVersion v:${version}`);
         await this.disableKeyBackup();
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {

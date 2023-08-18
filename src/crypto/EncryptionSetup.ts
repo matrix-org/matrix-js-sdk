@@ -228,6 +228,8 @@ export class EncryptionSetupOperation {
                     prefix: ClientPrefix.V3,
                 });
             }
+            // enable it
+            await crypto.backupManager.checkAndStart();
         }
     }
 }
