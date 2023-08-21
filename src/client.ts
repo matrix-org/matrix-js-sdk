@@ -2444,6 +2444,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns resolves to a VerificationRequest
      *    when the request has been sent to the other party.
+     *
+     * @deprecated Prefer {@link CryptoApi.requestVerificationDM}.
      */
     public requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
         if (!this.crypto) {
