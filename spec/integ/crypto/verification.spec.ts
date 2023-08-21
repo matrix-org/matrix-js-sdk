@@ -22,7 +22,15 @@ import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 
-import { createClient, CryptoEvent, IContent, ICreateClientOpts, MatrixClient } from "../../../src";
+import {
+    createClient,
+    CryptoEvent,
+    IContent,
+    ICreateClientOpts,
+    MatrixClient,
+    MatrixEvent,
+    MatrixEventEvent,
+} from "../../../src";
 import {
     canAcceptVerificationRequest,
     ShowQrCodeCallbacks,
@@ -47,6 +55,7 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
+    BOB_ONE_TIME_KEYS,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -815,18 +824,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     describe("Send verification request in DM", () => {
         beforeEach(async () => {
             aliceClient = await startTestClient();
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
 
             e2eKeyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             e2eKeyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
-
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
 
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
         });
 
+        /**
+         * Create a mock to respond when the verification request is sent
+         * Handle both encrypted and unencrypted requests
+         */
         function awaitRoomMessageRequest(): Promise<IContent> {
             return new Promise((resolve) => {
+                // Case of unencrypted message of the new crypto
                 fetchMock.put(
                     "express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId",
                     (url: string, options: RequestInit) => {
@@ -834,10 +848,36 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                         return { event_id: "$YUwRidLecu:example.com" };
                     },
                 );
+
+                // Case of encrypted message of the old crypto
+                fetchMock.put(
+                    "express:/_matrix/client/v3/rooms/:roomId/send/m.room.encrypted/:txId",
+                    async (url: string, options: RequestInit) => {
+                        const encryptedMessage = JSON.parse(options.body as string);
+                        const event = new MatrixEvent({
+                            content: encryptedMessage,
+                            type: "m.room.encrypted",
+                            room_id: TEST_ROOM_ID,
+                        });
+                        // Try to decrypt the event
+                        event.once(MatrixEventEvent.Decrypted, (decryptedEvent: MatrixEvent, error?: Error) => {
+                            expect(error).not.toBeDefined();
+                            resolve(decryptedEvent.getContent());
+                        });
+                        await aliceClient.decryptEventIfNeeded(event);
+                        return { event_id: "$YUwRidLecu:example.com" };
+                    },
+                );
             });
         }
 
-        newBackendOnly("alice sends a verification request in a DM to bob", async () => {
+        it("alice sends a verification request in a DM to bob", async () => {
+            fetchMock.post("express:/_matrix/client/v3/keys/claim", () => ({ one_time_keys: BOB_ONE_TIME_KEYS }));
+
+            // In `DeviceList#doQueuedQueries`, the key download response is processed every 5ms
+            // 5ms by users, ie Bob and Alice
+            await jest.advanceTimersByTimeAsync(10);
+
             const messageRequestPromise = awaitRoomMessageRequest();
             const verificationRequest = await aliceClient
                 .getCrypto()!
@@ -845,12 +885,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const requestContent = await messageRequestPromise;
 
             expect(requestContent.from_device).toBe(aliceClient.getDeviceId());
-            expect(requestContent.methods).toStrictEqual([
-                "m.sas.v1",
-                "m.qr_code.scan.v1",
-                "m.qr_code.show.v1",
-                "m.reciprocate.v1",
-            ]);
+            expect(requestContent.methods.sort()).toStrictEqual(
+                ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"].sort(),
+            );
             expect(requestContent.msgtype).toBe("m.key.verification.request");
             expect(requestContent.to).toBe(BOB_TEST_USER_ID);
 

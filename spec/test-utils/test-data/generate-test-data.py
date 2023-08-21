@@ -43,7 +43,9 @@ ALICE_DATA = {
     "SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"selfselfselfselfselfselfselfself",
 
     # Private key for secure key backup. There are some sessions encrypted with this key in megolm-backup.spec.ts
-    "B64_BACKUP_DECRYPTION_KEY": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo="
+    "B64_BACKUP_DECRYPTION_KEY": "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=",
+
+    "OTK": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw"
 }
 
 BOB_DATA = {
@@ -58,22 +60,10 @@ BOB_DATA = {
     "SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Selfselfselfselfselfselfselfself",
 
     # Private key for secure key backup. There are some sessions encrypted with this key in megolm-backup.spec.ts
-    "B64_BACKUP_DECRYPTION_KEY": "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo="
+    "B64_BACKUP_DECRYPTION_KEY": "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=",
+
+    "OTK": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw"
 }
-
-# input data
-TEST_USER_ID = "@alice:localhost"
-TEST_DEVICE_ID = "test_device"
-TEST_ROOM_ID = "!room:id"
-# any 32-byte string can be an ed25519 private key.
-TEST_DEVICE_PRIVATE_KEY_BYTES = b"deadbeefdeadbeefdeadbeefdeadbeef"
-
-MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"doyouspeakwhaaaaaaaaaaaaaaaaaale"
-USER_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"useruseruseruseruseruseruseruser"
-SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES = b"selfselfselfselfselfselfselfself"
-
-# Private key for secure key backup. There are some sessions encrypted with this key in megolm-backup.spec.ts
-B64_BACKUP_DECRYPTION_KEY = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo="
 
 def main() -> None:
     print(
@@ -170,6 +160,24 @@ def build_test_data(user_data, prefix = "") -> str:
         user_data["TEST_USER_ID"]: {f"ed25519:{user_data['TEST_DEVICE_ID']}": sig}
     }
 
+    otk_to_sign = {
+        "key": user_data['OTK']
+    }
+    # sign our public otk key with our device key
+    otk = sign_json(otk_to_sign, private_key)
+    otks = {
+        user_data["TEST_USER_ID"]: {
+            user_data['TEST_DEVICE_ID']: {
+                 "signed_curve25519:AAAAHQ": {
+                    "key": user_data["OTK"],
+                    "signatures": {
+                        user_data["TEST_USER_ID"]: {f"ed25519:{user_data['TEST_DEVICE_ID']}": otk}
+                    }
+                 }
+            }
+        }
+    }
+
     return f"""\
 export const {prefix}TEST_USER_ID = "{user_data['TEST_USER_ID']}";
 export const {prefix}TEST_DEVICE_ID = "{user_data['TEST_DEVICE_ID']}";
@@ -209,6 +217,9 @@ export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DEC
 
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
+
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
 """
 
 

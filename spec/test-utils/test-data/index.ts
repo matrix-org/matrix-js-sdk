@@ -119,6 +119,22 @@ export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
     }
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const ONE_TIME_KEYS = {
+    "@alice:localhost": {
+        "test_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@alice:localhost": {
+                        "ed25519:test_device": "25djC6Rk6gIgFBMVawY9X9LnY8XMMziey6lKqL8Q5Bbp7T1vw9uk0RE7eKO2a/jNLcYroO2xRztGhBrKz5sOCQ"
+                    }
+                }
+            }
+        }
+    }
+};
+
 // Bob data
 
 export const BOB_TEST_USER_ID = "@bob:xyz";
@@ -224,6 +240,22 @@ export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
         "signatures": {
             "@bob:xyz": {
                 "ed25519:bob_device": "lDIMj3VC0WazE2FamGHpmbiqKf9Z4pO4qapZ5TL5BnD3c+dvb+2waOEd6pgay/pmrQ6MW4Eu2KDEpe1fnHc3BA"
+            }
+        }
+    }
+};
+
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const BOB_ONE_TIME_KEYS = {
+    "@bob:xyz": {
+        "bob_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@bob:xyz": {
+                        "ed25519:bob_device": "dlZc9VA/hP980Mxvu9qwi0qJx8VK7sADGOM48CE01YM7K/Mbty9lis/QjtQAWqDg371QyynVRjEzt9qj7eSFCg"
+                    }
+                }
             }
         }
     }
