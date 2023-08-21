@@ -61,32 +61,7 @@ describe("RustCrypto", () => {
         );
 
         it("should import and export keys", async () => {
-            const someRoomKeys = [
-                {
-                    algorithm: "m.megolm.v1.aes-sha2",
-                    room_id: "!cLDYAnjpiQXIrSwngM:localhost:8480",
-                    sender_key: "C9FMqTD20C0VaGWE/aSImkimuE6HDa/RyYj5gRUg3gY",
-                    session_id: "iGQG5GaP1/B3dSH6zCQDQqrNuotrtQjVC7w1OsUDwbg",
-                    session_key:
-                        "AQAAAADaCbP2gdOy8jrhikjploKgSBaFSJ5rvHcziaADbwNEzeCSrfuAUlXvCvxik8kU+MfCHIi5arN2M7UM5rGKdzkHnkReoIByFkeMdbjKWk5SFpVQexcM74eDhBGj+ICkQqOgApfnEbSswrmreB0+MhHHyLStwW5fy5f8A9QW1sbPuohkBuRmj9fwd3Uh+swkA0KqzbqLa7UI1Qu8NTrFA8G4",
-                    sender_claimed_keys: {
-                        ed25519: "RSq0Xw0RR0DeqlJ/j3qrF5qbN0D96fKk8lz9kZJlG9k",
-                    },
-                    forwarding_curve25519_key_chain: [],
-                },
-                {
-                    algorithm: "m.megolm.v1.aes-sha2",
-                    room_id: "!cLDYAnjpiQXIrSwngM:localhost:8480",
-                    sender_key: "C9FMqTD20C0VaGWE/aSImkimuE6HDa/RyYj5gRUg3gY",
-                    session_id: "P/Jy9Tog4CMtLseeS4Fe2AEXZov3k6cibcop/uyhr78",
-                    session_key:
-                        "AQAAAAATyAVm0c9c9DW9Od72MxvfSDYoysBw3C6yMJ3bYuTmssHN7yNGm59KCtKeFp2Y5qO7lvUmwOfSTvTASUb7HViE7Lt+Bvp5WiMTJ2Pv6m+N12ihyowV5lgtKFWI18Wxd0AugMTVQRwjBK6aMobf86NXWD2hiKm3N6kWbC0PXmqV7T/ycvU6IOAjLS7HnkuBXtgBF2aL95OnIm3KKf7soa+/",
-                    sender_claimed_keys: {
-                        ed25519: "RSq0Xw0RR0DeqlJ/j3qrF5qbN0D96fKk8lz9kZJlG9k",
-                    },
-                    forwarding_curve25519_key_chain: [],
-                },
-            ];
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (stage) => {
@@ -95,11 +70,11 @@ describe("RustCrypto", () => {
             };
             await rustCrypto.importRoomKeys(someRoomKeys, opt);
 
-            expect(importTotal).toBe(2);
+            expect(importTotal).toBe(someRoomKeys.length);
 
             const keys = await rustCrypto.exportRoomKeys();
             expect(Array.isArray(keys)).toBeTruthy();
-            expect(keys.length).toBe(2);
+            expect(keys.length).toBe(someRoomKeys.length);
 
             const aSession = someRoomKeys[0];
 

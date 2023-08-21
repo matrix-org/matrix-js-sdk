@@ -119,8 +119,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
 
-        this.backupManager = new RustBackupManager(olmMachine, http);
-        this.reemitter.reEmit(this.backupManager, [CryptoEvent.KeyBackupStatus]);
+        this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+        this.reemitter.reEmit(this.backupManager, [
+            CryptoEvent.KeyBackupStatus,
+            CryptoEvent.KeyBackupSessionsRemaining,
+            CryptoEvent.KeyBackupFailed,
+        ]);
 
         // Fire if the cross signing keys are imported from the secret storage
         const onCrossSigningKeysImport = (): void => {
@@ -149,6 +153,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.stopped = true;
 
         this.keyClaimManager.stop();
+        this.backupManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -1079,9 +1084,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         for (const key of keys) {
             this.onRoomKeyUpdated(key);
         }
+        this.backupManager.maybeUploadKey();
     }
 
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
+        if (this.stopped) return;
         logger.debug(`Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`);
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
         if (pendingList.length === 0) return;
