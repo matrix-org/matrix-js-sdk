@@ -148,7 +148,7 @@ import {
     UNSTABLE_MSC3089_TREE_SUBTYPE,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
-import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
+import { IdServerUnbindResult, IImageInfo, JoinRule, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -736,6 +736,7 @@ export interface IPublicRoomsChunkRoom {
     guest_can_join: boolean;
     num_joined_members: number;
     room_type?: RoomType | string; // Added by MSC3827
+    join_rule?: JoinRule.Knock | JoinRule.Public; // Added by MSC2403
 }
 
 interface IPublicRoomsResponse {
