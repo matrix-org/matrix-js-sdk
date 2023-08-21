@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EventType, MatrixClient, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { MatrixRTCSession } from "../../../src/matrixrtc/MatrixRTCSession";
+import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { randomString } from "../../../src/randomstring";
 import { makeMockRoom } from "./mocks";
 
@@ -59,7 +59,7 @@ describe("MatrixRTCSession", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         expiredMembership.expires = 1000;
         expiredMembership.device_id = "EXPIRED";
-        const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], 10000);
+        const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], () => 10000);
 
         const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(1);
@@ -221,5 +221,29 @@ describe("MatrixRTCSession", () => {
             sess!.joinRoomSession([mockFocus]);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
         });
+    });
+
+    it("emits an event at the time a membership event expires", () => {
+        jest.useFakeTimers();
+        try {
+            let eventAge = 0;
+
+            const membership = Object.assign({}, membershipTemplate);
+            const mockRoom = makeMockRoom([membership], () => eventAge);
+
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            const membershipObject = sess.memberships[0];
+
+            const onMembershipsChanged = jest.fn();
+            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            eventAge = 61 * 1000 * 1000;
+            jest.advanceTimersByTime(61 * 1000 * 1000);
+
+            expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
+            expect(sess?.memberships.length).toEqual(0);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });

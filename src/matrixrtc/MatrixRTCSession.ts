@@ -133,6 +133,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         public memberships: CallMembership[],
     ) {
         super();
+        this.setExpiryTimer();
     }
 
     public isJoined(): boolean {

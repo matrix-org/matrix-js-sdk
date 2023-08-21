@@ -18,17 +18,22 @@ import { EventType, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-export function makeMockRoom(memberships: CallMembershipData[], localAge: number | undefined = undefined): Room {
+export function makeMockRoom(
+    memberships: CallMembershipData[],
+    getLocalAge: (() => number) | undefined = undefined,
+): Room {
     const roomId = randomString(8);
     return {
         roomId: roomId,
         getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, localAge)),
+            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, getLocalAge)),
         }),
     } as unknown as Room;
 }
 
-function makeMockRoomState(memberships: CallMembershipData[], roomId: string, localAge = 10) {
+function makeMockRoomState(memberships: CallMembershipData[], roomId: string, getLocalAge: (() => number) | undefined) {
+    const getLocalAgeFn = getLocalAge ?? (() => 10);
+
     return {
         getStateEvents: (_: string, stateKey: string) => {
             const event = {
@@ -38,7 +43,8 @@ function makeMockRoomState(memberships: CallMembershipData[], roomId: string, lo
                 }),
                 getSender: jest.fn().mockReturnValue("@mock:user.example"),
                 getTs: jest.fn().mockReturnValue(1000),
-                getLocalAge: jest.fn().mockReturnValue(localAge),
+                getLocalAge: getLocalAgeFn,
+                localTimestamp: Date.now(),
                 getRoomId: jest.fn().mockReturnValue(roomId),
             };
 
