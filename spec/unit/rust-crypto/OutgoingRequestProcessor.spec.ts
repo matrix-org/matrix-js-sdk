@@ -161,7 +161,7 @@ describe("OutgoingRequestProcessor", () => {
             .when("PUT", "/_matrix")
             .check((req) => {
                 expect(req.path).toEqual(
-                    "https://example.com/_matrix/client/v3/room/test%2Froom/send/test%2Ftype/test%2Ftxnid",
+                    "https://example.com/_matrix/client/v3/rooms/test%2Froom/send/test%2Ftype/test%2Ftxnid",
                 );
                 expect(req.rawData).toEqual(testBody);
                 expect(req.headers["Accept"]).toEqual("application/json");

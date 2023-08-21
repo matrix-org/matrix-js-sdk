@@ -61,9 +61,9 @@ import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
-import { RustBackupManager } from "./backup";
 import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 import { RustCrossSigningInfo } from "./RustCrossSigningInfo";
+import { randomString } from "../randomstring";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -121,8 +121,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(olmMachine);
 
-        this.backupManager = new RustBackupManager(olmMachine, http);
-        this.reemitter.reEmit(this.backupManager, [CryptoEvent.KeyBackupStatus]);
+        this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+        this.reemitter.reEmit(this.backupManager, [
+            CryptoEvent.KeyBackupStatus,
+            CryptoEvent.KeyBackupSessionsRemaining,
+            CryptoEvent.KeyBackupFailed,
+        ]);
 
         // Fire if the cross signing keys are imported from the secret storage
         const onCrossSigningKeysImport = (): void => {
@@ -151,6 +155,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.stopped = true;
 
         this.keyClaimManager.stop();
+        this.backupManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -712,6 +717,62 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Implementation of {@link CryptoApi#requestVerificationDM}
+     */
+    public async requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
+            new RustSdkCryptoJs.UserId(userId),
+        );
+
+        if (!userIdentity) throw new Error(`unknown userId ${userId}`);
+
+        // Transform the verification methods into rust objects
+        const methods = this._supportedVerificationMethods.map((method) =>
+            verificationMethodIdentifierToMethod(method),
+        );
+        // Get the request content to send to the DM room
+        const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+
+        // Send the request content to send to the DM room
+        const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
+
+        // Get a verification request
+        const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
+            new RustSdkCryptoJs.RoomId(roomId),
+            new RustSdkCryptoJs.EventId(eventId),
+            methods,
+        );
+        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+    }
+
+    /**
+     * Send the verification content to a room
+     * See https://spec.matrix.org/v1.7/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+     *
+     * Prefer to use {@link OutgoingRequestProcessor.makeOutgoingRequest} when dealing with {@link RustSdkCryptoJs.RoomMessageRequest}
+     *
+     * @param roomId - the targeted room
+     * @param verificationEventContent - the request body.
+     *
+     * @returns the event id
+     */
+    private async sendVerificationRequestContent(roomId: string, verificationEventContent: string): Promise<string> {
+        const txId = randomString(32);
+        // Send the verification request content to the DM room
+        const { event_id: eventId } = await this.http.authedRequest<{ event_id: string }>(
+            Method.Put,
+            `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${encodeURIComponent(txId)}`,
+            undefined,
+            verificationEventContent,
+            {
+                prefix: "",
+            },
+        );
+
+        return eventId;
+    }
+
+    /**
      * The verification methods we offer to the other side during an interactive verification.
      */
     private _supportedVerificationMethods: string[] = ALL_VERIFICATION_METHODS;
@@ -1024,9 +1085,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         for (const key of keys) {
             this.onRoomKeyUpdated(key);
         }
+        this.backupManager.maybeUploadKey();
     }
 
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
+        if (this.stopped) return;
         logger.debug(`Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`);
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
         if (pendingList.length === 0) return;
