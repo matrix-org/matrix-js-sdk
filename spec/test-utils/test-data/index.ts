@@ -158,7 +158,6 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "forwarding_curve25519_key_chain": []
 };
 
-
 /** Signed OTKs, returned by `POST /keys/claim` */
 export const ONE_TIME_KEYS = {
     "@alice:localhost": {
@@ -283,6 +282,45 @@ export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
             }
         }
     }
+};
+
+/** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
+export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
+    {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "room_id": "!roomA:example.org",
+        "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
+        "session_id": "X9SK5JceUdvUr9gZkmdfS78qmKztoL60oORJ9JA5XD8",
+        "session_key": "AQAAAADbfOdUj/ec5bK4xVEhhRw+jfd1FD4uA0MLy7NyVHugZxyXNZUx5YEof4H9YyjBretviZreMSXqflbgYKz257rkKu7MPeKFf7zmln2GxX0F/p++GOnvpY1FqOglhfRQi3tqiyOa7SL4f7TuERDTOpMqlWhIfTKQnqy0AyF2vpDi5V/UiuSXHlHb1K/YGZJnX0u/Kpis7aC+tKDkSfSQOVw/",
+        "sender_claimed_keys": {
+            "ed25519": "ZG6lrfATe+958wN1xaGf3dKG/CThEfkmNdp1jcu4zok"
+        },
+        "forwarding_curve25519_key_chain": []
+    },
+    {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "room_id": "!roomA:example.org",
+        "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
+        "session_id": "F4P7f1Z0RjbiZMgHk1xBCG3KC4/Ng9PmxLJ4hQ13sHA",
+        "session_key": "AQAAAACv0khqPrQ91MmWCgm0RTzfpn65AGCrRnAKLxGJdfSfECNZ8gyj34FZLwi+F+xC6ibFddcbLXW0mzR6PnTnHF3VHM4g/h+2rcxtlix8fySpIwFzaXViba7cOSy/b+dHTMZB40iA7F4y7AdTdHLv4N1XUj3puU/KVUIKf9/lEDLqyReD+39WdEY24mTIB5NcQQhtyguPzYPT5sSyeIUNd7Bw",
+        "sender_claimed_keys": {
+            "ed25519": "HxUKnGfeUu0fF3cLyCFSDXYtVCQHy/+33q9RkzKfsiU"
+        },
+        "forwarding_curve25519_key_chain": []
+    }
+];
+
+/** An exported megolm session */
+export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
+    "algorithm": "m.megolm.v1.aes-sha2",
+    "room_id": "!roomA:example.org",
+    "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
+    "session_id": "OsZMdC1gQ5nPr+L9tuT6xXsaFJkVPkgxP2FexHF1/QM",
+    "session_key": "AQAAAACvcoGk7mOY59fOqZaxFUiTCBRV1Ia94KBjAZx6kgdgBtkkvs50z8od8/Nc9ncK2UsEiXNvCTTp2dlN3du+Rx0/m7vet2ZOEEp2oYDjHMLLFmwd1gtlGuWYPdXA6Y1+9Yyph0/EDVfS+zd3XvbL0QgbyL43+yQnFNHKlxVJX1eiKTrGTHQtYEOZz6/i/bbk+sV7GhSZFT5IMT9hXsRxdf0D",
+    "sender_claimed_keys": {
+        "ed25519": "dV0TIhhkToXpL+gZLo+zXDHJfw7MWYxpg80cynIQDv0"
+    },
+    "forwarding_curve25519_key_chain": []
 };
 
 /** Signed OTKs, returned by `POST /keys/claim` */
