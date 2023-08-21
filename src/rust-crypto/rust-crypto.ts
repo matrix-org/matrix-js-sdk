@@ -62,7 +62,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
-import { RustCrossSigningInfo } from "./RustCrossSigningInfo";
+import { CrossSigningInfo as CrossSigningInfoImpl } from "./CrossSigningInfo";
 import { randomString } from "../randomstring";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
@@ -220,7 +220,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @returns the cross signing information for the user.
      */
     public async getStoredCrossSigningForUser(userId: string): Promise<CrossSigningInfo | null> {
-        return await RustCrossSigningInfo.getCrossSigningInfo(userId, this.olmMachine);
+        return await CrossSigningInfoImpl.create(userId, this.http);
     }
 
     /**

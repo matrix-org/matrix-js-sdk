@@ -25,7 +25,17 @@ import Olm from "@matrix-org/olm";
 import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
 import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { TEST_ROOM_ID, TEST_ROOM_ID as ROOM_ID, TEST_USER_ID } from "../../test-utils/test-data";
+import {
+    BOB_MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    BOB_SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
+    BOB_SIGNED_TEST_DEVICE_DATA,
+    BOB_TEST_USER_ID,
+    BOB_USER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    TEST_ROOM_ID,
+    TEST_ROOM_ID as ROOM_ID,
+    TEST_USER_ID,
+} from "../../test-utils/test-data";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
@@ -36,6 +46,7 @@ import {
     IDownloadKeyResult,
     IEvent,
     IndexedDBCryptoStore,
+    IRoomEvent,
     IStartClientOpts,
     MatrixClient,
     MatrixEvent,
@@ -44,7 +55,6 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
-    IRoomEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -54,7 +64,7 @@ import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-conver
 import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CryptoCallbacks } from "../../../src/crypto-api";
+import { CrossSigningKey, CryptoCallbacks } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -2565,5 +2575,38 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(request).not.toBeDefined();
             },
         );
+    });
+
+    describe("Get cross signing information for a user", () => {
+        beforeEach(async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+
+            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
+
+        it("Get Bob cross signing info", async () => {
+            // Needed for old crypto, download and cache locally the cross signing keys of Bob
+            await aliceClient.getCrypto()?.getUserDeviceInfo([BOB_TEST_USER_ID], true);
+
+            const crossSigningInfo = await aliceClient.getStoredCrossSigningForUser(BOB_TEST_USER_ID);
+            expect(crossSigningInfo).not.toBeNull();
+
+            expect(crossSigningInfo?.getId(CrossSigningKey.Master)).toStrictEqual(
+                BOB_MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+            );
+            expect(crossSigningInfo?.getId(CrossSigningKey.SelfSigning)).toStrictEqual(
+                BOB_SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+            );
+            expect(crossSigningInfo?.getId(CrossSigningKey.UserSigning)).toStrictEqual(
+                BOB_USER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+            );
+        });
     });
 });

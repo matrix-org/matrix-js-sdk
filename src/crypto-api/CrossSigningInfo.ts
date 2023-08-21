@@ -23,9 +23,9 @@ export interface CrossSigningInfo {
     /**
      * Return the public key of the cross singing key
      *
-     * @param crossSigningKey - `master` or `self_signing`
+     * @param crossSigningKey - the type of cross signing key wanted
      *
      * @returns
      */
-    getId(crossSigningKey?: Exclude<CrossSigningKey, CrossSigningKey.UserSigning>): string | null;
+    getId(crossSigningKey?: CrossSigningKey): string | null;
 }
