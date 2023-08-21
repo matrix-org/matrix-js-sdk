@@ -311,7 +311,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * If there is an existing backup server side it will be deleted and replaced
      * by the new one.
      *
-     * @param signer Method that should sign the backup with existing device and
+     * @param signer - Method that should sign the backup with existing device and
      * existing identity.
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
