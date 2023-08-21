@@ -26,9 +26,9 @@ import { encodeUri } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 
-/* eslint-disable camelcase */
 interface PreparedKeyBackupVersion {
     algorithm: string;
+    /* eslint-disable camelcase */
     auth_data: AuthData;
     decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
 }
@@ -39,6 +39,10 @@ interface BackupCreateResponse {
     version: string;
 }
 
+/**
+ * Holds information of a created keybackup.
+ * Usefull to get the generated private key material and save it securely somewhere.
+ */
 export interface KeyBackupCreationInfo {
     version: string;
     algorithm: string;
@@ -302,6 +306,15 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
     }
 
+    /**
+     * Creates a new key backup by generating a new random pivate key.
+     * If there is an existing backup server side it will be deleted and replaced
+     * by the new one.
+     *
+     * @param signer Method that should sign the backup with existing device and
+     * existing identity.
+     * @returns a KeyBackupCreationInfo - All information related to the backup.
+     */
     public async setUpKeyBackup(signer: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
         // check first if there is an existing backup
         // TODO should it be an option? like if there is already a backup we throw unless it's forced?
@@ -336,6 +349,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         };
     }
 
+    /**
+     * Deletes all key backups.
+     * Will call the API to delete active backup until there is no more present.
+     */
     public async deleteKeyBackup(): Promise<void> {
         // there could be several backup versions, delete all to be safe.
         let current = (await this.requestKeyBackupVersion())?.version ?? null;
@@ -347,6 +364,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // Should this also update Secret Storage and delete any existing keys?
     }
 
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         logger.debug(`deleteKeyBackupVersion v:${version}`);
         await this.disableKeyBackup();

@@ -234,6 +234,8 @@ export interface CryptoApi {
 
     /**
      * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
 

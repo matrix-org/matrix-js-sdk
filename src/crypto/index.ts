@@ -1154,7 +1154,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // Delete existing ones
         await this.backupManager.deleteKeyBackup();
 
-        // eslint-disable-next-line camelcase
         const info = await this.backupManager.prepareKeyBackupVersion();
 
         await this.signObject(info.auth_data);
