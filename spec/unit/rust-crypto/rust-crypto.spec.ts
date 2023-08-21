@@ -560,6 +560,15 @@ describe("RustCrypto", () => {
             );
         });
     });
+
+    describe("requestVerificationDM", () => {
+        it("send verification request to an unknown user", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() =>
+                rustCrypto.requestVerificationDM("@bob:example.com", testData.TEST_ROOM_ID),
+            ).rejects.toThrow("unknown userId @bob:example.com");
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

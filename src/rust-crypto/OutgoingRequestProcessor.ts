@@ -88,7 +88,7 @@ export class OutgoingRequestProcessor {
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof RoomMessageRequest) {
             const path =
-                `/_matrix/client/v3/room/${encodeURIComponent(msg.room_id)}/send/` +
+                `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof SigningKeysUploadRequest) {
