@@ -153,6 +153,7 @@ export type RoomEmittedEvents =
     | RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
+    | RoomStateEvent.NoLongerMember
     | RoomStateEvent.Update
     | RoomStateEvent.Marker
     | ThreadEvent.New
@@ -304,6 +305,7 @@ export type RoomEventHandlerMap = {
         | RoomStateEvent.Events
         | RoomStateEvent.Members
         | RoomStateEvent.NewMember
+        | RoomStateEvent.NoLongerMember
         | RoomStateEvent.Update
         | RoomStateEvent.Marker
         | BeaconEvent.New
@@ -1228,6 +1230,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 RoomStateEvent.Events,
                 RoomStateEvent.Members,
                 RoomStateEvent.NewMember,
+                RoomStateEvent.NoLongerMember,
                 RoomStateEvent.Update,
                 RoomStateEvent.Marker,
                 BeaconEvent.New,
@@ -1239,6 +1242,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 RoomStateEvent.Events,
                 RoomStateEvent.Members,
                 RoomStateEvent.NewMember,
+                RoomStateEvent.NoLongerMember,
                 RoomStateEvent.Update,
                 RoomStateEvent.Marker,
                 BeaconEvent.New,

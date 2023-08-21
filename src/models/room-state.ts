@@ -67,6 +67,7 @@ export enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",
+    NoLongerMember = "RoomState.noLongerMember",
     Update = "RoomState.update", // signals batches of updates without specificity
     BeaconLiveness = "RoomState.BeaconLiveness",
     Marker = "RoomState.Marker",
@@ -120,6 +121,7 @@ export type RoomStateEventHandlerMap = {
      * ```
      */
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    [RoomStateEvent.NoLongerMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
     [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions?: IMarkerFoundOptions) => void;
@@ -436,8 +438,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 }
 
                 const member = this.getOrCreateMember(userId, event);
+                const oldMembership = member.membership;
                 member.setMembershipEvent(event, this);
                 this.updateMember(member);
+                if (oldMembership === "join" && ["leave", "ban"].includes(member.membership as string)) {
+                    this.emit(RoomStateEvent.NoLongerMember, event, this, member);
+                }
                 this.emit(RoomStateEvent.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {
                 // events with unknown state keys should be ignored
@@ -704,7 +710,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
 
         const member = this.getOrCreateMember(userId, stateEvent);
+        const oldMembership = member.membership;
         member.setMembershipEvent(stateEvent, this);
+        if (oldMembership === "join" && ["leave", "ban"].includes(member.membership as string)) {
+            this.emit(RoomStateEvent.NoLongerMember, stateEvent, this, member);
+        }
         // needed to know which members need to be stored seperately
         // as they are not part of the sync accumulator
         // this is cleared by setMembershipEvent so when it's updated through /sync

@@ -908,6 +908,7 @@ type RoomEvents =
 type RoomStateEvents =
     | RoomStateEvent.Events
     | RoomStateEvent.Members
+    | RoomStateEvent.NoLongerMember
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
     | RoomStateEvent.Marker;
