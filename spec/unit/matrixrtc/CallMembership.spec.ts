@@ -88,6 +88,16 @@ describe("CallMembership", () => {
         expect(membership.isExpired()).toEqual(true);
     });
 
+    it("returns active foci", () => {
+        const fakeEvent = makeMockEvent();
+        const mockFocus = { type: "this_is_a_mock_focus" };
+        const membership = new CallMembership(
+            fakeEvent,
+            Object.assign({}, membershipTemplate, { foci_active: [mockFocus] }),
+        );
+        expect(membership.getActiveFoci()).toEqual([mockFocus]);
+    });
+
     describe("expiry calculation", () => {
         let fakeEvent: MatrixEvent;
         let membership: CallMembership;
