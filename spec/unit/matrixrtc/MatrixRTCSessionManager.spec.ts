@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, MatrixClient } from "../../../src";
+import { ClientEvent, EventTimeline, MatrixClient } from "../../../src";
+import { RoomStateEvent } from "../../../src/models/room-state";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessonManager";
 import { makeMockRoom } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
@@ -62,5 +64,42 @@ describe("MatrixRTCSessionManager", () => {
 
         const sessions = client.matrixRTC.getActiveSessions();
         expect(sessions).toHaveLength(1);
+    });
+
+    it("Fires event when session starts", () => {
+        const onStarted = jest.fn();
+        client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+
+        try {
+            const room1 = makeMockRoom([membershipTemplate]);
+            jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+            client.emit(ClientEvent.Room, room1);
+            expect(onStarted).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
+        } finally {
+            client.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+        }
+    });
+
+    it("Fires event when session ends", () => {
+        const onEnded = jest.fn();
+        client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
+
+        const memberships = [membershipTemplate];
+
+        const room1 = makeMockRoom(memberships);
+        jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+        jest.spyOn(client, "getRoom").mockReturnValue(room1);
+
+        client.emit(ClientEvent.Room, room1);
+
+        memberships.splice(0, 1);
+
+        const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+        const membEvent = roomState.getStateEvents("")[0];
+
+        client.emit(RoomStateEvent.Events, membEvent, roomState, null);
+
+        expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
     });
 });

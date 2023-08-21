@@ -22,7 +22,7 @@ import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MatrixEvent } from "../models/event";
 import { MatrixRTCSession } from "./MatrixRTCSession";
 
-enum MatrixRTCSessionManagerEvents {
+export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
     SessionStarted = "session_started",
     // All participants have left a given MatrixRTC session.
