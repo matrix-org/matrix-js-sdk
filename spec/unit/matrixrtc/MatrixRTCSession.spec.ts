@@ -166,6 +166,19 @@ describe("MatrixRTCSession", () => {
         expect(sess.memberships).toHaveLength(0);
     });
 
+    describe("getOldestMembership", () => {
+        it("returns the oldest membership event", () => {
+            const mockRoom = makeMockRoom([
+                Object.assign({}, membershipTemplate, { device_id: "foo", created_ts: 3000 }),
+                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
+                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
+            ]);
+
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            expect(sess.getOldestMembership()!.deviceId).toEqual("old");
+        });
+    });
+
     describe("joining", () => {
         let mockRoom: Room;
 
