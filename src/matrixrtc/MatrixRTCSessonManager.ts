@@ -56,6 +56,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
         this.client.on(ClientEvent.Room, this.onRoom);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
+        this.client.on(RoomStateEvent.NewMember, this.onRoomMembershipChange);
+        this.client.on(RoomStateEvent.NoLongerMember, this.onRoomMembershipChange);
     }
 
     public stop(): void {
@@ -66,6 +68,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
         this.client.removeListener(ClientEvent.Room, this.onRoom);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
+        this.client.removeListener(RoomStateEvent.NewMember, this.onRoomMembershipChange);
+        this.client.removeListener(RoomStateEvent.NoLongerMember, this.onRoomMembershipChange);
     }
 
     /**
@@ -109,6 +113,17 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.refreshRoom(room);
+    };
+
+    private onRoomMembershipChange = async (event: MatrixEvent): Promise<void> => {
+        const room = this.client.getRoom(event.getRoomId());
+        if (!room) {
+            logger.error(`Got membership change for unknown room ${event.getRoomId()}!`);
+            return;
+        }
+
+        const session = this.getRoomSession(room);
+        await session.updateEncryptionKey();
     };
 
     private refreshRoom(room: Room): void {

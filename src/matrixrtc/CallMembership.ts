@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, RoomMember } from "../matrix";
+import { logger } from "../logger";
+import { IEvent, MatrixClient, MatrixEvent, RoomMember } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -29,6 +30,7 @@ export interface CallMembershipData {
     created_ts?: number;
     expires: number;
     foci_active?: Focus[];
+    encryption_key_event?: string;
 }
 
 export class CallMembership {
@@ -36,11 +38,18 @@ export class CallMembership {
         return deepCompare(a.data, b.data);
     }
 
-    public constructor(private parentEvent: MatrixEvent, private data: CallMembershipData) {
+    public constructor(
+        private client: MatrixClient,
+        private parentEvent: MatrixEvent,
+        private data: CallMembershipData,
+    ) {
         if (typeof data.expires !== "number") throw new Error("Malformed membership: expires must be numeric");
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");
         if (typeof data.scope !== "string") throw new Error("Malformed membership event: scope must be string");
+        if (typeof data.encryption_key_event !== "string") {
+            throw new Error("Malformed membership event: encryption_key_event must be string");
+        }
         if (parentEvent.sender === null) throw new Error("Invalid parent event: sender is null");
     }
 
@@ -91,5 +100,30 @@ export class CallMembership {
 
     public getActiveFoci(): Focus[] {
         return this.data.foci_active ?? [];
+    }
+
+    public async getActiveEncryptionKey(): Promise<string | undefined> {
+        const roomId = this.parentEvent.getRoomId();
+        const eventId = this.data.encryption_key_event;
+
+        if (!roomId) return;
+        if (!eventId) return;
+
+        let partialEvent: Partial<IEvent>;
+        try {
+            partialEvent = await this.client.fetchRoomEvent(roomId, eventId);
+        } catch (error) {
+            logger.warn("Failed to fetch encryption key event", error);
+            return;
+        }
+
+        const event = new MatrixEvent(partialEvent);
+        const content = event.getContent();
+        const encryptionKey = content["io.element.key"];
+
+        if (!encryptionKey) return undefined;
+        if (typeof encryptionKey !== "string") return undefined;
+
+        return encryptionKey;
     }
 }
