@@ -1,4 +1,4 @@
-Changes in [27.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.3.0-rc.1) (2023-08-22)
+Changes in [28.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.0.0-rc.1) (2023-08-22)
 ============================================================================================================
 
 ## 🚨 BREAKING CHANGES
