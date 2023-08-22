@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, MatrixClient, Room } from "../../../src";
+import { EventTimeline, EventType, MatrixClient, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom } from "./mocks";
+import { makeMockRoom, mockRTCEvent } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
     call_id: "",
@@ -235,6 +235,56 @@ describe("MatrixRTCSession", () => {
 
             sess!.joinRoomSession([mockFocus]);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+
+        it("renews membership event before expiry time", async () => {
+            jest.useFakeTimers();
+            let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
+            const eventSentPromise = new Promise<Record<string, any>>((r) => {
+                resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
+                    r(val);
+                };
+            });
+            try {
+                const sendStateEventMock = jest.fn().mockImplementation(resolveFn);
+                client.sendStateEvent = sendStateEventMock;
+
+                sess!.joinRoomSession([mockFocus]);
+
+                const eventContent = await eventSentPromise;
+
+                // definitely should have renewed by 1 second before the expiry!
+                const timeElapsed = 60 * 60 * 1000 - 1000;
+                mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!.getStateEvents = jest
+                    .fn()
+                    .mockReturnValue(mockRTCEvent(eventContent.memberships, mockRoom.roomId, () => timeElapsed));
+
+                sendStateEventMock.mockClear();
+
+                jest.setSystemTime(Date.now() + timeElapsed);
+                jest.advanceTimersByTime(timeElapsed);
+
+                expect(sendStateEventMock).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.GroupCallMemberPrefix,
+                    {
+                        memberships: [
+                            {
+                                application: "m.call",
+                                scope: "m.room",
+                                call_id: "",
+                                device_id: "AAAAAAA",
+                                expires: 3600000 * 2,
+                                foci_active: [{ type: "mock" }],
+                                created_ts: 1000,
+                            },
+                        ],
+                    },
+                    "@alice:example.org",
+                );
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 

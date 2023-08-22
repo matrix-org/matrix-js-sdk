@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, Room } from "../../../src";
+import { EventType, MatrixEvent, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
@@ -32,24 +32,32 @@ export function makeMockRoom(
 }
 
 function makeMockRoomState(memberships: CallMembershipData[], roomId: string, getLocalAge: (() => number) | undefined) {
-    const getLocalAgeFn = getLocalAge ?? (() => 10);
-
     return {
         getStateEvents: (_: string, stateKey: string) => {
-            const event = {
-                getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-                getContent: jest.fn().mockReturnValue({
-                    memberships: memberships,
-                }),
-                getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                getTs: jest.fn().mockReturnValue(1000),
-                getLocalAge: getLocalAgeFn,
-                localTimestamp: Date.now(),
-                getRoomId: jest.fn().mockReturnValue(roomId),
-            };
+            const event = mockRTCEvent(memberships, roomId, getLocalAge);
 
             if (stateKey !== undefined) return event;
             return [event];
         },
     };
+}
+
+export function mockRTCEvent(
+    memberships: CallMembershipData[],
+    roomId: string,
+    getLocalAge: (() => number) | undefined,
+): MatrixEvent {
+    const getLocalAgeFn = getLocalAge ?? (() => 10);
+
+    return {
+        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+        getContent: jest.fn().mockReturnValue({
+            memberships: memberships,
+        }),
+        getSender: jest.fn().mockReturnValue("@mock:user.example"),
+        getTs: jest.fn().mockReturnValue(1000),
+        getLocalAge: getLocalAgeFn,
+        localTimestamp: Date.now(),
+        getRoomId: jest.fn().mockReturnValue(roomId),
+    } as unknown as MatrixEvent;
 }
