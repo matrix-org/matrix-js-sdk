@@ -32,6 +32,7 @@ const mockFocus = { type: "mock" };
 
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
+    let sess: MatrixRTCSession | undefined;
 
     beforeEach(() => {
         client = new MatrixClient({ baseUrl: "base_url" });
@@ -41,12 +42,14 @@ describe("MatrixRTCSession", () => {
 
     afterEach(() => {
         client.matrixRTC.stop();
+        if (sess) sess.stop();
+        sess = undefined;
     });
 
     it("Creates a room-scoped session from room state", () => {
         const mockRoom = makeMockRoom([membershipTemplate]);
 
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(1);
         expect(sess?.memberships[0].callId).toEqual("");
         expect(sess?.memberships[0].scope).toEqual("m.room");
@@ -61,7 +64,7 @@ describe("MatrixRTCSession", () => {
         expiredMembership.device_id = "EXPIRED";
         const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], () => 10000);
 
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(1);
         expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
     });
@@ -71,13 +74,13 @@ describe("MatrixRTCSession", () => {
         expiredMembership.created_ts = 500;
         expiredMembership.expires = 1000;
         const mockRoom = makeMockRoom([expiredMembership]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
     });
 
     it("returns empty session if no membership events are present", () => {
         const mockRoom = makeMockRoom([]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships).toHaveLength(0);
     });
 
@@ -98,7 +101,7 @@ describe("MatrixRTCSession", () => {
                 }),
             }),
         };
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
         expect(sess.memberships).toHaveLength(0);
     });
 
@@ -119,7 +122,7 @@ describe("MatrixRTCSession", () => {
                 }),
             }),
         };
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom as unknown as Room);
         expect(sess.memberships).toHaveLength(0);
     });
 
@@ -127,7 +130,7 @@ describe("MatrixRTCSession", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         (expiredMembership.expires as number | undefined) = undefined;
         const mockRoom = makeMockRoom([expiredMembership]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
     });
 
@@ -143,7 +146,7 @@ describe("MatrixRTCSession", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         (testMembership.call_id as string | undefined) = undefined;
         const mockRoom = makeMockRoom([testMembership]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
     });
 
@@ -151,7 +154,7 @@ describe("MatrixRTCSession", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         (testMembership.scope as string | undefined) = undefined;
         const mockRoom = makeMockRoom([testMembership]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
     });
 
@@ -159,12 +162,11 @@ describe("MatrixRTCSession", () => {
         const testMembership = Object.assign({}, membershipTemplate);
         testMembership.scope = "m.user";
         const mockRoom = makeMockRoom([testMembership]);
-        const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
     });
 
     describe("joining", () => {
-        let sess: MatrixRTCSession;
         let mockRoom: Room;
 
         beforeEach(() => {
@@ -231,7 +233,7 @@ describe("MatrixRTCSession", () => {
             const membership = Object.assign({}, membershipTemplate);
             const mockRoom = makeMockRoom([membership], () => eventAge);
 
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             const membershipObject = sess.memberships[0];
 
             const onMembershipsChanged = jest.fn();
@@ -245,5 +247,87 @@ describe("MatrixRTCSession", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    it("prunes expired memberships on update", () => {
+        client.sendStateEvent = jest.fn();
+
+        let eventAge = 0;
+
+        const mockRoom = makeMockRoom(
+            [
+                Object.assign({}, membershipTemplate, {
+                    device_id: "OTHERDEVICE",
+                    expires: 1000,
+                }),
+            ],
+            () => eventAge,
+        );
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+        // sanity check
+        expect(sess.memberships).toHaveLength(1);
+        expect(sess.memberships[0].deviceId).toEqual("OTHERDEVICE");
+
+        eventAge = 10000;
+
+        sess.joinRoomSession([mockFocus]);
+
+        expect(client.sendStateEvent).toHaveBeenCalledWith(
+            mockRoom!.roomId,
+            EventType.GroupCallMemberPrefix,
+            {
+                memberships: [
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        expires: 3600000,
+                        foci_active: [mockFocus],
+                    },
+                ],
+            },
+            "@alice:example.org",
+        );
+    });
+
+    it("fills in created_ts for other memberships on update", () => {
+        client.sendStateEvent = jest.fn();
+
+        const mockRoom = makeMockRoom([
+            Object.assign({}, membershipTemplate, {
+                device_id: "OTHERDEVICE",
+            }),
+        ]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+        sess.joinRoomSession([mockFocus]);
+
+        expect(client.sendStateEvent).toHaveBeenCalledWith(
+            mockRoom!.roomId,
+            EventType.GroupCallMemberPrefix,
+            {
+                memberships: [
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "OTHERDEVICE",
+                        expires: 3600000,
+                        created_ts: 1000,
+                    },
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        expires: 3600000,
+                        foci_active: [mockFocus],
+                    },
+                ],
+            },
+            "@alice:example.org",
+        );
     });
 });
