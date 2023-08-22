@@ -2595,16 +2595,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Needed for old crypto, download and cache locally the cross signing keys of Bob
             await aliceClient.getCrypto()?.getUserDeviceInfo([BOB_TEST_USER_ID], true);
 
-            const crossSigningInfo = await aliceClient.getStoredCrossSigningForUser(BOB_TEST_USER_ID);
+            const crossSigningInfo = await aliceClient.getCrypto()!.getCrossSigningKeysForUser(BOB_TEST_USER_ID);
             expect(crossSigningInfo).not.toBeNull();
 
-            expect(crossSigningInfo?.getId(CrossSigningKey.Master)).toStrictEqual(
+            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.Master)).toStrictEqual(
                 BOB_MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
             );
-            expect(crossSigningInfo?.getId(CrossSigningKey.SelfSigning)).toStrictEqual(
+            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.SelfSigning)).toStrictEqual(
                 BOB_SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
             );
-            expect(crossSigningInfo?.getId(CrossSigningKey.UserSigning)).toStrictEqual(
+            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.UserSigning)).toStrictEqual(
                 BOB_USER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
             );
         });

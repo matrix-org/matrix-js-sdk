@@ -109,7 +109,7 @@ import { EventTimelineSet } from "./models/event-timeline-set";
 import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
-import { DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
+import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
 import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
@@ -219,7 +219,6 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
-import { CrossSigningInfo } from "./crypto-api/CrossSigningInfo";
 
 export type Store = IStore;
 
@@ -2628,8 +2627,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param userId - the user ID to get the cross-signing info for.
      *
      * @returns the cross signing information for the user.
+     * @deprecated Prefer {@link CryptoApi#getCrossSigningKeysForUser}
      */
-    public getStoredCrossSigningForUser(userId: string): Promise<CrossSigningInfo | null> {
+    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
         if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }

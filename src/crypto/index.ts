@@ -1504,9 +1504,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userId - the user ID to get the cross-signing info for.
      *
      * @returns the cross signing information for the user.
+     *
+     * @deprecated Use {@link CryptoApi.getCrossSigningKeysForUser}.
      */
-    public getStoredCrossSigningForUser(userId: string): Promise<CrossSigningInfo | null> {
-        return Promise.resolve(this.deviceList.getStoredCrossSigningForUser(userId));
+    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
+        return this.deviceList.getStoredCrossSigningForUser(userId);
+    }
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    public getCrossSigningKeysForUser(userId: string): Promise<CrossSigningInfo | null> {
+        return Promise.resolve(this.getStoredCrossSigningForUser(userId));
     }
 
     /**

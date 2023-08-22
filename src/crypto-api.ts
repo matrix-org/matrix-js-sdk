@@ -22,6 +22,7 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
+import { CrossSigningInfo } from "./crypto-api/CrossSigningInfo";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -176,6 +177,15 @@ export interface CryptoApi {
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
      */
     getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
+
+    /**
+     * Get the cross signing information for a given user.
+     *
+     * @param userId - the user ID to get the cross-signing info for.
+     *
+     * @returns the cross signing information for the user.
+     */
+    getCrossSigningKeysForUser(userId: string): Promise<CrossSigningInfo | null>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.

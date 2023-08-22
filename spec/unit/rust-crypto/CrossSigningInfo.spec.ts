@@ -16,7 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { CrossSigningInfo } from "../../../src/rust-crypto/CrossSigningInfo";
+import { CrossSigningInfoImpl } from "../../../src/rust-crypto/CrossSigningInfoImpl";
 import { SIGNED_CROSS_SIGNING_KEYS_DATA, TEST_USER_ID } from "../../test-utils/test-data";
 import { CrossSigningKey } from "../../../src/crypto-api";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, MatrixHttpApi, TypedEventEmitter } from "../../../src";
@@ -39,7 +39,7 @@ describe("CrossSigningInfo", () => {
         it("should return null when the master keys are missing", async () => {
             fetchMock.post("https://example.com/_matrix/client/v3/keys/query", {});
 
-            const crossSigningInfo = await CrossSigningInfo.create(TEST_USER_ID, httpApi);
+            const crossSigningInfo = await CrossSigningInfoImpl.create(TEST_USER_ID, httpApi);
             expect(crossSigningInfo).toBeNull();
         });
 
@@ -54,7 +54,7 @@ describe("CrossSigningInfo", () => {
                 },
             });
 
-            const crossSigningInfo = await CrossSigningInfo.create(TEST_USER_ID, httpApi);
+            const crossSigningInfo = await CrossSigningInfoImpl.create(TEST_USER_ID, httpApi);
             expect(crossSigningInfo).toBeNull();
         });
 
@@ -76,7 +76,7 @@ describe("CrossSigningInfo", () => {
                 },
             });
 
-            const crossSigningInfo = await CrossSigningInfo.create(TEST_USER_ID, httpApi);
+            const crossSigningInfo = await CrossSigningInfoImpl.create(TEST_USER_ID, httpApi);
             expect(crossSigningInfo).toBeNull();
         });
     });
@@ -94,10 +94,10 @@ describe("CrossSigningInfo", () => {
             SIGNED_CROSS_SIGNING_KEYS_DATA.user_signing_keys![TEST_USER_ID].keys,
         )[0];
 
-        let crossSigningInfo: CrossSigningInfo;
+        let crossSigningInfo: CrossSigningInfoImpl;
 
         beforeEach(async () => {
-            crossSigningInfo = (await CrossSigningInfo.create(TEST_USER_ID, httpApi))!;
+            crossSigningInfo = (await CrossSigningInfoImpl.create(TEST_USER_ID, httpApi))!;
         });
 
         it.each([
@@ -108,7 +108,7 @@ describe("CrossSigningInfo", () => {
             { type: null, expected: null },
         ])("should return $expected for $type", async ({ type, expected }) => {
             // @ts-ignore force wrong type value to test edge case
-            expect(crossSigningInfo.getId(type)).toBe(expected);
+            expect(crossSigningInfo.getPublicKey(type)).toBe(expected);
         });
     });
 });

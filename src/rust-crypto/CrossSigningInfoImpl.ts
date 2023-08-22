@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { CrossSigningInfo as ICrossSigningInfo } from "../crypto-api/CrossSigningInfo";
+import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 import { CrossSigningKey } from "../crypto-api";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { IDownloadKeyResult, Keys } from "../client";
@@ -22,9 +22,9 @@ import { IDownloadKeyResult, Keys } from "../client";
 /**
  * Implementation of {@link ICrossSigningInfo}
  */
-export class CrossSigningInfo implements ICrossSigningInfo {
+export class CrossSigningInfoImpl implements CrossSigningInfo {
     /**
-     * Create an instance of {@link CrossSigningInfo} for the given user
+     * Create an instance of {@link CrossSigningInfoImpl} for the given user
      *
      * @param userId - the owner of the cross signing info
      * @param http - http interface
@@ -32,7 +32,7 @@ export class CrossSigningInfo implements ICrossSigningInfo {
     public static async create(
         userId: string,
         http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    ): Promise<CrossSigningInfo | null> {
+    ): Promise<CrossSigningInfoImpl | null> {
         const queryBody = {
             device_keys: {
                 [userId]: [],
@@ -65,7 +65,7 @@ export class CrossSigningInfo implements ICrossSigningInfo {
         if (!keyResult.user_signing_keys?.[userId]) return null;
         const userSigningKey = getPubKey(keyResult.user_signing_keys[userId]);
 
-        return new CrossSigningInfo({ masterKey, selfSigningKey, userSigningKey });
+        return new CrossSigningInfoImpl({ masterKey, selfSigningKey, userSigningKey });
     }
 
     /**
@@ -74,7 +74,7 @@ export class CrossSigningInfo implements ICrossSigningInfo {
      * @param crossSigningKeys - user's cross-signing keys
      */
     public constructor(
-        public readonly crossSigningKeys: { masterKey: string; selfSigningKey: string; userSigningKey: string },
+        private readonly crossSigningKeys: { masterKey: string; selfSigningKey: string; userSigningKey: string },
     ) {}
 
     /**
@@ -82,7 +82,7 @@ export class CrossSigningInfo implements ICrossSigningInfo {
      *
      * `crossSigningKeyType` has `master` as default value
      */
-    public getId(crossSigningKeyType = CrossSigningKey.Master): string | null {
+    public getPublicKey(crossSigningKeyType = CrossSigningKey.Master): string | null {
         switch (crossSigningKeyType) {
             case CrossSigningKey.Master:
                 return this.crossSigningKeys.masterKey;

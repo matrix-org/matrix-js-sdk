@@ -274,6 +274,19 @@ export class CrossSigningInfo implements NewCrossSigningInfo {
     }
 
     /**
+     * Get the public key of the user. This can also be used to test for
+     * the existence of a given key type.
+     *
+     * @param type - The type of key to get the ID of.  One of "master",
+     * "self_signing", or "user_signing".  Defaults to "master".
+     *
+     * @returns the public key
+     */
+    public getPublicKey(type = "master"): string | null {
+        return this.getId(type);
+    }
+
+    /**
      * Create new cross-signing keys for the given key types. The public keys
      * will be held in this class, while the private keys are passed off to the
      * `saveCrossSigningKeys` application callback.

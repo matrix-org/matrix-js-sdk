@@ -21,11 +21,11 @@ import { CrossSigningKey } from "../crypto-api";
  */
 export interface CrossSigningInfo {
     /**
-     * Return the public key of the cross singing key
+     * Return the public part of  one of the cross signing keys
      *
-     * @param crossSigningKey - the type of cross signing key wanted
+     * @param crossSigningKey - the type of cross signing key wanted. {@link CrossSigningKey.Master} is the default value.
      *
-     * @returns
+     * @returns the public key.
      */
-    getId(crossSigningKey?: CrossSigningKey): string | null;
+    getPublicKey(crossSigningKey?: CrossSigningKey): string | null;
 }
