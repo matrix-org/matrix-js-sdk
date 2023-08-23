@@ -312,7 +312,6 @@ describe("MatrixClient", function () {
         store = (
             [
                 "getRoom",
-                "getRooms",
                 "getUser",
                 "getSyncToken",
                 "scrollback",
@@ -339,6 +338,7 @@ describe("MatrixClient", function () {
         store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
+        store.getRooms = jest.fn().mockReturnValue([]);
 
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
