@@ -24,6 +24,7 @@ else
     exit
 fi
 yarn --version > /dev/null || (echo "yarn is required: please install it"; kill $$)
+[ -f localazy.json ] || localazy --help > /dev/null || (echo "localazy is required: please install it"; kill $$)
 
 USAGE="$0 [-x] [-c changelog_file] vX.Y.Z"
 
