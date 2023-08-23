@@ -4029,6 +4029,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
+    public setRoomAvatarUrl(roomId: string, url: string): Promise<ISendEventResponse> {
+        return this.sendStateEvent(roomId, EventType.RoomAvatar, { avatarUrl: url });
+    }
+
+    /**
+     * @returns Promise which resolves: TODO
+     * @returns Rejects: with an error response.
+     */
     public setRoomName(roomId: string, name: string): Promise<ISendEventResponse> {
         return this.sendStateEvent(roomId, EventType.RoomName, { name: name });
     }

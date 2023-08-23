@@ -54,7 +54,7 @@ log.methodFactory = function (methodName, logLevel, loggerName) {
  * Can be tailored down to specific use cases if needed.
  */
 export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
-logger.setLevel(log.levels.DEBUG, false);
+logger.setLevel(log.levels.WARN, false);
 
 export interface PrefixedLogger extends Logger {
     withPrefix: (prefix: string) => PrefixedLogger;
