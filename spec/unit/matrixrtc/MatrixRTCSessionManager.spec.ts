@@ -41,7 +41,7 @@ describe("MatrixRTCSessionManager", () => {
         client.matrixRTC.stop();
     });
 
-    it.skip("Gets active MatrixRTC sessions accross multiple rooms", () => {
+    it("Gets active MatrixRTC sessions accross multiple rooms", () => {
         const room1 = makeMockRoom([membershipTemplate]);
         const room2 = makeMockRoom([membershipTemplate]);
 
@@ -54,7 +54,7 @@ describe("MatrixRTCSessionManager", () => {
         expect(sessions).toHaveLength(2);
     });
 
-    it.skip("Ignores inactive sessions", () => {
+    it("Ignores inactive sessions", () => {
         const room1 = makeMockRoom([membershipTemplate]);
         const room2 = makeMockRoom([]);
 
@@ -67,7 +67,7 @@ describe("MatrixRTCSessionManager", () => {
         expect(sessions).toHaveLength(1);
     });
 
-    it.skip("Fires event when session starts", () => {
+    it("Fires event when session starts", () => {
         const onStarted = jest.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
@@ -82,7 +82,7 @@ describe("MatrixRTCSessionManager", () => {
         }
     });
 
-    it.skip("Fires event when session ends", () => {
+    it("Fires event when session ends", () => {
         const onEnded = jest.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
 

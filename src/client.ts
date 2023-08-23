@@ -1340,12 +1340,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
+            // Start listening for calls after the initial sync is done
+            // We do not need to backfill the call event buffer
+            // with encrypted events that might never get decrypted
+            this.on(ClientEvent.Sync, this.startCallEventHandlers);
         }
-
-        // Start listening for calls after the initial sync is done
-        // We do not need to backfill the call event buffer
-        // with encrypted events that might never get decrypted
-        this.on(ClientEvent.Sync, this.startCallEventHandlers);
 
         // NB. We initialise MatrixRTC whether we have call support or not: this is just
         // the underlying session management and doesn't use any actual media capabilities
@@ -1449,6 +1448,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
         this.clientRunning = true;
+
+        this.on(ClientEvent.Sync, this.startMatrixRTC);
+
         // backwards compat for when 'opts' was 'historyLen'.
         if (typeof opts === "number") {
             opts = {
@@ -1551,9 +1553,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public stopClient(): void {
         this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
-        // we will have added these in the constructor even if we didn't start
         this.off(ClientEvent.Sync, this.startCallEventHandlers);
-        this.off(ClientEvent.Sync, this.fixupRoomNotifications);
 
         if (!this.clientRunning) return; // already stopped
 
@@ -7073,9 +7073,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 this.groupCallEventHandler!.start();
             }
 
+            this.off(ClientEvent.Sync, this.startCallEventHandlers);
+        }
+    };
+
+    private startMatrixRTC = (): void => {
+        if (this.isInitialSyncComplete()) {
             this.matrixRTC.start();
 
-            this.off(ClientEvent.Sync, this.startCallEventHandlers);
+            this.off(ClientEvent.Sync, this.startMatrixRTC);
         }
     };
 
