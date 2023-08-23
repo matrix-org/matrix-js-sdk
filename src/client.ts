@@ -1553,7 +1553,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public stopClient(): void {
         this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
-        this.off(ClientEvent.Sync, this.startCallEventHandler);
+        this.off(ClientEvent.Sync, this.startMatrixRTC);
 
         if (!this.clientRunning) return; // already stopped
 
