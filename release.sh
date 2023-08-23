@@ -149,6 +149,17 @@ else
     read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
+if [ -f localazy.json ] && [ $prerelease -eq 1 ]; then
+    echo "Fetching translations from localazy"
+    localazy download
+
+    if [ -n "$(git ls-files --modified src/i18n/strings/*.json)" ]; then
+        read -p "Inspect git diff and press enter to continue " REPLY
+        echo "Committing updated translations"
+        git commit src/i18n/strings/*.json -m "Translations from Localazy"
+    fi
+fi
+
 rel_branch=$(git symbolic-ref --short HEAD)
 
 if [ -z "$skip_changelog" ]; then
