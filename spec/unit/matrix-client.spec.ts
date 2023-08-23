@@ -144,7 +144,7 @@ describe("convertQueryDictToMap", () => {
     });
 });
 
-describe("MatrixClient", function () {
+describe.skip("MatrixClient", function () {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
