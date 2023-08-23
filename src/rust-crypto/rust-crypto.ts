@@ -61,8 +61,6 @@ import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
-import { CrossSigningInfo } from "../crypto-api/CrossSigningInfo";
-import { CrossSigningInfoImpl } from "./CrossSigningInfoImpl";
 import { randomString } from "../randomstring";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
@@ -225,10 +223,33 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoApi#getCrossSigningKeysForUser}.
+     * Implementation of {@link CryptoApi#hasCrossSigningKeysForUser}.
      */
-    public async getCrossSigningKeysForUser(userId: string): Promise<CrossSigningInfo | null> {
-        return await CrossSigningInfoImpl.create(userId, this.http);
+    public async hasCrossSigningKeysForUser(userId: string, downloadUncached = false): Promise<boolean> {
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const rustTrackedUser = Array.from(rustTrackedUsers).find((rustUserId) => userId === rustUserId.toString());
+
+        // If the user is tracked locally, we check if we have the master key
+        if (rustTrackedUser) {
+            const identity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
+                rustTrackedUser,
+            );
+            return Boolean(identity?.masterKey);
+        } else if (downloadUncached) {
+            // Download the cross signing keys and check if the master key is available
+            const keyResult = await this.downloadDeviceList(new Set([userId]));
+            const keys = keyResult.master_keys?.[userId];
+
+            // No master key
+            if (!keys) return false;
+
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Boolean(Object.values(keys.keys)[0]);
+        } else {
+            return false;
+        }
     }
 
     /**

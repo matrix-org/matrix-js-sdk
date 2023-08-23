@@ -26,12 +26,11 @@ import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
 import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import {
-    BOB_MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
-    BOB_SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
     BOB_SIGNED_TEST_DEVICE_DATA,
     BOB_TEST_USER_ID,
-    BOB_USER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    SIGNED_CROSS_SIGNING_KEYS_DATA,
+    SIGNED_TEST_DEVICE_DATA,
     TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
@@ -64,7 +63,7 @@ import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-conver
 import { flushPromises } from "../../test-utils/flushPromises";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CrossSigningKey, CryptoCallbacks } from "../../../src/crypto-api";
+import { CryptoCallbacks } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -2577,12 +2576,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         );
     });
 
-    describe("Get cross signing information for a user", () => {
+    describe("Check if the cross signing keys are available for a user", () => {
         beforeEach(async () => {
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
 
             keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
             keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
             keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
@@ -2591,22 +2592,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
         });
 
-        it("Get Bob cross signing info", async () => {
+        it("Cross signing keys are available for an untracked user with cross signing keys on the homeserver", async () => {
             // Needed for old crypto, download and cache locally the cross signing keys of Bob
             await aliceClient.getCrypto()?.getUserDeviceInfo([BOB_TEST_USER_ID], true);
 
-            const crossSigningInfo = await aliceClient.getCrypto()!.getCrossSigningKeysForUser(BOB_TEST_USER_ID);
-            expect(crossSigningInfo).not.toBeNull();
+            const hasCrossSigningKeysForUser = await aliceClient
+                .getCrypto()!
+                .hasCrossSigningKeysForUser(BOB_TEST_USER_ID, true);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+        });
 
-            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.Master)).toStrictEqual(
-                BOB_MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
-            );
-            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.SelfSigning)).toStrictEqual(
-                BOB_SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
-            );
-            expect(crossSigningInfo?.getPublicKey(CrossSigningKey.UserSigning)).toStrictEqual(
-                BOB_USER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
-            );
+        it("Cross signing keys are available for a tracked user", async () => {
+            // Process Alice keys, old crypto has a sleep(5ms) during the process
+            await jest.advanceTimersByTimeAsync(5);
+            await flushPromises();
+
+            // Alice is the local user and should be tracked !
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.hasCrossSigningKeysForUser(TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+        });
+
+        it("Cross signing keys are not available for an unknown user", async () => {
+            const hasCrossSigningKeysForUser = await aliceClient
+                .getCrypto()!
+                .hasCrossSigningKeysForUser("@unknown:xyz");
+            expect(hasCrossSigningKeysForUser).toBe(false);
         });
     });
 });

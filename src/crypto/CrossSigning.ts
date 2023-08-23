@@ -31,7 +31,6 @@ import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 import { DeviceVerificationStatus } from "../crypto-api";
-import { CrossSigningInfo as NewCrossSigningInfo } from "../crypto-api/CrossSigningInfo";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -53,7 +52,7 @@ export interface ICrossSigningInfo {
     crossSigningVerifiedBefore: boolean;
 }
 
-export class CrossSigningInfo implements NewCrossSigningInfo {
+export class CrossSigningInfo {
     public keys: Record<string, ICrossSigningKey> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
@@ -271,19 +270,6 @@ export class CrossSigningInfo implements NewCrossSigningInfo {
         if (!this.keys[type]) return null;
         const keyInfo = this.keys[type];
         return publicKeyFromKeyInfo(keyInfo);
-    }
-
-    /**
-     * Get the public key of the user. This can also be used to test for
-     * the existence of a given key type.
-     *
-     * @param type - The type of key to get the ID of.  One of "master",
-     * "self_signing", or "user_signing".  Defaults to "master".
-     *
-     * @returns the public key
-     */
-    public getPublicKey(type = "master"): string | null {
-        return this.getId(type);
     }
 
     /**

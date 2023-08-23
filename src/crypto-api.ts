@@ -22,7 +22,6 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
-import { CrossSigningInfo } from "./crypto-api/CrossSigningInfo";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -179,13 +178,17 @@ export interface CryptoApi {
     getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
 
     /**
-     * Get the cross signing information for a given user.
+     * Check if the cross signing keys for the user are available.
      *
-     * @param userId - the user ID to get the cross-signing info for.
+     * If the user is not tracked locally and downloadUncached is set at true,
+     * a `/keys/query` request is made to the server to retrieve the cross singing keys.
      *
-     * @returns the cross signing information for the user.
+     * @param userId - the user ID to check
+     * @param downloadUncached - If true, download the cross signing keys.
+     *
+     * @returns true if the cross signing keys are available.
      */
-    getCrossSigningKeysForUser(userId: string): Promise<CrossSigningInfo | null>;
+    hasCrossSigningKeysForUser(userId: string, downloadUncached?: boolean): Promise<boolean>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.
