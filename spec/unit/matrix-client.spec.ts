@@ -528,7 +528,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("getSafeUserId()", () => {
+    describe("getSafeUserId()", () => {
         it("returns the logged in user id", () => {
             expect(client.getSafeUserId()).toEqual(userId);
         });
@@ -888,7 +888,7 @@ describe("MatrixClient", function () {
         await syncPromise;
     });
 
-    describe.skip("getSyncState", function () {
+    describe("getSyncState", function () {
         it("should return null if the client isn't started", function () {
             expect(client.getSyncState()).toBe(null);
         });
@@ -908,7 +908,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("getOrCreateFilter", function () {
+    describe("getOrCreateFilter", function () {
         it("should POST createFilter if no id is present in localStorage", function () {});
         it("should use an existing filter if id is present in localStorage", function () {});
         it("should handle localStorage filterId missing from the server", async () => {
@@ -942,7 +942,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("retryImmediately", function () {
+    describe("retryImmediately", function () {
         it("should return false if there is no request waiting", async function () {
             httpLookups = [];
             await client.startClient();
@@ -1046,7 +1046,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("emitted sync events", function () {
+    describe("emitted sync events", function () {
         function syncChecker(expectedStates: [string, string | null][], done: Function) {
             return function syncListener(state: SyncState, old: SyncState | null) {
                 const expected = expectedStates.shift();
@@ -1096,7 +1096,7 @@ describe("MatrixClient", function () {
         // Disabled because now `startClient` makes a legit call to `/versions`
         // And those tests are really unhappy about it... Not possible to figure
         // out what a good resolution would look like
-        it.skip("should transition ERROR -> CATCHUP after /sync if prev failed", async () => {
+        it("should transition ERROR -> CATCHUP after /sync if prev failed", async () => {
             const expectedStates: [string, string | null][] = [];
             acceptKeepalives = false;
             httpLookups = [];
@@ -1144,7 +1144,7 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
-        it.skip("should transition SYNCING -> ERROR after a failed /sync", async () => {
+        it("should transition SYNCING -> ERROR after a failed /sync", async () => {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -1169,7 +1169,7 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
-        it.skip("should transition ERROR -> SYNCING after /sync if prev failed", async () => {
+        it("should transition ERROR -> SYNCING after /sync if prev failed", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
                 method: "GET",
@@ -1203,7 +1203,7 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
-        it.skip("should transition ERROR -> ERROR if keepalive keeps failing", async () => {
+        it("should transition ERROR -> ERROR if keepalive keeps failing", async () => {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -1235,7 +1235,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("inviteByEmail", function () {
+    describe("inviteByEmail", function () {
         const roomId = "!foo:bar";
 
         it("should send an invite HTTP POST", function () {
@@ -1256,7 +1256,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("guest rooms", function () {
+    describe("guest rooms", function () {
         it("should only do /sync calls (without filter/pushrules)", async function () {
             httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
@@ -1269,10 +1269,10 @@ describe("MatrixClient", function () {
             expect(httpLookups.length).toBe(0);
         });
 
-        it.skip("should be able to peek into a room using peekInRoom", function () {});
+        it("should be able to peek into a room using peekInRoom", function () {});
     });
 
-    describe.skip("getPresence", function () {
+    describe("getPresence", function () {
         it("should send a presence HTTP GET", function () {
             httpLookups = [
                 {
@@ -1289,7 +1289,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("redactEvent", () => {
+    describe("redactEvent", () => {
         const roomId = "!room:example.org";
         const mockRoom = {
             getMyMembership: () => "join",
@@ -1376,7 +1376,7 @@ describe("MatrixClient", function () {
             await client.redactEvent(roomId, eventId, txnId, { reason });
         });
 
-        describe.skip("when calling with 'with_rel_types'", () => {
+        describe("when calling with 'with_rel_types'", () => {
             const eventId = "$event42:example.org";
 
             it("should raise an error if the server has no support for relation based redactions", async () => {
@@ -1426,7 +1426,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("cancelPendingEvent", () => {
+    describe("cancelPendingEvent", () => {
         const roomId = "!room:server";
         const txnId = "m12345";
 
@@ -1508,7 +1508,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("threads", () => {
+    describe("threads", () => {
         it.each([
             { startOpts: {}, hasThreadSupport: false },
             { startOpts: { threadSupport: true }, hasThreadSupport: true },
@@ -1555,7 +1555,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("read-markers and read-receipts", () => {
+    describe("read-markers and read-receipts", () => {
         it("setRoomReadMarkers", () => {
             client.setRoomReadMarkersHttpRequest = jest.fn();
             const room = {
@@ -1590,7 +1590,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("beacons", () => {
+    describe("beacons", () => {
         const roomId = "!room:server.org";
         const content = makeBeaconInfoContent(100, true);
 
@@ -1625,7 +1625,7 @@ describe("MatrixClient", function () {
             expect(requestContent).toEqual(content);
         });
 
-        describe.skip("processBeaconEvents()", () => {
+        describe("processBeaconEvents()", () => {
             it("does nothing when events is falsy", () => {
                 const room = new Room(roomId, client, userId);
                 const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
@@ -1655,7 +1655,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("setRoomTopic", () => {
+    describe("setRoomTopic", () => {
         const roomId = "!foofoofoofoofoofoo:matrix.org";
         const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
             return jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
@@ -1689,7 +1689,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("setPassword", () => {
+    describe("setPassword", () => {
         const auth = { session: "abcdef", type: "foo" };
         const newPassword = "newpassword";
 
@@ -1736,7 +1736,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("getLocalAliases", () => {
+    describe("getLocalAliases", () => {
         it("should call the right endpoint", async () => {
             const response = {
                 aliases: ["#woop:example.org", "#another:example.org"],
@@ -1757,7 +1757,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("pollingTurnServers", () => {
+    describe("pollingTurnServers", () => {
         afterEach(() => {
             mocked(supportsMatrixCall).mockReset();
         });
@@ -1782,7 +1782,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("checkTurnServers", () => {
+    describe("checkTurnServers", () => {
         beforeAll(() => {
             mocked(supportsMatrixCall).mockReturnValue(true);
         });
@@ -1850,7 +1850,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("encryptAndSendToDevices", () => {
+    describe("encryptAndSendToDevices", () => {
         it("throws an error if crypto is unavailable", () => {
             client.crypto = undefined;
             expect(() => client.encryptAndSendToDevices([], {})).toThrow();
@@ -1865,7 +1865,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("support for ignoring invites", () => {
+    describe("support for ignoring invites", () => {
         beforeEach(() => {
             // Mockup `getAccountData`/`setAccountData`.
             const dataStore = new Map();
@@ -2163,7 +2163,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("using E2EE in group calls", () => {
+    describe("using E2EE in group calls", () => {
         const opts = {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -2198,7 +2198,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("delete account data", () => {
+    describe("delete account data", () => {
         afterEach(() => {
             jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
         });
@@ -2262,7 +2262,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("room lists and history", () => {
+    describe("room lists and history", () => {
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
             return new MatrixEvent({
                 content: {
@@ -2312,7 +2312,7 @@ describe("MatrixClient", function () {
             });
         }
 
-        describe.skip("getVisibleRooms", () => {
+        describe("getVisibleRooms", () => {
             function setUpReplacedRooms(): {
                 room1: Room;
                 room2: Room;
@@ -2463,7 +2463,7 @@ describe("MatrixClient", function () {
             });
         });
 
-        describe.skip("getRoomUpgradeHistory", () => {
+        describe("getRoomUpgradeHistory", () => {
             /**
              * Create a chain of room history with create events and tombstones.
              *
@@ -2713,7 +2713,7 @@ describe("MatrixClient", function () {
     });
 
     // these wrappers are deprecated, but we need coverage of them to pass the quality gate
-    describe.skip("SecretStorage wrappers", () => {
+    describe("SecretStorage wrappers", () => {
         let mockSecretStorage: Mocked<ServerSideSecretStorageImpl>;
 
         beforeEach(() => {
@@ -2751,8 +2751,8 @@ describe("MatrixClient", function () {
     });
 
     // these wrappers are deprecated, but we need coverage of them to pass the quality gate
-    describe.skip("Crypto wrappers", () => {
-        describe.skip("exception if no crypto", () => {
+    describe("Crypto wrappers", () => {
+        describe("exception if no crypto", () => {
             it("isCrossSigningReady", () => {
                 expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
             });
@@ -2766,7 +2766,7 @@ describe("MatrixClient", function () {
             });
         });
 
-        describe.skip("defer to crypto backend", () => {
+        describe("defer to crypto backend", () => {
             let mockCryptoBackend: Mocked<CryptoBackend>;
 
             beforeEach(() => {
@@ -2804,8 +2804,8 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("paginateEventTimeline()", () => {
-        describe.skip("notifications timeline", () => {
+    describe("paginateEventTimeline()", () => {
+        describe("notifications timeline", () => {
             const unsafeNotification = {
                 actions: ["notify"],
                 room_id: "__proto__",
@@ -2964,7 +2964,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.skip("pushers", () => {
+    describe("pushers", () => {
         const pusher = {
             app_id: "test",
             app_display_name: "Test App",
