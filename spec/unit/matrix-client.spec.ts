@@ -312,6 +312,7 @@ describe("MatrixClient", function () {
         store = (
             [
                 "getRoom",
+                "getRooms",
                 "getUser",
                 "getSyncToken",
                 "scrollback",
@@ -332,7 +333,6 @@ describe("MatrixClient", function () {
             r[k] = jest.fn();
             return r;
         }, {} as Store);
-        store.getRooms = jest.fn().mockReturnValue(Promise.resolve(null));
         store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
         store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
         store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
