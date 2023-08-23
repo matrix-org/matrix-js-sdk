@@ -35,8 +35,8 @@ export enum MatrixRTCSessionEvent {
 
 export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.MembershipsChanged]: (
-        newMemberships: CallMembership[],
         oldMemberships: CallMembership[],
+        newMemberships: CallMembership[],
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
 };
