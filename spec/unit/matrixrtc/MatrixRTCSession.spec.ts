@@ -41,6 +41,7 @@ describe("MatrixRTCSession", () => {
     });
 
     afterEach(() => {
+        client.stopClient();
         client.matrixRTC.stop();
         if (sess) sess.stop();
         sess = undefined;
