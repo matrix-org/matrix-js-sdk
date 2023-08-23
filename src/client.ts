@@ -3597,7 +3597,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Restores all rooms if omitted.
      * @param targetSessionId - Session ID to target a specific session.
      * Restores all sessions if omitted.
-     * @param backupInfo - Backup metadata from `checkKeyBackup`
+     * @param backupInfo - Backup metadata from `getKeyBackupVersion` or `checkKeyBackup`.`backupInfo`
      * @param opts - Optional params such as callbacks
      * @returns Status of restoration with `total` and `imported`
      * key counts.
