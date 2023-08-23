@@ -115,18 +115,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return new MatrixRTCSession(client, room, callMemberships);
     }
 
-    /**
-     * Given the state of a room, find the active MatrixRTC Room-scoped session (if any) any return it
-     * or return undefined if no members are currently joined to the room's MatrixRTC session
-     */
-    /*public static activeRoomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession | undefined {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
-
-        if (callMemberships.length === 0) return undefined;
-
-        return new MatrixRTCSession(client, room, callMemberships);
-    }*/
-
     private constructor(
         private readonly client: MatrixClient,
         public readonly room: Room,

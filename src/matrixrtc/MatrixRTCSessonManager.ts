@@ -45,6 +45,13 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     public start(): void {
+        for (const room of this.client.getRooms()) {
+            const session = MatrixRTCSession.roomSessionForRoom(this.client, room);
+            if (session.memberships.length > 0) {
+                this.roomSessions.set(room.roomId, session);
+            }
+        }
+
         this.client.on(ClientEvent.Room, this.onRoom);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
     }

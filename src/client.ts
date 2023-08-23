@@ -1340,11 +1340,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
-            // Start listening for calls after the initial sync is done
-            // We do not need to backfill the call event buffer
-            // with encrypted events that might never get decrypted
-            this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
+
+        // Start listening for calls after the initial sync is done
+        // We do not need to backfill the call event buffer
+        // with encrypted events that might never get decrypted
+        this.on(ClientEvent.Sync, this.startCallEventHandlers);
 
         // NB. We initialise MatrixRTC whether we have call support or not: this is just
         // the underlying session management and doesn't use any actual media capabilities
@@ -1525,8 +1526,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.start();
-
-        this.matrixRTC.start();
     }
 
     /**
@@ -7063,11 +7062,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Post, path, undefined, {});
     }
 
-    private startCallEventHandler = (): void => {
+    private startCallEventHandlers = (): void => {
         if (this.isInitialSyncComplete()) {
-            this.callEventHandler!.start();
-            this.groupCallEventHandler!.start();
-            this.off(ClientEvent.Sync, this.startCallEventHandler);
+            if (supportsMatrixCall()) {
+                this.callEventHandler!.start();
+                this.groupCallEventHandler!.start();
+            }
+
+            this.matrixRTC.start();
+
+            this.off(ClientEvent.Sync, this.startCallEventHandlers);
         }
     };
 
