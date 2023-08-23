@@ -1343,7 +1343,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Start listening for calls after the initial sync is done
             // We do not need to backfill the call event buffer
             // with encrypted events that might never get decrypted
-            this.on(ClientEvent.Sync, this.startCallEventHandlers);
+            this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
 
         // NB. We initialise MatrixRTC whether we have call support or not: this is just
@@ -1553,7 +1553,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public stopClient(): void {
         this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
-        this.off(ClientEvent.Sync, this.startCallEventHandlers);
+        this.off(ClientEvent.Sync, this.startCallEventHandler);
 
         if (!this.clientRunning) return; // already stopped
 
@@ -7066,14 +7066,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Post, path, undefined, {});
     }
 
-    private startCallEventHandlers = (): void => {
+    private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
             if (supportsMatrixCall()) {
                 this.callEventHandler!.start();
                 this.groupCallEventHandler!.start();
             }
 
-            this.off(ClientEvent.Sync, this.startCallEventHandlers);
+            this.off(ClientEvent.Sync, this.startCallEventHandler);
         }
     };
 
