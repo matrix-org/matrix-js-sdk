@@ -247,6 +247,24 @@ describe("Room", function () {
             const roomCreator = room.getCreator();
             expect(roomCreator).toStrictEqual(userA);
         });
+
+        it("should return null if the sender is undefined", function () {
+            // @ts-ignore - mocked doesn't handle overloads sanely
+            mocked(room.currentState.getStateEvents).mockImplementation(function (type, key) {
+                if (type === EventType.RoomCreate && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomCreate,
+                        skey: "",
+                        room: roomId,
+                        user: undefined,
+                        content: {},
+                    });
+                }
+            });
+            const roomCreator = room.getCreator();
+            expect(roomCreator).toBeNull();
+        });
     });
 
     describe("getAvatarUrl", function () {
