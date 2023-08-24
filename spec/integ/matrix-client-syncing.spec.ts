@@ -389,9 +389,7 @@ describe("MatrixClient syncing", () => {
                             type: "m.room.create",
                             room: roomOne,
                             user: selfUserId,
-                            content: {
-                                creator: selfUserId,
-                            },
+                            content: {},
                         }),
                     ],
                 },
@@ -577,9 +575,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -611,9 +607,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomTwo,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -758,7 +752,6 @@ describe("MatrixClient syncing", () => {
                         room: roomOne,
                         user: otherUserId,
                         content: {
-                            creator: otherUserId,
                             room_version: "9",
                         },
                     });
@@ -844,7 +837,6 @@ describe("MatrixClient syncing", () => {
                         room: roomOne,
                         user: otherUserId,
                         content: {
-                            creator: otherUserId,
                             room_version: testMeta.roomVersion,
                         },
                     });
@@ -1372,9 +1364,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         } as Partial<IJoinedRoom>,
@@ -1471,9 +1461,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -1629,9 +1617,7 @@ describe("MatrixClient syncing", () => {
                                         type: "m.room.create",
                                         room: roomId,
                                         user: selfUserId,
-                                        content: {
-                                            creator: selfUserId,
-                                        },
+                                        content: {},
                                     }),
                                 ],
                             },

@@ -1684,7 +1684,6 @@ const REDACT_KEEP_KEYS = new Set([
 // a map from state event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP: Record<string, Record<string, 1>> = {
     [EventType.RoomMember]: { membership: 1 },
-    [EventType.RoomCreate]: { creator: 1 },
     [EventType.RoomJoinRules]: { join_rule: 1 },
     [EventType.RoomPowerLevels]: {
         ban: 1,
