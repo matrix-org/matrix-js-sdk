@@ -333,6 +333,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 newContent,
                 localUserId,
             );
+            logger.info(`Sent updated call member event.`);
 
             // check in 2 mins to see if we need to refresh our member event
             if (this.isJoined()) resendDelay = 2 * 60 * 1000;
