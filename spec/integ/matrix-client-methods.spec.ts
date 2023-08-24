@@ -1988,10 +1988,7 @@ const buildEventMember = () =>
 const buildEventCreate = () =>
     new MatrixEvent({
         age: 80126105,
-        content: {
-            creator: "@andybalaam-test1:matrix.org",
-            room_version: "6",
-        },
+        content: {},
         event_id: "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",
         origin_server_ts: 1643815438782,
         room_id: "!STrMRsukXHtqQdSeHa:matrix.org",

@@ -70,9 +70,7 @@ describe("RoomState", function () {
                 user: userA,
                 room: roomId,
                 event: true,
-                content: {
-                    creator: userA,
-                },
+                content: {},
             }),
         ]);
     });

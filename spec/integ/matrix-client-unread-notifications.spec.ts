@@ -178,10 +178,7 @@ describe("MatrixClient syncing", () => {
                         timeline: {
                             events: [
                                 {
-                                    content: {
-                                        creator: userB,
-                                        room_version: "9",
-                                    },
+                                    content: {},
                                     origin_server_ts: 1,
                                     sender: userB,
                                     state_key: "",

@@ -85,9 +85,7 @@ describe("MatrixClient room timelines", function () {
                                 type: "m.room.create",
                                 room: roomId,
                                 user: userId,
-                                content: {
-                                    creator: userId,
-                                },
+                                content: {},
                             }),
                         ],
                     },

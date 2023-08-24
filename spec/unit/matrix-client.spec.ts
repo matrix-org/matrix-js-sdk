@@ -2266,13 +2266,11 @@ describe("MatrixClient", function () {
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
             return new MatrixEvent({
                 content: {
-                    "creator": "@daryl:alexandria.example.com",
                     "m.federate": true,
                     "predecessor": {
                         event_id: "id_of_last_event",
                         room_id: predecessorRoomId,
                     },
-                    "room_version": "9",
                 },
                 event_id: `create_event_id_pred_${predecessorRoomId}`,
                 origin_server_ts: 1432735824653,
