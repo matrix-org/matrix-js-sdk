@@ -751,7 +751,9 @@ describe("MatrixClient syncing", () => {
                         type: "m.room.create",
                         room: roomOne,
                         user: otherUserId,
-                        content: {},
+                        content: {
+                            room_version: "9",
+                        },
                     });
                     const normalFirstSync = {
                         next_batch: "batch_token",
@@ -834,7 +836,9 @@ describe("MatrixClient syncing", () => {
                         type: "m.room.create",
                         room: roomOne,
                         user: otherUserId,
-                        content: {},
+                        content: {
+                            room_version: testMeta.roomVersion,
+                        },
                     });
 
                     const markerEventFromRoomCreator = utils.mkEvent({
