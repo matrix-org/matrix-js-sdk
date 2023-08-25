@@ -33,6 +33,13 @@ import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
+const testOIDCToken = {
+    access_token: "12345678",
+    expires_in: "10",
+    matrix_server_name: "homeserver.oabc",
+    token_type: "Bearer",
+};
+
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn();
     public requestCapability = jest.fn();
@@ -49,6 +56,7 @@ class MockWidgetApi extends EventEmitter {
     public sendRoomEvent = jest.fn(() => ({ event_id: `$${Math.random()}` }));
     public sendStateEvent = jest.fn();
     public sendToDevice = jest.fn();
+    public requestOpenIDConnectToken = jest.fn(() => testOIDCToken);
     public readStateEvents = jest.fn(() => []);
     public getTurnServers = jest.fn(() => []);
 
@@ -283,6 +291,13 @@ describe("RoomWidgetClient", () => {
             });
             expect((await emittedEvent).isEncrypted()).toEqual(encrypted);
             expect(await emittedSync).toEqual(SyncState.Syncing);
+        });
+    });
+
+    describe("oidc token", () => {
+        it("requests an oidc token", async () => {
+            await makeClient({});
+            expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
     });
 
