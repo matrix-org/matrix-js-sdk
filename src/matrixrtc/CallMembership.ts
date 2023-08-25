@@ -47,7 +47,7 @@ export class CallMembership {
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");
         if (typeof data.scope !== "string") throw new Error("Malformed membership event: scope must be string");
-        if (typeof data.encryption_key_event !== "string") {
+        if (data.encryption_key_event && typeof data.encryption_key_event !== "string") {
             throw new Error("Malformed membership event: encryption_key_event must be string");
         }
         if (parentEvent.sender === null) throw new Error("Invalid parent event: sender is null");

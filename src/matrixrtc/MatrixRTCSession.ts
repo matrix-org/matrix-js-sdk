@@ -160,7 +160,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
      */
-    public async joinRoomSession(activeFoci: Focus[]): Promise<void> {
+    public async joinRoomSession(activeFoci: Focus[], encryptMedia?: boolean): Promise<void> {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
@@ -169,7 +169,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Joining call session in room ${this.room.roomId}`);
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
-        await this.updateEncryptionKeyEvent();
+        if (encryptMedia) {
+            await this.updateEncryptionKeyEvent();
+        }
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         await this.updateCallMembershipEvent();
     }
@@ -203,6 +205,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring update encryption key`);
             return;
         }
+        if (!this._activeEncryptionKey) return;
 
         await this.updateEncryptionKeyEvent();
         await this.updateCallMembershipEvent();
@@ -292,9 +295,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
             foci_active: this.activeFoci,
-            encryption_key_event: this.activeEncryptionKeyEvent,
         };
 
+        if (this.activeEncryptionKeyEvent) m.encryption_key_event = this.activeEncryptionKeyEvent;
         if (prevMembership) m.created_ts = prevMembership.createdTs();
 
         return m;
