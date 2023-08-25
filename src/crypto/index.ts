@@ -700,9 +700,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @internal
      */
-    public async userHasCrossSigningKeys(): Promise<boolean> {
-        await this.downloadKeys([this.userId]);
-        return this.deviceList.getStoredCrossSigningForUser(this.userId) !== null;
+    public async userHasCrossSigningKeys(userId = this.userId): Promise<boolean> {
+        await this.downloadKeys([userId]);
+        return this.deviceList.getStoredCrossSigningForUser(userId) !== null;
     }
 
     /**
@@ -1507,17 +1507,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
         return this.deviceList.getStoredCrossSigningForUser(userId);
-    }
-
-    /**
-     * Check if we have locally the cross signing keys for a given user
-     *
-     * @param userId - the user ID to check.
-     *
-     * @returns True if we have the cross signing keys.
-     */
-    public hasCrossSigningKeysForUser(userId: string): Promise<boolean> {
-        return Promise.resolve(Boolean(this.getStoredCrossSigningForUser(userId)?.getId()));
     }
 
     /**

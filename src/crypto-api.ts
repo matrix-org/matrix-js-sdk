@@ -39,14 +39,19 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * Checks if the user has previously published cross-signing keys
+     * Check if the cross signing keys for the user are available.
      *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
+     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is not tracked locally and downloadUncached is set at true,
+     *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
+     * - Otherwise, return false
      *
-     * @returns true if the user has previously published cross-signing keys
+     * @param userId - the user ID to check
+     * @param downloadUncached - If true, download the cross signing keys.
+     *
+     * @returns true if the cross signing keys are available.
      */
-    userHasCrossSigningKeys(): Promise<boolean>;
+    userHasCrossSigningKeys(userId?: string, downloadUncached?: boolean): Promise<boolean>;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
@@ -176,19 +181,6 @@ export interface CryptoApi {
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
      */
     getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
-
-    /**
-     * Check if the cross signing keys for the user are available.
-     *
-     * If the user is not tracked locally and downloadUncached is set at true,
-     * a `/keys/query` request is made to the server to retrieve the cross singing keys.
-     *
-     * @param userId - the user ID to check
-     * @param downloadUncached - If true, download the cross signing keys.
-     *
-     * @returns true if the cross signing keys are available.
-     */
-    hasCrossSigningKeysForUser(userId: string, downloadUncached?: boolean): Promise<boolean>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.

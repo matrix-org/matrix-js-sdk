@@ -2598,7 +2598,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const hasCrossSigningKeysForUser = await aliceClient
                 .getCrypto()!
-                .hasCrossSigningKeysForUser(BOB_TEST_USER_ID, true);
+                .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
             expect(hasCrossSigningKeysForUser).toBe(true);
         });
 
@@ -2608,14 +2608,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await flushPromises();
 
             // Alice is the local user and should be tracked !
-            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.hasCrossSigningKeysForUser(TEST_USER_ID);
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
         });
 
         it("Cross signing keys are not available for an unknown user", async () => {
-            const hasCrossSigningKeysForUser = await aliceClient
-                .getCrypto()!
-                .hasCrossSigningKeysForUser("@unknown:xyz");
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
         });
     });

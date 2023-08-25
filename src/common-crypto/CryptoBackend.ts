@@ -88,8 +88,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param userId - the user ID to get the cross-signing info for.
      *
      * @returns the cross signing information for the user.
-     *
-     * @deprecated Prefer {@link CryptoApi#hasCrossSigningKeysForUser}
+     * @deprecated Prefer {@link CryptoApi#userHasCrossSigningKeys}
      */
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 

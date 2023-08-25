@@ -223,36 +223,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoApi#hasCrossSigningKeysForUser}.
-     */
-    public async hasCrossSigningKeysForUser(userId: string, downloadUncached = false): Promise<boolean> {
-        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
-        const rustTrackedUser = Array.from(rustTrackedUsers).find((rustUserId) => userId === rustUserId.toString());
-
-        // If the user is tracked locally, we check if we have the master key
-        if (rustTrackedUser) {
-            const identity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
-                rustTrackedUser,
-            );
-            return Boolean(identity?.masterKey);
-        } else if (downloadUncached) {
-            // Download the cross signing keys and check if the master key is available
-            const keyResult = await this.downloadDeviceList(new Set([userId]));
-            const keys = keyResult.master_keys?.[userId];
-
-            // No master key
-            if (!keys) return false;
-
-            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-            // We assume only a single key, and we want the bare form without type
-            // prefix, so we select the values.
-            return Boolean(Object.values(keys.keys)[0]);
-        } else {
-            return false;
-        }
-    }
-
-    /**
      * This function is unneeded for the rust-crypto.
      * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
      *
@@ -277,15 +247,33 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     /**
      * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
      */
-    public async userHasCrossSigningKeys(): Promise<boolean> {
-        const userId = new RustSdkCryptoJs.UserId(this.userId);
-        /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
-         * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
-         */
-        const request = this.olmMachine.queryKeysForUsers([userId]);
-        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
-        const userIdentity = await this.olmMachine.getIdentity(userId);
-        return userIdentity !== undefined;
+    public async userHasCrossSigningKeys(userId = this.userId, downloadUncached = false): Promise<boolean> {
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const rustTrackedUser = Array.from(rustTrackedUsers).find((rustUserId) => userId === rustUserId.toString());
+
+        if (rustTrackedUser) {
+            /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
+             * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
+             */
+            const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
+            await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+            const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            return userIdentity !== undefined;
+        } else if (downloadUncached) {
+            // Download the cross signing keys and check if the master key is available
+            const keyResult = await this.downloadDeviceList(new Set([userId]));
+            const keys = keyResult.master_keys?.[userId];
+
+            // No master key
+            if (!keys) return false;
+
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Boolean(Object.values(keys.keys)[0]);
+        } else {
+            return false;
+        }
     }
 
     public prepareToEncrypt(room: Room): void {
