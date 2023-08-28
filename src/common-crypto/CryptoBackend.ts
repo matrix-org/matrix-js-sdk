@@ -20,6 +20,8 @@ import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
+import { IMegolmSessionData } from "../@types/crypto";
+import { IKeyBackupInfo, IKeyBackupSession } from "../crypto/keybackup";
 
 /**
  * Common interface for the crypto implementations
@@ -99,6 +101,8 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @deprecated Unneeded for the new crypto
      */
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
+
+    getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -208,4 +212,17 @@ export interface EventDecryptionResult {
      * The sender doesn't authorize the unverified devices to decrypt his messages
      */
     encryptedDisabledForUnverifiedDevices?: boolean;
+}
+
+export interface BackupDecryptor {
+    /**
+     * Depending on the backup algorithm the source of a key can be trusted or not.
+     * If false, the key must be considered unsafe (authenticity cannot be guaranteed).
+     * It could be per design (deniability) or for some technical reason (asymmetric).
+     */
+    sourceTrusted: boolean;
+
+    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
+
+    free(): void;
 }

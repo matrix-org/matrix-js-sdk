@@ -3789,19 +3789,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = this.makeKeyBackupPath(targetRoomId!, targetSessionId!, backupInfo.version);
 
+        const backupDecryptor = await this.cryptoBackend!.getBackupDecryptor(backupInfo, privKey);
+
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {
             return privKey;
         });
 
-        const untrusted = algorithm.untrusted;
+        const untrusted = !backupDecryptor.sourceTrusted;
 
         try {
             // If the pubkey computed from the private data we've been given
             // doesn't match the one in the auth_data, the user has entered
             // a different recovery key / the wrong passphrase.
-            if (!(await algorithm.keyMatches(privKey))) {
-                return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
-            }
+            // if (!(await algorithm.keyMatches(privKey))) {
+            //     return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
+            // }
 
             if (!(privKey instanceof Uint8Array)) {
                 // eslint-disable-next-line @typescript-eslint/no-base-to-string
@@ -3836,7 +3838,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = await algorithm.decryptSessions(roomData.sessions);
+                    const roomKeys = await backupDecryptor.decryptSessions(roomData.sessions);
                     for (const k of roomKeys) {
                         k.room_id = roomId;
                         keys.push(k);
@@ -3845,14 +3847,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else if ((res as IRoomKeysResponse).sessions) {
                 const sessions = (res as IRoomKeysResponse).sessions;
                 totalKeyCount = Object.keys(sessions).length;
-                keys = await algorithm.decryptSessions(sessions);
+                keys = await backupDecryptor.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
             } else {
                 totalKeyCount = 1;
                 try {
-                    const [key] = await algorithm.decryptSessions({
+                    const [key] = await backupDecryptor.decryptSessions({
                         [targetSessionId!]: res as IKeyBackupSession,
                     });
                     key.room_id = targetRoomId!;
@@ -3872,6 +3874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             source: "backup",
         });
 
+        /// XXX why?
         await this.checkKeyBackup();
 
         return { total: totalKeyCount, imported: keys.length };

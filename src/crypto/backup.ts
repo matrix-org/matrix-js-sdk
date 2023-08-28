@@ -41,6 +41,7 @@ import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api";
 import { BackupTrustInfo } from "../crypto-api/keybackup";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -877,4 +878,24 @@ export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): Backup
         trusted: trustInfo.usable,
         matchesDecryptionKey: trustInfo.trusted_locally ?? false,
     };
+}
+
+export class LibOlmBackupDecryptor implements BackupDecryptor {
+    private algorithm: BackupAlgorithm;
+    public sourceTrusted: boolean;
+
+    public constructor(algorithm: BackupAlgorithm) {
+        this.algorithm = algorithm;
+        this.sourceTrusted = !algorithm.untrusted;
+    }
+
+    public free(): void {
+        this.algorithm.free();
+    }
+
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
+    ): Promise<IMegolmSessionData[]> {
+        return await this.algorithm.decryptSessions(sessions);
+    }
 }

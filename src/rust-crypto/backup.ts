@@ -20,11 +20,14 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { BackupTrustInfo, Curve25519AuthData, KeyBackupCheck, KeyBackupInfo } from "../crypto-api/keybackup";
 import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { CryptoEvent } from "../crypto";
+import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { encodeUri } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend";
+import { IEncryptedPayload } from "../crypto/aes";
+import { IKeyBackupSession, Curve25519SessionData } from "../crypto/keybackup";
 
 /**
  * prepareKeyBackupVersion result.
@@ -391,6 +394,43 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             auth_data: { public_key: pubKey.publicKeyBase64 },
             decryptionKey: randomKey,
         };
+    }
+}
+
+export class RustBackupDecryptor implements BackupDecryptor {
+    private decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
+    public sourceTrusted: boolean;
+
+    public constructor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey) {
+        this.decryptionKey = decryptionKey;
+        this.sourceTrusted = false;
+    }
+
+    public async decryptSessions(
+        ciphertexts: Record<string, IKeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
+    ): Promise<IMegolmSessionData[]> {
+        const keys: IMegolmSessionData[] = [];
+        for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {
+            try {
+                const decrypted = JSON.parse(
+                    await this.decryptionKey.decryptV1(
+                        sessionData.session_data.ephemeral,
+                        sessionData.session_data.mac,
+                        sessionData.session_data.ciphertext,
+                    ),
+                );
+                decrypted.session_id = sessionId;
+                keys.push(decrypted);
+            } catch (e) {
+                logger.log("Failed to decrypt megolm session from backup", e, sessionData);
+            }
+        }
+        return keys;
+    }
+
+    public free(): void {
+        // is this really needed?
+        this.decryptionKey.free();
     }
 }
 

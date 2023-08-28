@@ -23,14 +23,14 @@ import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault, recursiveMapToObject } from "../utils";
+import { MapWithDefault, recursiveMapToObject, encodeUri } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -39,6 +39,7 @@ import {
     CrossSigningKeyInfo,
     CrossSigningStatus,
     CryptoCallbacks,
+    Curve25519AuthData,
     DeviceVerificationStatus,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
@@ -60,13 +61,18 @@ import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentif
 import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { ISignatures } from "../@types/signed";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
+import { encodeBase64 } from "../crypto/olmlib";
+import { DecryptionError } from "../crypto/algorithms";
+import { IKeyBackupSession } from "../crypto/keybackup";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
+const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 interface ISignableObject {
     signatures?: ISignatures;
@@ -97,6 +103,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private crossSigningIdentity: CrossSigningIdentity;
     private readonly backupManager: RustBackupManager;
 
+    private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
     public constructor(
@@ -125,7 +133,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
-        this.eventDecryptor = new EventDecryptor(olmMachine);
+        this.eventDecryptor = new EventDecryptor(olmMachine, this);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
         this.reemitter.reEmit(this.backupManager, [
@@ -144,6 +152,65 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretStorage,
             onCrossSigningKeysImport,
         );
+    }
+
+    /**
+     * Attempts to retrieve a session from a key backup, if enough time
+     * has elapsed since the last check for this session id.
+     */
+    public async queryKeyBackupRateLimited(targetRoomId: string, targetSessionId: string): Promise<void> {
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (!backupKeys.decryptionKey) return;
+        const version = backupKeys.backupVersion;
+
+        const now = new Date().getTime();
+        if (
+            !this.sessionLastCheckAttemptedTime[targetSessionId!] ||
+            now - this.sessionLastCheckAttemptedTime[targetSessionId!] > KEY_BACKUP_CHECK_RATE_LIMIT
+        ) {
+            this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
+
+            const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
+                $roomId: targetRoomId,
+                $sessionId: targetSessionId,
+            });
+
+            const res = await this.http.authedRequest<IKeyBackupSession>(Method.Get, path, { version }, undefined, {
+                prefix: ClientPrefix.V3,
+            });
+
+            const backupDecryptor = new RustBackupDecryptor(backupKeys.decryptionKey);
+            if (res) {
+                const sessionsToImport: Record<string, IKeyBackupSession> = {};
+                sessionsToImport[targetSessionId] = res;
+                const keys = await backupDecryptor.decryptSessions(sessionsToImport);
+                for (const k of keys) {
+                    k.room_id = targetRoomId!;
+                }
+                await this.importRoomKeys(keys);
+            }
+        }
+    }
+
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
+            throw new Error(`getBackupDecryptor Unsupported algorithm ${backupInfo.algorithm}`);
+        }
+
+        const authData = <Curve25519AuthData>backupInfo.auth_data;
+
+        if (!(privKey instanceof Uint8Array)) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            throw new Error(`getBackupDecryptor expects Uint8Array, got ${privKey}`);
+        }
+
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
+
+        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
+            throw new Error(`getBackupDecryptor key mismatch error`);
+        }
+
+        return new RustBackupDecryptor(backupDecryptionKey);
     }
 
     /**
@@ -1189,7 +1256,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
         if (this.stopped) return;
-        logger.debug(`Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`);
+        logger.log(
+            `Got update for session sk:${key.senderKey.toBase64()}| sid:${key.sessionId} in ${key.roomId.toString()}`,
+        );
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
         if (pendingList.length === 0) return;
 
@@ -1316,7 +1385,7 @@ class EventDecryptor {
         () => new MapWithDefault<string, Set<MatrixEvent>>(() => new Set()),
     );
 
-    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine) {}
+    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine, private readonly crypto: RustCrypto) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
         logger.info("Attempting decryption of event", event);
@@ -1326,28 +1395,83 @@ class EventDecryptor {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        const res = (await this.olmMachine.decryptRoomEvent(
-            JSON.stringify({
-                event_id: event.getId(),
-                type: event.getWireType(),
-                sender: event.getSender(),
-                state_key: event.getStateKey(),
-                content: event.getWireContent(),
-                origin_server_ts: event.getTs(),
-            }),
-            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-        )) as RustSdkCryptoJs.DecryptedRoomEvent;
+        try {
+            const res = (await this.olmMachine.decryptRoomEvent(
+                JSON.stringify({
+                    event_id: event.getId(),
+                    type: event.getWireType(),
+                    sender: event.getSender(),
+                    state_key: event.getStateKey(),
+                    content: event.getWireContent(),
+                    origin_server_ts: event.getTs(),
+                }),
+                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+            )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
-        // Success. We can remove the event from the pending list, if
-        // that hasn't already happened.
-        this.removeEventFromPendingList(event);
+            // Success. We can remove the event from the pending list, if
+            // that hasn't already happened.
+            this.removeEventFromPendingList(event);
 
-        return {
-            clearEvent: JSON.parse(res.event),
-            claimedEd25519Key: res.senderClaimedEd25519Key,
-            senderCurve25519Key: res.senderCurve25519Key,
-            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
-        };
+            return {
+                clearEvent: JSON.parse(res.event),
+                claimedEd25519Key: res.senderClaimedEd25519Key,
+                senderCurve25519Key: res.senderCurve25519Key,
+                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+            };
+        } catch (err) {
+            // We need to map back to regular decryption errors (used for analytics for example)
+            // The DecryptionErrors are used by react-sdk so is implicitly part of API, but poorly typed
+            if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
+                logger.log(`HELLO failed to decrypt ${err.code}, ${err.description}`);
+                const content = event.getWireContent();
+                let jsError;
+                switch (err.code) {
+                    case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey: {
+                        jsError = new DecryptionError(
+                            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            "The sender's device has not sent us the keys for this message.",
+                            {
+                                session: content.sender_key + "|" + content.session_id,
+                            },
+                        );
+                        this.crypto.queryKeyBackupRateLimited(event.getRoomId()!, event.getWireContent().session_id!);
+                        break;
+                    }
+                    case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex: {
+                        jsError = new DecryptionError(
+                            "OLM_UNKNOWN_MESSAGE_INDEX",
+                            "The sender's device has not sent us the keys for this message at this index.",
+                            {
+                                session: content.sender_key + "|" + content.session_id,
+                            },
+                        );
+                        await this.crypto.queryKeyBackupRateLimited(
+                            event.getRoomId()!,
+                            event.getWireContent().session_id!,
+                        );
+                        break;
+                    }
+                    case RustSdkCryptoJs.DecryptionErrorCode.MismatchedIdentityKeys: {
+                        jsError = new DecryptionError(
+                            "MISMATCHED_IDENTITY_KEYS",
+                            "Decryption failed because of mismatched identity keys of the sending device and those recorded in the to-device message",
+                            {
+                                session: content.sender_key + "|" + content.session_id,
+                            },
+                        );
+                        break;
+                    }
+                    default: {
+                        jsError = new DecryptionError("UNABLE_TO_DECRYPT", err.description, {
+                            session: content.sender_key + "|" + content.session_id,
+                        });
+                        break;
+                    }
+                }
+                throw jsError;
+            }
+            throw new DecryptionError("UNABLE_TO_DECRYPT", "Unknown error");
+        }
     }
 
     /**
@@ -1376,6 +1500,7 @@ class EventDecryptor {
         const senderKey = content.sender_key;
         const sessionId = content.session_id;
 
+        logger.log(`Add event to UTD pending list sender_key:${senderKey} session_id:${sessionId}`);
         const senderPendingEvents = this.eventsPendingKey.getOrCreate(senderKey);
         const sessionPendingEvents = senderPendingEvents.getOrCreate(sessionId);
         sessionPendingEvents.add(event);
@@ -1396,6 +1521,8 @@ class EventDecryptor {
         if (!sessionPendingEvents) return;
 
         sessionPendingEvents.delete(event);
+
+        logger.log(`Remove event to UTD pending list sender_key:${senderKey} session_id:${sessionId}`);
 
         // also clean up the higher-level maps if they are now empty
         if (sessionPendingEvents.size === 0) {
