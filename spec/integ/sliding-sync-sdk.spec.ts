@@ -188,7 +188,7 @@ describe("SlidingSyncSdk", () => {
                 [roomA]: {
                     name: "A",
                     required_state: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnStateEvent(EventType.RoomName, { name: "A" }, ""),
@@ -203,7 +203,7 @@ describe("SlidingSyncSdk", () => {
                     name: "B",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello B" }),
@@ -215,7 +215,7 @@ describe("SlidingSyncSdk", () => {
                     name: "C",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello C" }),
@@ -228,7 +228,7 @@ describe("SlidingSyncSdk", () => {
                     name: "D",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello D" }),
@@ -264,7 +264,7 @@ describe("SlidingSyncSdk", () => {
                 [roomF]: {
                     name: "#foo:localhost",
                     required_state: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnStateEvent(EventType.RoomCanonicalAlias, { alias: "#foo:localhost" }, ""),
@@ -280,7 +280,7 @@ describe("SlidingSyncSdk", () => {
                     name: "G",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     ],
@@ -292,7 +292,7 @@ describe("SlidingSyncSdk", () => {
                     name: "H",
                     required_state: [],
                     timeline: [
-                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                         mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "live event" }),
@@ -602,7 +602,7 @@ describe("SlidingSyncSdk", () => {
                 name: "Room with Invite",
                 required_state: [],
                 timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
@@ -718,7 +718,7 @@ describe("SlidingSyncSdk", () => {
                 name: "Room with account data",
                 required_state: [],
                 timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
@@ -922,7 +922,7 @@ describe("SlidingSyncSdk", () => {
                 name: "Room with typing",
                 required_state: [],
                 timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
@@ -963,7 +963,7 @@ describe("SlidingSyncSdk", () => {
                 name: "Room with typing",
                 required_state: [],
                 timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
@@ -1049,7 +1049,7 @@ describe("SlidingSyncSdk", () => {
                 name: "Room with receipts",
                 required_state: [],
                 timeline: [
-                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     {
