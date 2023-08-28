@@ -210,6 +210,8 @@ export class RoomWidgetClient extends MatrixClient {
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
+        this.matrixRTC.start();
+
         // Watch for TURN servers, if requested
         if (this.capabilities.turnServers) this.watchTurnServers();
     }
