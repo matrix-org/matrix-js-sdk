@@ -24,6 +24,7 @@ import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
+const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 
 export enum MatrixRTCSessionEvent {
@@ -288,7 +289,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
 
-        if (!needsUpdate) return;
+        if (!needsUpdate) {
+            // nothing to do - reschedule the check again
+            setTimeout(this.updateCallMembershipEvent, MEMBER_EVENT_CHECK_PERIOD);
+            return;
+        }
 
         const filterExpired = (m: CallMembershipData): boolean => {
             let membershipObj;
@@ -335,8 +340,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             );
             logger.info(`Sent updated call member event.`);
 
-            // check in 2 mins to see if we need to refresh our member event
-            if (this.isJoined()) resendDelay = 2 * 60 * 1000;
+            // check periodically to see if we need to refresh our member event
+            if (this.isJoined()) resendDelay = MEMBER_EVENT_CHECK_PERIOD;
         } catch (e) {
             resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
             logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
