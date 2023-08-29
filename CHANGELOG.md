@@ -1,5 +1,5 @@
-Changes in [28.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.0.0-rc.1) (2023-08-22)
-============================================================================================================
+Changes in [28.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.0.0) (2023-08-29)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Set minimum supported Matrix 1.1 version (drop legacy r0 versions) ([\#3007](https://github.com/matrix-org/matrix-js-sdk/pull/3007)). Fixes vector-im/element-web#16876.
