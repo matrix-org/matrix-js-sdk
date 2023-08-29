@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../logger";
 import { MatrixClient, ClientEvent } from "../client";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Room } from "../models/room";
+import { Room, RoomEvent } from "../models/room";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MatrixEvent } from "../models/event";
 import { MatrixRTCSession } from "./MatrixRTCSession";
@@ -56,9 +56,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.client.on(ClientEvent.Room, this.onRoom);
+        this.client.on(RoomEvent.Timeline, this.onTimeline);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
-        this.client.on(RoomStateEvent.NewMember, this.onRoomMembershipChange);
-        this.client.on(RoomStateEvent.NoLongerMember, this.onRoomMembershipChange);
     }
 
     public stop(): void {
@@ -68,9 +67,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.roomSessions.clear();
 
         this.client.removeListener(ClientEvent.Room, this.onRoom);
+        this.client.removeListener(RoomEvent.Timeline, this.onTimeline);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
-        this.client.removeListener(RoomStateEvent.NewMember, this.onRoomMembershipChange);
-        this.client.removeListener(RoomStateEvent.NoLongerMember, this.onRoomMembershipChange);
     }
 
     /**
@@ -102,6 +100,18 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
+    private onTimeline = (event: MatrixEvent): void => {
+        if (event.getType() !== EventType.CallEncryptionPrefix) return;
+
+        const room = this.client.getRoom(event.getRoomId());
+        if (!room) {
+            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
+            return;
+        }
+
+        this.getRoomSession(room).onCallEncryption(event);
+    };
+
     private onRoom = (room: Room): void => {
         this.refreshRoom(room);
     };
@@ -114,17 +124,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.refreshRoom(room);
-    };
-
-    private onRoomMembershipChange = async (event: MatrixEvent): Promise<void> => {
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) {
-            logger.error(`Got membership change for unknown room ${event.getRoomId()}!`);
-            return;
-        }
-
-        const session = this.getRoomSession(room);
-        await session.updateEncryptionKey();
     };
 
     private refreshRoom(room: Room): void {

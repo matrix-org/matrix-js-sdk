@@ -23,6 +23,8 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { randomString } from "../randomstring";
+import { MatrixEvent } from "../matrix";
+import { EncryptionKeyEventContent } from "./types";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -36,7 +38,7 @@ export enum MatrixRTCSessionEvent {
     // We joined or left the session (our own local idea of whether we are joined, separate from MembershipsChanged)
     JoinStateChanged = "join_state_changed",
     // The key used to encrypt media has changed
-    ActiveEncryptionKeyChanged = "active_encryption_key",
+    EncryptionKeyChanged = "encryption_key_changed",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -45,7 +47,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         newMemberships: CallMembership[],
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
-    [MatrixRTCSessionEvent.ActiveEncryptionKeyChanged]: (activeEncryptionKey: string) => void;
+    [MatrixRTCSessionEvent.EncryptionKeyChanged]: (key: string, userId: string, deviceId: string) => void;
 };
 
 /**
@@ -62,11 +64,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private activeFoci: Focus[] | undefined;
 
-    private _activeEncryptionKey?: string;
-    private activeEncryptionKeyEvent?: string;
+    private encryptMedia = false;
+    private _encryptionKeys = new Map<{ userId: string; deviceId: string }, string>();
 
-    public get activeEncryptionKey(): string | undefined {
-        return this._activeEncryptionKey;
+    public get encryptionKeys(): Map<{ userId: string; deviceId: string }, string> {
+        return new Map(this._encryptionKeys);
     }
 
     /**
@@ -94,7 +96,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
             for (const membershipData of eventMemberships) {
                 try {
-                    const membership = new CallMembership(room.client, memberEvent, membershipData);
+                    const membership = new CallMembership(memberEvent, membershipData);
 
                     if (membership.callId !== "" || membership.scope !== "m.room") {
                         // for now, just ignore anything that isn't the a room scope call
@@ -169,9 +171,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Joining call session in room ${this.room.roomId}`);
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
-        if (encryptMedia) {
-            await this.updateEncryptionKeyEvent();
-        }
+        this.encryptMedia = encryptMedia ?? false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         await this.updateCallMembershipEvent();
     }
@@ -191,24 +191,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
-        this.clearEncryptionKey();
+        this.encryptMedia = false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
         this.updateCallMembershipEvent();
-    }
-
-    /**
-     * Re-sends the encryption key room event and updates our member state event
-     * to link to it
-     */
-    public async updateEncryptionKey(): Promise<void> {
-        if (!this.isJoined()) {
-            logger.info(`Not joined to session in room ${this.room.roomId}: ignoring update encryption key`);
-            return;
-        }
-        if (!this._activeEncryptionKey) return;
-
-        await this.updateEncryptionKeyEvent();
-        await this.updateCallMembershipEvent();
     }
 
     /**
@@ -216,25 +201,24 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     private async updateEncryptionKeyEvent(): Promise<void> {
         if (!this.isJoined()) return;
+        if (!this.encryptMedia) return;
 
         logger.info(`MatrixRTCSession updating encryption key for room ${this.room.roomId}`);
 
-        this._activeEncryptionKey = getNewEncryptionKey();
-        this.activeEncryptionKeyEvent = (
-            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
-                "io.element.key": this._activeEncryptionKey,
-            })
-        ).event_id;
+        const encryptionKey = getNewEncryptionKey();
+        await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
+            "m.encryption_key": encryptionKey,
+            "m.device_id": this.client.getDeviceId(),
+        } as EncryptionKeyEventContent);
 
-        this.emit(MatrixRTCSessionEvent.ActiveEncryptionKeyChanged, this._activeEncryptionKey);
-    }
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
 
-    /**
-     * Delete info about our encryption key
-     */
-    private clearEncryptionKey(): void {
-        this._activeEncryptionKey = undefined;
-        this.activeEncryptionKeyEvent = undefined;
+        if (!userId) throw new Error("No userId");
+        if (!deviceId) throw new Error("No deviceId");
+
+        this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
     }
 
     /**
@@ -263,6 +247,26 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.memberships[0];
     }
 
+    public onCallEncryption = (event: MatrixEvent): void => {
+        const userId = event.getSender();
+        const content = event.getContent<EncryptionKeyEventContent>();
+        const encryptionKey = content["m.encryption_key"];
+        const deviceId = content["m.device_id"];
+
+        if (
+            !userId ||
+            !deviceId ||
+            !encryptionKey ||
+            typeof deviceId !== "string" ||
+            typeof encryptionKey !== "string"
+        ) {
+            throw new Error("Malformed m.call.encryption_key");
+        }
+
+        this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
+    };
+
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
@@ -274,6 +278,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (changed) {
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+        }
+
+        const ts = (m: CallMembership): string => `${m.member.userId}:${m.deviceId}`;
+        const callMembersChanged = new Set(oldMemberships.map(ts)) !== new Set(this.memberships.map(ts));
+
+        if (callMembersChanged && this.isJoined()) {
+            this.updateEncryptionKeyEvent();
         }
 
         this.setExpiryTimer();
@@ -297,7 +308,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             foci_active: this.activeFoci,
         };
 
-        if (this.activeEncryptionKeyEvent) m.encryption_key_event = this.activeEncryptionKeyEvent;
         if (prevMembership) m.created_ts = prevMembership.createdTs();
 
         return m;
@@ -325,7 +335,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         let myPrevMembership;
         try {
             if (myCallMemberEvent && myPrevMembershipData) {
-                myPrevMembership = new CallMembership(this.client, myCallMemberEvent, myPrevMembershipData);
+                myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
             }
         } catch (e) {
             // This would indicate a bug or something weird if our own call membership
@@ -357,7 +367,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const filterExpired = (m: CallMembershipData): boolean => {
             let membershipObj;
             try {
-                membershipObj = new CallMembership(this.client, myCallMemberEvent!, m);
+                membershipObj = new CallMembership(myCallMemberEvent!, m);
             } catch (e) {
                 return false;
             }
