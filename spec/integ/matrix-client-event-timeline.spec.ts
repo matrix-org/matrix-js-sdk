@@ -107,9 +107,7 @@ const INITIAL_SYNC_DATA = {
                         utils.mkEvent({
                             type: "m.room.create",
                             user: userId,
-                            content: {
-                                creator: userId,
-                            },
+                            content: {},
                             event: false,
                         }),
                     ],

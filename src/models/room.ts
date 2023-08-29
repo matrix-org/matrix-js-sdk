@@ -569,7 +569,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        return createEvent?.getContent()["creator"] ?? null;
+        return createEvent?.getSender() ?? null;
     }
 
     /**

@@ -15,12 +15,11 @@ limitations under the License.
 */
 
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import { MatrixEvent } from "../models/event";
+import { IClearEvent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
-import { IEventDecryptionResult } from "../@types/crypto";
 
 /**
  * Common interface for the crypto implementations
@@ -71,7 +70,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns a promise which resolves once we have finished decrypting.
      * Rejects with an error if there is a problem decrypting the event.
      */
-    decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+    decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult>;
 
     /**
      * Get information about the encryption of an event
@@ -181,4 +180,32 @@ export interface OnSyncCompletedData {
  */
 export interface CheckOwnCrossSigningTrustOpts {
     allowPrivateKeyRequests?: boolean;
+}
+
+/**
+ * The result of a (successful) call to {@link CryptoBackend.decryptEvent}
+ */
+export interface EventDecryptionResult {
+    /**
+     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
+     */
+    clearEvent: IClearEvent;
+    /**
+     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
+     */
+    forwardingCurve25519KeyChain?: string[];
+    /**
+     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
+     */
+    senderCurve25519Key?: string;
+    /**
+     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
+     */
+    claimedEd25519Key?: string;
+    untrusted?: boolean;
+    /**
+     * The sender doesn't authorize the unverified devices to decrypt his messages
+     */
+    encryptedDisabledForUnverifiedDevices?: boolean;
 }
