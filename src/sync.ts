@@ -1604,7 +1604,13 @@ export class SyncApi {
                     success();
                 },
                 (err) => {
-                    if (err.httpStatus == 400 || err.httpStatus == 404) {
+                    if (err.name === "AbortError") {
+                        clearTimeout(this.keepAliveTimer);
+                        if (this.connectionReturnedDefer) {
+                            this.connectionReturnedDefer.reject();
+                            this.connectionReturnedDefer = undefined;
+                        }
+                    } else if (err.httpStatus == 400 || err.httpStatus == 404) {
                         // treat this as a success because the server probably just doesn't
                         // support /versions: point is, we're getting a response.
                         // We wait a short time though, just in case somehow the server
