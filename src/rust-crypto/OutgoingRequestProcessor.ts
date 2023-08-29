@@ -108,9 +108,12 @@ export class OutgoingRequestProcessor {
             try {
                 await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
             } catch (e) {
-                // Ignore "Attempt to use moved value" errors. The most likely cause is that olmMachine has been
-                // stopped and frees, so we have nowhere to report the success of our call to.
-                if (e instanceof Error && e.message === "Attempt to use a moved value") {
+                // Ignore errors which are caused by the olmMachine having been freed. The exact error message depends
+                // on whether we are using a release or develop build of rust-sdk-crypto-wasm.
+                if (
+                    e instanceof Error &&
+                    (e.message === "Attempt to use a moved value" || e.message === "null pointer passed to rust")
+                ) {
                     logger.log(`Ignoring error '${e.message}': client is likely shutting down`);
                 } else {
                     throw e;
