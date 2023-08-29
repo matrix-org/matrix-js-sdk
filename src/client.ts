@@ -3352,19 +3352,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Deletes any existing key backup and then recreates a new one.
-     * The 4S will be updated in order to stay in sync and have the new
-     * secrets stored.
-     */
-    public async resetKeyBackup(): Promise<void> {
-        if (!this.cryptoBackend) {
-            throw new Error("End-to-end encryption disabled");
-        }
-
-        await this.cryptoBackend!.resetKeyBackup();
-    }
-
-    /**
      * Set up the data required to create a new backup version.  The backup version
      * will not be created and enabled until createKeyBackupVersion is called.
      *
