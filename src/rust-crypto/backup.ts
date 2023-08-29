@@ -26,18 +26,21 @@ import { encodeUri } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 
+/**
+ * prepareKeyBackupVersion result.
+ */
 interface PreparedKeyBackupVersion {
+    /** The prepared algorithm version */
     algorithm: string;
+    /** The auth data of the algorithm */
     /* eslint-disable-next-line camelcase */
     auth_data: AuthData;
+    /** The generated private key */
     decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
 }
 
+/** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
-
-interface BackupCreateResponse {
-    version: string;
-}
 
 /**
  * Holds information of a created keybackup.
@@ -326,7 +329,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const version = await this.prepareKeyBackupVersion();
         await signer(version.auth_data);
 
-        const res = await this.http.authedRequest<BackupCreateResponse>(
+        const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
@@ -379,7 +382,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Prepare the keybackup version data, auth_data not signed at this point
-     * @returns P
+     * @returns a {@link PreparedKeyBackupVersion} with all information about the creation.
      */
     private async prepareKeyBackupVersion(): Promise<PreparedKeyBackupVersion> {
         const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
