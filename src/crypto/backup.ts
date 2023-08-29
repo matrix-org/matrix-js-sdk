@@ -233,12 +233,12 @@ export class BackupManager {
         let current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
         while (current != null) {
             await this.deleteKeyBackupVersion(current);
+            this.disableKeyBackup();
             current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
         }
     }
 
     public async deleteKeyBackupVersion(version: string): Promise<void> {
-        this.disableKeyBackup();
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.baseApis.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,

@@ -371,7 +371,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         logger.debug(`deleteKeyBackupVersion v:${version}`);
-        await this.disableKeyBackup();
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
