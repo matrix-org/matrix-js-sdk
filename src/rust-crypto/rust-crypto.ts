@@ -251,7 +251,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
         const rustTrackedUser = Array.from(rustTrackedUsers).find((rustUserId) => userId === rustUserId.toString());
 
-        if (rustTrackedUser) {
+        if (rustTrackedUser !== undefined) {
             /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
              * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
              */

@@ -39,15 +39,16 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * Check if the cross signing keys for the user are available.
+     * Check if the given user has published cross-signing keys.
      *
      * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
-     * - If the user is not tracked locally and downloadUncached is set at true,
+     * - If the user is not tracked locally and downloadUncached is set to true,
      *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
      * - Otherwise, return false
      *
-     * @param userId - the user ID to check
-     * @param downloadUncached - If true, download the cross signing keys.
+     * @param userId - the user ID to check. Defaults to the local user.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case `false` will be returned for such users.
      *
      * @returns true if the cross signing keys are available.
      */
