@@ -244,38 +244,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public globalBlacklistUnverifiedDevices = false;
 
-    /**
-     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
-     */
-    public async userHasCrossSigningKeys(userId = this.userId, downloadUncached = false): Promise<boolean> {
-        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
-        const rustTrackedUser = Array.from(rustTrackedUsers).find((rustUserId) => userId === rustUserId.toString());
-
-        if (rustTrackedUser !== undefined) {
-            /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
-             * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
-             */
-            const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
-            await this.outgoingRequestProcessor.makeOutgoingRequest(request);
-            const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
-            return userIdentity !== undefined;
-        } else if (downloadUncached) {
-            // Download the cross signing keys and check if the master key is available
-            const keyResult = await this.downloadDeviceList(new Set([userId]));
-            const keys = keyResult.master_keys?.[userId];
-
-            // No master key
-            if (!keys) return false;
-
-            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-            // We assume only a single key, and we want the bare form without type
-            // prefix, so we select the values.
-            return Boolean(Object.values(keys.keys)[0]);
-        } else {
-            return false;
-        }
-    }
-
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 
@@ -305,6 +273,47 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             };
             opts?.progressCallback?.(importOpt);
         });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
+     */
+    public async userHasCrossSigningKeys(userId = this.userId, downloadUncached = false): Promise<boolean> {
+        // TODO: could probably do with a more efficient way of doing this than returning the whole set and searching
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        let rustTrackedUser: RustSdkCryptoJs.UserId | undefined;
+        for (const u of rustTrackedUsers) {
+            if (userId === u.toString()) {
+                rustTrackedUser = u;
+                break;
+            }
+        }
+
+        if (rustTrackedUser !== undefined) {
+            if (userId === this.userId) {
+                /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
+                 * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
+                 */
+                const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
+                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+            }
+            const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            return userIdentity !== undefined;
+        } else if (downloadUncached) {
+            // Download the cross signing keys and check if the master key is available
+            const keyResult = await this.downloadDeviceList(new Set([userId]));
+            const keys = keyResult.master_keys?.[userId];
+
+            // No master key
+            if (!keys) return false;
+
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Boolean(Object.values(keys.keys)[0]);
+        } else {
+            return false;
+        }
     }
 
     /**
