@@ -57,7 +57,7 @@ export class KeySignatureUploadError extends Error {
  *
  * This error will be thrown if you attempt to do so.
  *
- * `MatrixClient#stopClient` itself is an exception to this: it may safely be called multiple times on the same
+ * {@link MatrixClient#stopClient} itself is an exception to this: it may safely be called multiple times on the same
  * instance.
  */
 export class ClientStoppedError extends Error {

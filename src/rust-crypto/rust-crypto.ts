@@ -144,7 +144,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
      *
-     * @throws {@link ClientStoppedError} if {@link RustCrypto#stop} has been called.
+     * @throws ClientStoppedError if {@link RustCrypto#stop} has been called.
      */
     private getOlmMachineOrThrow(): RustSdkCryptoJs.OlmMachine {
         if (this.stopped) {
