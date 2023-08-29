@@ -59,6 +59,7 @@ class MockWidgetApi extends EventEmitter {
     public requestOpenIDConnectToken = jest.fn(() => testOIDCToken);
     public readStateEvents = jest.fn(() => []);
     public getTurnServers = jest.fn(() => []);
+    public sendContentLoaded = jest.fn();
 
     public transport = { reply: jest.fn() };
 }
