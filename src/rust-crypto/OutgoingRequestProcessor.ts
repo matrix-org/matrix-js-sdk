@@ -105,7 +105,17 @@ export class OutgoingRequestProcessor {
         }
 
         if (msg.id) {
-            await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
+            try {
+                await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
+            } catch (e) {
+                // Ignore "Attempt to use moved value" errors. The most likely cause is that olmMachine has been
+                // stopped and frees, so we have nowhere to report the success of our call to.
+                if (e instanceof Error && e.message === "Attempt to use a moved value") {
+                    logger.log(`Ignoring error '${e.message}': client is likely shutting down`);
+                } else {
+                    throw e;
+                }
+            }
         }
     }
 
