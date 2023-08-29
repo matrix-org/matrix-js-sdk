@@ -3341,7 +3341,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Disable backing up of keys.
-     * @deprecated There is no public API to disabled backup, delete it if needed
+     * @deprecated It should be unnecessary to disable key backup.
      */
     public disableKeyBackup(): void {
         if (!this.crypto) {
@@ -3351,6 +3351,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.crypto.backupManager.disableKeyBackup();
     }
 
+    /**
+     * Deletes any existing key backup and then recreates a new one.
+     * The 4S will be updated in order to stay in sync and have the new
+     * secrets stored.
+     */
     public async resetKeyBackup(): Promise<void> {
         if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");

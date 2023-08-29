@@ -28,7 +28,7 @@ import { sleep } from "../utils";
 
 interface PreparedKeyBackupVersion {
     algorithm: string;
-    /* eslint-disable camelcase */
+    /* eslint-disable-next-line camelcase */
     auth_data: AuthData;
     decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
 }
@@ -41,9 +41,9 @@ interface BackupCreateResponse {
 
 /**
  * Holds information of a created keybackup.
- * Usefull to get the generated private key material and save it securely somewhere.
+ * Useful to get the generated private key material and save it securely somewhere.
  */
-export interface KeyBackupCreationInfo {
+interface KeyBackupCreationInfo {
     version: string;
     algorithm: string;
     authData: AuthData;
@@ -307,7 +307,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Creates a new key backup by generating a new random pivate key.
+     * Creates a new key backup by generating a new random private key.
      * If there is an existing backup server side it will be deleted and replaced
      * by the new one.
      *

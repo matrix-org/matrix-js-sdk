@@ -226,9 +226,10 @@ export interface CryptoApi {
     bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
 
     /**
-     * Creates a new keybackup.
-     * If there are existing keybackups they will be replaced.
-     * The decryption key will be saved in Secret Storage and the backup engine will be started.
+     * Creates a new key backup version.
+     * If there are existing backups they will be replaced.
+     * The decryption key will be saved in Secret Storage (will prompt for passphrase/key if neeeded)
+     * and the backup engine will be started.
      */
     resetKeyBackup(): Promise<void>;
 

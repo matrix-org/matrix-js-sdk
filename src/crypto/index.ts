@@ -543,6 +543,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
+    /**
+     * Deletes the given backup.
+     * @param version - The version to deleted.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         await this.backupManager.deleteKeyBackupVersion(version);
     }
