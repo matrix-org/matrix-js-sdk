@@ -460,6 +460,23 @@ describe("RustCrypto", () => {
 
             await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
         });
+
+        it("returns true if the user is untracked, downloadUncached is set at true and the cross-signing keys are available", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.BOB_TEST_USER_ID]: {
+                        [testData.BOB_TEST_DEVICE_ID]: testData.BOB_SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+                ...testData.BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
+            });
+
+            await expect(rustCrypto.userHasCrossSigningKeys(testData.BOB_TEST_USER_ID, true)).resolves.toBe(true);
+        });
+
+        it("returns false if the user is unknown", async () => {
+            await expect(rustCrypto.userHasCrossSigningKeys(testData.BOB_TEST_USER_ID)).resolves.toBe(false);
+        });
     });
 
     describe("createRecoveryKeyFromPassphrase", () => {
