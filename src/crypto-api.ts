@@ -39,16 +39,6 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * Checks if the user has previously published cross-signing keys
-     *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
-     *
-     * @returns true if the user has previously published cross-signing keys
-     */
-    userHasCrossSigningKeys(): Promise<boolean>;
-
-    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
@@ -87,6 +77,22 @@ export interface CryptoApi {
      * @returns a promise which resolves once the keys have been imported
      */
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
+
+    /**
+     * Check if the given user has published cross-signing keys.
+     *
+     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is not tracked locally and downloadUncached is set to true,
+     *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
+     * - Otherwise, return false
+     *
+     * @param userId - the user ID to check. Defaults to the local user.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case `false` will be returned for such users.
+     *
+     * @returns true if the cross signing keys are available.
+     */
+    userHasCrossSigningKeys(userId?: string, downloadUncached?: boolean): Promise<boolean>;
 
     /**
      * Get the device information for the given list of users.

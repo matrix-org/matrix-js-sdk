@@ -25,7 +25,16 @@ import Olm from "@matrix-org/olm";
 import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
 import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { TEST_ROOM_ID, TEST_ROOM_ID as ROOM_ID, TEST_USER_ID } from "../../test-utils/test-data";
+import {
+    BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
+    BOB_SIGNED_TEST_DEVICE_DATA,
+    BOB_TEST_USER_ID,
+    SIGNED_CROSS_SIGNING_KEYS_DATA,
+    SIGNED_TEST_DEVICE_DATA,
+    TEST_ROOM_ID,
+    TEST_ROOM_ID as ROOM_ID,
+    TEST_USER_ID,
+} from "../../test-utils/test-data";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
@@ -36,6 +45,7 @@ import {
     IDownloadKeyResult,
     IEvent,
     IndexedDBCryptoStore,
+    IRoomEvent,
     IStartClientOpts,
     MatrixClient,
     MatrixEvent,
@@ -44,7 +54,6 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
-    IRoomEvent,
     CryptoEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
@@ -2741,5 +2750,47 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(request).not.toBeDefined();
             },
         );
+    });
+
+    describe("Check if the cross signing keys are available for a user", () => {
+        beforeEach(async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+
+            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
+            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
+
+        it("Cross signing keys are available for an untracked user with cross signing keys on the homeserver", async () => {
+            // Needed for old crypto, download and cache locally the cross signing keys of Bob
+            await aliceClient.getCrypto()?.getUserDeviceInfo([BOB_TEST_USER_ID], true);
+
+            const hasCrossSigningKeysForUser = await aliceClient
+                .getCrypto()!
+                .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+        });
+
+        it("Cross signing keys are available for a tracked user", async () => {
+            // Process Alice keys, old crypto has a sleep(5ms) during the process
+            await jest.advanceTimersByTimeAsync(5);
+            await flushPromises();
+
+            // Alice is the local user and should be tracked !
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+        });
+
+        it("Cross signing keys are not available for an unknown user", async () => {
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
+            expect(hasCrossSigningKeysForUser).toBe(false);
+        });
     });
 });

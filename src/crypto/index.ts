@@ -709,9 +709,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @internal
      */
-    public async userHasCrossSigningKeys(): Promise<boolean> {
-        await this.downloadKeys([this.userId]);
-        return this.deviceList.getStoredCrossSigningForUser(this.userId) !== null;
+    public async userHasCrossSigningKeys(userId = this.userId): Promise<boolean> {
+        await this.downloadKeys([userId]);
+        return this.deviceList.getStoredCrossSigningForUser(userId) !== null;
     }
 
     /**
