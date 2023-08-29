@@ -144,6 +144,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             onCrossSigningKeysImport,
         );
     }
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         await this.backupManager.deleteKeyBackupVersion(version);
     }

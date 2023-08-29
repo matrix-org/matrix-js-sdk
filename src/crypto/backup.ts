@@ -238,6 +238,11 @@ export class BackupManager {
         }
     }
 
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.baseApis.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
