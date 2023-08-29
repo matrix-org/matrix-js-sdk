@@ -320,7 +320,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     public async setUpKeyBackup(signer: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
         // check first if there is an existing backup
-        // TODO should it be an option? like if there is already a backup we throw unless it's forced?
         if (this.activeBackupVersion || (await this.requestKeyBackupVersion()) != null) {
             // we want to delete?
             await this.deleteKeyBackup();
