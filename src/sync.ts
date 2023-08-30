@@ -1604,7 +1604,7 @@ export class SyncApi {
                     success();
                 },
                 (err) => {
-                    if (err.name === "AbortError") {
+                    if (!this.running) {
                         clearTimeout(this.keepAliveTimer);
                         if (this.connectionReturnedDefer) {
                             this.connectionReturnedDefer.reject();
