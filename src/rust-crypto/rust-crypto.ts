@@ -62,6 +62,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
+import { ClientStoppedError } from "../errors";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -136,6 +137,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretStorage,
             onCrossSigningKeysImport,
         );
+    }
+
+    /**
+     * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link RustCrypto#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): RustSdkCryptoJs.OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -635,16 +650,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.getOlmMachineOrThrow().getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
+
         const publicKeysOnDevice =
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
         const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
-            await this.olmMachine.crossSigningStatus();
+            await this.getOlmMachineOrThrow().crossSigningStatus();
 
         return {
             publicKeysOnDevice,
