@@ -150,6 +150,44 @@ describe("RustCrypto", () => {
         await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
     });
 
+    describe("getCrossSigningStatus", () => {
+        it("returns sensible values on a default client", async () => {
+            const secretStorage = {
+                isStored: jest.fn().mockResolvedValue(null),
+            } as unknown as Mocked<ServerSideSecretStorage>;
+            const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
+
+            const result = await rustCrypto.getCrossSigningStatus();
+
+            expect(secretStorage.isStored).toHaveBeenCalledWith("m.cross_signing.master");
+            expect(result).toEqual({
+                privateKeysCachedLocally: {
+                    masterKey: false,
+                    selfSigningKey: false,
+                    userSigningKey: false,
+                },
+                privateKeysInSecretStorage: false,
+                publicKeysOnDevice: false,
+            });
+        });
+
+        it("throws if `stop` is called mid-call", async () => {
+            const secretStorage = {
+                isStored: jest.fn().mockResolvedValue(null),
+            } as unknown as Mocked<ServerSideSecretStorage>;
+            const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
+
+            // start the call off
+            const result = rustCrypto.getCrossSigningStatus();
+
+            // call `.stop`
+            rustCrypto.stop();
+
+            // getCrossSigningStatus should abort
+            await expect(result).rejects.toEqual(new Error("MatrixClient has been stopped"));
+        });
+    });
+
     it("bootstrapCrossSigning delegates to CrossSigningIdentity", async () => {
         const rustCrypto = await makeTestRustCrypto();
         const mockCrossSigningIdentity = {
@@ -459,6 +497,23 @@ describe("RustCrypto", () => {
             });
 
             await expect(rustCrypto.userHasCrossSigningKeys()).resolves.toBe(true);
+        });
+
+        it("returns true if the user is untracked, downloadUncached is set at true and the cross-signing keys are available", async () => {
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.BOB_TEST_USER_ID]: {
+                        [testData.BOB_TEST_DEVICE_ID]: testData.BOB_SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+                ...testData.BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
+            });
+
+            await expect(rustCrypto.userHasCrossSigningKeys(testData.BOB_TEST_USER_ID, true)).resolves.toBe(true);
+        });
+
+        it("returns false if the user is unknown", async () => {
+            await expect(rustCrypto.userHasCrossSigningKeys(testData.BOB_TEST_USER_ID)).resolves.toBe(false);
         });
     });
 

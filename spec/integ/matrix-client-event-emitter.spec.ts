@@ -92,9 +92,7 @@ describe("MatrixClient events", function () {
                                     type: "m.room.create",
                                     room: "!erufh:bar",
                                     user: "@foo:bar",
-                                    content: {
-                                        creator: "@foo:bar",
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },

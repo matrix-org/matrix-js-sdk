@@ -62,6 +62,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
+import { ClientStoppedError } from "../errors";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -136,6 +137,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretStorage,
             onCrossSigningKeysImport,
         );
+    }
+
+    /**
+     * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link RustCrypto#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): RustSdkCryptoJs.OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -244,20 +259,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public globalBlacklistUnverifiedDevices = false;
 
-    /**
-     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
-     */
-    public async userHasCrossSigningKeys(): Promise<boolean> {
-        const userId = new RustSdkCryptoJs.UserId(this.userId);
-        /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
-         * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
-         */
-        const request = this.olmMachine.queryKeysForUsers([userId]);
-        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
-        const userIdentity = await this.olmMachine.getIdentity(userId);
-        return userIdentity !== undefined;
-    }
-
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 
@@ -287,6 +288,47 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             };
             opts?.progressCallback?.(importOpt);
         });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi.userHasCrossSigningKeys}.
+     */
+    public async userHasCrossSigningKeys(userId = this.userId, downloadUncached = false): Promise<boolean> {
+        // TODO: could probably do with a more efficient way of doing this than returning the whole set and searching
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        let rustTrackedUser: RustSdkCryptoJs.UserId | undefined;
+        for (const u of rustTrackedUsers) {
+            if (userId === u.toString()) {
+                rustTrackedUser = u;
+                break;
+            }
+        }
+
+        if (rustTrackedUser !== undefined) {
+            if (userId === this.userId) {
+                /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
+                 * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
+                 */
+                const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
+                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+            }
+            const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            return userIdentity !== undefined;
+        } else if (downloadUncached) {
+            // Download the cross signing keys and check if the master key is available
+            const keyResult = await this.downloadDeviceList(new Set([userId]));
+            const keys = keyResult.master_keys?.[userId];
+
+            // No master key
+            if (!keys) return false;
+
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Boolean(Object.values(keys.keys)[0]);
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -608,16 +650,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.getOlmMachineOrThrow().getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
+
         const publicKeysOnDevice =
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
         const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
-            await this.olmMachine.crossSigningStatus();
+            await this.getOlmMachineOrThrow().crossSigningStatus();
 
         return {
             publicKeysOnDevice,
