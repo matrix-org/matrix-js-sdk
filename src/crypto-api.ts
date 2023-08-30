@@ -170,6 +170,8 @@ export interface CryptoApi {
      * return true.
      *
      * @returns True if cross-signing is ready to be used on this device
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     isCrossSigningReady(): Promise<boolean>;
 
@@ -249,7 +251,10 @@ export interface CryptoApi {
     /**
      * Get the status of our cross-signing keys.
      *
-     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
+     * whether the private keys are in secret storage.
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 

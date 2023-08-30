@@ -29,8 +29,9 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, UIAuthCallback } from "../../../src";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, MatrixHttpApi, UIAuthCallback } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { defer } from "../../../src/utils";
 
 describe("OutgoingRequestProcessor", () => {
     /** the OutgoingRequestProcessor implementation under test */
@@ -217,5 +218,41 @@ describe("OutgoingRequestProcessor", () => {
         const markSentCallPromise = awaitCallToMarkAsSent();
         await Promise.all([processor.makeOutgoingRequest(outgoingRequest), markSentCallPromise]);
         expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("5678", 987, "");
+    });
+
+    it("does not explode if the OlmMachine is stopped while the request is in flight", async () => {
+        // we use a real olm machine for this test
+        const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
+            new RustSdkCryptoJs.UserId("@alice:example.com"),
+            new RustSdkCryptoJs.DeviceId("TEST_DEVICE"),
+        );
+
+        const authRequestResultDefer = defer<string>();
+
+        const authRequestCalledPromise = new Promise<void>((resolve) => {
+            const mockHttpApi = {
+                authedRequest: async () => {
+                    resolve();
+                    return await authRequestResultDefer.promise;
+                },
+            } as unknown as Mocked<MatrixHttpApi<IHttpOpts & { onlyData: true }>>;
+            processor = new OutgoingRequestProcessor(olmMachine, mockHttpApi);
+        });
+
+        // build a request
+        const request = olmMachine.queryKeysForUsers([new RustSdkCryptoJs.UserId("@bob:example.com")]);
+        const result = processor.makeOutgoingRequest(request);
+
+        // wait for the HTTP request to be made
+        await authRequestCalledPromise;
+
+        // while the HTTP request is in flight, the OlmMachine gets stopped.
+        olmMachine.close();
+
+        // the HTTP request completes...
+        authRequestResultDefer.resolve("{}");
+
+        // ... and `makeOutgoingRequest` resolves satisfactorily
+        await result;
     });
 });
