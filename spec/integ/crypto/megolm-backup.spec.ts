@@ -219,10 +219,48 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
+            let onKeyCached: () => void;
+            const awaitKeyCached = new Promise<void>((resolve) => {
+                onKeyCached = resolve;
+            });
+
             const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
                 testData.BACKUP_DECRYPTION_KEY_BASE58,
                 undefined,
                 undefined,
+                check!.backupInfo!,
+                {
+                    cacheCompleteCallback: () => onKeyCached(),
+                },
+            );
+
+            expect(result.imported).toStrictEqual(1);
+
+            await awaitKeyCached;
+        });
+
+        it("recover specific session from backup", async function () {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                testData.CURVE25519_KEY_BACKUP_DATA,
+            );
+
+            const check = await aliceCrypto.checkKeyBackupAndEnable();
+
+            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
+                testData.BACKUP_DECRYPTION_KEY_BASE58,
+                ROOM_ID,
+                testData.MEGOLM_SESSION_DATA.session_id,
                 check!.backupInfo!,
             );
 
