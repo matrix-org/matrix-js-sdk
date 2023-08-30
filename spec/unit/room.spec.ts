@@ -1202,6 +1202,21 @@ describe("Room", function () {
                 room.recalculate();
                 expect(room.name).toEqual("Empty room");
             });
+
+            it("emits an update event", function () {
+                const spy = jest.fn();
+                const summary = {
+                    "m.heroes": [],
+                    "m.invited_member_count": 1,
+                };
+
+                room.once(RoomEvent.Summary, spy);
+
+                room.setSummary(summary);
+                room.recalculate();
+
+                expect(spy).toHaveBeenCalledWith(summary);
+            });
         });
 
         describe("Room.recalculate => Room Name", function () {
