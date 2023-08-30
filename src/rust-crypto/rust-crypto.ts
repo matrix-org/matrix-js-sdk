@@ -1424,7 +1424,6 @@ class EventDecryptor {
             // We need to map back to regular decryption errors (used for analytics for example)
             // The DecryptionErrors are used by react-sdk so is implicitly part of API, but poorly typed
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
-                logger.log(`HELLO failed to decrypt ${err.code}, ${err.description}`);
                 const content = event.getWireContent();
                 let jsError;
                 switch (err.code) {
@@ -1447,10 +1446,7 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        await this.crypto.queryKeyBackupRateLimited(
-                            event.getRoomId()!,
-                            event.getWireContent().session_id!,
-                        );
+                        this.crypto.queryKeyBackupRateLimited(event.getRoomId()!, event.getWireContent().session_id!);
                         break;
                     }
                     case RustSdkCryptoJs.DecryptionErrorCode.MismatchedIdentityKeys: {
