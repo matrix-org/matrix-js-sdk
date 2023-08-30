@@ -179,6 +179,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 prefix: ClientPrefix.V3,
             });
 
+            if (this.stopped) return;
+
             const backupDecryptor = new RustBackupDecryptor(backupKeys.decryptionKey);
             if (res) {
                 const sessionsToImport: Record<string, IKeyBackupSession> = {};

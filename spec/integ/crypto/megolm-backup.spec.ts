@@ -193,6 +193,78 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
     });
 
+    describe("recover from backup", () => {
+        it("can restore from backup (Curve25519 version)", async function () {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            const fullBackup = {
+                rooms: {
+                    [ROOM_ID]: {
+                        sessions: {
+                            [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
+                        },
+                    },
+                },
+            };
+
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+            const check = await aliceCrypto.checkKeyBackupAndEnable();
+
+            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
+                testData.BACKUP_DECRYPTION_KEY_BASE58,
+                undefined,
+                undefined,
+                check!.backupInfo!,
+            );
+
+            expect(result.imported).toStrictEqual(1);
+        });
+
+        it("Fails on bad recovery key", async function () {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            const fullBackup = {
+                rooms: {
+                    [ROOM_ID]: {
+                        sessions: {
+                            [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
+                        },
+                    },
+                },
+            };
+
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+            const check = await aliceCrypto.checkKeyBackupAndEnable();
+
+            await expect(
+                aliceClient.restoreKeyBackupWithRecoveryKey(
+                    "EsTx A7Xn aNFF k3jH zpV3 MQoN LJEg mscC HecF 982L wC77 mYQD",
+                    undefined,
+                    undefined,
+                    check!.backupInfo!,
+                ),
+            ).rejects.toThrow();
+        });
+    });
+
     describe("backupLoop", () => {
         it("Alice should upload known keys when backup is enabled", async function () {
             // 404 means that there is no active backup

@@ -106,6 +106,9 @@ export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
 /** base64-encoded backup decryption (private) key */
 export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
+/** Backup decryption key in export format */
+export const BACKUP_DECRYPTION_KEY_BASE58 = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
+
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
 export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
     "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
@@ -308,6 +311,9 @@ export const BOB_SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
 
 /** base64-encoded backup decryption (private) key */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Backup decryption key in export format */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
 
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
 export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {

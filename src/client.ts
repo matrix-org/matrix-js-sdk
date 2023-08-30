@@ -3465,9 +3465,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         await this.cryptoBackend!.deleteKeyBackupVersion(version);
     }
 
-    private makeKeyBackupPath(roomId: undefined, sessionId: undefined, version?: string): IKeyBackupPath;
-    private makeKeyBackupPath(roomId: string, sessionId: undefined, version?: string): IKeyBackupPath;
-    private makeKeyBackupPath(roomId: string, sessionId: string, version?: string): IKeyBackupPath;
     private makeKeyBackupPath(roomId?: string, sessionId?: string, version?: string): IKeyBackupPath {
         let path: string;
         if (sessionId !== undefined) {
@@ -3652,7 +3649,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         targetSessionId?: string,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
         const storedKey = await this.secretStorage.get("m.megolm_backup.v1");
@@ -3787,24 +3784,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let totalKeyCount = 0;
         let keys: IMegolmSessionData[] = [];
 
-        const path = this.makeKeyBackupPath(targetRoomId!, targetSessionId!, backupInfo.version);
+        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
         const backupDecryptor = await this.cryptoBackend!.getBackupDecryptor(backupInfo, privKey);
-
-        const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {
-            return privKey;
-        });
 
         const untrusted = !backupDecryptor.sourceTrusted;
 
         try {
-            // If the pubkey computed from the private data we've been given
-            // doesn't match the one in the auth_data, the user has entered
-            // a different recovery key / the wrong passphrase.
-            // if (!(await algorithm.keyMatches(privKey))) {
-            //     return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
-            // }
-
             if (!(privKey instanceof Uint8Array)) {
                 // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 throw new Error(`restoreKeyBackup expects Uint8Array, got ${privKey}`);
@@ -3865,7 +3851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
             }
         } finally {
-            algorithm.free();
+            backupDecryptor.free();
         }
 
         await this.cryptoBackend.importRoomKeys(keys, {
@@ -3874,8 +3860,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             source: "backup",
         });
 
-        /// XXX why?
-        await this.checkKeyBackup();
+        /// in case entering the passphrase would add a new signature?
+        await this.cryptoBackend.checkKeyBackupAndEnable();
 
         return { total: totalKeyCount, imported: keys.length };
     }

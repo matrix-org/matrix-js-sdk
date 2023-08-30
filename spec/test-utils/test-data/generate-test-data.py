@@ -20,12 +20,13 @@ This file is a Python script to generate test data for crypto tests.
 To run it:
 
 python -m venv env
-./env/bin/pip install cryptography canonicaljson
+./env/bin/pip install cryptography canonicaljson base58
 ./env/bin/python generate-test-data.py > index.ts
 """
 
 import base64
 import json
+import base58
 
 from canonicaljson import encode_canonical_json
 from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
@@ -204,6 +205,8 @@ def build_test_data(user_data, prefix = "") -> str:
 
     clear_event, encrypted_event = generate_encrypted_event_content(additional_exported_room_key, additional_exported_ed_key, device_curve_key)
 
+    backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
+
     return f"""\
 export const {prefix}TEST_USER_ID = "{user_data['TEST_USER_ID']}";
 export const {prefix}TEST_DEVICE_ID = "{user_data['TEST_DEVICE_ID']}";
@@ -240,6 +243,9 @@ export const {prefix}SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult>
 
 /** base64-encoded backup decryption (private) key */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
+
+/** Backup decryption key in export format */
+export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
 
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
@@ -560,6 +566,35 @@ def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519
     }
 
     return clear_event, encrypted_event
+
+
+def export_recovery_key(key_b64: str) -> str:
+    """
+        Export a private recovery key as a recovery key that can be presented
+        to users.
+    """
+    private_key_bytes = base64.b64decode(key_b64)
+
+    # The 256-bit curve25519 private key is prepended by the bytes 0x8B and 0x01
+    export_bytes = bytearray()
+    export_bytes += b'\x8b'
+    export_bytes += b'\x01'
+
+    export_bytes += private_key_bytes
+
+    # All the bytes in the string above, including the two header bytes,
+    # are XORed together to form a parity byte. This parity byte is appended to the byte string.
+    parity_byte = 0 #b'\x8b' ^ b'\x01'
+    [parity_byte := parity_byte ^ x for x in export_bytes]
+
+    export_bytes += parity_byte.to_bytes(1, 'big')
+
+    # The byte string is encoded using base58
+    recovery_key = base58.b58encode(export_bytes).decode('utf-8')
+
+    split = [recovery_key[i:i + 4] for i in range(0, len(recovery_key), 4)]
+    return ' '.join(split)
+
 
 if __name__ == "__main__":
     main()
