@@ -226,9 +226,10 @@ export class BackupManager {
 
     /**
      * Deletes all key backups.
+     *
      * Will call the API to delete active backup until there is no more present.
      */
-    public async deleteKeyBackup(): Promise<void> {
+    public async deleteAllKeyBackupVersions(): Promise<void> {
         // there could be several backup versions, delete all to be safe.
         let current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
         while (current != null) {

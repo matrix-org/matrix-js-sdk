@@ -235,8 +235,11 @@ export interface CryptoApi {
 
     /**
      * Creates a new key backup version.
+     *
      * If there are existing backups they will be replaced.
-     * The decryption key will be saved in Secret Storage (will prompt for passphrase/key if neeeded)
+     *
+     * The decryption key will be saved in Secret Storage (the `SecretStorageCallbacks.getSecretStorageKey` Crypto
+     * callback will be called)
      * and the backup engine will be started.
      */
     resetKeyBackup(): Promise<void>;

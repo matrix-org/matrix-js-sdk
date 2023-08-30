@@ -3363,7 +3363,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Object that can be passed to createKeyBackupVersion and
      *     additionally has a 'recovery_key' member with the user-facing recovery key string.
      *
-     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async prepareKeyBackupVersion(
         password?: string | Uint8Array | null,
@@ -3408,7 +3408,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param info - Info object from prepareKeyBackupVersion
      * @returns Object with 'version' param indicating the version created
      *
-     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
@@ -3455,7 +3455,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @deprecated Use {@link Crypto.CryptoApi.deleteKeyBackupVersion | `CryptoApi.deleteKeyBackupVersion`}
+     * @deprecated Use {@link Crypto.CryptoApi.deleteKeyBackupVersion | `CryptoApi.deleteKeyBackupVersion`}.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         if (!this.cryptoBackend) {

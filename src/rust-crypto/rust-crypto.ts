@@ -147,15 +147,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Deletes the given key backup.
-     *
-     * @param version - The backup version to delete.
-     */
-    public async deleteKeyBackupVersion(version: string): Promise<void> {
-        await this.backupManager.deleteKeyBackupVersion(version);
-    }
-
-    /**
      * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
      *
      * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
@@ -622,12 +613,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
     }
 
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
     public async resetKeyBackup(): Promise<void> {
-        // check if there is already an existing backup
-        const backupInfo = await this.backupManager.setUpKeyBackup(this.signObject.bind(this));
+        const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
 
         // we want to store the private key in 4S
-        // need to check if 4S setup?
+        // need to check if 4S is set up?
         if (await this.secretStorageHasAESKey()) {
             await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
         }
@@ -636,7 +638,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.checkKeyBackupAndEnable();
     }
 
-    public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+    private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
         const sigs = new Map(Object.entries(obj.signatures || {}));
         const unsigned = obj.unsigned;
 

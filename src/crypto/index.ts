@@ -545,7 +545,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * Deletes the given backup.
-     * @param version - The version to deleted.
+     *
+     * @param version - The version to delete.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         await this.backupManager.deleteKeyBackupVersion(version);
@@ -1097,7 +1098,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 // and want to write to the local secretStorage object
                 { secureSecretStorage: false },
             );
-            // write the key ourselves to 4S
+            // write the key to 4S
             const privateKey = decodeRecoveryKey(info.recovery_key);
             await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
@@ -1156,7 +1157,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     public async resetKeyBackup(): Promise<void> {
         // Delete existing ones
-        await this.backupManager.deleteKeyBackup();
+        // There is no use case for having several key backup version live server side.
+        // Even if not deleted it would be lost as the key to restore is lost.
+        // There should be only one backup at a time.
+        await this.backupManager.deleteAllKeyBackupVersions();
 
         const info = await this.backupManager.prepareKeyBackupVersion();
 
@@ -1173,13 +1177,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             },
         );
 
-        // write the key ourselves to 4S
-        const privateKey = decodeRecoveryKey(info.recovery_key);
+        logger.log(`Created backup version ${version}`);
+
+        // write the key to 4S
+        const privateKey = info.privateKey;
         await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
-        logger.log(`Created backup version ${version}`);
     }
 
     /**
