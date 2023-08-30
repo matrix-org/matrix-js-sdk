@@ -291,6 +291,12 @@ export type RoomEventHandlerMap = {
     [RoomEvent.HistoryImportedWithinTimeline]: (markerEvent: MatrixEvent, room: Room) => void;
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
+    /**
+     * Fires when the room summary is updated.
+     * See `RoomSummary` on https://spec.matrix.org/latest/client-server-api/
+     * for full details
+     * @param summary - the room summary object
+     */
     [RoomEvent.Summary]: (summary: IRoomSummary) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
