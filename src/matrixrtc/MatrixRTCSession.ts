@@ -96,11 +96,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
             if (eventMemberships === undefined) {
-                logger.warn("Ignoring malformed member event: no memberships section");
+                logger.warn(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
                 continue;
             }
             if (!Array.isArray(eventMemberships)) {
-                logger.warn("Malformed member event: memberships is not an array");
+                logger.warn(`Malformed member event from ${memberEvent.getSender()}: memberships is not an array`);
                 continue;
             }
 
@@ -128,6 +128,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
+        logger.debug(
+            "Call memberships, in order: ",
+            callMemberships.map((m) => [m.createdTs(), m.member.userId]),
+        );
 
         return callMemberships;
     }
@@ -339,36 +343,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return m;
     }
 
-    private updateCallMembershipEvent = async (): Promise<void> => {
-        if (this.memberEventTimeout) {
-            clearTimeout(this.memberEventTimeout);
-            this.memberEventTimeout = undefined;
-        }
-
-        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        const localUserId = this.client.getUserId();
-        const localDeviceId = this.client.getDeviceId();
-
-        if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
-
-        if (!roomState) throw new Error("Couldn't get room state for room " + this.room.roomId);
-
-        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
-        const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
-        const memberships: CallMembershipData[] = Array.isArray(content["memberships"]) ? content["memberships"] : [];
-
-        const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
-        let myPrevMembership;
-        try {
-            if (myCallMemberEvent && myPrevMembershipData) {
-                myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
-            }
-        } catch (e) {
-            // This would indicate a bug or something weird if our own call membership
-            // wasn't valid
-            logger.warn("Our previous call membership was invalid - this shouldn't happen.", e);
-        }
-
+    /**
+     * Returns true if our membership event needs to be updated
+     */
+    private membershipEventNeedsUpdate(
+        myPrevMembershipData?: CallMembershipData,
+        myPrevMembership?: CallMembership,
+    ): boolean {
         // work out if we need to update our membership event
         let needsUpdate = false;
         // Need to update if there's a membership for us but we're not joined (valid or otherwise)
@@ -384,11 +365,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
 
-        if (!needsUpdate) {
-            // nothing to do - reschedule the check again
-            setTimeout(this.updateCallMembershipEvent, MEMBER_EVENT_CHECK_PERIOD);
-            return;
-        }
+        return needsUpdate;
+    }
+
+    /**
+     * Makes a new membership list given the old list alonng with this user's previous membership event
+     * (if any) and this device's previous membership (if any)
+     */
+    private makeNewMemberships(
+        oldMemberships: CallMembershipData[],
+        myCallMemberEvent?: MatrixEvent,
+        myPrevMembership?: CallMembership,
+    ): CallMembershipData[] {
+        const localDeviceId = this.client.getDeviceId();
+        if (!localDeviceId) throw new Error("Local device ID is null!");
 
         const filterExpired = (m: CallMembershipData): boolean => {
             let membershipObj;
@@ -411,7 +401,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         };
 
         // Filter our any invalid or expired memberships, and also our own - we'll add that back in next
-        let newMemberships = memberships.filter(filterExpired).filter((m) => m.device_id !== localDeviceId);
+        let newMemberships = oldMemberships.filter(filterExpired).filter((m) => m.device_id !== localDeviceId);
 
         // Fix up any memberships that need their created_ts adding
         newMemberships = newMemberships.map(transformMemberships);
@@ -421,8 +411,50 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             newMemberships.push(this.makeMyMembership(myPrevMembership));
         }
 
+        return newMemberships;
+    }
+
+    private updateCallMembershipEvent = async (): Promise<void> => {
+        if (this.memberEventTimeout) {
+            clearTimeout(this.memberEventTimeout);
+            this.memberEventTimeout = undefined;
+        }
+
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!roomState) throw new Error("Couldn't get room state for room " + this.room.roomId);
+
+        const localUserId = this.client.getUserId();
+        const localDeviceId = this.client.getDeviceId();
+        if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
+
+        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
+        const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
+        const memberships: CallMembershipData[] = Array.isArray(content["memberships"]) ? content["memberships"] : [];
+
+        const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
+        let myPrevMembership;
+        try {
+            if (myCallMemberEvent && myPrevMembershipData) {
+                myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
+            }
+        } catch (e) {
+            // This would indicate a bug or something weird if our own call membership
+            // wasn't valid
+            logger.warn("Our previous call membership was invalid - this shouldn't happen.", e);
+        }
+
+        if (myPrevMembership) {
+            logger.debug(`${myPrevMembership.getMsUntilExpiry()} until our membership expires`);
+        }
+
+        if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
+            // nothing to do - reschedule the check again
+            setTimeout(this.updateCallMembershipEvent, MEMBER_EVENT_CHECK_PERIOD);
+            return;
+        }
+
         const newContent = {
-            memberships: newMemberships,
+            memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
         };
 
         let resendDelay;

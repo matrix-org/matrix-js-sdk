@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "27.2.0",
+    "version": "28.0.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=18.0.0"
@@ -101,7 +101,7 @@
         "browserify-swap": "^0.2.2",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.46.0",
+        "eslint": "8.47.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
