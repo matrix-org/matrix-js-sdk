@@ -36,6 +36,8 @@ const getNewEncryptionKey = (): string => {
     return encodeBase64(key);
 };
 
+const membershipToUserAndDeviceId = (m: CallMembership): string => `${m.member.userId}:${m.deviceId}`;
+
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a proprty of their membership
     MembershipsChanged = "memberships_changed",
@@ -284,8 +286,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
         }
 
-        const ts = (m: CallMembership): string => `${m.member.userId}:${m.deviceId}`;
-        const callMembersChanged = new Set(oldMemberships.map(ts)) !== new Set(this.memberships.map(ts));
+        const callMembersChanged =
+            new Set(oldMemberships.map(membershipToUserAndDeviceId)) !==
+            new Set(this.memberships.map(membershipToUserAndDeviceId));
 
         if (callMembersChanged && this.isJoined()) {
             this.updateEncryptionKeyEvent();
