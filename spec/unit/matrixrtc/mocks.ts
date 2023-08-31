@@ -59,5 +59,8 @@ export function mockRTCEvent(
         getLocalAge: getLocalAgeFn,
         localTimestamp: Date.now(),
         getRoomId: jest.fn().mockReturnValue(roomId),
+        sender: {
+            userId: "@mock:user.example",
+        },
     } as unknown as MatrixEvent;
 }
