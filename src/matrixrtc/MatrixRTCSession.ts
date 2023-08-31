@@ -73,6 +73,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptMedia = false;
     private _encryptionKeys = new Map<{ userId: string; deviceId: string }, string>();
 
+    /**
+     * A map of keys used to encrypt and decrypt (we are using a symmetric
+     * cipher) given participant's media. This also includes our own key
+     */
     public get encryptionKeys(): Map<{ userId: string; deviceId: string }, string> {
         return new Map(this._encryptionKeys);
     }
