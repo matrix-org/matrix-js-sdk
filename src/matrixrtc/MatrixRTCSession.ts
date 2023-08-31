@@ -22,6 +22,7 @@ import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
+import { MatrixEvent } from "../matrix";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -273,6 +274,52 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return needsUpdate;
     }
 
+    /**
+     * Makes a new membership list given the old list alonng with this user's previous membership event
+     * (if any) and this device's previous membership (if any)
+     */
+    private makeNewMemberships(
+        oldMemberships: CallMembershipData[],
+        myCallMemberEvent?: MatrixEvent,
+        myPrevMembership?: CallMembership,
+    ): CallMembershipData[] {
+        const localDeviceId = this.client.getDeviceId();
+        if (!localDeviceId) throw new Error("Local device ID is null!");
+
+        const filterExpired = (m: CallMembershipData): boolean => {
+            let membershipObj;
+            try {
+                membershipObj = new CallMembership(myCallMemberEvent!, m);
+            } catch (e) {
+                return false;
+            }
+
+            return !membershipObj.isExpired();
+        };
+
+        const transformMemberships = (m: CallMembershipData): CallMembershipData => {
+            if (m.created_ts === undefined) {
+                // we need to fill this in with the origin_server_ts from its original event
+                m.created_ts = myCallMemberEvent!.getTs();
+            }
+
+            return m;
+        };
+
+        // Filter our any invalid or expired memberships, and also our own - we'll add that back in next
+        let newMemberships = oldMemberships.filter(filterExpired).filter((m) => m.device_id !== localDeviceId);
+
+        // Fix up any memberships that need their created_ts adding
+        newMemberships = newMemberships.map(transformMemberships);
+
+        // If we're joined, add our own
+        if (this.isJoined()) {
+            newMemberships.push(this.makeMyMembership(myPrevMembership));
+        }
+
+        return newMemberships;
+    }
+
     private updateCallMembershipEvent = async (): Promise<void> => {
         if (this.memberEventTimeout) {
             clearTimeout(this.memberEventTimeout);
@@ -286,7 +333,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const localDeviceId = this.client.getDeviceId();
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
-        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
+        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
         const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
         const memberships: CallMembershipData[] = Array.isArray(content["memberships"]) ? content["memberships"] : [];
 
@@ -312,39 +359,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        const filterExpired = (m: CallMembershipData): boolean => {
-            let membershipObj;
-            try {
-                membershipObj = new CallMembership(myCallMemberEvent!, m);
-            } catch (e) {
-                return false;
-            }
-
-            return !membershipObj.isExpired();
-        };
-
-        const transformMemberships = (m: CallMembershipData): CallMembershipData => {
-            if (m.created_ts === undefined) {
-                // we need to fill this in with the origin_server_ts from its original event
-                m.created_ts = myCallMemberEvent!.getTs();
-            }
-
-            return m;
-        };
-
-        // Filter our any invalid or expired memberships, and also our own - we'll add that back in next
-        let newMemberships = memberships.filter(filterExpired).filter((m) => m.device_id !== localDeviceId);
-
-        // Fix up any memberships that need their created_ts adding
-        newMemberships = newMemberships.map(transformMemberships);
-
-        // If we're joined, add our own
-        if (this.isJoined()) {
-            newMemberships.push(this.makeMyMembership(myPrevMembership));
-        }
-
         const newContent = {
-            memberships: newMemberships,
+            memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
         };
 
         let resendDelay;
