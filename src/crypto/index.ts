@@ -1155,6 +1155,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.log("Secure Secret Storage ready");
     }
 
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
     public async resetKeyBackup(): Promise<void> {
         // Delete existing ones
         // There is no use case for having several key backup version live server side.
