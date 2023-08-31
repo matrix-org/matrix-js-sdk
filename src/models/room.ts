@@ -292,8 +292,9 @@ export type RoomEventHandlerMap = {
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     /**
-     * Fires when the room summary is updated.
-     * See `RoomSummary` on https://spec.matrix.org/latest/client-server-api/
+     * Fires when a new room summary is returned by `/sync`.
+     *
+     * See https://spec.matrix.org/v1.8/client-server-api/#_matrixclientv3sync_roomsummary
      * for full details
      * @param summary - the room summary object
      */
