@@ -172,7 +172,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
      */
-    public async joinRoomSession(activeFoci: Focus[], encryptMedia?: boolean): Promise<void> {
+    public joinRoomSession(activeFoci: Focus[], encryptMedia?: boolean): void {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
@@ -183,7 +183,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.encryptMedia = encryptMedia ?? false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
-        await this.updateCallMembershipEvent();
+        this.updateCallMembershipEvent();
     }
 
     /**
