@@ -248,6 +248,31 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return m;
     }
 
+    /**
+     * Returns true if our membership event needs to be updated
+     */
+    private membershipEventNeedsUpdate(
+        myPrevMembershipData?: CallMembershipData,
+        myPrevMembership?: CallMembership,
+    ): boolean {
+        // work out if we need to update our membership event
+        let needsUpdate = false;
+        // Need to update if there's a membership for us but we're not joined (valid or otherwise)
+        if (!this.isJoined() && myPrevMembershipData) needsUpdate = true;
+        if (this.isJoined()) {
+            // ...or if we are joined, but there's no valid membership event
+            if (!myPrevMembership) {
+                needsUpdate = true;
+            } else if (myPrevMembership.getMsUntilExpiry() < MEMBERSHIP_EXPIRY_TIME / 2) {
+                // ...or if the expiry time needs bumping
+                needsUpdate = true;
+                this.relativeExpiry! += MEMBERSHIP_EXPIRY_TIME;
+            }
+        }
+
+        return needsUpdate;
+    }
+
     private updateCallMembershipEvent = async (): Promise<void> => {
         if (this.memberEventTimeout) {
             clearTimeout(this.memberEventTimeout);
@@ -255,12 +280,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!roomState) throw new Error("Couldn't get room state for room " + this.room.roomId);
+
         const localUserId = this.client.getUserId();
         const localDeviceId = this.client.getDeviceId();
-
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
-
-        if (!roomState) throw new Error("Couldn't get room state for room " + this.room.roomId);
 
         const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId);
         const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
@@ -282,22 +306,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.debug(`${myPrevMembership.getMsUntilExpiry()} until our membership expires`);
         }
 
-        // work out if we need to update our membership event
-        let needsUpdate = false;
-        // Need to update if there's a membership for us but we're not joined (valid or otherwise)
-        if (!this.isJoined() && myPrevMembershipData) needsUpdate = true;
-        if (this.isJoined()) {
-            // ...or if we are joined, but there's no valid membership event
-            if (!myPrevMembership) {
-                needsUpdate = true;
-            } else if (myPrevMembership.getMsUntilExpiry() < MEMBERSHIP_EXPIRY_TIME / 2) {
-                // ...or if the expiry time needs bumping
-                needsUpdate = true;
-                this.relativeExpiry! += MEMBERSHIP_EXPIRY_TIME;
-            }
-        }
-
-        if (!needsUpdate) {
+        if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
             // nothing to do - reschedule the check again
             setTimeout(this.updateCallMembershipEvent, MEMBER_EVENT_CHECK_PERIOD);
             return;
