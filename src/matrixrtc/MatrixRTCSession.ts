@@ -271,6 +271,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
+        logger.log(`Updated encryption key for userId=${userId}, deviceId=${deviceId}`);
     };
 
     public onMembershipUpdate = (): void => {
