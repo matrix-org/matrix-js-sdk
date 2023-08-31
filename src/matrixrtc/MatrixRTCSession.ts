@@ -22,15 +22,19 @@ import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
-import { randomString } from "../randomstring";
 import { MatrixEvent } from "../matrix";
 import { EncryptionKeyEventContent } from "./types";
+import { encodeBase64 } from "../crypto/olmlib";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 
-const getNewEncryptionKey = (): string => randomString(32);
+const getNewEncryptionKey = (): string => {
+    const key = new Uint8Array(32);
+    crypto.getRandomValues(key);
+    return encodeBase64(key);
+};
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a proprty of their membership
