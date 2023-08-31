@@ -635,13 +635,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
 
-        // // if we're using the old crypto impl, stub out some methods in the device manager.
-        // // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        // if (aliceClient.crypto) {
-        //     aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve(new Map());
-        //     aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-        // }
-
         const awaitUISI = new Promise<void>((resolve) => {
             aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
                 const error = err as DecryptionError;
@@ -665,6 +658,42 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await syncPromise(aliceClient);
 
         await awaitUISI;
+    });
+
+    it("Encryption fails with Unable to decrypt for other errors", async () => {
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        await aliceClient.getCrypto()!.importRoomKeys([testData.MEGOLM_SESSION_DATA]);
+
+        const awaitDecryptionError = new Promise<void>((resolve) => {
+            aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                const error = err as DecryptionError;
+                // rust and libolm can't have an exact 1:1 mapping for all errors,
+                // but some errors are part of API and should match
+                if (error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" && error.code != "OLM_UNKNOWN_MESSAGE_INDEX") {
+                    resolve();
+                }
+            });
+        });
+
+        const malformedEvent: Partial<IEvent> = JSON.parse(JSON.stringify(testData.ENCRYPTED_EVENT));
+        malformedEvent.content!.ciphertext = "AwgAEnAkBmciEAyhh1j6DCk29UXJ7kv/kvayUNfuNT0iAioLxcXjFX";
+
+        // Alice gets both the events in a single sync
+        const syncResponse = {
+            next_batch: 1,
+            rooms: {
+                join: {
+                    [testData.TEST_ROOM_ID]: { timeline: { events: [malformedEvent] } },
+                },
+            },
+        };
+
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        await awaitDecryptionError;
     });
 
     it("Alice receives a megolm message before the session keys", async () => {

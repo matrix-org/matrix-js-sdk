@@ -370,6 +370,7 @@ def build_exported_megolm_key(device_curve_key: x25519.X25519PrivateKey) -> tupl
     """
     Creates an exported megolm room key, as per https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md#session-export-format
     that can be imported via importRoomKeys API.
+    Returns the exported key, the matching privat edKey (needed to encrypt)
     """
     index = 0
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32))
