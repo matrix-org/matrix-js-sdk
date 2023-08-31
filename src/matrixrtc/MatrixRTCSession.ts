@@ -71,11 +71,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
             if (eventMemberships === undefined) {
-                logger.warn("Ignoring malformed member event: no memberships section");
+                logger.warn(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
                 continue;
             }
             if (!Array.isArray(eventMemberships)) {
-                logger.warn("Malformed member event: memberships is not an array");
+                logger.warn(`Malformed member event from ${memberEvent.getSender()}: memberships is not an array`);
                 continue;
             }
 
@@ -103,6 +103,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
+        logger.debug(
+            "Call memberships, in order: ",
+            callMemberships.map((m) => [m.createdTs(), m.member.userId]),
+        );
 
         return callMemberships;
     }
@@ -272,6 +276,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // This would indicate a bug or something weird if our own call membership
             // wasn't valid
             logger.warn("Our previous call membership was invalid - this shouldn't happen.", e);
+        }
+
+        if (myPrevMembership) {
+            logger.debug(`${myPrevMembership.getMsUntilExpiry()} until our membership expires`);
         }
 
         // work out if we need to update our membership event
