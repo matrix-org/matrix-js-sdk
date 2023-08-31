@@ -162,6 +162,19 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "forwarding_curve25519_key_chain": []
 };
 
+/** A ratcheted version of MEGOLM_SESSION_DATA */
+export const RATCHTED_MEGOLM_SESSION_DATA: IMegolmSessionData = {
+    "algorithm": "m.megolm.v1.aes-sha2",
+    "room_id": "!room:id",
+    "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+    "session_id": "ipdI6Zs/7DzFTEhiA2iGaMDfHkIYCleqXT6L+5e1/co",
+    "session_key": "AQAAAAFXGO+Z9jlQJhIL6ByhXrv2BwCIxkhh7MXpKLsYmXkJcWrQlirmXmD79ga1zo+I4DCtEZzyGSpDWXBC6G7ez3H4gDMBam1RE3Jm5tc+oTlIri32UkYgSL0kBkcEnttqmIUWvpwC7by/yg231+gyzu9lDHAU4ivCj48pt7WGiORWmIqXSOmbP+w8xUxIYgNohmjA3x5CGApXql0+i/uXtf3K",
+    "sender_claimed_keys": {
+        "ed25519": "Bhbpt6hqMZlSH4sJV7xiEEEiPVeTWz4Vkujl1EMdIPI"
+    },
+    "forwarding_curve25519_key_chain": []
+};
+
 /** Signed OTKs, returned by `POST /keys/claim` */
 export const ONE_TIME_KEYS = {
     "@alice:localhost": {
@@ -362,6 +375,19 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
     "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
     "session_key": "AQAAAADZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9XoinBNIWr/gkyepuAKiQqemlc8J5amD9OkmbVkmnrxP1uyYMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
+    "sender_claimed_keys": {
+        "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
+    },
+    "forwarding_curve25519_key_chain": []
+};
+
+/** A ratcheted version of BOB_MEGOLM_SESSION_DATA */
+export const BOB_RATCHTED_MEGOLM_SESSION_DATA: IMegolmSessionData = {
+    "algorithm": "m.megolm.v1.aes-sha2",
+    "room_id": "!room:id",
+    "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+    "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
+    "session_key": "AQAAAAHZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9Xoil2JdGx9oPqR0dFVh661Aqs86rJRbQ4IeRiuEm35VMxboMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
         "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
     },

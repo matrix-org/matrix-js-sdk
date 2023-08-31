@@ -660,6 +660,37 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await awaitUISI;
     });
 
+    it("Encryption fails with expected Unknown Index error", async () => {
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+
+        const awaitUnknownIndex = new Promise<void>((resolve) => {
+            aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                const error = err as DecryptionError;
+                if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
+                    resolve();
+                }
+            });
+        });
+
+        await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
+
+        // Alice gets both the events in a single sync
+        const syncResponse = {
+            next_batch: 1,
+            rooms: {
+                join: {
+                    [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                },
+            },
+        };
+
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        await awaitUnknownIndex;
+    });
+
     it("Encryption fails with Unable to decrypt for other errors", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
