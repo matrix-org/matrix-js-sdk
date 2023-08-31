@@ -213,19 +213,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!this.isJoined()) return;
         if (!this.encryptMedia) return;
 
-        logger.info(`MatrixRTCSession updating encryption key for room ${this.room.roomId}`);
-
-        const encryptionKey = getNewEncryptionKey();
-        await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
-            "m.encryption_key": encryptionKey,
-            "m.device_id": this.client.getDeviceId(),
-        } as EncryptionKeyEventContent);
-
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
 
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
+
+        logger.info(`MatrixRTCSession updating encryption key for room ${this.room.roomId}`);
+
+        const encryptionKey = getNewEncryptionKey();
+        await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
+            "m.encryption_key": encryptionKey,
+            "m.device_id": deviceId,
+            "m.call_id": "",
+        } as EncryptionKeyEventContent);
 
         this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
@@ -262,15 +263,28 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const content = event.getContent<EncryptionKeyEventContent>();
         const encryptionKey = content["m.encryption_key"];
         const deviceId = content["m.device_id"];
+        const callId = content["m.call_id"];
 
         if (
             !userId ||
             !deviceId ||
+            !callId ||
             !encryptionKey ||
             typeof deviceId !== "string" ||
+            typeof callId !== "string" ||
             typeof encryptionKey !== "string"
         ) {
-            throw new Error(`Malformed m.call.encryption_key from userId=${userId}, deviceId=${deviceId}`);
+            throw new Error(
+                `Malformed m.call.encryption_key: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
+            );
+        }
+
+        // We currently only handle callId = ""
+        if (callId !== "") {
+            logger.warn(
+                `Received m.call.encryption_key with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
+            );
+            return;
         }
 
         this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
