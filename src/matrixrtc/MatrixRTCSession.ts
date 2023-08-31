@@ -142,7 +142,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private constructor(
-        public readonly client: MatrixClient,
+        private readonly client: MatrixClient,
         public readonly room: Room,
         public memberships: CallMembership[],
     ) {
