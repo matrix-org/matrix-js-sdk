@@ -266,7 +266,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             typeof deviceId !== "string" ||
             typeof encryptionKey !== "string"
         ) {
-            throw new Error("Malformed m.call.encryption_key");
+            throw new Error(`Malformed m.call.encryption_key from userId=${userId}, deviceId=${deviceId}`);
         }
 
         this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
