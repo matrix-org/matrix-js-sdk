@@ -1487,7 +1487,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     public setUnread(type: NotificationCountType, count: number): void {
-        return this.setUnreadNotificationCount(type, count);
+        //return this.setUnreadNotificationCount(type, count);
     }
 
     public setSummary(summary: IRoomSummary): void {
