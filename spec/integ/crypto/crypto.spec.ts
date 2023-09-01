@@ -40,6 +40,7 @@ import { logger } from "../../../src/logger";
 import {
     Category,
     createClient,
+    CryptoEvent,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -61,9 +62,13 @@ import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
+import {
+    mockInitialApiRequests,
+    mockSetupCrossSigningRequests,
+    mockSetupMegolmBackupRequests,
+} from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CryptoCallbacks } from "../../../src/crypto-api";
+import { CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -2197,11 +2202,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
-
                         if (content.key) {
                             resolve(content.key);
                         }
-
                         return {};
                     },
                     { overwriteRoutes: true },
@@ -2226,6 +2229,68 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     },
                 );
             });
+        }
+
+        function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
+            return new Promise((resolve) => {
+                // Called when the megolm backup key is uploaded
+                fetchMock.put(
+                    `express:/_matrix/client/v3/user/:userId/account_data/m.megolm_backup.v1`,
+                    (url: string, options: RequestInit) => {
+                        const content = JSON.parse(options.body as string);
+                        resolve(content.encrypted);
+                        return {};
+                    },
+                    { overwriteRoutes: true },
+                );
+            });
+        }
+
+        async function bootstrapSecurity(backupVersion: string): Promise<void> {
+            mockSetupCrossSigningRequests();
+            mockSetupMegolmBackupRequests(backupVersion);
+
+            // promise which will resolve when a `KeyBackupStatus` event is emitted with `enabled: true`
+            const backupStatusUpdate = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            const setupPromises = [
+                awaitCrossSigningKeyUpload("master"),
+                awaitCrossSigningKeyUpload("user_signing"),
+                awaitCrossSigningKeyUpload("self_signing"),
+                awaitMegolmBackupKeyUpload(),
+            ];
+
+            // Before setting up secret-storage, bootstrap cross-signing, so that the client has cross-signing keys.
+            await aliceClient.getCrypto()!.bootstrapCrossSigning({});
+
+            // Now, when we bootstrap secret-storage, the cross-signing keys should be uploaded.
+            const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({
+                setupNewSecretStorage: true,
+                createSecretStorageKey,
+                setupNewKeyBackup: true,
+            });
+
+            // Wait for the key to be uploaded in the account data
+            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
+
+            // Wait for the cross signing keys to be uploaded
+            await Promise.all(setupPromises);
+
+            // wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
+            // Finally ensure backup is working
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+
+            await backupStatusUpdate;
         }
 
         /**
@@ -2384,6 +2449,89 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(masterKey[secretStorageKey]).toBeDefined();
             expect(userSigningKey[secretStorageKey]).toBeDefined();
             expect(selfSigningKey[secretStorageKey]).toBeDefined();
+        });
+
+        oldBackendOnly("should create a new megolm backup", async () => {
+            const backupVersion = "abc";
+            await bootstrapSecurity(backupVersion);
+
+            // Expect a backup to be available and used
+            const activeBackup = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
+            expect(activeBackup).toStrictEqual(backupVersion);
+        });
+
+        oldBackendOnly("Reset key backup should create a new backup and update 4S", async () => {
+            // First set up recovery
+            const backupVersion = "1";
+            await bootstrapSecurity(backupVersion);
+
+            const currentVersion = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
+            const currentBackupKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+
+            // we will call reset backup, it should delete the existing one, then setup a new one
+            // Let's mock for that
+
+            // Mock delete and replace the GET to return 404 as soon as called
+            const awaitDeleteCalled = new Promise<void>((resolve) => {
+                fetchMock.delete(
+                    "express:/_matrix/client/v3/room_keys/version/:version",
+                    (url: string, options: RequestInit) => {
+                        fetchMock.get(
+                            "path:/_matrix/client/v3/room_keys/version",
+                            {
+                                status: 404,
+                                body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
+                            },
+                            { overwriteRoutes: true },
+                        );
+                        resolve();
+                        return {};
+                    },
+                    { overwriteRoutes: true },
+                );
+            });
+
+            const newVersion = "2";
+            fetchMock.post(
+                "path:/_matrix/client/v3/room_keys/version",
+                (url, request) => {
+                    const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+                    backupData.version = newVersion;
+                    backupData.count = 0;
+                    backupData.etag = "zer";
+
+                    // update get call with new version
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData, {
+                        overwriteRoutes: true,
+                    });
+                    return {
+                        version: backupVersion,
+                    };
+                },
+                { overwriteRoutes: true },
+            );
+
+            const newBackupStatusUpdate = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            const new4SUpload = awaitMegolmBackupKeyUpload();
+
+            await aliceClient.getCrypto()!.resetKeyBackup();
+            await awaitDeleteCalled;
+            await newBackupStatusUpdate;
+            await new4SUpload;
+
+            const nextVersion = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
+            const nextKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+
+            expect(nextVersion).toBeDefined();
+            expect(nextVersion).not.toEqual(currentVersion);
+            expect(nextKey).not.toEqual(currentBackupKey);
         });
     });
 

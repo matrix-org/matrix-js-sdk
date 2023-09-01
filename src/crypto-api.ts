@@ -234,6 +234,24 @@ export interface CryptoApi {
     bootstrapSecretStorage(opts: CreateSecretStorageOpts): Promise<void>;
 
     /**
+     * Creates a new key backup version.
+     *
+     * If there are existing backups they will be replaced.
+     *
+     * The decryption key will be saved in Secret Storage (the `SecretStorageCallbacks.getSecretStorageKey` Crypto
+     * callback will be called)
+     * and the backup engine will be started.
+     */
+    resetKeyBackup(): Promise<void>;
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
      * Get the status of our cross-signing keys.
      *
      * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
