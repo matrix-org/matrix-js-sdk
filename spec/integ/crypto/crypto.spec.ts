@@ -40,7 +40,6 @@ import { logger } from "../../../src/logger";
 import {
     Category,
     createClient,
-    CryptoEvent,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -55,6 +54,7 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
+    CryptoEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -68,7 +68,7 @@ import {
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
+import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -2202,9 +2202,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
+
                         if (content.key) {
                             resolve(content.key);
                         }
+
                         return {};
                     },
                     { overwriteRoutes: true },
@@ -2295,7 +2297,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await bootstrapPromise;
             // Finally ensure backup is working
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-
             await backupStatusUpdate;
         }
 
@@ -2346,7 +2347,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             },
         );
 
-        newBackendOnly("should create a new key", async () => {
+        it("should create a new key", async () => {
             const bootstrapPromise = aliceClient
                 .getCrypto()!
                 .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
@@ -2389,46 +2390,43 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             },
         );
 
-        newBackendOnly(
-            "should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage",
-            async () => {
-                let bootstrapPromise = aliceClient
-                    .getCrypto()!
-                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+        it("should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage", async () => {
+            let bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
-                // Wait for the key to be uploaded in the account data
-                let secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+            // Wait for the key to be uploaded in the account data
+            let secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
-                // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
 
-                // Wait for bootstrapSecretStorage to finished
-                await bootstrapPromise;
+            // Wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
 
-                // Call again bootstrapSecretStorage
-                bootstrapPromise = aliceClient
-                    .getCrypto()!
-                    .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
+            // Call again bootstrapSecretStorage
+            bootstrapPromise = aliceClient
+                .getCrypto()!
+                .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
-                // Wait for the key to be uploaded in the account data
-                secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+            // Wait for the key to be uploaded in the account data
+            secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
-                // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+            // Return the newly created key in the sync response
+            sendSyncResponse(secretStorageKey);
 
-                // Wait for bootstrapSecretStorage to finished
-                await bootstrapPromise;
+            // Wait for bootstrapSecretStorage to finished
+            await bootstrapPromise;
 
-                // createSecretStorageKey should have been called twice, one time every bootstrapSecretStorage call
-                expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
-            },
-        );
+            // createSecretStorageKey should have been called twice, one time every bootstrapSecretStorage call
+            expect(createSecretStorageKey).toHaveBeenCalledTimes(2);
+        });
 
-        newBackendOnly("should upload cross signing keys", async () => {
+        it("should upload cross signing keys", async () => {
             mockSetupCrossSigningRequests();
 
             // Before setting up secret-storage, bootstrap cross-signing, so that the client has cross-signing keys.
-            await aliceClient.getCrypto()?.bootstrapCrossSigning({});
+            await aliceClient.getCrypto()!.bootstrapCrossSigning({});
 
             // Now, when we bootstrap secret-storage, the cross-signing keys should be uploaded.
             const bootstrapPromise = aliceClient
@@ -2457,17 +2455,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(selfSigningKey[secretStorageKey]).toBeDefined();
         });
 
-        oldBackendOnly("should create a new megolm backup", async () => {
+        it("should create a new megolm backup", async () => {
             const backupVersion = "abc";
             await bootstrapSecurity(backupVersion);
 
             // Expect a backup to be available and used
             const activeBackup = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
             expect(activeBackup).toStrictEqual(backupVersion);
+
+            // check that there is a MSK signature
+            const signatures = (await aliceClient.getCrypto()!.checkKeyBackupAndEnable())!.backupInfo.auth_data!
+                .signatures;
+            expect(signatures).toBeDefined();
+            expect(signatures![aliceClient.getUserId()!]).toBeDefined();
+            const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
+            expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
         });
 
-        oldBackendOnly("Reset key backup should create a new backup and update 4S", async () => {
-            // First set up 4S and key backup
+        it("Reset key backup should create a new backup and update 4S", async () => {
+            // First set up recovery
             const backupVersion = "1";
             await bootstrapSecurity(backupVersion);
 
