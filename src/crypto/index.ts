@@ -1525,6 +1525,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoApi.getUserVerificationStatus}.
+     */
+    public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
+        return this.checkUserTrust(userId);
+    }
+
+    /**
      * Check whether a given device is trusted.
      *
      * @param userId - The ID of the user whose device is to be checked.

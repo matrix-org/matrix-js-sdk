@@ -25,7 +25,6 @@ import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
@@ -44,6 +43,7 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
+    UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
@@ -128,8 +128,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         ]);
 
         // Fire if the cross signing keys are imported from the secret storage
-        const onCrossSigningKeysImport = (): void => {
-            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(this.userId));
+        const onCrossSigningKeysImport = async (): Promise<void> => {
+            const newVerification = await this.getUserVerificationStatus(this.userId);
+            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, newVerification);
         };
         this.crossSigningIdentity = new CrossSigningIdentity(
             olmMachine,
@@ -218,9 +219,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return ret as IEncryptedEventInfo;
     }
 
-    public checkUserTrust(userId: string): UserTrustLevel {
-        // TODO
-        return new UserTrustLevel(false, false, false);
+    /**
+     * Implementation of {@link CryptoBackend#checkUserTrust}.
+     *
+     * Stub for backwards compatibility.
+     *
+     */
+    public checkUserTrust(userId: string): UserVerificationStatus {
+        return new UserVerificationStatus(false, false, false);
     }
 
     /**
@@ -243,7 +249,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      * The function is stub to keep the compatibility with the old crypto.
      * More information: https://github.com/vector-im/element-web/issues/25648
-     *
      *
      * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
      */
@@ -473,6 +478,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             localVerified: device.isLocallyTrusted(),
             trustCrossSignedDevices: this._trustCrossSignedDevices,
         });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getUserVerificationStatus}.
+     */
+    public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+            await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(userId));
+        if (userIdentity === undefined) {
+            return new UserVerificationStatus(false, false, false);
+        }
+        return new UserVerificationStatus(userIdentity.isVerified(), false, false);
     }
 
     /**
@@ -1364,5 +1381,5 @@ type RustCryptoEventMap = {
     /**
      * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
      */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserTrustLevel) => void;
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
 } & RustBackupCryptoEventMap;
