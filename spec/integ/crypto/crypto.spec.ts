@@ -2532,6 +2532,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(nextVersion).toBeDefined();
             expect(nextVersion).not.toEqual(currentVersion);
             expect(nextKey).not.toEqual(currentBackupKey);
+
+            // The API is deprecated but has been modified to work with both crypto backend
+            // ensure that it works anyhow
+            await aliceClient.deleteKeyBackupVersion(nextVersion!);
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+            // XXX Legacy is not updating 4S when doing that, should ensure that rust implem does it.
+            expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toBeNull();
         });
     });
 
