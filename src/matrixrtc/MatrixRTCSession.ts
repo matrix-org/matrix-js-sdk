@@ -271,8 +271,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (
             !userId ||
             !deviceId ||
-            !callId ||
             !encryptionKey ||
+            callId === undefined ||
+            callId === null ||
             typeof deviceId !== "string" ||
             typeof callId !== "string" ||
             typeof encryptionKey !== "string"
