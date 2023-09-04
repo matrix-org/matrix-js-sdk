@@ -35,7 +35,8 @@ const getNewEncryptionKey = (): string => {
     return key.toString();
 };
 
-const membershipToUserAndDeviceId = (m: CallMembership): string => `${m.member.userId}:${m.deviceId}`;
+const combineUserAndDeviceId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
+const membershipToUserAndDeviceId = (m: CallMembership): string => combineUserAndDeviceId(m.member.userId, m.deviceId);
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a proprty of their membership
@@ -70,14 +71,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private activeFoci: Focus[] | undefined;
 
     private encryptMedia = false;
-    private _encryptionKeys = new Map<{ userId: string; deviceId: string }, string>();
+    private encryptionKeys = new Map<string, string>();
+
+    public getKeyForParticipant(userId: string, deviceId: string): string | undefined {
+        return this.encryptionKeys.get(combineUserAndDeviceId(userId, deviceId));
+    }
 
     /**
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
      */
-    public get encryptionKeys(): Map<{ userId: string; deviceId: string }, string> {
-        return new Map(this._encryptionKeys);
+    public getEncryptionKeys(): IterableIterator<[string, string]> {
+        return this.encryptionKeys.entries();
     }
 
     /**
@@ -231,7 +236,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             "m.call_id": "",
         } as EncryptionKeyEventContent);
 
-        this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
+        this.encryptionKeys.set(combineUserAndDeviceId(userId, deviceId), encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
     }
 
@@ -291,7 +296,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        this._encryptionKeys.set({ userId, deviceId }, encryptionKey);
+        this.encryptionKeys.set(combineUserAndDeviceId(userId, deviceId), encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
         logger.log(`Updated encryption key for userId=${userId}, deviceId=${deviceId}`);
     };
