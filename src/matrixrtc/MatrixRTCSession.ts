@@ -315,8 +315,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         const callMembersChanged =
-            new Set(oldMemberships.map(membershipToUserAndDeviceId)) !==
-            new Set(this.memberships.map(membershipToUserAndDeviceId));
+            oldMemberships.map(membershipToUserAndDeviceId).sort().join() !==
+            this.memberships.map(membershipToUserAndDeviceId).sort().join();
 
         if (callMembersChanged && this.isJoined()) {
             this.updateEncryptionKeyEvent();
