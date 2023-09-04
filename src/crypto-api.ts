@@ -382,6 +382,24 @@ export interface CryptoApi {
      *   and trust information (as returned by {@link isKeyBackupTrusted}).
      */
     checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null>;
+
+    /**
+     * Creates a new key backup version.
+     *
+     * If there are existing backups they will be replaced.
+     *
+     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * callback will be called)
+     * and the backup engine will be started.
+     */
+    resetKeyBackup(): Promise<void>;
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
 /**

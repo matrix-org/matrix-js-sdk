@@ -938,6 +938,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.backupManager.checkKeyBackupAndEnable(true);
     }
 
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        // stub
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        // stub
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
