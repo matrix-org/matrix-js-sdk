@@ -22,6 +22,7 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
+import { MatrixEvent } from "./models/event";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -256,6 +257,16 @@ export interface CryptoApi {
      *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
+
+    /**
+     * Get information about the encryption of the given event.
+     *
+     * @param event - the event to get information for
+     *
+     * @returns `null` if the event is not encrypted, or has not (yet) been successfully decrypted. Otherwise, an
+     *      object with information about the encryption of the event.
+     */
+    getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -615,6 +626,58 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
+}
+
+/**
+ *  Result type of {@link CryptoApi#getEventEncryptionInfo}.
+ */
+export interface EventEncryptionInfo {
+    /** "Shield" to be shown next to this event representing its verification status */
+    shieldColour: EventShieldColour;
+
+    /**
+     * `null` if `shieldColour` is `EventShieldColour.NONE`; otherwise a reason code for the shield in `shieldColour`.
+     */
+    shieldReason: EventShieldReason | null;
+}
+
+/**
+ * Types of shield to be shown for {@link EventEncryptionInfo#shieldColour}.
+ */
+export enum EventShieldColour {
+    NONE,
+    GREY,
+    RED,
+}
+
+/**
+ * Reason codes for {@link EventEncryptionInfo#shieldReason}.
+ */
+export enum EventShieldReason {
+    /** An unknown reason from the crypto library (if you see this, it is a bug in matrix-js-sdk). */
+    UNKNOWN,
+
+    /** "Encrypted by an unverified user." */
+    UNVERIFIED_IDENTITY,
+
+    /** "Encrypted by a device not verified by its owner." */
+    UNSIGNED_DEVICE,
+
+    /** "Encrypted by an unknown or deleted device." */
+    UNKNOWN_DEVICE,
+
+    /**
+     * "The authenticity of this encrypted message can't be guaranteed on this device."
+     *
+     * ie: the key has been forwarded, or retrieved from an insecure backup.
+     */
+    AUTHENTICITY_NOT_GUARANTEED,
+
+    /**
+     * The (deprecated) sender_key field in the event does not match the Ed25519 key of the device that sent us the
+     * decryption keys.
+     */
+    MISMATCHED_SENDER_KEY,
 }
 
 export * from "./crypto-api/verification";

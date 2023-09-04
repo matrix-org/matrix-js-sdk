@@ -2846,6 +2846,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
+     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {

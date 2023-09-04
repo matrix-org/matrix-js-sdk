@@ -39,6 +39,8 @@ import {
     CrossSigningStatus,
     CryptoCallbacks,
     DeviceVerificationStatus,
+    EventEncryptionInfo,
+    EventShieldColour,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
@@ -200,6 +202,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.eventDecryptor.attemptEventDecryption(event);
     }
 
+    /**
+     * Implementation of (deprecated) {@link MatrixClient#getEventEncryptionInfo}.
+     *
+     * @param event - event to inspect
+     */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         // TODO: make this work properly. Or better, replace it.
 
@@ -700,6 +707,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             keyInfo,
             encodedPrivateKey,
             privateKey: key,
+        };
+    }
+
+    /**
+     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     */
+    public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
+        return {
+            shieldColour: EventShieldColour.NONE,
+            shieldReason: null,
         };
     }
 

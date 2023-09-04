@@ -20,6 +20,7 @@ import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestMana
 import { RoomMember } from "../../src/models/room-member";
 import { IStore } from "../../src/store";
 import { IRoomEncryption, RoomList } from "../../src/crypto/RoomList";
+import { EventShieldColour, EventShieldReason } from "../../src/crypto-api";
 
 const Olm = global.Olm;
 
@@ -118,6 +119,7 @@ describe("Crypto", function () {
             // unencrypted event
             const event = {
                 getId: () => "$event_id",
+                getSender: () => "@bob:example.com",
                 getSenderKey: () => null,
                 getWireContent: () => {
                     return {};
@@ -126,6 +128,8 @@ describe("Crypto", function () {
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
+
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toBe(null);
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
             event.getSenderKey = () => "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
@@ -141,6 +145,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.authenticated).toBeFalsy();
             expect(encryptionInfo.sender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, megolm key from backup
             event.getForwardingCurve25519KeyChain = () => [];
             event.isKeySourceUntrusted = () => true;
@@ -155,6 +164,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
             device.keys["ed25519:FLIBBLE"] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
@@ -164,6 +178,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.authenticated).toBeTruthy();
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeTruthy();
+
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+            });
 
             client.stopClient();
         });
