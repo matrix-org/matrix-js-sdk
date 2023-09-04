@@ -2247,7 +2247,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         /**
-         * Add all mocks needed to setup cross-signing, key backup, 4S and then
+         * Add all mocks needed to set up cross-signing, key backup, 4S and then
          * configure the account to have recovery.
          *
          * @param backupVersion - The version of the created backup
@@ -2539,11 +2539,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(nextVersion).not.toEqual(currentVersion);
             expect(nextKey).not.toEqual(currentBackupKey);
 
-            // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
-            // ensure that it works anyhow
-            await aliceClient.deleteKeyBackupVersion(nextVersion!);
+            // Test deletion of the backup
+            await aliceClient.getCrypto()!.deleteKeyBackupVersion(nextVersion!);
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-            // XXX Legacy crypto does not update 4S when doing that; should ensure that rust implem does it.
+            // XXX Legacy crypto does not update 4S when deleting backup; should ensure that rust implem does it.
             expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toBeNull();
         });
     });
