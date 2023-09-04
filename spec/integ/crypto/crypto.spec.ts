@@ -2246,6 +2246,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
+        /**
+         * Add all mocks needed to setup cross-signing, key backup, 4S and then
+         * configure the account to have recovery.
+         *
+         * @param backupVersion - The version of the created backup
+         */
         async function bootstrapSecurity(backupVersion: string): Promise<void> {
             mockSetupCrossSigningRequests();
             mockSetupMegolmBackupRequests(backupVersion);
@@ -2461,7 +2467,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         oldBackendOnly("Reset key backup should create a new backup and update 4S", async () => {
-            // First set up recovery
+            // First set up 4S and key backup
             const backupVersion = "1";
             await bootstrapSecurity(backupVersion);
 
@@ -2519,12 +2525,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             });
 
-            const new4SUpload = awaitMegolmBackupKeyUpload();
+            const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
 
             await aliceClient.getCrypto()!.resetKeyBackup();
             await awaitDeleteCalled;
             await newBackupStatusUpdate;
-            await new4SUpload;
+            await newBackupUploadPromise;
 
             const nextVersion = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
             const nextKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -2533,11 +2539,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(nextVersion).not.toEqual(currentVersion);
             expect(nextKey).not.toEqual(currentBackupKey);
 
-            // The API is deprecated but has been modified to work with both crypto backend
+            // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
             // ensure that it works anyhow
             await aliceClient.deleteKeyBackupVersion(nextVersion!);
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-            // XXX Legacy is not updating 4S when doing that, should ensure that rust implem does it.
+            // XXX Legacy crypto does not update 4S when doing that; should ensure that rust implem does it.
             expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toBeNull();
         });
     });

@@ -602,16 +602,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoApi#resetKeyBackup}.
-     */
-    public async resetKeyBackup(): Promise<void> {
-        // stub
-    }
-
-    public async deleteKeyBackupVersion(version: string): Promise<void> {
-        // stub
-    }
-    /**
      * Add the secretStorage key to the secret storage
      * - The secret storage key must have the `keyInfo` field filled
      * - The secret storage key is set as the default key of the secret storage
@@ -946,6 +936,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         return await this.backupManager.checkKeyBackupAndEnable(true);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        // stub
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        // stub
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

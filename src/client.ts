@@ -3410,7 +3410,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param info - Info object from prepareKeyBackupVersion
      * @returns Object with 'version' param indicating the version created
      *
-     *
      * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
