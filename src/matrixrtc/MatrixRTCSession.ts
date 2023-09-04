@@ -53,7 +53,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         newMemberships: CallMembership[],
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
-    [MatrixRTCSessionEvent.EncryptionKeyChanged]: (key: string, userId: string, deviceId: string) => void;
+    [MatrixRTCSessionEvent.EncryptionKeyChanged]: (key: string, participantId: string) => void;
 };
 
 /**
@@ -236,8 +236,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             "m.call_id": "",
         } as EncryptionKeyEventContent);
 
-        this.encryptionKeys.set(combineUserAndDeviceId(userId, deviceId), encryptionKey);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
+        const participantId = combineUserAndDeviceId(userId, deviceId);
+        this.encryptionKeys.set(participantId, encryptionKey);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
     }
 
     /**
@@ -296,8 +297,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        this.encryptionKeys.set(combineUserAndDeviceId(userId, deviceId), encryptionKey);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, userId, deviceId);
+        const participantId = combineUserAndDeviceId(userId, deviceId);
+        this.encryptionKeys.set(participantId, encryptionKey);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
         logger.log(`Updated encryption key for userId=${userId}, deviceId=${deviceId}`);
     };
 
