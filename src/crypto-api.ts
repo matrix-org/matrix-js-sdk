@@ -629,7 +629,7 @@ export interface GeneratedSecretStorageKey {
 }
 
 /**
- *  Result type of {@link CryptoApi#getEventEncryptionInfo}.
+ *  Result type of {@link CryptoApi#getEncryptionInfoForEvent}.
  */
 export interface EventEncryptionInfo {
     /** "Shield" to be shown next to this event representing its verification status */
