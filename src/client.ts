@@ -3272,6 +3272,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get information about the current key backup.
      * @returns Information object from API or null
+     *
+     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res: IKeyBackupInfo;
@@ -3343,6 +3345,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Disable backing up of keys.
+     *
+     * @deprecated It should be unnecessary to disable key backup.
      */
     public disableKeyBackup(): void {
         if (!this.crypto) {
@@ -3362,6 +3366,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns Object that can be passed to createKeyBackupVersion and
      *     additionally has a 'recovery_key' member with the user-facing recovery key string.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async prepareKeyBackupVersion(
         password?: string | Uint8Array | null,
@@ -3405,6 +3411,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param info - Info object from prepareKeyBackupVersion
      * @returns Object with 'version' param indicating the version created
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
@@ -3450,24 +3458,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return res;
     }
 
+    /**
+     * @deprecated Use {@link Crypto.CryptoApi.deleteKeyBackupVersion | `CryptoApi.deleteKeyBackupVersion`}.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        // If we're currently backing up to this backup... stop.
-        // (We start using it automatically in createKeyBackupVersion
-        // so this is symmetrical).
-        // TODO: convert this to use crypto.getActiveSessionBackupVersion. And actually check the version.
-        if (this.crypto.backupManager.version) {
-            this.crypto.backupManager.disableKeyBackup();
-        }
-
-        const path = utils.encodeUri("/room_keys/version/$version", {
-            $version: version,
-        });
-
-        await this.http.authedRequest(Method.Delete, path, undefined, undefined, { prefix: ClientPrefix.V3 });
+        await this.cryptoBackend.deleteKeyBackupVersion(version);
     }
 
     private makeKeyBackupPath(roomId: undefined, sessionId: undefined, version?: string): IKeyBackupPath;
