@@ -3270,6 +3270,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get information about the current key backup.
      * @returns Information object from API or null
+     *
      * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
@@ -3342,6 +3343,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Disable backing up of keys.
+     *
      * @deprecated It should be unnecessary to disable key backup.
      */
     public disableKeyBackup(): void {
@@ -3462,7 +3464,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        await this.cryptoBackend!.deleteKeyBackupVersion(version);
+        await this.cryptoBackend.deleteKeyBackupVersion(version);
     }
 
     private makeKeyBackupPath(roomId?: string, sessionId?: string, version?: string): IKeyBackupPath {

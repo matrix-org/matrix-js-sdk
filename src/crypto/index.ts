@@ -544,15 +544,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Deletes the given backup.
-     *
-     * @param version - The version to delete.
-     */
-    public async deleteKeyBackupVersion(version: string): Promise<void> {
-        await this.backupManager.deleteKeyBackupVersion(version);
-    }
-
-    /**
      * Initialise the crypto module so that it is ready for use
      *
      * Returns a promise which resolves once the crypto module is ready for use.
@@ -1155,38 +1146,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.log("Secure Secret Storage ready");
     }
 
-    public async resetKeyBackup(): Promise<void> {
-        // Delete existing ones
-        // There is no use case for having several key backup version live server side.
-        // Even if not deleted it would be lost as the key to restore is lost.
-        // There should be only one backup at a time.
-        await this.backupManager.deleteAllKeyBackupVersions();
-
-        const info = await this.backupManager.prepareKeyBackupVersion();
-
-        await this.signObject(info.auth_data);
-
-        // add new key backup
-        const { version } = await this.baseApis.http.authedRequest<{ version: string }>(
-            Method.Post,
-            "/room_keys/version",
-            undefined,
-            info,
-            {
-                prefix: ClientPrefix.V3,
-            },
-        );
-
-        logger.log(`Created backup version ${version}`);
-
-        // write the key to 4S
-        const privateKey = info.privateKey;
-        await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
-        await this.storeSessionBackupPrivateKey(privateKey);
-
-        await this.backupManager.checkAndStart();
-    }
-
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#addKey}.
      */
@@ -1345,6 +1304,48 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
         const trustInfo = await this.backupManager.isKeyBackupTrusted(info);
         return backupTrustInfoFromLegacyTrustInfo(trustInfo);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        // Delete existing ones
+        // There is no use case for having several key backup version live server side.
+        // Even if not deleted it would be lost as the key to restore is lost.
+        // There should be only one backup at a time.
+        await this.backupManager.deleteAllKeyBackupVersions();
+
+        const info = await this.backupManager.prepareKeyBackupVersion();
+
+        await this.signObject(info.auth_data);
+
+        // add new key backup
+        const { version } = await this.baseApis.http.authedRequest<{ version: string }>(
+            Method.Post,
+            "/room_keys/version",
+            undefined,
+            info,
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        logger.log(`Created backup version ${version}`);
+
+        // write the key to 4S
+        const privateKey = info.privateKey;
+        await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+        await this.storeSessionBackupPrivateKey(privateKey);
+
+        await this.backupManager.checkAndStart();
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
     }
 
     /**

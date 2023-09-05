@@ -30,7 +30,7 @@ import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault, recursiveMapToObject, encodeUri } from "../utils";
+import { MapWithDefault, encodeUri } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -63,14 +63,19 @@ import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
-import { ISignatures } from "../@types/signed";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { encodeBase64 } from "../crypto/olmlib";
 import { DecryptionError } from "../crypto/algorithms";
 import { IKeyBackupSession } from "../crypto/keybackup";
+import { ISignatures } from "../@types/signed";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
+interface ISignableObject {
+    signatures?: ISignatures;
+    unsigned?: object;
+}
 
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
@@ -683,51 +688,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Deletes the given key backup.
-     *
-     * @param version - The backup version to delete.
-     */
-    public async deleteKeyBackupVersion(version: string): Promise<void> {
-        await this.backupManager.deleteKeyBackupVersion(version);
-    }
-
-    /**
-     * Implementation of {@link CryptoApi#resetKeyBackup}.
-     */
-    public async resetKeyBackup(): Promise<void> {
-        const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
-
-        // we want to store the private key in 4S
-        // need to check if 4S is set up?
-        if (await this.secretStorageHasAESKey()) {
-            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
-        }
-
-        // we can check and start async
-        this.checkKeyBackupAndEnable();
-    }
-
-    private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
-        const sigs = new Map(Object.entries(obj.signatures || {}));
-        const unsigned = obj.unsigned;
-
-        delete obj.signatures;
-        delete obj.unsigned;
-
-        const userSignatures = sigs.get(this.userId) || {};
-
-        const canonalizedJson = anotherjson.stringify(obj);
-        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
-
-        const map = JSON.parse(signatures.asJSON());
-
-        sigs.set(this.userId, { ...userSignatures, ...map[this.userId] });
-
-        if (unsigned !== undefined) obj.unsigned = unsigned;
-        obj.signatures = recursiveMapToObject(sigs);
-    }
-
-    /**
      * Add the secretStorage key to the secret storage
      * - The secret storage key must have the `keyInfo` field filled
      * - The secret storage key is set as the default key of the secret storage
@@ -1062,6 +1022,55 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         return await this.backupManager.checkKeyBackupAndEnable(true);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
+
+        // we want to store the private key in 4S
+        // need to check if 4S is set up?
+        if (await this.secretStorageHasAESKey()) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
+        }
+
+        // we can check and start async
+        this.checkKeyBackupAndEnable();
+    }
+
+    /**
+     * Signs the given object with the current device and current identity (if available).
+     * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.
+     *
+     * @param obj - The object to sign
+     */
+    private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+        const sigs = new Map(Object.entries(obj.signatures || {}));
+        const unsigned = obj.unsigned;
+
+        delete obj.signatures;
+        delete obj.unsigned;
+
+        const userSignatures = sigs.get(this.userId) || {};
+
+        const canonalizedJson = anotherjson.stringify(obj);
+        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
+
+        const map = JSON.parse(signatures.asJSON());
+
+        sigs.set(this.userId, { ...userSignatures, ...map[this.userId] });
+
+        if (unsigned !== undefined) obj.unsigned = unsigned;
+        obj.signatures = Object.fromEntries(sigs.entries());
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

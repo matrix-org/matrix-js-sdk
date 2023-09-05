@@ -40,6 +40,7 @@ import { logger } from "../../../src/logger";
 import {
     Category,
     createClient,
+    CryptoEvent,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -69,7 +70,7 @@ import {
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
+import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
 
@@ -2300,11 +2301,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
-
                         if (content.key) {
                             resolve(content.key);
                         }
-
                         return {};
                     },
                     { overwriteRoutes: true },
@@ -2346,6 +2345,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
+        /**
+         * Add all mocks needed to setup cross-signing, key backup, 4S and then
+         * configure the account to have recovery.
+         *
+         * @param backupVersion - The version of the created backup
+         */
         async function bootstrapSecurity(backupVersion: string): Promise<void> {
             mockSetupCrossSigningRequests();
             mockSetupMegolmBackupRequests(backupVersion);
@@ -2385,8 +2390,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Wait for the cross signing keys to be uploaded
             await Promise.all(setupPromises);
 
-            // Finally, wait for bootstrapSecretStorage to finished
+            // wait for bootstrapSecretStorage to finished
             await bootstrapPromise;
+            // Finally ensure backup is working
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
             await backupStatusUpdate;
         }
 
@@ -2545,17 +2552,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(selfSigningKey[secretStorageKey]).toBeDefined();
         });
 
-        newBackendOnly("should create a new megolm backup", async () => {
+        it("should create a new megolm backup", async () => {
             const backupVersion = "abc";
             await bootstrapSecurity(backupVersion);
 
             // Expect a backup to be available and used
             const activeBackup = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
             expect(activeBackup).toStrictEqual(backupVersion);
+
+            // check that there is a MSK signature
+            const signatures = (await aliceClient.getCrypto()!.checkKeyBackupAndEnable())!.backupInfo.auth_data!
+                .signatures;
+            expect(signatures).toBeDefined();
+            expect(signatures![aliceClient.getUserId()!]).toBeDefined();
+            const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
+            expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
         });
 
         it("Reset key backup should create a new backup and update 4S", async () => {
-            // First set up recovery
+            // First set up 4S and key backup
             const backupVersion = "1";
             await bootstrapSecurity(backupVersion);
 
@@ -2613,12 +2628,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             });
 
-            const new4SUpload = awaitMegolmBackupKeyUpload();
+            const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
 
             await aliceClient.getCrypto()!.resetKeyBackup();
             await awaitDeleteCalled;
             await newBackupStatusUpdate;
-            await new4SUpload;
+            await newBackupUploadPromise;
 
             const nextVersion = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
             const nextKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -2626,6 +2641,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(nextVersion).toBeDefined();
             expect(nextVersion).not.toEqual(currentVersion);
             expect(nextKey).not.toEqual(currentBackupKey);
+
+            // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
+            // ensure that it works anyhow
+            await aliceClient.deleteKeyBackupVersion(nextVersion!);
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+            // XXX Legacy crypto does not update 4S when doing that; should ensure that rust implem does it.
+            expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toBeNull();
         });
     });
 

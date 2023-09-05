@@ -29,19 +29,6 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
 import { IKeyBackupSession, Curve25519SessionData } from "../crypto/keybackup";
 
-/**
- * prepareKeyBackupVersion result.
- */
-interface PreparedKeyBackupVersion {
-    /** The prepared algorithm version */
-    algorithm: string;
-    /** The auth data of the algorithm */
-    /* eslint-disable-next-line camelcase */
-    auth_data: AuthData;
-    /** The generated private key */
-    decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
-}
-
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
 
@@ -323,32 +310,36 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
     public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
-        // Cleanup any existing backup
+        // Clean up any existing backup
         await this.deleteAllKeyBackupVersions();
 
-        const version = await this.prepareKeyBackupVersion();
-        await signObject(version.auth_data);
+        const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
+        const pubKey = randomKey.megolmV1PublicKey;
+
+        const authData = { public_key: pubKey.publicKeyBase64 };
+
+        await signObject(authData);
 
         const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
             {
-                algorithm: version.algorithm,
-                auth_data: version.auth_data,
+                algorithm: pubKey.algorithm,
+                auth_data: authData,
             },
             {
                 prefix: ClientPrefix.V3,
             },
         );
 
-        this.olmMachine.saveBackupDecryptionKey(version.decryptionKey, res.version);
+        this.olmMachine.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
             version: res.version,
-            algorithm: version.algorithm,
-            authData: version.auth_data,
-            decryptionKey: version.decryptionKey,
+            algorithm: pubKey.algorithm,
+            authData: authData,
+            decryptionKey: randomKey,
         };
     }
 
@@ -379,21 +370,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
-    }
-
-    /**
-     * Prepare the keybackup version data, auth_data not signed at this point
-     * @returns a {@link PreparedKeyBackupVersion} with all information about the creation.
-     */
-    private async prepareKeyBackupVersion(): Promise<PreparedKeyBackupVersion> {
-        const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
-        const pubKey = randomKey.megolmV1PublicKey;
-
-        return {
-            algorithm: pubKey.algorithm,
-            auth_data: { public_key: pubKey.publicKeyBase64 },
-            decryptionKey: randomKey,
-        };
     }
 }
 

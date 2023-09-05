@@ -361,7 +361,7 @@ export class BackupManager {
         };
 
         if (!backupInfo || !backupInfo.algorithm || !backupInfo.auth_data || !backupInfo.auth_data.signatures) {
-            logger.info("Key backup is absent or missing required data");
+            logger.info(`Key backup is absent or missing required data: ${JSON.stringify(backupInfo)}`);
             return ret;
         }
 
