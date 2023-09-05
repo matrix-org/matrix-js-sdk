@@ -181,7 +181,7 @@ describe("Crypto", function () {
 
             expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
                 shieldColour: EventShieldColour.RED,
-                shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+                shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
             });
 
             client.stopClient();
