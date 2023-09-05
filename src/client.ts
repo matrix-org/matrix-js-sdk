@@ -2643,6 +2643,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
      * @param userId - The ID of the user to check.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.getUserVerificationStatus | `CryptoApi.getUserVerificationStatus`}
      */
     public checkUserTrust(userId: string): UserTrustLevel {
         if (!this.cryptoBackend) {

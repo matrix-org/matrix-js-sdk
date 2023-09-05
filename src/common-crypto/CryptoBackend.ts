@@ -48,9 +48,9 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
      * Get the verification level for a given user
      *
-     * TODO: define this better
-     *
      * @param userId - user to be checked
+     *
+     * @deprecated Superceded by {@link CryptoApi#getUserVerificationStatus}.
      */
     checkUserTrust(userId: string): UserTrustLevel;
 

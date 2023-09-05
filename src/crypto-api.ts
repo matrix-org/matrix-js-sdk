@@ -133,6 +133,14 @@ export interface CryptoApi {
     getTrustCrossSignedDevices(): boolean;
 
     /**
+     * Get the verification status of a given user.
+     *
+     * @param userId - The ID of the user to check.
+     *
+     */
+    getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.
@@ -414,6 +422,46 @@ export interface BootstrapCrossSigningOpts {
      * will not be uploaded to the server (which seems like a bad thing?).
      */
     authUploadDeviceSigningKeys?: UIAuthCallback<void>;
+}
+
+/**
+ * Represents the ways in which we trust a user
+ */
+export class UserVerificationStatus {
+    public constructor(
+        private readonly crossSigningVerified: boolean,
+        private readonly crossSigningVerifiedBefore: boolean,
+        private readonly tofu: boolean,
+    ) {}
+
+    /**
+     * @returns true if this user is verified via any means
+     */
+    public isVerified(): boolean {
+        return this.isCrossSigningVerified();
+    }
+
+    /**
+     * @returns true if this user is verified via cross signing
+     */
+    public isCrossSigningVerified(): boolean {
+        return this.crossSigningVerified;
+    }
+
+    /**
+     * @returns true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    public wasCrossSigningVerified(): boolean {
+        return this.crossSigningVerifiedBefore;
+    }
+
+    /**
+     * @returns true if this user's key is trusted on first use
+     */
+    public isTofu(): boolean {
+        return this.tofu;
+    }
 }
 
 export class DeviceVerificationStatus {
