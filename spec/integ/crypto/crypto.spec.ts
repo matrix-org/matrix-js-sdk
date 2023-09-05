@@ -2471,7 +2471,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         it("Reset key backup should create a new backup and update 4S", async () => {
-            // First set up recovery
+            // First set up 4S and key backup
             const backupVersion = "1";
             await bootstrapSecurity(backupVersion);
 
