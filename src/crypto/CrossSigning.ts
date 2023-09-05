@@ -30,7 +30,10 @@ import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
-import { DeviceVerificationStatus } from "../crypto-api";
+import { DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
+
+// backwards-compatibility re-exports
+export { UserTrustLevel };
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
@@ -585,46 +588,6 @@ export enum CrossSigningLevel {
     MASTER = 4,
     USER_SIGNING = 2,
     SELF_SIGNING = 1,
-}
-
-/**
- * Represents the ways in which we trust a user
- */
-export class UserTrustLevel {
-    public constructor(
-        private readonly crossSigningVerified: boolean,
-        private readonly crossSigningVerifiedBefore: boolean,
-        private readonly tofu: boolean,
-    ) {}
-
-    /**
-     * @returns true if this user is verified via any means
-     */
-    public isVerified(): boolean {
-        return this.isCrossSigningVerified();
-    }
-
-    /**
-     * @returns true if this user is verified via cross signing
-     */
-    public isCrossSigningVerified(): boolean {
-        return this.crossSigningVerified;
-    }
-
-    /**
-     * @returns true if we ever verified this user before (at least for
-     * the history of verifications observed by this device).
-     */
-    public wasCrossSigningVerified(): boolean {
-        return this.crossSigningVerifiedBefore;
-    }
-
-    /**
-     * @returns true if this user's key is trusted on first use
-     */
-    public isTofu(): boolean {
-        return this.tofu;
-    }
 }
 
 /**

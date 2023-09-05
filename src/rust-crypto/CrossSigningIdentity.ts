@@ -33,7 +33,7 @@ export class CrossSigningIdentity {
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly secretStorage: ServerSideSecretStorage,
         /** Called if the cross signing keys are imported from the secret storage */
-        private readonly onCrossSigningKeysImport: () => void,
+        private readonly onCrossSigningKeysImport: () => Promise<void>,
     ) {}
 
     /**
@@ -96,7 +96,7 @@ export class CrossSigningIdentity {
             const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
             await this.outgoingRequestProcessor.makeOutgoingRequest(request);
 
-            this.onCrossSigningKeysImport();
+            await this.onCrossSigningKeysImport();
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the
