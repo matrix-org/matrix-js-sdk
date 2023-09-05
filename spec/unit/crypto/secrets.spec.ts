@@ -312,6 +312,7 @@ describe("Secrets", function () {
                 this.emit(ClientEvent.AccountData, event);
                 return {};
             };
+            bob.getKeyBackupVersion = jest.fn().mockResolvedValue(null);
 
             await bob.bootstrapCrossSigning({
                 authUploadDeviceSigningKeys: async (func) => {
