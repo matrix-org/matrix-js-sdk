@@ -2216,18 +2216,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         logger.warn(`Call ${this.callId} getUserMediaFailed() failed to get user media - ending call`, err);
 
-        let msg: string;
-        let errorCode: CallErrorCode;
-        if (err.name === "SyntaxError") {
-            errorCode = CallErrorCode.IceFailed;
-            msg = "Couldn't start call! Invalid ICE server configuration.";
-        } else {
-            errorCode = CallErrorCode.NoUserMedia;
-            msg = "Couldn't start capturing media! Is your microphone set up and does this app have permission?";
+        this.emit(
+            CallEvent.Error,
+            new CallError(
+                CallErrorCode.NoUserMedia,
+                "Couldn't start capturing media! Is your microphone set up and does this app have permission?",
+                err,
+            ),
+            this,
+        );
+        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
+    };
+
+    private placeCallFailed = (err: Error): void => {
+        if (this.successor) {
+            this.successor.placeCallFailed(err);
+            return;
         }
 
-        this.emit(CallEvent.Error, new CallError(errorCode, msg, err), this);
-        this.terminate(CallParty.Local, errorCode, false);
+        logger.warn(`Call ${this.callId} placeCallWithCallFeeds() failed - ending call`, err);
+
+        this.emit(
+            CallEvent.Error,
+            new CallError(CallErrorCode.IceFailed, "Couldn't start call! Invalid ICE server configuration.", err),
+            this,
+        );
+        this.terminate(CallParty.Local, CallErrorCode.IceFailed, false);
     };
 
     private onIceConnectionStateChanged = (): void => {
@@ -2777,6 +2791,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         this.state = CallState.WaitLocalMedia;
 
+        let callFeed: CallFeed;
         try {
             const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);
 
@@ -2785,7 +2800,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             setTracksEnabled(stream.getAudioTracks(), true);
             setTracksEnabled(stream.getVideoTracks(), true);
 
-            const callFeed = new CallFeed({
+            callFeed = new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
                 userId: this.client.getUserId()!,
@@ -2795,9 +2810,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audioMuted: false,
                 videoMuted: false,
             });
-            await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
             this.getUserMediaFailed(<Error>e);
+            return;
+        }
+
+        try {
+            await this.placeCallWithCallFeeds([callFeed]);
+        } catch (e) {
+            this.placeCallFailed(<Error>e);
             return;
         }
     }
