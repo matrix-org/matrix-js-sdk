@@ -40,6 +40,7 @@ import { logger } from "../../../src/logger";
 import {
     Category,
     createClient,
+    CryptoEvent,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -54,7 +55,6 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
-    CryptoEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver, IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -2202,11 +2202,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
-
                         if (content.key) {
                             resolve(content.key);
                         }
-
                         return {};
                     },
                     { overwriteRoutes: true },
