@@ -22,8 +22,23 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { encodeUri } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
+
+/** Authentification of the backup info, depends on algorithm */
+type AuthData = KeyBackupInfo["auth_data"];
+
+/**
+ * Holds information of a created keybackup.
+ * Useful to get the generated private key material and save it securely somewhere.
+ */
+interface KeyBackupCreationInfo {
+    version: string;
+    algorithm: string;
+    authData: AuthData;
+    decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
+}
 
 /**
  * @internal
@@ -279,6 +294,79 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 throw e;
             }
         }
+    }
+
+    /**
+     * Creates a new key backup by generating a new random private key.
+     *
+     * If there is an existing backup server side it will be deleted and replaced
+     * by the new one.
+     *
+     * @param signObject - Method that should sign the backup with existing device and
+     * existing identity.
+     * @returns a KeyBackupCreationInfo - All information related to the backup.
+     */
+    public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        // Clean up any existing backup
+        await this.deleteAllKeyBackupVersions();
+
+        const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
+        const pubKey = randomKey.megolmV1PublicKey;
+
+        const authData = { public_key: pubKey.publicKeyBase64 };
+
+        await signObject(authData);
+
+        const res = await this.http.authedRequest<{ version: string }>(
+            Method.Post,
+            "/room_keys/version",
+            undefined,
+            {
+                algorithm: pubKey.algorithm,
+                auth_data: authData,
+            },
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        this.olmMachine.saveBackupDecryptionKey(randomKey, res.version);
+
+        return {
+            version: res.version,
+            algorithm: pubKey.algorithm,
+            authData: authData,
+            decryptionKey: randomKey,
+        };
+    }
+
+    /**
+     * Deletes all key backups.
+     *
+     * Will call the API to delete active backup until there is no more present.
+     */
+    public async deleteAllKeyBackupVersions(): Promise<void> {
+        // there could be several backup versions. Delete all to be safe.
+        let current = (await this.requestKeyBackupVersion())?.version ?? null;
+        while (current != null) {
+            await this.deleteKeyBackupVersion(current);
+            current = (await this.requestKeyBackupVersion())?.version ?? null;
+        }
+
+        // XXX: Should this also update Secret Storage and delete any existing keys?
+    }
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        logger.debug(`deleteKeyBackupVersion v:${version}`);
+        const path = encodeUri("/room_keys/version/$version", { $version: version });
+        await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
     }
 }
 

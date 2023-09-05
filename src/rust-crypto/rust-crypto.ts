@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
@@ -63,8 +64,14 @@ import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } f
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
+import { ISignatures } from "../@types/signed";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
+interface ISignableObject {
+    signatures?: ISignatures;
+    unsigned?: object;
+}
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -555,6 +562,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage,
+        setupNewKeyBackup,
     }: CreateSecretStorageOpts = {}): Promise<void> {
         // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
         // we don't want to create a new key
@@ -598,6 +606,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+
+            if (setupNewKeyBackup) {
+                await this.resetKeyBackup();
+            }
         }
     }
 
@@ -939,17 +951,52 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoApi#resetKeyBackup}.
-     */
-    public async resetKeyBackup(): Promise<void> {
-        // stub
-    }
-
-    /**
      * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
-        // stub
+        await this.backupManager.deleteKeyBackupVersion(version);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
+
+        // we want to store the private key in 4S
+        // need to check if 4S is set up?
+        if (await this.secretStorageHasAESKey()) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
+        }
+
+        // we can check and start async
+        this.checkKeyBackupAndEnable();
+    }
+
+    /**
+     * Signs the given object with the current device and current identity (if available).
+     * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.
+     *
+     * @param obj - The object to sign
+     */
+    private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+        const sigs = new Map(Object.entries(obj.signatures || {}));
+        const unsigned = obj.unsigned;
+
+        delete obj.signatures;
+        delete obj.unsigned;
+
+        const userSignatures = sigs.get(this.userId) || {};
+
+        const canonalizedJson = anotherjson.stringify(obj);
+        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
+
+        const map = JSON.parse(signatures.asJSON());
+
+        sigs.set(this.userId, { ...userSignatures, ...map[this.userId] });
+
+        if (unsigned !== undefined) obj.unsigned = unsigned;
+        obj.signatures = Object.fromEntries(sigs.entries());
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
