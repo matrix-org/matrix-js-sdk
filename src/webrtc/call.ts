@@ -2834,7 +2834,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private createPeerConnection(): RTCPeerConnection {
         const pc = new window.RTCPeerConnection({
             iceTransportPolicy: this.forceTURN ? "relay" : undefined,
-            iceServers: this.turnServers,
+            iceServers: this.turnServers.length ? this.turnServers : undefined,
             iceCandidatePoolSize: this.client.iceCandidatePoolSize,
             bundlePolicy: "max-bundle",
         });
