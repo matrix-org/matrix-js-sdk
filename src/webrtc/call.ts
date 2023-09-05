@@ -2216,16 +2216,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         logger.warn(`Call ${this.callId} getUserMediaFailed() failed to get user media - ending call`, err);
 
-        this.emit(
-            CallEvent.Error,
-            new CallError(
-                CallErrorCode.NoUserMedia,
-                "Couldn't start capturing media! Is your microphone set up and " + "does this app have permission?",
-                err,
-            ),
-            this,
-        );
-        this.terminate(CallParty.Local, CallErrorCode.NoUserMedia, false);
+        let msg: string;
+        let errorCode: CallErrorCode;
+        if (err.name === "SyntaxError") {
+            errorCode = CallErrorCode.IceFailed;
+            msg = "Couldn't start call! Invalid ICE server configuration.";
+        } else {
+            errorCode = CallErrorCode.NoUserMedia;
+            msg = "Couldn't start capturing media! Is your microphone set up and does this app have permission?";
+        }
+
+        this.emit(CallEvent.Error, new CallError(errorCode, msg, err), this);
+        this.terminate(CallParty.Local, errorCode, false);
     };
 
     private onIceConnectionStateChanged = (): void => {
