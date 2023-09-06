@@ -41,9 +41,9 @@
     "@jridgewell/trace-mapping" "^0.3.9"
 
 "@babel/cli@^7.12.10":
-  version "7.22.10"
-  resolved "https://registry.yarnpkg.com/@babel/cli/-/cli-7.22.10.tgz#25e4bbd8d0a0d8b4b389e1b5e2d7a238bd4c1b75"
-  integrity sha512-rM9ZMmaII630zGvtMtQ3P4GyHs28CHLYE9apLG7L8TgaSqcfoIGrlLSLsh4Q8kDTdZQQEXZm1M0nQtOvU/2heg==
+  version "7.22.15"
+  resolved "https://registry.yarnpkg.com/@babel/cli/-/cli-7.22.15.tgz#22ed82d76745a43caa60a89917bedb7c9b5bd145"
+  integrity sha512-prtg5f6zCERIaECeTZzd2fMtVjlfjhUcO+fBLQ6DXXdq5FljN+excVitJ2nogsusdf31LeqkjAfXZ7Xq+HmN8g==
   dependencies:
     "@jridgewell/trace-mapping" "^0.3.17"
     commander "^4.0.1"
@@ -893,11 +893,11 @@
     "@babel/helper-plugin-utils" "^7.22.5"
 
 "@babel/plugin-transform-runtime@^7.12.10":
-  version "7.22.10"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-runtime/-/plugin-transform-runtime-7.22.10.tgz#89eda6daf1d3af6f36fb368766553054c8d7cd46"
-  integrity sha512-RchI7HePu1eu0CYNKHHHQdfenZcM4nz8rew5B1VWqeRKdcwW5aQ5HeG9eTUbWiAS1UrmHVLmoxTWHt3iLD/NhA==
+  version "7.22.15"
+  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-runtime/-/plugin-transform-runtime-7.22.15.tgz#3a625c4c05a39e932d7d34f5d4895cdd0172fdc9"
+  integrity sha512-tEVLhk8NRZSmwQ0DJtxxhTrCht1HVo8VaMzYT4w6lwyKBuHsgoioAUA7/6eT2fRfc5/23fuGdlwIxXhRVgWr4g==
   dependencies:
-    "@babel/helper-module-imports" "^7.22.5"
+    "@babel/helper-module-imports" "^7.22.15"
     "@babel/helper-plugin-utils" "^7.22.5"
     babel-plugin-polyfill-corejs2 "^0.4.5"
     babel-plugin-polyfill-corejs3 "^0.8.3"
@@ -1088,9 +1088,9 @@
     "@babel/plugin-transform-typescript" "^7.22.15"
 
 "@babel/register@^7.12.10":
-  version "7.22.5"
-  resolved "https://registry.yarnpkg.com/@babel/register/-/register-7.22.5.tgz#e4d8d0f615ea3233a27b5c6ada6750ee59559939"
-  integrity sha512-vV6pm/4CijSQ8Y47RH5SopXzursN35RQINfGJkmOlcpAtGuf94miFvIPhCKGQN7WGIcsgG1BHEX2KVdTYwTwUQ==
+  version "7.22.15"
+  resolved "https://registry.yarnpkg.com/@babel/register/-/register-7.22.15.tgz#c2c294a361d59f5fa7bcc8b97ef7319c32ecaec7"
+  integrity sha512-V3Q3EqoQdn65RCgTLwauZaTfd1ShhwPmbBv+1dkZV/HpCGMKVyn6oFcRlI7RaKqiDQjX2Qd3AuoEguBgdjIKlg==
   dependencies:
     clone-deep "^4.0.1"
     find-cache-dir "^2.0.0"
@@ -3887,10 +3887,15 @@ fs.realpath@^1.0.0:
   resolved "https://registry.yarnpkg.com/fs.realpath/-/fs.realpath-1.0.0.tgz#1504ad2523158caa40db4a2787cb01411994ea4f"
   integrity sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==
 
-fsevents@^2.3.2, fsevents@~2.3.2:
+fsevents@^2.3.2:
   version "2.3.2"
   resolved "https://registry.yarnpkg.com/fsevents/-/fsevents-2.3.2.tgz#8a526f78b8fdf4623b709e0b975c52c24c02fd1a"
   integrity sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==
+
+fsevents@~2.3.2:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/fsevents/-/fsevents-2.3.3.tgz#cac6407785d03675a2a5e1a5305c697b347d90d6"
+  integrity sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==
 
 function-bind@^1.1.1:
   version "1.1.1"
