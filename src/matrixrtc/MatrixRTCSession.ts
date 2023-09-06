@@ -29,7 +29,7 @@ const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 
 export enum MatrixRTCSessionEvent {
-    // A member joined, left, or updated a proprty of their membership
+    // A member joined, left, or updated a property of their membership.
     MembershipsChanged = "memberships_changed",
     // We joined or left the session (our own local idea of whether we are joined, separate from MembershipsChanged)
     JoinStateChanged = "join_state_changed",
