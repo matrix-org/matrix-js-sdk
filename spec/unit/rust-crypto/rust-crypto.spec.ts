@@ -150,6 +150,44 @@ describe("RustCrypto", () => {
         await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
     });
 
+    describe("getCrossSigningStatus", () => {
+        it("returns sensible values on a default client", async () => {
+            const secretStorage = {
+                isStored: jest.fn().mockResolvedValue(null),
+            } as unknown as Mocked<ServerSideSecretStorage>;
+            const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
+
+            const result = await rustCrypto.getCrossSigningStatus();
+
+            expect(secretStorage.isStored).toHaveBeenCalledWith("m.cross_signing.master");
+            expect(result).toEqual({
+                privateKeysCachedLocally: {
+                    masterKey: false,
+                    selfSigningKey: false,
+                    userSigningKey: false,
+                },
+                privateKeysInSecretStorage: false,
+                publicKeysOnDevice: false,
+            });
+        });
+
+        it("throws if `stop` is called mid-call", async () => {
+            const secretStorage = {
+                isStored: jest.fn().mockResolvedValue(null),
+            } as unknown as Mocked<ServerSideSecretStorage>;
+            const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
+
+            // start the call off
+            const result = rustCrypto.getCrossSigningStatus();
+
+            // call `.stop`
+            rustCrypto.stop();
+
+            // getCrossSigningStatus should abort
+            await expect(result).rejects.toEqual(new Error("MatrixClient has been stopped"));
+        });
+    });
+
     it("bootstrapCrossSigning delegates to CrossSigningIdentity", async () => {
         const rustCrypto = await makeTestRustCrypto();
         const mockCrossSigningIdentity = {
@@ -584,6 +622,43 @@ describe("RustCrypto", () => {
             await expect(() =>
                 rustCrypto.requestVerificationDM("@bob:example.com", testData.TEST_ROOM_ID),
             ).rejects.toThrow("unknown userId @bob:example.com");
+        });
+    });
+
+    describe("getUserVerificationStatus", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("returns an unverified UserVerificationStatus when there is no UserIdentity", async () => {
+            const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.isVerified()).toBeFalsy();
+            expect(userVerificationStatus.isTofu()).toBeFalsy();
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeFalsy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+        });
+
+        it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
+            olmMachine.getIdentity.mockResolvedValue({ isVerified: jest.fn().mockReturnValue(true) });
+
+            const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.isVerified()).toBeTruthy();
+            expect(userVerificationStatus.isTofu()).toBeFalsy();
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
         });
     });
 });

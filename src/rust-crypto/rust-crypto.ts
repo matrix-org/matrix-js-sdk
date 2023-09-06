@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
@@ -25,7 +26,6 @@ import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
@@ -44,6 +44,7 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
+    UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
@@ -62,8 +63,15 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
+import { ClientStoppedError } from "../errors";
+import { ISignatures } from "../@types/signed";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+
+interface ISignableObject {
+    signatures?: ISignatures;
+    unsigned?: object;
+}
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -127,8 +135,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         ]);
 
         // Fire if the cross signing keys are imported from the secret storage
-        const onCrossSigningKeysImport = (): void => {
-            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, this.checkUserTrust(this.userId));
+        const onCrossSigningKeysImport = async (): Promise<void> => {
+            const newVerification = await this.getUserVerificationStatus(this.userId);
+            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, newVerification);
         };
         this.crossSigningIdentity = new CrossSigningIdentity(
             olmMachine,
@@ -136,6 +145,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretStorage,
             onCrossSigningKeysImport,
         );
+    }
+
+    /**
+     * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link RustCrypto#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): RustSdkCryptoJs.OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,9 +226,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return ret as IEncryptedEventInfo;
     }
 
-    public checkUserTrust(userId: string): UserTrustLevel {
-        // TODO
-        return new UserTrustLevel(false, false, false);
+    /**
+     * Implementation of {@link CryptoBackend#checkUserTrust}.
+     *
+     * Stub for backwards compatibility.
+     *
+     */
+    public checkUserTrust(userId: string): UserVerificationStatus {
+        return new UserVerificationStatus(false, false, false);
     }
 
     /**
@@ -228,7 +256,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      * The function is stub to keep the compatibility with the old crypto.
      * More information: https://github.com/vector-im/element-web/issues/25648
-     *
      *
      * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
      */
@@ -461,6 +488,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Implementation of {@link CryptoApi#getUserVerificationStatus}.
+     */
+    public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+            await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(userId));
+        if (userIdentity === undefined) {
+            return new UserVerificationStatus(false, false, false);
+        }
+        return new UserVerificationStatus(userIdentity.isVerified(), false, false);
+    }
+
+    /**
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
@@ -540,6 +579,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage,
+        setupNewKeyBackup,
     }: CreateSecretStorageOpts = {}): Promise<void> {
         // If an AES Key is already stored in the secret storage and setupNewSecretStorage is not set
         // we don't want to create a new key
@@ -583,6 +623,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+
+            if (setupNewKeyBackup) {
+                await this.resetKeyBackup();
+            }
         }
     }
 
@@ -635,16 +679,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.getOlmMachineOrThrow().getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
+
         const publicKeysOnDevice =
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
         const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
-            await this.olmMachine.crossSigningStatus();
+            await this.getOlmMachineOrThrow().crossSigningStatus();
 
         return {
             publicKeysOnDevice,
@@ -920,6 +965,55 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         return await this.backupManager.checkKeyBackupAndEnable(true);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
+
+        // we want to store the private key in 4S
+        // need to check if 4S is set up?
+        if (await this.secretStorageHasAESKey()) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
+        }
+
+        // we can check and start async
+        this.checkKeyBackupAndEnable();
+    }
+
+    /**
+     * Signs the given object with the current device and current identity (if available).
+     * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.
+     *
+     * @param obj - The object to sign
+     */
+    private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
+        const sigs = new Map(Object.entries(obj.signatures || {}));
+        const unsigned = obj.unsigned;
+
+        delete obj.signatures;
+        delete obj.unsigned;
+
+        const userSignatures = sigs.get(this.userId) || {};
+
+        const canonalizedJson = anotherjson.stringify(obj);
+        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
+
+        const map = JSON.parse(signatures.asJSON());
+
+        sigs.set(this.userId, { ...userSignatures, ...map[this.userId] });
+
+        if (unsigned !== undefined) obj.unsigned = unsigned;
+        obj.signatures = Object.fromEntries(sigs.entries());
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1348,5 +1442,5 @@ type RustCryptoEventMap = {
     /**
      * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
      */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserTrustLevel) => void;
+    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
 } & RustBackupCryptoEventMap;

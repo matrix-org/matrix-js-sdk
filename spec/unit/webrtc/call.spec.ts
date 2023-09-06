@@ -47,6 +47,7 @@ import {
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
+import { emitPromise } from "../../test-utils/test-utils";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -1811,5 +1812,31 @@ describe("Call", function () {
             await call.onNegotiateReceived(offerEvent);
             expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
         });
+    });
+
+    it("should emit IceFailed error on the successor call if RTCPeerConnection throws", async () => {
+        // @ts-ignore - writing to window as we are simulating browser edge-cases
+        global.window = {};
+        Object.defineProperty(global.window, "RTCPeerConnection", {
+            get: () => {
+                throw Error("Secure mode, naaah!");
+            },
+        });
+
+        const call = new MatrixCall({
+            client: client.client,
+            roomId: "!room_id",
+        });
+        const successor = new MatrixCall({
+            client: client.client,
+            roomId: "!room_id",
+        });
+        call.replacedBy(successor);
+
+        const prom = emitPromise(successor, CallEvent.Error);
+        call.placeCall(true, true);
+
+        const err = await prom;
+        expect(err.code).toBe(CallErrorCode.IceFailed);
     });
 });

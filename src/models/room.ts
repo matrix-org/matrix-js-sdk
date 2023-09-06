@@ -146,6 +146,7 @@ export enum RoomEvent {
     CurrentStateUpdated = "Room.CurrentStateUpdated",
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
     UnreadNotifications = "Room.UnreadNotifications",
+    Summary = "Room.Summary",
 }
 
 export type RoomEmittedEvents =
@@ -290,6 +291,14 @@ export type RoomEventHandlerMap = {
     [RoomEvent.HistoryImportedWithinTimeline]: (markerEvent: MatrixEvent, room: Room) => void;
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
+    /**
+     * Fires when a new room summary is returned by `/sync`.
+     *
+     * See https://spec.matrix.org/v1.8/client-server-api/#_matrixclientv3sync_roomsummary
+     * for full details
+     * @param summary - the room summary object
+     */
+    [RoomEvent.Summary]: (summary: IRoomSummary) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
      * Fires when a new poll instance is added to the room state
@@ -1499,6 +1508,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return userId !== this.myUserId;
             });
         }
+
+        this.emit(RoomEvent.Summary, summary);
     }
 
     /**

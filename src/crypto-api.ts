@@ -133,6 +133,14 @@ export interface CryptoApi {
     getTrustCrossSignedDevices(): boolean;
 
     /**
+     * Get the verification status of a given user.
+     *
+     * @param userId - The ID of the user to check.
+     *
+     */
+    getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.
@@ -170,6 +178,8 @@ export interface CryptoApi {
      * return true.
      *
      * @returns True if cross-signing is ready to be used on this device
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     isCrossSigningReady(): Promise<boolean>;
 
@@ -234,7 +244,10 @@ export interface CryptoApi {
     /**
      * Get the status of our cross-signing keys.
      *
-     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
+     * whether the private keys are in secret storage.
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 
@@ -377,6 +390,24 @@ export interface CryptoApi {
      *   and trust information (as returned by {@link isKeyBackupTrusted}).
      */
     checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null>;
+
+    /**
+     * Creates a new key backup version.
+     *
+     * If there are existing backups they will be replaced.
+     *
+     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * callback will be called)
+     * and the backup engine will be started.
+     */
+    resetKeyBackup(): Promise<void>;
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
 /**
@@ -391,6 +422,46 @@ export interface BootstrapCrossSigningOpts {
      * will not be uploaded to the server (which seems like a bad thing?).
      */
     authUploadDeviceSigningKeys?: UIAuthCallback<void>;
+}
+
+/**
+ * Represents the ways in which we trust a user
+ */
+export class UserVerificationStatus {
+    public constructor(
+        private readonly crossSigningVerified: boolean,
+        private readonly crossSigningVerifiedBefore: boolean,
+        private readonly tofu: boolean,
+    ) {}
+
+    /**
+     * @returns true if this user is verified via any means
+     */
+    public isVerified(): boolean {
+        return this.isCrossSigningVerified();
+    }
+
+    /**
+     * @returns true if this user is verified via cross signing
+     */
+    public isCrossSigningVerified(): boolean {
+        return this.crossSigningVerified;
+    }
+
+    /**
+     * @returns true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    public wasCrossSigningVerified(): boolean {
+        return this.crossSigningVerifiedBefore;
+    }
+
+    /**
+     * @returns true if this user's key is trusted on first use
+     */
+    public isTofu(): boolean {
+        return this.tofu;
+    }
 }
 
 export class DeviceVerificationStatus {
