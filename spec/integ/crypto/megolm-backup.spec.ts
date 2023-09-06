@@ -304,7 +304,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     });
 
     describe("recover from backup", () => {
-        oldBackendOnly("can restore from backup (Curve25519 version)", async function () {
+        it("can restore from backup (Curve25519 version)", async function () {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             aliceClient = await initTestClient();
@@ -349,7 +349,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await awaitKeyCached;
         });
 
-        oldBackendOnly("recover specific session from backup", async function () {
+        it("recover specific session from backup", async function () {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             aliceClient = await initTestClient();
@@ -377,7 +377,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(1);
         });
 
-        oldBackendOnly("Fails on bad recovery key", async function () {
+        it("Fails on bad recovery key", async function () {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             aliceClient = await initTestClient();
