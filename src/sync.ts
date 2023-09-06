@@ -40,6 +40,7 @@ import {
     IInviteState,
     IJoinedRoom,
     ILeftRoom,
+    IKnockedRoom,
     IMinimalEvent,
     IRoomEvent,
     IStateEvent,
@@ -1240,6 +1241,7 @@ export class SyncApi {
         let inviteRooms: WrappedRoom<IInvitedRoom>[] = [];
         let joinRooms: WrappedRoom<IJoinedRoom>[] = [];
         let leaveRooms: WrappedRoom<ILeftRoom>[] = [];
+        let knockRooms: WrappedRoom<IKnockedRoom>[] = [];
 
         if (data.rooms) {
             if (data.rooms.invite) {
@@ -1250,6 +1252,9 @@ export class SyncApi {
             }
             if (data.rooms.leave) {
                 leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
+            }
+            if (data.rooms.knock) {
+                knockRooms = this.mapSyncResponseToRoomArray(data.rooms.knock);
             }
         }
 
@@ -1511,6 +1516,26 @@ export class SyncApi {
             });
         });
 
+        // Handle knocks
+        await promiseMapSeries(knockRooms, async (knockObj) => {
+            const room = knockObj.room;
+            const stateEvents = this.mapSyncEventsFormat(knockObj.knock_state, room);
+
+            await this.injectRoomEvents(room, stateEvents);
+
+            if (knockObj.isBrandNewRoom) {
+                room.recalculate();
+                client.store.storeRoom(room);
+                client.emit(ClientEvent.Room, room);
+            } else {
+                // Update room state for knock->leave->knock cycles
+                room.recalculate();
+            }
+            stateEvents.forEach(function (e) {
+                client.emit(ClientEvent.Event, e);
+            });
+        });
+
         // update the notification timeline, if appropriate.
         // we only do this for live events, as otherwise we can't order them sanely
         // in the timeline relative to ones paginated in by /notifications.
@@ -1629,7 +1654,7 @@ export class SyncApi {
             );
     }
 
-    private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom>(
+    private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom | IKnockedRoom>(
         obj: Record<string, T>,
     ): Array<WrappedRoom<T>> {
         // Maps { roomid: {stuff}, roomid: {stuff} }

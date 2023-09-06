@@ -228,6 +228,8 @@ export class EncryptionSetupOperation {
                     prefix: ClientPrefix.V3,
                 });
             }
+            // tell the backup manager to re-check the keys now that they have been (maybe) updated
+            await crypto.backupManager.checkKeyBackup();
         }
     }
 }
