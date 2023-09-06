@@ -168,7 +168,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
-        // No need to wait for this: just start the process off and return
+        // We don't wait for this, mostly because it may fail and schedule a retry, so this
+        // function returning doesn't really mean anything at all.
         this.updateCallMembershipEvent();
     }
 
