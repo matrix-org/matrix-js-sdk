@@ -26,7 +26,6 @@ import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { UserTrustLevel } from "../crypto/CrossSigning";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";

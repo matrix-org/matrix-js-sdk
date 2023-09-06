@@ -55,7 +55,6 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
-    CryptoEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import * as testData from "../../test-utils/test-data";
