@@ -112,18 +112,18 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private refreshRoom(room: Room): void {
-        const hadSession = this.roomSessions.has(room.roomId);
+        const isNewSession = !this.roomSessions.has(room.roomId);
         const sess = this.getRoomSession(room);
 
-        const wasActive = sess.memberships.length > 0 && hadSession;
+        const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
 
         sess.onMembershipUpdate();
 
         const nowActive = sess.memberships.length > 0;
 
-        if (wasActive && !nowActive) {
+        if (wasActiveAndKnown && !nowActive) {
             this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
-        } else if (!wasActive && nowActive) {
+        } else if (!wasActiveAndKnown && nowActive) {
             this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
         }
     }
