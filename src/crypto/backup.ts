@@ -480,7 +480,6 @@ export class BackupManager {
             const delay = Math.random() * maxDelay;
             await sleep(delay);
             if (!this.clientRunning) {
-                logger.debug("Key backup send aborted, client stopped");
                 this.sendingBackups = false;
                 return;
             }
@@ -522,7 +521,6 @@ export class BackupManager {
                 }
 
                 if (!this.clientRunning) {
-                    logger.debug("Key backup send loop aborted, client stopped");
                     this.sendingBackups = false;
                     return;
                 }
