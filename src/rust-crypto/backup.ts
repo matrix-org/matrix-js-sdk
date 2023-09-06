@@ -373,6 +373,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 }
 
+/**
+ * Implementation of {@link BackupDecryptor} for the rust crypto backend.
+ */
 export class RustBackupDecryptor implements BackupDecryptor {
     private decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
     public sourceTrusted: boolean;
@@ -382,6 +385,9 @@ export class RustBackupDecryptor implements BackupDecryptor {
         this.sourceTrusted = false;
     }
 
+    /**
+     * Implements {@link BackupDecryptor#decryptSessions}
+     */
     public async decryptSessions(
         ciphertexts: Record<string, IKeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
     ): Promise<IMegolmSessionData[]> {
@@ -404,8 +410,10 @@ export class RustBackupDecryptor implements BackupDecryptor {
         return keys;
     }
 
+    /**
+     * Implements {@link BackupDecryptor#free}
+     */
     public free(): void {
-        // is this really needed?
         this.decryptionKey.free();
     }
 }

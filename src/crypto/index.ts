@@ -1842,6 +1842,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the backup with the new key (if not already signed)?
     }
 
+    /**
+     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
+     */
     public async getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             // eslint-disable-next-line @typescript-eslint/no-base-to-string

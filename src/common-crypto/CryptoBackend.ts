@@ -102,6 +102,11 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      */
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
+    /**
+     * Gets a backup decryptor capable of decrypting megolm session data encrypted with this backup.
+     * @param backupInfo - The backup information
+     * @param privKey - The private decryption key.
+     */
     getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
 }
 
@@ -214,6 +219,10 @@ export interface EventDecryptionResult {
     encryptedDisabledForUnverifiedDevices?: boolean;
 }
 
+/**
+ * Responsible of decrypting megolm session data retrieved from a remote backup.
+ * Will be implemented by crypto backends {@link CryptoBackend#getBackupDecryptor}
+ */
 export interface BackupDecryptor {
     /**
      * Depending on the backup algorithm the source of a key can be trusted or not.
@@ -222,7 +231,18 @@ export interface BackupDecryptor {
      */
     sourceTrusted: boolean;
 
+    /**
+     *
+     * Decrypts megolm session data retrieved from backup.
+     *
+     * @param ciphertexts - a Record of sessionId to session data.
+     *
+     * @returns An array of decrypted `IMegolmSessionData`
+     */
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
 
+    /**
+     * Used to free any resources if needed.
+     */
     free(): void;
 }

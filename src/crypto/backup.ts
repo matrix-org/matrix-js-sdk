@@ -878,6 +878,9 @@ export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): Backup
     };
 }
 
+/**
+ * Implementation of {@link BackupDecryptor} for the libolm crypto backend.
+ */
 export class LibOlmBackupDecryptor implements BackupDecryptor {
     private algorithm: BackupAlgorithm;
     public sourceTrusted: boolean;
@@ -887,10 +890,16 @@ export class LibOlmBackupDecryptor implements BackupDecryptor {
         this.sourceTrusted = !algorithm.untrusted;
     }
 
+    /**
+     * Implements {@link BackupDecryptor#free}
+     */
     public free(): void {
         this.algorithm.free();
     }
 
+    /**
+     * Implements {@link BackupDecryptor#decryptSessions}
+     */
     public async decryptSessions(
         sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
     ): Promise<IMegolmSessionData[]> {
