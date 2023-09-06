@@ -38,6 +38,7 @@ import {
     CrossSigningKeyInfo,
     CrossSigningStatus,
     CryptoCallbacks,
+    Curve25519AuthData,
     DeviceVerificationStatus,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
@@ -60,11 +61,12 @@ import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentif
 import { EventType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
+import { encodeBase64 } from "../crypto/olmlib";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -151,7 +153,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
     public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
-        throw new Error("Stub not yet implemented");
+        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
+            throw new Error(`getBackupDecryptor Unsupported algorithm ${backupInfo.algorithm}`);
+        }
+
+        const authData = <Curve25519AuthData>backupInfo.auth_data;
+
+        if (!(privKey instanceof Uint8Array)) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            throw new Error(`getBackupDecryptor expects Uint8Array, got ${privKey}`);
+        }
+
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
+
+        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
+            throw new Error(`getBackupDecryptor key mismatch error`);
+        }
+
+        return new RustBackupDecryptor(backupDecryptionKey);
     }
 
     /**
