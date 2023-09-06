@@ -17,7 +17,7 @@ limitations under the License.
 import { ClientEvent, EventTimeline, MatrixClient } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessonManager";
+import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
 import { makeMockRoom } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
