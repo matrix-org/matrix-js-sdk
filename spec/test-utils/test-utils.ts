@@ -506,17 +506,13 @@ export async function awaitDecryption(
     event: MatrixEvent,
     { waitOnDecryptionFailure = false } = {},
 ): Promise<MatrixEvent> {
-    // An event is not always decrypted ahead of time
-    // getClearContent is a good signal to know whether an event has been decrypted
-    // already
-    if (event.getClearContent() !== null) {
-        if (waitOnDecryptionFailure && event.isDecryptionFailure()) {
-            logger.log(`${Date.now()}: event ${event.getId()} got decryption error; waiting`);
-        } else {
-            return event;
-        }
+    // if a decryption is in flight, wait for it.
+    await event.getDecryptionPromise();
+
+    if (waitOnDecryptionFailure && event.isDecryptionFailure()) {
+        logger.log(`${Date.now()}: event ${event.getId()} got decryption error; waiting`);
     } else {
-        logger.log(`${Date.now()}: event ${event.getId()} is not yet decrypted; waiting`);
+        return event;
     }
 
     return new Promise((resolve) => {

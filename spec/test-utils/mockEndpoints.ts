@@ -17,6 +17,7 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 
 import { KeyBackupInfo } from "../../src/crypto-api";
+import { DEFAULT_OVERRIDE_RULES, DEFAULT_UNDERRIDE_RULES } from "../../src/pushprocessor";
 
 /**
  * Mock out the endpoints that the js-sdk calls when we call `MatrixClient.start()`.
@@ -25,7 +26,9 @@ import { KeyBackupInfo } from "../../src/crypto-api";
  */
 export function mockInitialApiRequests(homeserverUrl: string) {
     fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["v1.1"] });
-    fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
+    fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {
+        global: { override: DEFAULT_OVERRIDE_RULES, underride: DEFAULT_UNDERRIDE_RULES },
+    });
     fetchMock.postOnce(new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
         filter_id: "fid",
     });

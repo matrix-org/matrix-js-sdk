@@ -19,6 +19,8 @@ import { Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
 import { MockResponse } from "fetch-mock";
 
+import { defer, IDeferred } from "../../src/utils";
+
 /** Interface implemented by classes that intercept `/sync` requests from test clients
  *
  * Common interface implemented by {@link TestClient} and {@link SyncResponder}
@@ -37,6 +39,16 @@ enum SyncResponderState {
     WAITING_FOR_RESPONSE,
 }
 
+class WaitingForRequestState {
+    /** a deferred which will resolve when the request is made */
+    public readonly requestDefer: IDeferred<void> = defer();
+
+    /**
+     * @param pendingResponse - the response to be sent when the request is made
+     */
+    constructor(public readonly pendingResponse: object) {}
+}
+
 /** SyncResponder: An object which intercepts `/sync` fetches via fetch-mock.
  *
  * Two modes are possible:
@@ -50,9 +62,7 @@ export class SyncResponder implements ISyncResponder {
     /*
      * properties that are only valid in WAITING_FOR_REQUEST
      */
-
-    /** the response to be sent when the request is made */
-    private pendingResponse: object | null = null;
+    private waitingForRequestState: null | WaitingForRequestState = null;
 
     /*
      * properties that are only valid in WAITING_FOR_RESPONSE
@@ -84,22 +94,24 @@ export class SyncResponder implements ISyncResponder {
         switch (this.state) {
             case SyncResponderState.IDLE: {
                 this.debug("Got /sync request: waiting for response to be ready");
-                const res = await new Promise<object>((resolve) => {
-                    this.onResponseReceived = resolve;
+                return await new Promise<object>((resolve) => {
+                    this.onResponseReceived = (r) => {
+                        this.debug("Responding to /sync");
+                        this.state = SyncResponderState.IDLE;
+                        this.onResponseReceived = null;
+                        resolve(r);
+                    };
                     this.state = SyncResponderState.WAITING_FOR_RESPONSE;
                 });
-                this.debug("Responding to /sync");
-                this.state = SyncResponderState.IDLE;
-                this.onResponseReceived = null;
-                return res;
             }
 
             case SyncResponderState.WAITING_FOR_REQUEST: {
                 this.debug("Got /sync request: responding immediately with queued response");
-                const res = this.pendingResponse!;
+                const state = this.waitingForRequestState!;
+                this.waitingForRequestState = null;
                 this.state = SyncResponderState.IDLE;
-                this.pendingResponse = null;
-                return res;
+                state.requestDefer.resolve();
+                return state.pendingResponse;
             }
 
             default:
@@ -115,7 +127,7 @@ export class SyncResponder implements ISyncResponder {
     public sendOrQueueSyncResponse(response: object): void {
         switch (this.state) {
             case SyncResponderState.IDLE:
-                this.pendingResponse = response;
+                this.waitingForRequestState = new WaitingForRequestState(response);
                 this.state = SyncResponderState.WAITING_FOR_REQUEST;
                 break;
 
@@ -126,6 +138,20 @@ export class SyncResponder implements ISyncResponder {
             default:
                 // we already have a response queued
                 throw new Error(`Cannot queue more than one /sync response`);
+        }
+    }
+
+    /** return a promise which will resolve once any queued response has been flushed */
+    public flushPendingResponse(): Promise<void> {
+        switch (this.state) {
+            case SyncResponderState.IDLE:
+                return Promise.resolve();
+
+            case SyncResponderState.WAITING_FOR_RESPONSE:
+                throw new Error("SyncResponder is waiting for response to request");
+
+            case SyncResponderState.WAITING_FOR_REQUEST:
+                return this.waitingForRequestState!.requestDefer.promise;
         }
     }
 }

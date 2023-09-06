@@ -56,7 +56,8 @@ const RULEKINDS_IN_ORDER = [
 //      more details.
 //   2. We often want to start using push rules ahead of the server supporting them,
 //      and so we can put them here.
-const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
+/** @internal */
+export const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     {
         // For homeservers which don't support MSC2153 yet
         rule_id: ".m.rule.reaction",
@@ -122,7 +123,8 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     },
 ];
 
-const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
+/** @internal */
+export const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
     {
         // For homeservers which don't support MSC3914 yet
         rule_id: ".org.matrix.msc3914.rule.room.call",

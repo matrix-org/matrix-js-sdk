@@ -67,9 +67,10 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
+import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { CrossSigningKey, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { createCryptoCallbacks } from "../../test-utils/crypto-stubs";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -502,27 +503,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         return {
             one_time_keys: { [userId]: { DEVICE_ID: { ["signed_curve25519:" + keyId]: keyResult } } },
             failures: {},
-        };
-    }
-
-    /**
-     * Create the {@link CryptoCallbacks}
-     */
-    function createCryptoCallbacks(): CryptoCallbacks {
-        // Store the cached secret storage key and return it when `getSecretStorageKey` is called
-        let cachedKey: { keyId: string; key: Uint8Array };
-        const cacheSecretStorageKey = (keyId: string, keyInfo: AddSecretStorageKeyOpts, key: Uint8Array) => {
-            cachedKey = {
-                keyId,
-                key,
-            };
-        };
-
-        const getSecretStorageKey = () => Promise.resolve<[string, Uint8Array]>([cachedKey.keyId, cachedKey.key]);
-
-        return {
-            cacheSecretStorageKey,
-            getSecretStorageKey,
         };
     }
 

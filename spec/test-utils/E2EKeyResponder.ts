@@ -22,7 +22,7 @@ import { IDeviceKeys } from "../../src/@types/crypto";
 import { E2EKeyReceiver } from "./E2EKeyReceiver";
 
 /**
- * An object which intercepts `/keys/query` fetches via fetch-mock.
+ * An object which intercepts `/keys/query` requests (normally via fetch-mock).
  */
 export class E2EKeyResponder {
     private deviceKeysByUserByDevice = new MapWithDefault<string, Map<string, any>>(() => new Map());
@@ -34,20 +34,27 @@ export class E2EKeyResponder {
     /**
      * Construct a new E2EKeyResponder.
      *
-     * It will immediately register an intercept of `/keys/query` requests for the given homeserverUrl.
+     * If a homeserverUrl is given, it will immediately register an intercept of `/keys/query` requests for the given URL.
      * Only /query requests made to this server will be intercepted: this allows a single test to use more than one
      * client and have the keys collected separately.
      *
      * @param homeserverUrl - the Homeserver Url of the client under test.
      */
-    public constructor(homeserverUrl: string) {
-        // set up a listener for /keys/query.
-        const listener = (url: string, options: RequestInit) => this.onKeyQueryRequest(options);
-        fetchMock.post(new URL("/_matrix/client/v3/keys/query", homeserverUrl).toString(), listener);
+    public constructor(homeserverUrl?: string) {
+        if (homeserverUrl) {
+            // set up a listener for /keys/query.
+            const listener = (url: string, options: RequestInit) =>
+                this.onKeyQueryRequest(JSON.parse(options.body as string));
+            fetchMock.post(new URL("/_matrix/client/v3/keys/query", homeserverUrl).toString(), listener);
+        }
     }
 
-    private onKeyQueryRequest(options: RequestInit) {
-        const content = JSON.parse(options.body as string);
+    /** Process a /keys/query request, and build the response
+     *
+     * @param content Deserialized request body
+     * @returns response body, ready for serialising
+     */
+    public onKeyQueryRequest(content: any): object {
         const usersToReturn = Object.keys(content["device_keys"]);
         const response = {
             device_keys: {} as { [userId: string]: any },

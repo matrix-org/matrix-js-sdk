@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import debugFunc from "debug";
-import { Debugger } from "debug";
+import debugFunc, { Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
+import { defer } from "../../src/utils";
 
 /** Interface implemented by classes that intercept `/keys/upload` requests from test clients to catch the uploaded keys
  *
@@ -47,7 +47,8 @@ export interface IE2EKeyReceiver {
     awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>>;
 }
 
-/** E2EKeyReceiver: An object which intercepts `/keys/uploads` fetches via fetch-mock.
+/**
+ * E2EKeyReceiver: An object which intercepts `/keys/uploads` requests (normally via fetch-mock)
  *
  * It stashes the uploaded keys for use elsewhere in the tests.
  */
@@ -55,33 +56,37 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     private readonly debug: Debugger;
 
     private deviceKeys: IDeviceKeys | null = null;
+    private readonly deviceKeysDeferred = defer<IDeviceKeys>();
     private oneTimeKeys: Record<string, IOneTimeKey> = {};
-    private readonly oneTimeKeysPromise: Promise<void>;
+    private readonly oneTimeKeysDeferred = defer();
 
     /**
      * Construct a new E2EKeyReceiver.
      *
-     * It will immediately register an intercept of `/keys/uploads` requests for the given homeserverUrl.
-     * Only /upload requests made to this server will be intercepted: this allows a single test to use more than one
+     * If a homeserver URL is given, it will immediately register an intercept of `/keys/uploads` requests for the given
+     * URL. Only /upload requests made to this server will be intercepted: this allows a single test to use more than one
      * client and have the keys collected separately.
      *
      * @param homeserverUrl - the Homeserver Url of the client under test.
      */
-    public constructor(homeserverUrl: string) {
+    public constructor(homeserverUrl?: string) {
         this.debug = debugFunc(`e2e-key-receiver:[${homeserverUrl}]`);
 
-        // set up a listener for /keys/upload.
-        this.oneTimeKeysPromise = new Promise((resolveOneTimeKeys) => {
+        if (homeserverUrl) {
+            // set up a listener for /keys/upload.
             const listener = (url: string, options: RequestInit) =>
-                this.onKeyUploadRequest(resolveOneTimeKeys, options);
+                this.onKeyUploadRequest(JSON.parse(options.body as string));
 
             fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
-        });
+        }
     }
 
-    private async onKeyUploadRequest(onOnTimeKeysUploaded: () => void, options: RequestInit): Promise<object> {
-        const content = JSON.parse(options.body as string);
-
+    /** Process a /keys/upload request, and build the response
+     *
+     * @param content Deserialized request body
+     * @returns response body, ready for serialising
+     */
+    public async onKeyUploadRequest(content: any): Promise<object> {
         // device keys may only be uploaded once
         if (content.device_keys && Object.keys(content.device_keys).length > 0) {
             if (this.deviceKeys) {
@@ -89,6 +94,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             }
             this.debug(`received device keys`);
             this.deviceKeys = content.device_keys;
+            this.deviceKeysDeferred.resolve(content.device_keys);
         }
 
         if (content.one_time_keys && Object.keys(content.one_time_keys).length > 0) {
@@ -103,7 +109,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
 
             this.debug(`received ${Object.keys(content.one_time_keys).length} one-time keys`);
             Object.assign(this.oneTimeKeys, content.one_time_keys);
-            onOnTimeKeysUploaded();
+            this.oneTimeKeysDeferred.resolve();
         }
 
         return {
@@ -151,6 +157,13 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     }
 
     /**
+     * Wait for the device keys to be uploaded, and return them
+     */
+    public awaitDeviceKeyUpload(): Promise<IDeviceKeys> {
+        return this.deviceKeysDeferred.promise;
+    }
+
+    /**
      * If one-time keys have already been uploaded, return them. Otherwise,
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.
@@ -158,7 +171,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
      * @returns Promise for the one-time keys
      */
     public async awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
-        await this.oneTimeKeysPromise;
+        await this.oneTimeKeysDeferred.promise;
         return this.oneTimeKeys;
     }
 }
