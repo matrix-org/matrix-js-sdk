@@ -203,6 +203,10 @@ export interface EventDecryptionResult {
      * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
      */
     claimedEd25519Key?: string;
+    /**
+     * Whether the keys for this event have been received via an unauthenticated source (eg via key forwards, or
+     * restored from backup)
+     */
     untrusted?: boolean;
     /**
      * The sender doesn't authorize the unverified devices to decrypt his messages
