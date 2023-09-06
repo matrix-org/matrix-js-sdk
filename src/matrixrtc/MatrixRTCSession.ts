@@ -132,6 +132,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.setExpiryTimer();
     }
 
+    /*
+     * Returns true if we intend to be participating in the MatrixRTC session.
+     */
     public isJoined(): boolean {
         return this.relativeExpiry !== undefined;
     }
