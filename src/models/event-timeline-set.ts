@@ -72,6 +72,16 @@ export interface IAddLiveEventOptions
      * entirely, preserving the existing event in the timeline. Events are
      * identical based on their event ID <b>only</b>. */
     duplicateStrategy?: DuplicateStrategy;
+
+    /**
+     * True if this event is one of a batch of events e.g. from a sync, and this
+     * is not the last one.
+     *
+     * Useful to know if we are deciding whether a receipt we are generating for
+     * our own event should override the unread state of the room. (If there are
+     * more events coming, we should not override the unread state.)
+     */
+    moreEventsComing?: boolean;
 }
 
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;

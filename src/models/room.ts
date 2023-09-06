@@ -2413,15 +2413,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Fires {@link RoomEvent.Timeline}
      */
     private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
-        const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
-
         // add to our timeline sets
         for (const timelineSet of this.timelineSets) {
-            timelineSet.addLiveEvent(event, {
-                duplicateStrategy,
-                fromCache,
-                timelineWasEmpty,
-            });
+            timelineSet.addLiveEvent(event, addLiveEventOptions);
         }
 
         // synthesize and inject implicit read receipts
@@ -2429,7 +2423,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // pointing to an event that wasn't yet in the timeline
         // Don't synthesize RR for m.room.redaction as this causes the RR to go missing.
         if (event.sender && event.getType() !== EventType.RoomRedaction) {
-            this.addReceipt(synthesizeReceipt(event.sender.userId, event, ReceiptType.Read), true);
+            this.addReceipt(
+                synthesizeReceipt(event.sender.userId, event, ReceiptType.Read),
+                true,
+                addLiveEventOptions.moreEventsComing,
+            );
 
             // Any live events from a user could be taken as implicit
             // presence information: evidence that they are currently active.
@@ -2807,6 +2805,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // List of extra events to check for being parents of any relations encountered
         const neighbouringEvents = [...events];
 
+        const eventsLength = events.length;
+        let thisEventIndex = 0;
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
@@ -2855,10 +2855,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             eventsByThread[threadId ?? ""]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, options);
+                const moreEventsComing = thisEventIndex !== eventsLength - 1;
+                this.addLiveEvent(event, { ...options, moreEventsComing });
             } else if (!shouldLiveInThread && event.isRelation()) {
                 this.relations.aggregateChildEvent(event);
             }
+            thisEventIndex++;
         }
 
         Object.entries(eventsByThread).forEach(([threadId, threadEvents]) => {
@@ -2924,8 +2926,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Add a receipt event to the room.
      * @param event - The m.receipt event.
      * @param synthetic - True if this event is implicit.
+     * @param moreEventsComing - True if this event is part of a batch (e.g.
+     *                           from sync) and is not the last one. If so, we
+     *                           don't override the unread status of this room
+     *                           even if we find a read receipt for ourself.
      */
-    public addReceipt(event: MatrixEvent, synthetic = false): void {
+    public addReceipt(event: MatrixEvent, synthetic = false, moreEventsComing = false): void {
         const content = event.getContent<ReceiptContent>();
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
@@ -2952,7 +2958,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // from synapse
                         // This needs to be done after the initial sync as we do not want this
                         // logic to run whilst the room is being initialised
-                        if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
+                        if (
+                            !moreEventsComing &&
+                            this.client.isInitialSyncComplete() &&
+                            userId === this.client.getUserId()
+                        ) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
                             if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);
