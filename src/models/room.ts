@@ -849,7 +849,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @returns the membership type (join | leave | invite) for the logged in user
+     * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
     public getMyMembership(): string {
         return this.selfMembership ?? "leave";
