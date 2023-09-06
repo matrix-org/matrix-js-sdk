@@ -227,8 +227,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
 
-        logger.info(`MatrixRTCSession updating encryption key for room ${this.room.roomId}`);
-
         const encryptionKey = getNewEncryptionKey();
         await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
             "m.encryption_key": encryptionKey,
@@ -239,6 +237,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const participantId = combineUserAndDeviceId(userId, deviceId);
         this.encryptionKeys.set(participantId, encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
+
+        console.log(
+            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${participantId} encryptionKey=${encryptionKey}`,
+        );
     }
 
     /**
@@ -300,7 +302,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const participantId = combineUserAndDeviceId(userId, deviceId);
         this.encryptionKeys.set(participantId, encryptionKey);
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
-        logger.log(`Updated encryption key for userId=${userId}, deviceId=${deviceId}`);
+
+        console.log(`Embedded-E2EE-LOG onCallEncryption participantId${participantId} encryptionKey=${encryptionKey}`);
     };
 
     public onMembershipUpdate = (): void => {
