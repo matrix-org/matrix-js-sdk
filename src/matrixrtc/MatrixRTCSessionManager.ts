@@ -37,7 +37,10 @@ type EventHandlerMap = {
 export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionManagerEvents, EventHandlerMap> {
     // All the room-scoped sessions we know about. This will include any where the app
     // has queried for the MatrixRTC sessions in a room, whether it's ever had any members
-    // or not)
+    // or not). We keep a (lazily created) session object for every room to ensure that there
+    // is only ever one single room session object for any given room for the lifetime of the
+    // client: that way there can never be any code holding onto a stale object that is no
+    // longer the correct session object for the room.
     private roomSessions = new Map<string, MatrixRTCSession>();
 
     public constructor(private client: MatrixClient) {
