@@ -156,6 +156,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * leaveRoomSession() is called
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
+     * This method will return immediately and the session will be joined in the background.
      */
     public joinRoomSession(activeFoci: Focus[]): void {
         if (this.isJoined()) {
@@ -167,6 +168,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
+        // No need to wait for this: just start the process off and return
         this.updateCallMembershipEvent();
     }
 
