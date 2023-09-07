@@ -73,6 +73,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptMedia = false;
     private encryptionKeys = new Map<string, string>();
 
+    private setEncryptionKey(userId: string, deviceId: string, encryptionKey: string): void {
+        const participantId = combineUserAndDeviceId(userId, deviceId);
+        if (this.encryptionKeys.get(participantId) === encryptionKey) return;
+
+        this.encryptionKeys.set(participantId, encryptionKey);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
+    }
+
     public getKeyForParticipant(userId: string, deviceId: string): string | undefined {
         return this.encryptionKeys.get(combineUserAndDeviceId(userId, deviceId));
     }
@@ -234,13 +242,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             "m.call_id": "",
         } as EncryptionKeyEventContent);
 
-        const participantId = combineUserAndDeviceId(userId, deviceId);
-        this.encryptionKeys.set(participantId, encryptionKey);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
-
         console.log(
-            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${participantId} encryptionKey=${encryptionKey}`,
+            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKey=${encryptionKey}`,
         );
+        this.setEncryptionKey(userId, deviceId, encryptionKey);
     }
 
     /**
@@ -299,11 +304,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        const participantId = combineUserAndDeviceId(userId, deviceId);
-        this.encryptionKeys.set(participantId, encryptionKey);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
-
-        console.log(`Embedded-E2EE-LOG onCallEncryption participantId${participantId} encryptionKey=${encryptionKey}`);
+        console.log(`Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey}`);
+        this.setEncryptionKey(userId, deviceId, encryptionKey);
     };
 
     public onMembershipUpdate = (): void => {
