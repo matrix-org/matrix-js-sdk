@@ -72,15 +72,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     /**
-     * Get a list of all ongoing MatrixRTC sessions that have 1 or more active
-     * members
-     * (whether the client is joined to them or not)
-     */
-    public getActiveSessions(): MatrixRTCSession[] {
-        return Array.from(this.roomSessions.values()).filter((m) => m.memberships.length > 0);
-    }
-
-    /**
      * Gets the main MatrixRTC session for a room, or undefined if there is
      * no current session
      */
