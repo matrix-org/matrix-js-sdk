@@ -136,17 +136,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupFailed,
         ]);
 
-        // Fire if the cross signing keys are imported from the secret storage
-        const onCrossSigningKeysImport = async (): Promise<void> => {
-            const newVerification = await this.getUserVerificationStatus(this.userId);
-            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, newVerification);
-        };
-        this.crossSigningIdentity = new CrossSigningIdentity(
-            olmMachine,
-            this.outgoingRequestProcessor,
-            secretStorage,
-            onCrossSigningKeysImport,
-        );
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
     }
 
     /**
