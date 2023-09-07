@@ -2948,7 +2948,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // If the read receipt sent for the logged in user matches
                         // the last event of the live timeline, then we know for a fact
                         // that the user has read that message, so we can mark the room
-                        // as read and not wait for the local echo from synapse.
+                        // as read and not wait for the remote echo from synapse.
                         //
                         // This needs to be done after the initial sync as we do not want this
                         // logic to run whilst the room is being initialised
