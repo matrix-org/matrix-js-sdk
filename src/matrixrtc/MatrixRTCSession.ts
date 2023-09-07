@@ -237,11 +237,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!deviceId) throw new Error("No deviceId");
 
         const encryptionKey = getNewEncryptionKey();
-        await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
-            "m.encryption_key": encryptionKey,
-            "m.device_id": deviceId,
-            "m.call_id": "",
-        } as EncryptionKeyEventContent);
+        try {
+            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
+                "m.encryption_key": encryptionKey,
+                "m.device_id": deviceId,
+                "m.call_id": "",
+            } as EncryptionKeyEventContent);
+        } catch (error) {
+            logger.error("Failed to send m.call.encryption_key", error);
+        }
 
         console.log(
             `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKey=${encryptionKey}`,
