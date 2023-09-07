@@ -225,7 +225,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Re-sends the encryption key room event with a new key
      */
-    private async updateEncryptionKeyEvent(): Promise<void> {
+    public async updateEncryptionKeyEvent(): Promise<void> {
         if (!this.isJoined()) return;
         if (!this.encryptMedia) return;
 
