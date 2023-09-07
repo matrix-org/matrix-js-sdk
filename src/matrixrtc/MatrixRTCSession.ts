@@ -195,6 +195,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         logger.info(`Joining call session in room ${this.room.roomId}`);
+        this.updateEncryptionKeyEvent();
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.encryptMedia = encryptMedia ?? false;
@@ -321,9 +322,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
         }
 
+        const isMyMembership = (m: CallMembership): boolean =>
+            m.member.userId === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
         const callMembersChanged =
-            oldMemberships.map(membershipToUserAndDeviceId).sort().join() !==
-            this.memberships.map(membershipToUserAndDeviceId).sort().join();
+            oldMemberships
+                .filter((m) => !isMyMembership(m))
+                .map(membershipToUserAndDeviceId)
+                .sort()
+                .join() !==
+            this.memberships
+                .filter((m) => !isMyMembership(m))
+                .map(membershipToUserAndDeviceId)
+                .sort()
+                .join();
 
         if (callMembersChanged && this.isJoined()) {
             this.updateEncryptionKeyEvent();
