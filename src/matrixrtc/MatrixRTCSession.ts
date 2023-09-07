@@ -195,11 +195,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         logger.info(`Joining call session in room ${this.room.roomId}`);
-        this.updateEncryptionKeyEvent();
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.encryptMedia = encryptMedia ?? false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
+        this.updateEncryptionKeyEvent();
         this.updateCallMembershipEvent();
     }
 
