@@ -194,7 +194,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        logger.info(`Joining call session in room ${this.room.roomId}`);
+        logger.info(`Joining call session in room ${this.room.roomId} with encryptMedia=${encryptMedia}`);
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.encryptMedia = encryptMedia ?? false;
