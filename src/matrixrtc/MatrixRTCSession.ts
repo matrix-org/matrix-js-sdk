@@ -59,6 +59,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private activeFoci: Focus[] | undefined;
 
+    private updateCallMembershipRunning = false;
+
     /**
      * Returns all the call memberships for a room, oldest first
      */
@@ -170,7 +172,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        this.updateCallMembershipEvent();
+        this.triggerCallMembershipEventUpdate();
     }
 
     /**
@@ -189,7 +191,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
-        this.updateCallMembershipEvent();
+        this.triggerCallMembershipEventUpdate();
     }
 
     /**
@@ -328,7 +330,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return newMemberships;
     }
 
-    private updateCallMembershipEvent = async (): Promise<void> => {
+    private triggerCallMembershipEventUpdate = (): void => {
+        if (this.updateCallMembershipRunning) return;
+
+        this.updateCallMembershipRunning = true;
+        try {
+            this.updateCallMembershipEvent();
+        } finally {
+            this.updateCallMembershipRunning = false;
+        }
+    };
+
+    private async updateCallMembershipEvent(): Promise<void> {
         if (this.memberEventTimeout) {
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
@@ -363,7 +376,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
             // nothing to do - reschedule the check again
-            setTimeout(this.updateCallMembershipEvent, MEMBER_EVENT_CHECK_PERIOD);
+            setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
             return;
         }
 
@@ -388,6 +401,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
         }
 
-        if (resendDelay) this.memberEventTimeout = setTimeout(this.updateCallMembershipEvent, resendDelay);
-    };
+        if (resendDelay) this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, resendDelay);
+    }
 }
