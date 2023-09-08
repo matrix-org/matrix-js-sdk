@@ -103,7 +103,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
     /**
-     * Gets a backup decryptor capable of decrypting megolm session data encrypted with this backup.
+     * Get a backup decryptor capable of decrypting megolm session data encrypted with the given backup information.
      * @param backupInfo - The backup information
      * @param privKey - The private decryption key.
      */
@@ -220,20 +220,22 @@ export interface EventDecryptionResult {
 }
 
 /**
- * Responsible of decrypting megolm session data retrieved from a remote backup.
- * Will be implemented by crypto backends {@link CryptoBackend#getBackupDecryptor}
+ * Responsible for decrypting megolm session data retrieved from a remote backup.
+ * The result of {@link CryptoBackend#getBackupDecryptor}.
  */
 export interface BackupDecryptor {
     /**
-     * Depending on the backup algorithm the source of a key can be trusted or not.
-     * If false, the key must be considered unsafe (authenticity cannot be guaranteed).
-     * It could be per design (deniability) or for some technical reason (asymmetric).
+     * Whether keys retrieved from this backup can be trusted.
+     *
+     * Depending on the backup algorithm, keys retrieved from the backup can be trusted or not.
+     * If false, keys retrieved from the backup  must be considered unsafe (authenticity cannot be guaranteed).
+     * It could be by design (deniability) or for some technical reason (eg asymmetric encryption).
      */
-    sourceTrusted: boolean;
+    readonly sourceTrusted: boolean;
 
     /**
      *
-     * Decrypts megolm session data retrieved from backup.
+     * Decrypt megolm session data retrieved from backup.
      *
      * @param ciphertexts - a Record of sessionId to session data.
      *
@@ -242,7 +244,9 @@ export interface BackupDecryptor {
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
 
     /**
-     * Used to free any resources if needed.
+     * Free any resources held by this decryptor.
+     *
+     * Should be called once the decryptor is no longer needed.
      */
     free(): void;
 }

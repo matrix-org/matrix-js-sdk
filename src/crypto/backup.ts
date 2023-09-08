@@ -885,7 +885,7 @@ export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): Backup
  */
 export class LibOlmBackupDecryptor implements BackupDecryptor {
     private algorithm: BackupAlgorithm;
-    public sourceTrusted: boolean;
+    public readonly sourceTrusted: boolean;
 
     public constructor(algorithm: BackupAlgorithm) {
         this.algorithm = algorithm;

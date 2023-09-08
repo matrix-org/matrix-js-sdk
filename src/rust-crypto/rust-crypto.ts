@@ -148,13 +148,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
-     */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
-        throw new Error("Stub not yet implemented");
-    }
-
-    /**
      * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
      *
      * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
@@ -1021,6 +1014,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         if (unsigned !== undefined) obj.unsigned = unsigned;
         obj.signatures = Object.fromEntries(sigs.entries());
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
+     */
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+        throw new Error("Stub not yet implemented");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

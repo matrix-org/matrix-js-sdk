@@ -192,7 +192,7 @@ def build_test_data(user_data, prefix = "") -> str:
         }
     }
 
-    encrypted_backup_key = encrypt_megolm_key_to_backup(additional_exported_room_key, backup_decryption_key.public_key())
+    backed_up_room_key = encrypt_megolm_key_for_backup(additional_exported_room_key, backup_decryption_key.public_key())
 
     backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
 
@@ -230,6 +230,9 @@ export const {prefix}SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult>
         json.dumps(build_cross_signing_keys_data(user_data), indent=4)
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
+
 /** base64-encoded backup decryption (private) key */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
 
@@ -249,11 +252,8 @@ export const {prefix}MEGOLM_SESSION_DATA: IMegolmSessionData = {
         json.dumps(additional_exported_room_key, indent=4)
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
-
-/** An encrypted megolm backup key for backup */
-export const {prefix}CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {json.dumps(encrypted_backup_key, indent=4)};
+/** The key from {prefix}MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
+export const {prefix}CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {json.dumps(backed_up_room_key, indent=4)};
 """
 
 
@@ -383,10 +383,10 @@ def build_exported_megolm_key() -> dict:
 
     return megolm_export
 
-def encrypt_megolm_key_to_backup(session_data: dict, backup_public_key: x25519.X25519PublicKey) -> dict:
+def encrypt_megolm_key_for_backup(session_data: dict, backup_public_key: x25519.X25519PublicKey) -> dict:
 
     """
-        Encrypts an exported megolm key for the backup format based on m.megolm_backup.v1.curve25519-aes-sha2
+    Encrypts an exported megolm key for key backup, using the m.megolm_backup.v1.curve25519-aes-sha2 algorithm.
     """
     data = encode_canonical_json(session_data)
 
@@ -447,113 +447,10 @@ def encrypt_megolm_key_to_backup(session_data: dict, backup_public_key: x25519.X
 
     return encrypted_key
 
-
-def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519PrivateKey, curve_key: x25519.X25519PrivateKey) -> tuple[dict, dict]:
-    """
-        Encrypts an event using the given key in session export format.
-        Will not do any ratcheting, just encrypt at index 0.
-    """
-
-    clear_event = {
-        "type": "m.room.message",
-        "room_id": "!room:id",
-        "sender": "@alice:localhost",
-        "content": {
-            "msgtype": "m.text",
-            "body": "Hello world"
-        }
-    }
-
-    session_key: str = exported_key["session_key"]
-
-    # Get the megolm R0 from the export format
-    decoded = base64.b64decode(session_key.encode("ascii"))
-    r0 = decoded[5:133]
-
-    hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=80,
-        salt=bytes(32),
-        info=b"MEGOLM_KEYS",
-    )
-
-    raw_key = hkdf.derive(r0)
-    aes_key = raw_key[:32]
-    mac = raw_key[32:64]
-    aes_iv = raw_key[64:80]
-
-    payload_json = {
-        "room_id": clear_event["room_id"],
-        "type": clear_event["type"],
-        "content": clear_event["content"]
-    }
-
-    payload_string = encode_canonical_json(payload_json)
-
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv))
-    encryptor = cipher.encryptor()
-    padder = padding.PKCS7(128).padder()
-
-    padded_data = padder.update(payload_string)
-    padded_data += padder.finalize()
-
-    ct = encryptor.update(padded_data) + encryptor.finalize()
-
-    # The ratchet index i, and the cipher-text​, are then packed
-    # into a message as described in Message format. Then the entire message
-    # (including the version bytes and all payload bytes) are passed through
-    # HMAC-SHA-256. The first 8 bytes of the MAC are appended to the message.
-    message = bytearray()
-    message += b'\x03'
-    # int tag for index
-    message += b'\x08'
-    # index is 0
-    message += b'\x00'
-    message += b'\x12'
-    # probably works only for short messages
-    message += len(ct).to_bytes(1, 'big')
-    # encrypted data
-    message += ct
-
-    h = hmac.HMAC(mac, hashes.SHA256())
-    h.update(message)
-    signature = h.finalize()
-    mac = signature[:8]
-
-    message += mac
-
-    # Finally, the authenticated message is signed using the Ed25519 keypair;
-    # the 64 byte signature is appended to the message
-    signature = ed_key.sign(bytes(message))
-
-    message += signature
-
-    cipher_text = encode_base64(message)
-
-    encrypted_payload = {
-        "algorithm" : "m.megolm.v1.aes-sha2",
-        "sender_key" : encode_base64(curve_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
-        "ciphertext" : cipher_text,
-        "session_id" : exported_key["session_id"],
-        "device_id" : "TEST_DEVICE"
-    }
-
-    encrypted_event = {
-        "type": "m.room.encrypted",
-        "room_id": "!room:id",
-        "sender": "@alice:localhost",
-        "content": encrypted_payload,
-        "event_id": "$event1",
-        "origin_server_ts": 1507753886000,
-    }
-
-    return clear_event, encrypted_event
-
-
 def export_recovery_key(key_b64: str) -> str:
     """
         Export a private recovery key as a recovery key that can be presented
-        to users.
+        to users. As per spec https://spec.matrix.org/v1.8/client-server-api/#recovery-key
     """
     private_key_bytes = base64.b64decode(key_b64)
 

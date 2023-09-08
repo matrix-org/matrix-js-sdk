@@ -103,6 +103,22 @@ export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
     }
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const ONE_TIME_KEYS = {
+    "@alice:localhost": {
+        "test_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@alice:localhost": {
+                        "ed25519:test_device": "25djC6Rk6gIgFBMVawY9X9LnY8XMMziey6lKqL8Q5Bbp7T1vw9uk0RE7eKO2a/jNLcYroO2xRztGhBrKz5sOCQ"
+                    }
+                }
+            }
+        }
+    }
+};
+
 /** base64-encoded backup decryption (private) key */
 export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
@@ -162,23 +178,7 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "forwarding_curve25519_key_chain": []
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const ONE_TIME_KEYS = {
-    "@alice:localhost": {
-        "test_device": {
-            "signed_curve25519:AAAAHQ": {
-                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
-                "signatures": {
-                    "@alice:localhost": {
-                        "ed25519:test_device": "25djC6Rk6gIgFBMVawY9X9LnY8XMMziey6lKqL8Q5Bbp7T1vw9uk0RE7eKO2a/jNLcYroO2xRztGhBrKz5sOCQ"
-                    }
-                }
-            }
-        }
-    }
-};
-
-/** An encrypted megolm backup key for backup */
+/** The key from MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
 export const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
     "first_message_index": 1,
     "forwarded_count": 0,
@@ -283,6 +283,22 @@ export const BOB_SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
     }
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const BOB_ONE_TIME_KEYS = {
+    "@bob:xyz": {
+        "bob_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@bob:xyz": {
+                        "ed25519:bob_device": "dlZc9VA/hP980Mxvu9qwi0qJx8VK7sADGOM48CE01YM7K/Mbty9lis/QjtQAWqDg371QyynVRjEzt9qj7eSFCg"
+                    }
+                }
+            }
+        }
+    }
+};
+
 /** base64-encoded backup decryption (private) key */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
@@ -342,23 +358,7 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "forwarding_curve25519_key_chain": []
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const BOB_ONE_TIME_KEYS = {
-    "@bob:xyz": {
-        "bob_device": {
-            "signed_curve25519:AAAAHQ": {
-                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
-                "signatures": {
-                    "@bob:xyz": {
-                        "ed25519:bob_device": "dlZc9VA/hP980Mxvu9qwi0qJx8VK7sADGOM48CE01YM7K/Mbty9lis/QjtQAWqDg371QyynVRjEzt9qj7eSFCg"
-                    }
-                }
-            }
-        }
-    }
-};
-
-/** An encrypted megolm backup key for backup */
+/** The key from BOB_MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
 export const BOB_CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
     "first_message_index": 1,
     "forwarded_count": 0,
