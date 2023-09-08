@@ -60,6 +60,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private activeFoci: Focus[] | undefined;
 
     private updateCallMembershipRunning = false;
+    private needCallMembershipUpdate = false;
 
     /**
      * Returns all the call memberships for a room, oldest first
@@ -331,11 +332,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private triggerCallMembershipEventUpdate = (): void => {
-        if (this.updateCallMembershipRunning) return;
+        if (this.updateCallMembershipRunning) {
+            this.needCallMembershipUpdate = true;
+            return;
+        }
 
         this.updateCallMembershipRunning = true;
+        this.needCallMembershipUpdate = false;
         try {
-            this.updateCallMembershipEvent();
+            // if anything triggers an update while the update is running, do another update afterwards
+            do {
+                this.updateCallMembershipEvent();
+            } while (this.needCallMembershipUpdate);
         } finally {
             this.updateCallMembershipRunning = false;
         }
