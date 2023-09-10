@@ -28,6 +28,7 @@ import { EncryptionKeyEventContent } from "./types";
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
+const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
 
 const getNewEncryptionKey = (): string => {
     const key = new Uint8Array(32);
@@ -35,8 +36,8 @@ const getNewEncryptionKey = (): string => {
     return key.toString();
 };
 
-const combineUserAndDeviceId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
-const membershipToUserAndDeviceId = (m: CallMembership): string => combineUserAndDeviceId(m.member.userId, m.deviceId);
+const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
+const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.member.userId, m.deviceId);
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a proprty of their membership
@@ -53,7 +54,11 @@ export type MatrixRTCSessionEventHandlerMap = {
         newMemberships: CallMembership[],
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
-    [MatrixRTCSessionEvent.EncryptionKeyChanged]: (key: string, participantId: string) => void;
+    [MatrixRTCSessionEvent.EncryptionKeyChanged]: (
+        key: string,
+        encryptionKeyIndex: number,
+        participantId: string,
+    ) => void;
 };
 
 /**
@@ -71,25 +76,44 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private activeFoci: Focus[] | undefined;
 
     private encryptMedia = false;
-    private encryptionKeys = new Map<string, string>();
+    private encryptionKeys = new Map<string, Array<string>>();
+    private lastEncryptionKeyUpdateRequest?: number;
 
-    private setEncryptionKey(userId: string, deviceId: string, encryptionKey: string): void {
-        const participantId = combineUserAndDeviceId(userId, deviceId);
-        if (this.encryptionKeys.get(participantId) === encryptionKey) return;
+    private getNewEncryptionKeyIndex(): number {
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
 
-        this.encryptionKeys.set(participantId, encryptionKey);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, participantId);
+        if (!userId) throw new Error("No userId!");
+        if (!deviceId) throw new Error("No deviceId!");
+
+        return (this.getKeyForParticipant(userId, deviceId)?.length ?? 0) % 16;
     }
 
-    public getKeyForParticipant(userId: string, deviceId: string): string | undefined {
-        return this.encryptionKeys.get(combineUserAndDeviceId(userId, deviceId));
+    private setEncryptionKey(
+        userId: string,
+        deviceId: string,
+        encryptionKeyIndex: number,
+        encryptionKey: string,
+    ): void {
+        const participantId = getParticipantId(userId, deviceId);
+        const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
+
+        if (encryptionKeys[encryptionKeyIndex] === encryptionKey) return;
+
+        encryptionKeys[encryptionKeyIndex] = encryptionKey;
+        this.encryptionKeys.set(participantId, encryptionKeys);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, encryptionKeyIndex, participantId);
+    }
+
+    public getKeyForParticipant(userId: string, deviceId: string): Array<string> | undefined {
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId));
     }
 
     /**
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
      */
-    public getEncryptionKeys(): IterableIterator<[string, string]> {
+    public getEncryptionKeys(): IterableIterator<[string, Array<string>]> {
         return this.encryptionKeys.entries();
     }
 
@@ -227,6 +251,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Re-sends the encryption key room event with a new key
      */
     private async updateEncryptionKeyEvent(): Promise<void> {
+        if (
+            this.lastEncryptionKeyUpdateRequest &&
+            this.lastEncryptionKeyUpdateRequest + UPDATE_ENCRYPTION_KEY_THROTTLE > Date.now()
+        ) {
+            this.lastEncryptionKeyUpdateRequest = Date.now();
+            setTimeout(() => {
+                this.updateEncryptionKeyEvent();
+            }, UPDATE_ENCRYPTION_KEY_THROTTLE);
+            return;
+        }
+
+        this.lastEncryptionKeyUpdateRequest = Date.now();
+
         if (!this.isJoined()) return;
         if (!this.encryptMedia) return;
 
@@ -237,9 +274,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!deviceId) throw new Error("No deviceId");
 
         const encryptionKey = getNewEncryptionKey();
+        const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         try {
             await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
                 "m.encryption_key": encryptionKey,
+                "m.encryption_key_index": encryptionKeyIndex,
                 "m.device_id": deviceId,
                 "m.call_id": "",
             } as EncryptionKeyEventContent);
@@ -248,9 +287,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         console.log(
-            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKey=${encryptionKey}`,
+            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} encryptionKey=${encryptionKey}`,
+            this.encryptionKeys,
         );
-        this.setEncryptionKey(userId, deviceId, encryptionKey);
+        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
     }
 
     /**
@@ -283,6 +323,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeyEventContent>();
         const encryptionKey = content["m.encryption_key"];
+        const encryptionKeyIndex = content["m.encryption_key_index"];
         const deviceId = content["m.device_id"];
         const callId = content["m.call_id"];
 
@@ -290,14 +331,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             !userId ||
             !deviceId ||
             !encryptionKey ||
+            encryptionKeyIndex === undefined ||
+            encryptionKeyIndex === null ||
             callId === undefined ||
             callId === null ||
             typeof deviceId !== "string" ||
             typeof callId !== "string" ||
-            typeof encryptionKey !== "string"
+            typeof encryptionKey !== "string" ||
+            typeof encryptionKeyIndex !== "number"
         ) {
             throw new Error(
-                `Malformed m.call.encryption_key: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
+                `Malformed m.call.encryption_key: userId=${userId}, deviceId=${deviceId}, encryptionKeyIndex=${encryptionKeyIndex} callId=${callId}`,
             );
         }
 
@@ -309,8 +353,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        console.log(`Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey}`);
-        this.setEncryptionKey(userId, deviceId, encryptionKey);
+        console.log(
+            `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey} encryptionKeyIndex=${encryptionKeyIndex}`,
+            this.encryptionKeys,
+        );
+        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
     };
 
     public onMembershipUpdate = (): void => {
@@ -331,12 +378,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const callMembersChanged =
             oldMemberships
                 .filter((m) => !isMyMembership(m))
-                .map(membershipToUserAndDeviceId)
+                .map(getParticipantIdFromMembership)
                 .sort()
                 .join() !==
             this.memberships
                 .filter((m) => !isMyMembership(m))
-                .map(membershipToUserAndDeviceId)
+                .map(getParticipantIdFromMembership)
                 .sort()
                 .join();
 

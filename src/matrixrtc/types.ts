@@ -16,6 +16,7 @@ limitations under the License.
 
 export interface EncryptionKeyEventContent {
     "m.encryption_key": string;
+    "m.encryption_key_index": number;
     "m.device_id": string;
     "m.call_id": string;
 }
