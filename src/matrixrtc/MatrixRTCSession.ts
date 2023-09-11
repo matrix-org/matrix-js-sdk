@@ -331,7 +331,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return newMemberships;
     }
 
-    private triggerCallMembershipEventUpdate = (): void => {
+    private triggerCallMembershipEventUpdate = async (): Promise<void> => {
         if (this.updateCallMembershipRunning) {
             this.needCallMembershipUpdate = true;
             return;
@@ -342,7 +342,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         try {
             // if anything triggers an update while the update is running, do another update afterwards
             do {
-                this.updateCallMembershipEvent();
+                await this.updateCallMembershipEvent();
             } while (this.needCallMembershipUpdate);
         } finally {
             this.updateCallMembershipRunning = false;
