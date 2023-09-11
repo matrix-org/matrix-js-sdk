@@ -241,6 +241,7 @@ describe("MatrixRTCSession", () => {
         it("renews membership event before expiry time", async () => {
             jest.useFakeTimers();
             let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
+
             const eventSentPromise = new Promise<Record<string, any>>((r) => {
                 resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
                     r(val);
@@ -260,10 +261,17 @@ describe("MatrixRTCSession", () => {
                     .fn()
                     .mockReturnValue(mockRTCEvent(eventContent.memberships, mockRoom.roomId, () => timeElapsed));
 
-                sendStateEventMock.mockClear();
+                const eventReSentPromise = new Promise<Record<string, any>>((r) => {
+                    resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
+                        r(val);
+                    };
+                });
+
+                sendStateEventMock.mockReset().mockImplementation(resolveFn);
 
                 jest.setSystemTime(Date.now() + timeElapsed);
                 jest.advanceTimersByTime(timeElapsed);
+                await eventReSentPromise;
 
                 expect(sendStateEventMock).toHaveBeenCalledWith(
                     mockRoom.roomId,

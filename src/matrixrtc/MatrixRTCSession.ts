@@ -151,6 +151,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             clearTimeout(this.expiryTimeout);
             this.expiryTimeout = undefined;
         }
+        if (this.memberEventTimeout) {
+            clearTimeout(this.memberEventTimeout);
+            this.memberEventTimeout = undefined;
+        }
     }
 
     /**
@@ -338,10 +342,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         this.updateCallMembershipRunning = true;
-        this.needCallMembershipUpdate = false;
         try {
             // if anything triggers an update while the update is running, do another update afterwards
             do {
+                this.needCallMembershipUpdate = false;
                 await this.updateCallMembershipEvent();
             } while (this.needCallMembershipUpdate);
         } finally {
@@ -384,7 +388,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
             // nothing to do - reschedule the check again
-            setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
+            this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
             return;
         }
 
