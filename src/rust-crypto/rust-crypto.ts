@@ -39,6 +39,8 @@ import {
     CrossSigningStatus,
     CryptoCallbacks,
     DeviceVerificationStatus,
+    EventEncryptionInfo,
+    EventShieldColour,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
@@ -134,17 +136,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupFailed,
         ]);
 
-        // Fire if the cross signing keys are imported from the secret storage
-        const onCrossSigningKeysImport = async (): Promise<void> => {
-            const newVerification = await this.getUserVerificationStatus(this.userId);
-            this.emit(CryptoEvent.UserTrustStatusChanged, this.userId, newVerification);
-        };
-        this.crossSigningIdentity = new CrossSigningIdentity(
-            olmMachine,
-            this.outgoingRequestProcessor,
-            secretStorage,
-            onCrossSigningKeysImport,
-        );
+        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
     }
 
     /**
@@ -208,6 +200,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.eventDecryptor.attemptEventDecryption(event);
     }
 
+    /**
+     * Implementation of (deprecated) {@link MatrixClient#getEventEncryptionInfo}.
+     *
+     * @param event - event to inspect
+     */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         // TODO: make this work properly. Or better, replace it.
 
@@ -733,6 +730,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     */
+    public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
+        return {
+            shieldColour: EventShieldColour.NONE,
+            shieldReason: null,
+        };
+    }
+
+    /**
      * Returns to-device verification requests that are already in progress for the given user id.
      *
      * Implementation of {@link CryptoApi#getVerificationRequestsToDeviceInProgress}
@@ -1240,6 +1247,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Callback for `OlmMachine.registerUserIdentityUpdatedCallback`
+     *
+     * Called by the rust-sdk whenever there is an update to any user's cross-signing status. We re-check their trust
+     * status and emit a `UserTrustStatusChanged` event.
+     *
+     * @param userId - the user with the updated identity
+     */
+    public async onUserIdentityUpdated(userId: RustSdkCryptoJs.UserId): Promise<void> {
+        const newVerification = await this.getUserVerificationStatus(userId.toString());
+        this.emit(CryptoEvent.UserTrustStatusChanged, userId.toString(), newVerification);
+    }
+
+    /**
      * Handle a live event received via /sync.
      * See {@link ClientEventHandlerMap#event}
      *
@@ -1447,7 +1467,7 @@ type RustCryptoEventMap = {
     [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
 
     /**
-     * Fires when the cross signing keys are imported during {@link CryptoApi#bootstrapCrossSigning}
+     * Fires when the trust status of a user changes.
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
 } & RustBackupCryptoEventMap;

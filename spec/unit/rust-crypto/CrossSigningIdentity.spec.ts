@@ -52,7 +52,7 @@ describe("CrossSigningIdentity", () => {
                 get: jest.fn(),
             } as unknown as Mocked<ServerSideSecretStorage>;
 
-            crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage, jest.fn());
+            crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage);
         });
 
         it("should do nothing if keys are present on-device and in secret storage", async () => {
