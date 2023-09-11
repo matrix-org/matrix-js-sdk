@@ -190,6 +190,8 @@ export class GroupCallEventHandler {
             content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
+            this.client.useLivekitForGroupCalls,
+            content["io.element.livekit_service_url"],
         );
 
         this.groupCalls.set(room.roomId, groupCall);
