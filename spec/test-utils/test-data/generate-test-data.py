@@ -449,8 +449,8 @@ def encrypt_megolm_key_for_backup(session_data: dict, backup_public_key: x25519.
 
 def export_recovery_key(key_b64: str) -> str:
     """
-        Export a private recovery key as a recovery key that can be presented
-        to users. As per spec https://spec.matrix.org/v1.8/client-server-api/#recovery-key
+        Export a private recovery key as a recovery key that can be presented to users.
+        As per spec https://spec.matrix.org/v1.8/client-server-api/#recovery-key
     """
     private_key_bytes = base64.b64decode(key_b64)
 
