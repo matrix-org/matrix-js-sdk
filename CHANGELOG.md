@@ -4,6 +4,7 @@ Changes in [28.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
 ## 🦖 Deprecations
  * Deprecate `MatrixClient.checkUserTrust` ([\#3691](https://github.com/matrix-org/matrix-js-sdk/pull/3691)).
  * Deprecate `MatrixClient.{prepare,create}KeyBackupVersion` in favour of new `CryptoApi.resetKeyBackup` API ([\#3689](https://github.com/matrix-org/matrix-js-sdk/pull/3689)).
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
 
 ## ✨ Features
  * Allow calls without ICE/TURN/STUN servers ([\#3695](https://github.com/matrix-org/matrix-js-sdk/pull/3695)).
