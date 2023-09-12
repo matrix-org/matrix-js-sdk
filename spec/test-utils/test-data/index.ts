@@ -6,6 +6,7 @@
 import { IDeviceKeys, IMegolmSessionData } from "../../../src/@types/crypto";
 import { IDownloadKeyResult } from "../../../src";
 import { KeyBackupInfo } from "../../../src/crypto-api";
+import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 
 /* eslint-disable comma-dangle */
 
@@ -102,8 +103,27 @@ export const SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
     }
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const ONE_TIME_KEYS = {
+    "@alice:localhost": {
+        "test_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@alice:localhost": {
+                        "ed25519:test_device": "25djC6Rk6gIgFBMVawY9X9LnY8XMMziey6lKqL8Q5Bbp7T1vw9uk0RE7eKO2a/jNLcYroO2xRztGhBrKz5sOCQ"
+                    }
+                }
+            }
+        }
+    }
+};
+
 /** base64-encoded backup decryption (private) key */
 export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Backup decryption key in export format */
+export const BACKUP_DECRYPTION_KEY_BASE58 = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
 
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
 export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
@@ -158,19 +178,15 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "forwarding_curve25519_key_chain": []
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const ONE_TIME_KEYS = {
-    "@alice:localhost": {
-        "test_device": {
-            "signed_curve25519:AAAAHQ": {
-                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
-                "signatures": {
-                    "@alice:localhost": {
-                        "ed25519:test_device": "25djC6Rk6gIgFBMVawY9X9LnY8XMMziey6lKqL8Q5Bbp7T1vw9uk0RE7eKO2a/jNLcYroO2xRztGhBrKz5sOCQ"
-                    }
-                }
-            }
-        }
+/** The key from MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
+export const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
+    "first_message_index": 1,
+    "forwarded_count": 0,
+    "is_verified": false,
+    "session_data": {
+        "ciphertext": "r6HRk2/Im2yJe5cLP8R81aVjFWjYWPHpw7TVxphiSK1cdIDZTTK57r6MfU+0i/mTPn+/PosT74OvYwCnehy2d1BPGxhDl8AhPcBu3//KzlqinE6iAfrQYHmoOTes2uOsHgvbE7M9bIyAE1/FxzIgZuzmbJ1Fp/qjgKeTeonuMujLpnezUOYzDYqbF8hyLdm+SkrVWISde/wmVfpl1TI56ItCKmz0uB4fjUMWUV0sgp+3JLAUIqIqmwb7VVZooox94ze2VuspJMu9mF6MoQs5BEk3bFi9nbdgGwGh0pFYjEwE62+xLjo9x/gdVkIy8xlBmCFjBdvWjBjtvc8NfboWKxZ1tmpPCt6IiCTwOY4kyQdmK6U+sjh3tvs7qLOX5ETThOAqwKsY9VeXbeCtWF2h/m6ZXFQpxsf/vLgpTe0djDsGpWgLY+dywAelfz6O69EiHAxti9XxEGO0WLBDs0rmyhPN03IeLa+b8Gp2RMRdJ4prjKr0m7CVTUXEHbw6LtN0SWvEnc6iBI0vCEs1EocJAFfXsiwzAAgPDmaaDrCEk1dOoYj2eXoy4tbJx3+/FXFKe+RVdmiuv1nsVAQxPq78Tx6UtIz7ihHI0tzaZV+/7PUY065b6kevDBST+SZWERwqFZdz28TWsHu6Kxjr5k2N4sahs8a4frobip6C7PhXJFiq3n7lMx1IjfRrN0HxzpMqBzhkmiat9JR6nWtGjvOvvw",
+        "ephemeral": "q+P1WdRtEiPIEtNuuGrRcueZxUbLnSKdsuTAkxewXgU",
+        "mac": "OibmACbORhI"
     }
 };
 
@@ -267,8 +283,27 @@ export const BOB_SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
     }
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const BOB_ONE_TIME_KEYS = {
+    "@bob:xyz": {
+        "bob_device": {
+            "signed_curve25519:AAAAHQ": {
+                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
+                "signatures": {
+                    "@bob:xyz": {
+                        "ed25519:bob_device": "dlZc9VA/hP980Mxvu9qwi0qJx8VK7sADGOM48CE01YM7K/Mbty9lis/QjtQAWqDg371QyynVRjEzt9qj7eSFCg"
+                    }
+                }
+            }
+        }
+    }
+};
+
 /** base64-encoded backup decryption (private) key */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Backup decryption key in export format */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
 
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
 export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
@@ -290,10 +325,10 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!roomA:example.org",
         "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-        "session_id": "X9SK5JceUdvUr9gZkmdfS78qmKztoL60oORJ9JA5XD8",
-        "session_key": "AQAAAADbfOdUj/ec5bK4xVEhhRw+jfd1FD4uA0MLy7NyVHugZxyXNZUx5YEof4H9YyjBretviZreMSXqflbgYKz257rkKu7MPeKFf7zmln2GxX0F/p++GOnvpY1FqOglhfRQi3tqiyOa7SL4f7TuERDTOpMqlWhIfTKQnqy0AyF2vpDi5V/UiuSXHlHb1K/YGZJnX0u/Kpis7aC+tKDkSfSQOVw/",
+        "session_id": "/2K+V777vipCxPZ0gpY9qcpz1DYaXwuMRIu0UEP0Wa0",
+        "session_key": "AQAAAAAclzWVMeWBKH+B/WMowa3rb4ma3jEl6n5W4GCs9ue65CruzD3ihX+85pZ9hsV9Bf6fvhjp76WNRajoJYX0UIt7aosjmu0i+H+07hEQ0zqTKpVoSH0ykJ6stAMhdr6Q4uW5crBmdTTBIsqmoWsNJZKKoE2+ldYrZ1lrFeaJbjBIY/9ivle++74qQsT2dIKWPanKc9Q2Gl8LjESLtFBD9Fmt",
         "sender_claimed_keys": {
-            "ed25519": "ZG6lrfATe+958wN1xaGf3dKG/CThEfkmNdp1jcu4zok"
+            "ed25519": "F4P7f1Z0RjbiZMgHk1xBCG3KC4/Ng9PmxLJ4hQ13sHA"
         },
         "forwarding_curve25519_key_chain": []
     },
@@ -301,10 +336,10 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!roomA:example.org",
         "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-        "session_id": "F4P7f1Z0RjbiZMgHk1xBCG3KC4/Ng9PmxLJ4hQ13sHA",
-        "session_key": "AQAAAACv0khqPrQ91MmWCgm0RTzfpn65AGCrRnAKLxGJdfSfECNZ8gyj34FZLwi+F+xC6ibFddcbLXW0mzR6PnTnHF3VHM4g/h+2rcxtlix8fySpIwFzaXViba7cOSy/b+dHTMZB40iA7F4y7AdTdHLv4N1XUj3puU/KVUIKf9/lEDLqyReD+39WdEY24mTIB5NcQQhtyguPzYPT5sSyeIUNd7Bw",
+        "session_id": "+07YOpSgdZ1X9le3n3NMByw0V1B0H0Djnbm76jgmWoo",
+        "session_key": "AQAAAAAjWfIMo9+BWS8IvhfsQuomxXXXGy11tJs0ej505xxd1RzOIP4ftq3MbZYsfH8kqSMBc2l1Ym2u3Dksv2/nR0zGQeNIgOxeMuwHU3Ry7+DdV1I96blPylVCCn/f5RAy6smKoaeylptPdXgVXmw3YBBUVYpHpm+xCIUUp9foAdb8hftO2DqUoHWdV/ZXt59zTAcsNFdQdB9A4525u+o4JlqK",
         "sender_claimed_keys": {
-            "ed25519": "HxUKnGfeUu0fF3cLyCFSDXYtVCQHy/+33q9RkzKfsiU"
+            "ed25519": "OsZMdC1gQ5nPr+L9tuT6xXsaFJkVPkgxP2FexHF1/QM"
         },
         "forwarding_curve25519_key_chain": []
     }
@@ -315,27 +350,23 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!roomA:example.org",
     "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
-    "session_id": "OsZMdC1gQ5nPr+L9tuT6xXsaFJkVPkgxP2FexHF1/QM",
-    "session_key": "AQAAAACvcoGk7mOY59fOqZaxFUiTCBRV1Ia94KBjAZx6kgdgBtkkvs50z8od8/Nc9ncK2UsEiXNvCTTp2dlN3du+Rx0/m7vet2ZOEEp2oYDjHMLLFmwd1gtlGuWYPdXA6Y1+9Yyph0/EDVfS+zd3XvbL0QgbyL43+yQnFNHKlxVJX1eiKTrGTHQtYEOZz6/i/bbk+sV7GhSZFT5IMT9hXsRxdf0D",
+    "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
+    "session_key": "AQAAAADZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9XoinBNIWr/gkyepuAKiQqemlc8J5amD9OkmbVkmnrxP1uyYMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
-        "ed25519": "dV0TIhhkToXpL+gZLo+zXDHJfw7MWYxpg80cynIQDv0"
+        "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
     },
     "forwarding_curve25519_key_chain": []
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const BOB_ONE_TIME_KEYS = {
-    "@bob:xyz": {
-        "bob_device": {
-            "signed_curve25519:AAAAHQ": {
-                "key": "j3fR3HemM16M7CWhoI4Sk5ZsdmdfQHsKL1xuSft6MSw",
-                "signatures": {
-                    "@bob:xyz": {
-                        "ed25519:bob_device": "dlZc9VA/hP980Mxvu9qwi0qJx8VK7sADGOM48CE01YM7K/Mbty9lis/QjtQAWqDg371QyynVRjEzt9qj7eSFCg"
-                    }
-                }
-            }
-        }
+/** The key from BOB_MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
+export const BOB_CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
+    "first_message_index": 1,
+    "forwarded_count": 0,
+    "is_verified": false,
+    "session_data": {
+        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAMW+71BJqIPQW910vV7SX3JkR91kuuiDqlFT1VHLMP9/MNsvCfeZz1Q+0/LqkJo1KTbrrjKxqOq5/e7RQequOEXHu0a658fKaK/tk0eLvO2xUTxxBCgtuuLpeysOykf4jqp3yV89+h+h3o4zsWGyA2cLIBC/9ofqiqsoF+l1smzA+sQ3ArLBM5B2wc7b4Ir7jZUzCpnOK6O6nQA3vwOpwy3AqpeCKbsuXBPLkb9QXnVH9UzNbuL1Go7M6S3zH2BlAQrUhKSj4yI9tQC3XL3Y3IuAJRUX2bIXzYn9DryL+zwz9aULGN1ECZ4pMHm9jlPUYgMDYmSA2rRCZPWXcSeqmV8aB2qR3k+gcCFXNGbKy73bdN87GsPsYPI7RCkgtHGyW2tpz0JpP1CQmtP3wXNBKIJKIgcxGQ3YDehGV7XlFDDUYBZyYGazXqU/fdt21gc4Jvg1xVKsj83woVmGDo+2WzPrpIJ79NJUovC8jJ+UA3QamY28Df6UaRuS3+vvgCCW9e3T5+h5hR7BQayZ9r9Ykv7h7NTxQYjsYwxfZK+OULJPFNYbcB+vc6msLAsqocPhNQTazOe4TfsSAAuaHa/2FfGGMyaWCQY5DI3tk3Pagr87L8lBhwXll9usXKslvc+sJw",
+        "ephemeral": "oO0VX84OUIzm2i/12zAhTWOZT5IFRH5mXaKZ8fXkCgU",
+        "mac": "lEfHlqfJQwU"
     }
 };
 
