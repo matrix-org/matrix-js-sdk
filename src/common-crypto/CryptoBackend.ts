@@ -20,7 +20,7 @@ import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
-import { IKeyBackupInfo, IKeyBackupSession } from "../crypto/keybackup";
+import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
 import { IMegolmSessionData } from "../@types/crypto";
 
 /**
@@ -107,7 +107,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param backupInfo - The backup information
      * @param privKey - The private decryption key.
      */
-    getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
+    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -245,7 +245,7 @@ export interface BackupDecryptor {
      *
      * @returns An array of decrypted `IMegolmSessionData`
      */
-    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
+    decryptSessions(ciphertexts: Record<string, KeyBackupSession>): Promise<IMegolmSessionData[]>;
 
     /**
      * Free any resources held by this decryptor.

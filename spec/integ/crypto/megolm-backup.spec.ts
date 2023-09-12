@@ -18,7 +18,6 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient, TypedEventEmitter } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -26,7 +25,7 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
-import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
+import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
 
 const ROOM_ID = "!ROOM:ID";
@@ -52,7 +51,7 @@ const ENCRYPTED_EVENT: Partial<IEvent> = {
     origin_server_ts: 1507753886000,
 };
 
-const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
+const CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     first_message_index: 0,
     forwarded_count: 0,
     is_verified: false,
