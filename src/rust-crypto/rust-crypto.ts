@@ -68,7 +68,7 @@ import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
-import { encodeBase64 } from "../crypto/olmlib";
+import { encodeBase64 } from "../common-crypto/base64";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -943,7 +943,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param key - the backup decryption key
      */
     public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
-        const base64Key = Buffer.from(key).toString("base64");
+        const base64Key = encodeBase64(key);
 
         // TODO get version from backupManager
         await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
