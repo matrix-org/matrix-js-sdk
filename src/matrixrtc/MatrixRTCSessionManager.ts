@@ -34,6 +34,10 @@ type EventHandlerMap = {
     [MatrixRTCSessionManagerEvents.SessionEnded]: (roomId: string, session: MatrixRTCSession) => void;
 };
 
+/**
+ * Holds all active MatrixRTC session objects and creates new ones as events arrive.
+ * This interface is UNSTABLE and may change without warning.
+ */
 export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionManagerEvents, EventHandlerMap> {
     // All the room-scoped sessions we know about. This will include any where the app
     // has queried for the MatrixRTC sessions in a room, whether it's ever had any members
