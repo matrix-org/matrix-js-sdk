@@ -5309,7 +5309,7 @@ matrix-mock-request@^2.5.0:
   dependencies:
     expect "^28.1.0"
 
-matrix-widget-api@^1.5.0:
+matrix-widget-api@^1.6.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/matrix-widget-api/-/matrix-widget-api-1.6.0.tgz#f0075411edffc6de339580ade7e6e6e6edb01af4"
   integrity sha512-VXIJyAZ/WnBmT4C7ePqevgMYGneKMCP/0JuCOqntSsaNlCRHJvwvTxmqUU+ufOpzIF5gYNyIrAjbgrEbK3iqJQ==
