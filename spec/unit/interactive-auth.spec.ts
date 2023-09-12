@@ -560,7 +560,7 @@ describe("InteractiveAuth", () => {
         expect(ia.getChosenFlow()?.stages).toEqual([AuthType.Password]);
     });
 
-    it("should fire stateUpdated callback if with error when encountered", async () => {
+    it("should fire stateUpdated callback with error when a request fails", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -578,15 +578,20 @@ describe("InteractiveAuth", () => {
             },
         });
 
-        // first we expect a call here
+        // StateUpdated should be called. We call submitAuthDict() to trigger a request ...
+        let firstTime = true;
         stateUpdated.mockImplementation((stage) => {
             expect(stage).toEqual(AuthType.Password);
-            ia.submitAuthDict({
-                type: AuthType.Password,
-            });
+            // Only trigger the request the first time, to avoid an infinite loop
+            if (firstTime) {
+                firstTime = false;
+                ia.submitAuthDict({
+                    type: AuthType.Password,
+                });
+            }
         });
 
-        // .. which should trigger a call here
+        // .. which which we then reject, so we can test the behaviour in that case.
         doRequest.mockRejectedValue(new MatrixError({ errcode: "M_UNKNOWN", error: "This is an error" }));
 
         await Promise.allSettled([ia.attemptAuth()]);

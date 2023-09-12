@@ -260,10 +260,17 @@ describe("MatrixRTCSession", () => {
                     .fn()
                     .mockReturnValue(mockRTCEvent(eventContent.memberships, mockRoom.roomId, () => timeElapsed));
 
-                sendStateEventMock.mockClear();
+                const eventReSentPromise = new Promise<Record<string, any>>((r) => {
+                    resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
+                        r(val);
+                    };
+                });
+
+                sendStateEventMock.mockReset().mockImplementation(resolveFn);
 
                 jest.setSystemTime(Date.now() + timeElapsed);
                 jest.advanceTimersByTime(timeElapsed);
+                await eventReSentPromise;
 
                 expect(sendStateEventMock).toHaveBeenCalledWith(
                     mockRoom.roomId,

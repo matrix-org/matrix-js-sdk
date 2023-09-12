@@ -383,6 +383,8 @@ export interface ICreateClientOpts {
      */
     useE2eForGroupCall?: boolean;
 
+    livekitServiceURL?: string;
+
     /**
      * Crypto callbacks provided by the application
      */
@@ -400,6 +402,12 @@ export interface ICreateClientOpts {
      * Default: false.
      */
     isVoipWithNoMediaAllowed?: boolean;
+
+    /**
+     * If true, group calls will not establish media connectivity and only create the signaling events,
+     * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
+     */
+    useLivekitForGroupCalls?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1212,6 +1220,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
 
+    public useLivekitForGroupCalls: boolean;
+
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
 
@@ -1259,6 +1269,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
+    public livekitServiceURL?: string;
 
     private _secretStorage: ServerSideSecretStorageImpl;
 
@@ -1320,6 +1331,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.pickleKey = opts.pickleKey;
         }
 
+        this.useLivekitForGroupCalls = Boolean(opts.useLivekitForGroupCalls);
+
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
             this.scheduler.setProcessFunction(async (eventToSend: MatrixEvent) => {
@@ -1366,6 +1379,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.isVoipWithNoMediaAllowed = opts.isVoipWithNoMediaAllowed || false;
 
         if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
+
+        this.livekitServiceURL = opts.livekitServiceURL;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1762,8 +1777,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             let indexedDB: IDBFactory;
             try {
                 indexedDB = global.indexedDB;
+                if (!indexedDB) return; // No indexedDB support
             } catch (e) {
-                // No indexeddb support
+                // No indexedDB support
                 return;
             }
             for (const dbname of [
@@ -1951,7 +1967,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.isVoipWithNoMediaAllowed,
+            this.useLivekitForGroupCalls,
+            this.livekitServiceURL,
         ).create();
+    }
+
+    public getLivekitServiceURL(): string | undefined {
+        return this.livekitServiceURL;
+    }
+
+    // This shouldn't need to exist, but the widget API has startup ordering problems that
+    // mean it doesn't know the livekit URL fast enough: remove this once this is fixed.
+    public setLivekitServiceURL(newURL: string): void {
+        this.livekitServiceURL = newURL;
     }
 
     /**
@@ -2657,6 +2685,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
      * @param userId - The ID of the user to check.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.getUserVerificationStatus | `CryptoApi.getUserVerificationStatus`}
      */
     public checkUserTrust(userId: string): UserTrustLevel {
         if (!this.cryptoBackend) {
@@ -2860,6 +2890,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
+     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {
@@ -3284,6 +3315,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get information about the current key backup.
      * @returns Information object from API or null
+     *
+     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res: IKeyBackupInfo;
@@ -3355,6 +3388,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Disable backing up of keys.
+     *
+     * @deprecated It should be unnecessary to disable key backup.
      */
     public disableKeyBackup(): void {
         if (!this.crypto) {
@@ -3374,6 +3409,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns Object that can be passed to createKeyBackupVersion and
      *     additionally has a 'recovery_key' member with the user-facing recovery key string.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async prepareKeyBackupVersion(
         password?: string | Uint8Array | null,
@@ -3417,6 +3454,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param info - Info object from prepareKeyBackupVersion
      * @returns Object with 'version' param indicating the version created
+     *
+     * @deprecated Use {@link Crypto.CryptoApi.resetKeyBackup | `CryptoApi.resetKeyBackup`}.
      */
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<IKeyBackupInfo> {
         if (!this.crypto) {
@@ -3462,29 +3501,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return res;
     }
 
+    /**
+     * @deprecated Use {@link Crypto.CryptoApi.deleteKeyBackupVersion | `CryptoApi.deleteKeyBackupVersion`}.
+     */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
 
-        // If we're currently backing up to this backup... stop.
-        // (We start using it automatically in createKeyBackupVersion
-        // so this is symmetrical).
-        // TODO: convert this to use crypto.getActiveSessionBackupVersion. And actually check the version.
-        if (this.crypto.backupManager.version) {
-            this.crypto.backupManager.disableKeyBackup();
-        }
-
-        const path = utils.encodeUri("/room_keys/version/$version", {
-            $version: version,
-        });
-
-        await this.http.authedRequest(Method.Delete, path, undefined, undefined, { prefix: ClientPrefix.V3 });
+        await this.cryptoBackend.deleteKeyBackupVersion(version);
     }
 
-    private makeKeyBackupPath(roomId: undefined, sessionId: undefined, version?: string): IKeyBackupPath;
-    private makeKeyBackupPath(roomId: string, sessionId: undefined, version?: string): IKeyBackupPath;
-    private makeKeyBackupPath(roomId: string, sessionId: string, version?: string): IKeyBackupPath;
     private makeKeyBackupPath(roomId?: string, sessionId?: string, version?: string): IKeyBackupPath {
         let path: string;
         if (sessionId !== undefined) {
@@ -3804,22 +3831,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let totalKeyCount = 0;
         let keys: IMegolmSessionData[] = [];
 
-        const path = this.makeKeyBackupPath(targetRoomId!, targetSessionId!, backupInfo.version);
+        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
-        const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {
-            return privKey;
-        });
+        const backupDecryptor = await this.cryptoBackend.getBackupDecryptor(backupInfo, privKey);
 
-        const untrusted = algorithm.untrusted;
+        const untrusted = !backupDecryptor.sourceTrusted;
 
         try {
-            // If the pubkey computed from the private data we've been given
-            // doesn't match the one in the auth_data, the user has entered
-            // a different recovery key / the wrong passphrase.
-            if (!(await algorithm.keyMatches(privKey))) {
-                return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
-            }
-
             if (!(privKey instanceof Uint8Array)) {
                 // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 throw new Error(`restoreKeyBackup expects Uint8Array, got ${privKey}`);
@@ -3853,7 +3871,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     if (!roomData.sessions) continue;
 
                     totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = await algorithm.decryptSessions(roomData.sessions);
+                    const roomKeys = await backupDecryptor.decryptSessions(roomData.sessions);
                     for (const k of roomKeys) {
                         k.room_id = roomId;
                         keys.push(k);
@@ -3862,14 +3880,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else if ((res as IRoomKeysResponse).sessions) {
                 const sessions = (res as IRoomKeysResponse).sessions;
                 totalKeyCount = Object.keys(sessions).length;
-                keys = await algorithm.decryptSessions(sessions);
+                keys = await backupDecryptor.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
             } else {
                 totalKeyCount = 1;
                 try {
-                    const [key] = await algorithm.decryptSessions({
+                    const [key] = await backupDecryptor.decryptSessions({
                         [targetSessionId!]: res as IKeyBackupSession,
                     });
                     key.room_id = targetRoomId!;
@@ -3880,7 +3898,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
             }
         } finally {
-            algorithm.free();
+            backupDecryptor.free();
         }
 
         await this.cryptoBackend.importRoomKeys(keys, {
@@ -3889,7 +3907,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             source: "backup",
         });
 
-        await this.checkKeyBackup();
+        /// in case entering the passphrase would add a new signature?
+        await this.cryptoBackend.checkKeyBackupAndEnable();
 
         return { total: totalKeyCount, imported: keys.length };
     }

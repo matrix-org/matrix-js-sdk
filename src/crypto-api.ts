@@ -22,6 +22,7 @@ import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescri
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
+import { MatrixEvent } from "./models/event";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -131,6 +132,14 @@ export interface CryptoApi {
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
     getTrustCrossSignedDevices(): boolean;
+
+    /**
+     * Get the verification status of a given user.
+     *
+     * @param userId - The ID of the user to check.
+     *
+     */
+    getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
 
     /**
      * Get the verification status of a given device.
@@ -257,6 +266,16 @@ export interface CryptoApi {
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
 
+    /**
+     * Get information about the encryption of the given event.
+     *
+     * @param event - the event to get information for
+     *
+     * @returns `null` if the event is not encrypted, or has not (yet) been successfully decrypted. Otherwise, an
+     *      object with information about the encryption of the event.
+     */
+    getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Device/User verification
@@ -382,6 +401,24 @@ export interface CryptoApi {
      *   and trust information (as returned by {@link isKeyBackupTrusted}).
      */
     checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null>;
+
+    /**
+     * Creates a new key backup version.
+     *
+     * If there are existing backups they will be replaced.
+     *
+     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * callback will be called)
+     * and the backup engine will be started.
+     */
+    resetKeyBackup(): Promise<void>;
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
 /**
@@ -396,6 +433,46 @@ export interface BootstrapCrossSigningOpts {
      * will not be uploaded to the server (which seems like a bad thing?).
      */
     authUploadDeviceSigningKeys?: UIAuthCallback<void>;
+}
+
+/**
+ * Represents the ways in which we trust a user
+ */
+export class UserVerificationStatus {
+    public constructor(
+        private readonly crossSigningVerified: boolean,
+        private readonly crossSigningVerifiedBefore: boolean,
+        private readonly tofu: boolean,
+    ) {}
+
+    /**
+     * @returns true if this user is verified via any means
+     */
+    public isVerified(): boolean {
+        return this.isCrossSigningVerified();
+    }
+
+    /**
+     * @returns true if this user is verified via cross signing
+     */
+    public isCrossSigningVerified(): boolean {
+        return this.crossSigningVerified;
+    }
+
+    /**
+     * @returns true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    public wasCrossSigningVerified(): boolean {
+        return this.crossSigningVerifiedBefore;
+    }
+
+    /**
+     * @returns true if this user's key is trusted on first use
+     */
+    public isTofu(): boolean {
+        return this.tofu;
+    }
 }
 
 export class DeviceVerificationStatus {
@@ -597,6 +674,58 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
+}
+
+/**
+ *  Result type of {@link CryptoApi#getEncryptionInfoForEvent}.
+ */
+export interface EventEncryptionInfo {
+    /** "Shield" to be shown next to this event representing its verification status */
+    shieldColour: EventShieldColour;
+
+    /**
+     * `null` if `shieldColour` is `EventShieldColour.NONE`; otherwise a reason code for the shield in `shieldColour`.
+     */
+    shieldReason: EventShieldReason | null;
+}
+
+/**
+ * Types of shield to be shown for {@link EventEncryptionInfo#shieldColour}.
+ */
+export enum EventShieldColour {
+    NONE,
+    GREY,
+    RED,
+}
+
+/**
+ * Reason codes for {@link EventEncryptionInfo#shieldReason}.
+ */
+export enum EventShieldReason {
+    /** An unknown reason from the crypto library (if you see this, it is a bug in matrix-js-sdk). */
+    UNKNOWN,
+
+    /** "Encrypted by an unverified user." */
+    UNVERIFIED_IDENTITY,
+
+    /** "Encrypted by a device not verified by its owner." */
+    UNSIGNED_DEVICE,
+
+    /** "Encrypted by an unknown or deleted device." */
+    UNKNOWN_DEVICE,
+
+    /**
+     * "The authenticity of this encrypted message can't be guaranteed on this device."
+     *
+     * ie: the key has been forwarded, or retrieved from an insecure backup.
+     */
+    AUTHENTICITY_NOT_GUARANTEED,
+
+    /**
+     * The (deprecated) sender_key field in the event does not match the Ed25519 key of the device that sent us the
+     * decryption keys.
+     */
+    MISMATCHED_SENDER_KEY,
 }
 
 export * from "./crypto-api/verification";

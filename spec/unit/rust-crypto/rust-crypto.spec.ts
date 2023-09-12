@@ -624,6 +624,43 @@ describe("RustCrypto", () => {
             ).rejects.toThrow("unknown userId @bob:example.com");
         });
     });
+
+    describe("getUserVerificationStatus", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("returns an unverified UserVerificationStatus when there is no UserIdentity", async () => {
+            const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.isVerified()).toBeFalsy();
+            expect(userVerificationStatus.isTofu()).toBeFalsy();
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeFalsy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+        });
+
+        it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
+            olmMachine.getIdentity.mockResolvedValue({ isVerified: jest.fn().mockReturnValue(true) });
+
+            const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.isVerified()).toBeTruthy();
+            expect(userVerificationStatus.isTofu()).toBeFalsy();
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

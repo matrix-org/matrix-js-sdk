@@ -17,7 +17,7 @@ limitations under the License.
 import { ClientEvent, EventTimeline, MatrixClient } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessonManager";
+import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
 import { makeMockRoom } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
@@ -39,32 +39,6 @@ describe("MatrixRTCSessionManager", () => {
     afterEach(() => {
         client.stopClient();
         client.matrixRTC.stop();
-    });
-
-    it("Gets active MatrixRTC sessions accross multiple rooms", () => {
-        const room1 = makeMockRoom([membershipTemplate]);
-        const room2 = makeMockRoom([membershipTemplate]);
-
-        jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
-
-        client.emit(ClientEvent.Room, room1);
-        client.emit(ClientEvent.Room, room2);
-
-        const sessions = client.matrixRTC.getActiveSessions();
-        expect(sessions).toHaveLength(2);
-    });
-
-    it("Ignores inactive sessions", () => {
-        const room1 = makeMockRoom([membershipTemplate]);
-        const room2 = makeMockRoom([]);
-
-        jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
-
-        client.emit(ClientEvent.Room, room1);
-        client.emit(ClientEvent.Room, room2);
-
-        const sessions = client.matrixRTC.getActiveSessions();
-        expect(sessions).toHaveLength(1);
     });
 
     it("Fires event when session starts", () => {

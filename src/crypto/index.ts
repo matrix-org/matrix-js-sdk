@@ -50,7 +50,7 @@ import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
 import { DehydrationManager } from "./dehydration";
-import { BackupManager, backupTrustInfoFromLegacyTrustInfo } from "./backup";
+import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
@@ -73,7 +73,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
@@ -91,6 +91,9 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
     DeviceVerificationStatus,
+    EventEncryptionInfo,
+    EventShieldColour,
+    EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
@@ -98,6 +101,7 @@ import {
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
+import { ClientPrefix, MatrixError, Method } from "../http-api";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -1088,7 +1092,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 // and want to write to the local secretStorage object
                 { secureSecretStorage: false },
             );
-            // write the key ourselves to 4S
+            // write the key to 4S
             const privateKey = decodeRecoveryKey(info.recovery_key);
             await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
 
@@ -1143,6 +1147,48 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await builder.persist(this);
 
         logger.log("Secure Secret Storage ready");
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     */
+    public async resetKeyBackup(): Promise<void> {
+        // Delete existing ones
+        // There is no use case for having several key backup version live server side.
+        // Even if not deleted it would be lost as the key to restore is lost.
+        // There should be only one backup at a time.
+        await this.backupManager.deleteAllKeyBackupVersions();
+
+        const info = await this.backupManager.prepareKeyBackupVersion();
+
+        await this.signObject(info.auth_data);
+
+        // add new key backup
+        const { version } = await this.baseApis.http.authedRequest<{ version: string }>(
+            Method.Post,
+            "/room_keys/version",
+            undefined,
+            info,
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        logger.log(`Created backup version ${version}`);
+
+        // write the key to 4S
+        const privateKey = info.privateKey;
+        await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+        await this.storeSessionBackupPrivateKey(privateKey);
+
+        await this.backupManager.checkAndStart();
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        await this.backupManager.deleteKeyBackupVersion(version);
     }
 
     /**
@@ -1525,6 +1571,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoApi.getUserVerificationStatus}.
+     */
+    public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
+        return this.checkUserTrust(userId);
+    }
+
+    /**
      * Check whether a given device is trusted.
      *
      * @param userId - The ID of the user whose device is to be checked.
@@ -1790,6 +1843,28 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.backupManager.checkKeyBackup();
         // FIXME: if we previously trusted the backup, should we automatically sign
         // the backup with the new key (if not already signed)?
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
+     */
+    public async getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+        if (!(privKey instanceof Uint8Array)) {
+            throw new Error(`getBackupDecryptor expects Uint8Array`);
+        }
+
+        const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {
+            return privKey;
+        });
+
+        // If the pubkey computed from the private data we've been given
+        // doesn't match the one in the auth_data, the user has entered
+        // a different recovery key / the wrong passphrase.
+        if (!(await algorithm.keyMatches(privKey))) {
+            return Promise.reject(new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY }));
+        }
+
+        return new LibOlmBackupDecryptor(algorithm);
     }
 
     /**
@@ -2649,6 +2724,68 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         return ret as IEncryptedEventInfo;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     */
+    public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
+        const encryptionInfo = this.getEventEncryptionInfo(event);
+        if (!encryptionInfo.encrypted) {
+            return null;
+        }
+
+        const senderId = event.getSender();
+        if (!senderId || encryptionInfo.mismatchedSender) {
+            // something definitely wrong is going on here
+            return {
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
+            };
+        }
+
+        const userTrust = this.checkUserTrust(senderId);
+        if (!userTrust.isCrossSigningVerified()) {
+            // If the message is unauthenticated, then display a grey
+            // shield, otherwise if the user isn't cross-signed then
+            // nothing's needed
+            if (!encryptionInfo.authenticated) {
+                return {
+                    shieldColour: EventShieldColour.GREY,
+                    shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+                };
+            } else {
+                return { shieldColour: EventShieldColour.NONE, shieldReason: null };
+            }
+        }
+
+        const eventSenderTrust =
+            senderId &&
+            encryptionInfo.sender &&
+            (await this.getDeviceVerificationStatus(senderId, encryptionInfo.sender.deviceId));
+
+        if (!eventSenderTrust) {
+            return {
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+            };
+        }
+
+        if (!eventSenderTrust.isVerified()) {
+            return {
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+            };
+        }
+
+        if (!encryptionInfo.authenticated) {
+            return {
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            };
+        }
+
+        return { shieldColour: EventShieldColour.NONE, shieldReason: null };
     }
 
     /**

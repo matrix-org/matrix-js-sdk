@@ -16,6 +16,8 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
+import { KeyBackupInfo } from "../../src/crypto-api";
+
 /**
  * Mock out the endpoints that the js-sdk calls when we call `MatrixClient.start()`.
  *
@@ -55,4 +57,36 @@ export function mockSetupCrossSigningRequests(): void {
         },
         {},
     );
+}
+
+/**
+ * Mock out requests to `/room_keys/version`.
+ *
+ * Returns `404 M_NOT_FOUND` for GET requests until `POST room_keys/version` is called.
+ * Once the POST is done, `GET /room_keys/version` will return the posted backup
+ * instead of 404.
+ *
+ * @param backupVersion - The backup version that will be returned by `POST room_keys/version`.
+ */
+export function mockSetupMegolmBackupRequests(backupVersion: string): void {
+    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+        status: 404,
+        body: {
+            errcode: "M_NOT_FOUND",
+            error: "No current backup version",
+        },
+    });
+
+    fetchMock.post("path:/_matrix/client/v3/room_keys/version", (url, request) => {
+        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+        backupData.version = backupVersion;
+        backupData.count = 0;
+        backupData.etag = "zer";
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData, {
+            overwriteRoutes: true,
+        });
+        return {
+            version: backupVersion,
+        };
+    });
 }
