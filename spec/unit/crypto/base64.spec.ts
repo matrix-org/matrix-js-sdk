@@ -42,7 +42,7 @@ describe("Crypto Base64 encoding", () => {
 
     it("Decode should be indifferent to padding", async () => {
         const withPadding = "ZW5jb2RpbmcgaGVsbG8gd29ybGQ=";
-        const withoutPadding = "ZW5jb2RpbmcgaGVsbG8gd29ybGQ=";
+        const withoutPadding = "ZW5jb2RpbmcgaGVsbG8gd29ybGQ";
 
         const decodedPad = decodeBase64(withPadding);
         const decodedNoPad = decodeBase64(withoutPadding);
