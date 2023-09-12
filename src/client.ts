@@ -1748,8 +1748,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             let indexedDB: IDBFactory;
             try {
                 indexedDB = global.indexedDB;
+                if (!indexedDB) return; // No indexedDB support
             } catch (e) {
-                // No indexeddb support
+                // No indexedDB support
                 return;
             }
             for (const dbname of [
@@ -2848,6 +2849,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
+     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {
@@ -3790,7 +3792,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
-        const backupDecryptor = await this.cryptoBackend!.getBackupDecryptor(backupInfo, privKey);
+        const backupDecryptor = await this.cryptoBackend.getBackupDecryptor(backupInfo, privKey);
 
         const untrusted = !backupDecryptor.sourceTrusted;
 

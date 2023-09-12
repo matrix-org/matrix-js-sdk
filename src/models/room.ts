@@ -849,7 +849,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @returns the membership type (join | leave | invite) for the logged in user
+     * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
     public getMyMembership(): string {
         return this.selfMembership ?? "leave";
@@ -2947,12 +2947,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
                         // If the read receipt sent for the logged in user matches
                         // the last event of the live timeline, then we know for a fact
-                        // that the user has read that message.
-                        // We can mark the room as read and not wait for the local echo
-                        // from synapse
+                        // that the user has read that message, so we can mark the room
+                        // as read and not wait for the remote echo from synapse.
+                        //
                         // This needs to be done after the initial sync as we do not want this
                         // logic to run whilst the room is being initialised
-                        if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
+                        //
+                        // We only do this for non-synthetic receipts, because
+                        // our intention is to do this when the user really did
+                        // just read a message, not when we are e.g. receiving
+                        // an event during the sync. More explanation at:
+                        // https://github.com/matrix-org/matrix-js-sdk/issues/3684
+                        if (!synthetic && this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
                             if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);

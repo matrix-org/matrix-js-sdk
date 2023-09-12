@@ -192,7 +192,8 @@ def build_test_data(user_data, prefix = "") -> str:
         }
     }
 
-    encrypted_backup_key = encrypt_megolm_key_to_backup(additional_exported_room_key, backup_decryption_key.public_key())
+
+    backed_up_room_key = encrypt_megolm_key_for_backup(additional_exported_room_key, backup_decryption_key.public_key())
 
     backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
 
@@ -230,6 +231,9 @@ export const {prefix}SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult>
         json.dumps(build_cross_signing_keys_data(user_data), indent=4)
 };
 
+/** Signed OTKs, returned by `POST /keys/claim` */
+export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
+
 /** base64-encoded backup decryption (private) key */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
 
@@ -249,11 +253,8 @@ export const {prefix}MEGOLM_SESSION_DATA: IMegolmSessionData = {
         json.dumps(additional_exported_room_key, indent=4)
 };
 
-/** Signed OTKs, returned by `POST /keys/claim` */
-export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
-
-/** An encrypted megolm backup key for backup */
-export const {prefix}CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {json.dumps(encrypted_backup_key, indent=4)};
+/** The key from {prefix}MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
+export const {prefix}CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {json.dumps(backed_up_room_key, indent=4)};
 """
 
 
@@ -383,10 +384,11 @@ def build_exported_megolm_key() -> dict:
 
     return megolm_export
 
-def encrypt_megolm_key_to_backup(session_data: dict, backup_public_key: x25519.X25519PublicKey) -> dict:
+
+def encrypt_megolm_key_for_backup(session_data: dict, backup_public_key: x25519.X25519PublicKey) -> dict:
 
     """
-        Encrypts an exported megolm key for the backup format based on m.megolm_backup.v1.curve25519-aes-sha2
+    Encrypts an exported megolm key for key backup, using the m.megolm_backup.v1.curve25519-aes-sha2 algorithm.
     """
     data = encode_canonical_json(session_data)
 
@@ -446,7 +448,6 @@ def encrypt_megolm_key_to_backup(session_data: dict, backup_public_key: x25519.X
     }
 
     return encrypted_key
-
 
 def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519PrivateKey, curve_key: x25519.X25519PrivateKey) -> tuple[dict, dict]:
     """
@@ -552,8 +553,8 @@ def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519
 
 def export_recovery_key(key_b64: str) -> str:
     """
-        Export a private recovery key as a recovery key that can be presented
-        to users.
+        Export a private recovery key as a recovery key that can be presented to users.
+        As per spec https://spec.matrix.org/v1.8/client-server-api/#recovery-key
     """
     private_key_bytes = base64.b64decode(key_b64)
 

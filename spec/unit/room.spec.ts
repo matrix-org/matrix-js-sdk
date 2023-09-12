@@ -1453,6 +1453,87 @@ describe("Room", function () {
         }
 
         describe("addReceipt", function () {
+            describe("resets the unread count", () => {
+                const event1 = utils.mkMessage({ room: roomId, user: userA, msg: "1", event: true });
+                const event2 = utils.mkMessage({ room: roomId, user: userA, msg: "2", event: true });
+
+                it("should reset the unread count when our non-synthetic receipt points to the latest event", () => {
+                    // Given a room with 2 events, and an unread count set.
+                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
+                    room.timeline = [event1, event2];
+                    room.setUnread(NotificationCountType.Total, 45);
+                    room.setUnread(NotificationCountType.Highlight, 57);
+                    // Sanity check:
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+
+                    // When I receive a receipt for me for the last event
+                    const receipt = mkReceipt(roomId, [mkRecord(event2.getId()!, "m.read", userA, 123)]);
+                    room.addReceipt(receipt);
+
+                    // Then the count is set to 0
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(0);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(0);
+                });
+
+                it("should not reset the unread count when someone else's receipt points to the latest event", () => {
+                    // Given a room with 2 events, and an unread count set.
+                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
+                    room.timeline = [event1, event2];
+                    room.setUnread(NotificationCountType.Total, 45);
+                    room.setUnread(NotificationCountType.Highlight, 57);
+                    // Sanity check:
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+
+                    // When I receive a receipt for someone else for the last event
+                    const receipt = mkReceipt(roomId, [mkRecord(event2.getId()!, "m.read", userB, 123)]);
+                    room.addReceipt(receipt);
+
+                    // Then the count is unchanged because it's not my receipt
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+                });
+
+                it("should not reset the unread count when our non-synthetic receipt points to an earlier event", () => {
+                    // Given a room with 2 events, and an unread count set.
+                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
+                    room.timeline = [event1, event2];
+                    room.setUnread(NotificationCountType.Total, 45);
+                    room.setUnread(NotificationCountType.Highlight, 57);
+                    // Sanity check:
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+
+                    // When I receive a receipt for me for an earlier event
+                    const receipt = mkReceipt(roomId, [mkRecord(event1.getId()!, "m.read", userA, 123)]);
+                    room.addReceipt(receipt);
+
+                    // Then the count is unchanged because it wasn't the latest event
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+                });
+
+                it("should not reset the unread count when our a synthetic receipt points to the latest event", () => {
+                    // Given a room with 2 events, and an unread count set.
+                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
+                    room.timeline = [event1, event2];
+                    room.setUnread(NotificationCountType.Total, 45);
+                    room.setUnread(NotificationCountType.Highlight, 57);
+                    // Sanity check:
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+
+                    // When I receive a synthetic receipt for me for the last event
+                    const receipt = mkReceipt(roomId, [mkRecord(event2.getId()!, "m.read", userA, 123)]);
+                    room.addReceipt(receipt, true);
+
+                    // Then the count is unchanged because the receipt was synthetic
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(45);
+                    expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toEqual(57);
+                });
+            });
+
             it("should store the receipt so it can be obtained via getReceiptsForEvent", function () {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
