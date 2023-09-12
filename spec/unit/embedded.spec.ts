@@ -23,7 +23,14 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 import { MockedObject } from "jest-mock";
-import { WidgetApi, WidgetApiToWidgetAction, MatrixCapabilities, ITurnServer, IRoomEvent } from "matrix-widget-api";
+import {
+    WidgetApi,
+    WidgetApiToWidgetAction,
+    MatrixCapabilities,
+    ITurnServer,
+    IRoomEvent,
+    IOpenIDCredentials,
+} from "matrix-widget-api";
 
 import { createRoomWidgetClient, MsgType } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
@@ -33,6 +40,12 @@ import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
+const testOIDCToken = {
+    access_token: "12345678",
+    expires_in: "10",
+    matrix_server_name: "homeserver.oabc",
+    token_type: "Bearer",
+};
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn();
     public requestCapability = jest.fn();
@@ -49,8 +62,15 @@ class MockWidgetApi extends EventEmitter {
     public sendRoomEvent = jest.fn(() => ({ event_id: `$${Math.random()}` }));
     public sendStateEvent = jest.fn();
     public sendToDevice = jest.fn();
+    public requestOpenIDConnectToken = jest.fn(() => {
+        return testOIDCToken;
+        return new Promise<IOpenIDCredentials>(() => {
+            return testOIDCToken;
+        });
+    });
     public readStateEvents = jest.fn(() => []);
     public getTurnServers = jest.fn(() => []);
+    public sendContentLoaded = jest.fn();
 
     public transport = { reply: jest.fn() };
 }
@@ -285,7 +305,12 @@ describe("RoomWidgetClient", () => {
             expect(await emittedSync).toEqual(SyncState.Syncing);
         });
     });
-
+    describe("oidc token", () => {
+        it("requests an oidc token", async () => {
+            await makeClient({});
+            expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
+        });
+    });
     it("gets TURN servers", async () => {
         const server1: ITurnServer = {
             uris: [

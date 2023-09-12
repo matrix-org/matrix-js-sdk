@@ -71,7 +71,8 @@ describe("Group Call Event Handler", function () {
             getMember: (userId: string) => (userId === FAKE_USER_ID ? mockMember : null),
         } as unknown as Room;
 
-        (mockClient as any).getRoom = jest.fn().mockReturnValue(mockRoom);
+        mockClient.getRoom = jest.fn().mockReturnValue(mockRoom);
+        mockClient.getFoci.mockReturnValue([{}]);
     });
 
     describe("reacts to state changes", () => {
