@@ -1850,8 +1850,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string
-            throw new Error(`getBackupDecryptor expects Uint8Array, got ${privKey}`);
+            throw new Error(`getBackupDecryptor expects Uint8Array`);
         }
 
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {

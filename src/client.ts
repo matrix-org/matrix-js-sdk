@@ -3792,7 +3792,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
-        const backupDecryptor = await this.cryptoBackend!.getBackupDecryptor(backupInfo, privKey);
+        const backupDecryptor = await this.cryptoBackend.getBackupDecryptor(backupInfo, privKey);
 
         const untrusted = !backupDecryptor.sourceTrusted;
 
