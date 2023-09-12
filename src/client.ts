@@ -219,6 +219,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
+import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
 
 export type Store = IStore;
 
@@ -382,6 +383,8 @@ export interface ICreateClientOpts {
      */
     useE2eForGroupCall?: boolean;
 
+    livekitServiceURL?: string;
+
     /**
      * Crypto callbacks provided by the application
      */
@@ -399,6 +402,12 @@ export interface ICreateClientOpts {
      * Default: false.
      */
     isVoipWithNoMediaAllowed?: boolean;
+
+    /**
+     * If true, group calls will not establish media connectivity and only create the signaling events,
+     * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
+     */
+    useLivekitForGroupCalls?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1211,6 +1220,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
 
+    public useLivekitForGroupCalls: boolean;
+
     // Note: these are all `protected` to let downstream consumers make mistakes if they want to.
     // We don't technically support this usage, but have reasons to do this.
 
@@ -1258,11 +1269,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
+    public livekitServiceURL?: string;
 
     private _secretStorage: ServerSideSecretStorageImpl;
 
     // A manager for determining which invites should be ignored.
     public readonly ignoredInvites: IgnoredInvites;
+
+    public readonly matrixRTC: MatrixRTCSessionManager;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1317,6 +1331,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.pickleKey = opts.pickleKey;
         }
 
+        this.useLivekitForGroupCalls = Boolean(opts.useLivekitForGroupCalls);
+
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
             this.scheduler.setProcessFunction(async (eventToSend: MatrixEvent) => {
@@ -1344,6 +1360,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
 
+        // NB. We initialise MatrixRTC whether we have call support or not: this is just
+        // the underlying session management and doesn't use any actual media capabilities
+        this.matrixRTC = new MatrixRTCSessionManager(this);
+
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
         this.timelineSupport = Boolean(opts.timelineSupport);
@@ -1359,6 +1379,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.isVoipWithNoMediaAllowed = opts.isVoipWithNoMediaAllowed || false;
 
         if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
+
+        this.livekitServiceURL = opts.livekitServiceURL;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1442,6 +1464,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
         this.clientRunning = true;
+
+        this.on(ClientEvent.Sync, this.startMatrixRTC);
+
         // backwards compat for when 'opts' was 'historyLen'.
         if (typeof opts === "number") {
             opts = {
@@ -1544,6 +1569,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public stopClient(): void {
         this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
+        this.off(ClientEvent.Sync, this.startMatrixRTC);
+
         if (!this.clientRunning) return; // already stopped
 
         logger.log("stopping MatrixClient");
@@ -1568,6 +1595,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.stop();
+
+        this.matrixRTC.stop();
     }
 
     /**
@@ -1938,7 +1967,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.isVoipWithNoMediaAllowed,
+            this.useLivekitForGroupCalls,
+            this.livekitServiceURL,
         ).create();
+    }
+
+    public getLivekitServiceURL(): string | undefined {
+        return this.livekitServiceURL;
+    }
+
+    // This shouldn't need to exist, but the widget API has startup ordering problems that
+    // mean it doesn't know the livekit URL fast enough: remove this once this is fixed.
+    public setLivekitServiceURL(newURL: string): void {
+        this.livekitServiceURL = newURL;
     }
 
     /**
@@ -7048,9 +7089,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
-            this.callEventHandler!.start();
-            this.groupCallEventHandler!.start();
+            if (supportsMatrixCall()) {
+                this.callEventHandler!.start();
+                this.groupCallEventHandler!.start();
+            }
+
             this.off(ClientEvent.Sync, this.startCallEventHandler);
+        }
+    };
+
+    private startMatrixRTC = (): void => {
+        if (this.isInitialSyncComplete()) {
+            this.matrixRTC.start();
+
+            this.off(ClientEvent.Sync, this.startMatrixRTC);
         }
     };
 
