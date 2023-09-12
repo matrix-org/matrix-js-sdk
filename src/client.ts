@@ -219,7 +219,7 @@ import {
     ServerSideSecretStorageImpl,
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
-import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessonManager";
+import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
 
 export type Store = IStore;
 

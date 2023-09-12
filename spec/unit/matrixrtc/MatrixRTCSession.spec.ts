@@ -241,6 +241,7 @@ describe("MatrixRTCSession", () => {
         it("renews membership event before expiry time", async () => {
             jest.useFakeTimers();
             let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
+
             const eventSentPromise = new Promise<Record<string, any>>((r) => {
                 resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
                     r(val);
