@@ -33,7 +33,7 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
  * @returns The unpadded base64.
  */
 export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeBase64(uint8Array).replace(/=+$/g, "");
+    return encodeBase64(uint8Array).replace(/={1,2}$/, "");
 }
 
 /**
