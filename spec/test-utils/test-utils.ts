@@ -99,6 +99,7 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
             join: { [roomId]: roomResponse },
             invite: {},
             leave: {},
+            knock: {},
         },
         account_data: { events: [] },
     };

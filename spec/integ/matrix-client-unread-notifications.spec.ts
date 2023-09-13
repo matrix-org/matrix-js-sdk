@@ -376,6 +376,7 @@ describe("MatrixClient syncing", () => {
                 },
                 [Category.Leave]: {},
                 [Category.Invite]: {},
+                [Category.Knock]: {},
             },
         };
     }
