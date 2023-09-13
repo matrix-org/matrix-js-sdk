@@ -17,7 +17,14 @@ limitations under the License.
 import { OlmMachine, SignatureVerification } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { BackupTrustInfo, Curve25519AuthData, KeyBackupCheck, KeyBackupInfo } from "../crypto-api/keybackup";
+import {
+    BackupTrustInfo,
+    Curve25519AuthData,
+    KeyBackupCheck,
+    KeyBackupInfo,
+    KeyBackupSession,
+    Curve25519SessionData,
+} from "../crypto-api/keybackup";
 import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
@@ -27,7 +34,6 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
-import { IKeyBackupSession, Curve25519SessionData } from "../crypto/keybackup";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -389,7 +395,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
      * Implements {@link BackupDecryptor#decryptSessions}
      */
     public async decryptSessions(
-        ciphertexts: Record<string, IKeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
+        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {

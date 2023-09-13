@@ -91,6 +91,9 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
     DeviceVerificationStatus,
+    EventEncryptionInfo,
+    EventShieldColour,
+    EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
@@ -1845,10 +1848,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string
-            throw new Error(`getBackupDecryptor expects Uint8Array, got ${privKey}`);
+            throw new Error(`getBackupDecryptor expects Uint8Array`);
         }
 
         const algorithm = await BackupManager.makeAlgorithm(backupInfo, async () => {
@@ -2722,6 +2724,68 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         return ret as IEncryptedEventInfo;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     */
+    public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
+        const encryptionInfo = this.getEventEncryptionInfo(event);
+        if (!encryptionInfo.encrypted) {
+            return null;
+        }
+
+        const senderId = event.getSender();
+        if (!senderId || encryptionInfo.mismatchedSender) {
+            // something definitely wrong is going on here
+            return {
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
+            };
+        }
+
+        const userTrust = this.checkUserTrust(senderId);
+        if (!userTrust.isCrossSigningVerified()) {
+            // If the message is unauthenticated, then display a grey
+            // shield, otherwise if the user isn't cross-signed then
+            // nothing's needed
+            if (!encryptionInfo.authenticated) {
+                return {
+                    shieldColour: EventShieldColour.GREY,
+                    shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+                };
+            } else {
+                return { shieldColour: EventShieldColour.NONE, shieldReason: null };
+            }
+        }
+
+        const eventSenderTrust =
+            senderId &&
+            encryptionInfo.sender &&
+            (await this.getDeviceVerificationStatus(senderId, encryptionInfo.sender.deviceId));
+
+        if (!eventSenderTrust) {
+            return {
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+            };
+        }
+
+        if (!eventSenderTrust.isVerified()) {
+            return {
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+            };
+        }
+
+        if (!encryptionInfo.authenticated) {
+            return {
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            };
+        }
+
+        return { shieldColour: EventShieldColour.NONE, shieldReason: null };
     }
 
     /**

@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "28.0.0",
+    "version": "28.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=18.0.0"
@@ -55,14 +55,14 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^1.2.2",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^1.2.3-alpha.0",
         "another-json": "^0.2.0",
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
         "jwt-decode": "^3.1.2",
         "loglevel": "^1.7.1",
         "matrix-events-sdk": "0.0.1",
-        "matrix-widget-api": "^1.5.0",
+        "matrix-widget-api": "^1.6.0",
         "oidc-client-ts": "^2.2.4",
         "p-retry": "4",
         "sdp-transform": "^2.14.1",

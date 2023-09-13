@@ -20,7 +20,7 @@ import { Room } from "../models/room";
 import { CryptoApi } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
-import { IKeyBackupInfo, IKeyBackupSession } from "../crypto/keybackup";
+import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
 import { IMegolmSessionData } from "../@types/crypto";
 
 /**
@@ -103,11 +103,11 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
     /**
-     * Gets a backup decryptor capable of decrypting megolm session data encrypted with this backup.
+     * Get a backup decryptor capable of decrypting megolm session data encrypted with the given backup information.
      * @param backupInfo - The backup information
      * @param privKey - The private decryption key.
      */
-    getBackupDecryptor(backupInfo: IKeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
+    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -212,6 +212,10 @@ export interface EventDecryptionResult {
      * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
      */
     claimedEd25519Key?: string;
+    /**
+     * Whether the keys for this event have been received via an unauthenticated source (eg via key forwards, or
+     * restored from backup)
+     */
     untrusted?: boolean;
     /**
      * The sender doesn't authorize the unverified devices to decrypt his messages
@@ -220,29 +224,33 @@ export interface EventDecryptionResult {
 }
 
 /**
- * Responsible of decrypting megolm session data retrieved from a remote backup.
- * Will be implemented by crypto backends {@link CryptoBackend#getBackupDecryptor}
+ * Responsible for decrypting megolm session data retrieved from a remote backup.
+ * The result of {@link CryptoBackend#getBackupDecryptor}.
  */
 export interface BackupDecryptor {
     /**
-     * Depending on the backup algorithm the source of a key can be trusted or not.
-     * If false, the key must be considered unsafe (authenticity cannot be guaranteed).
-     * It could be per design (deniability) or for some technical reason (asymmetric).
+     * Whether keys retrieved from this backup can be trusted.
+     *
+     * Depending on the backup algorithm, keys retrieved from the backup can be trusted or not.
+     * If false, keys retrieved from the backup  must be considered unsafe (authenticity cannot be guaranteed).
+     * It could be by design (deniability) or for some technical reason (eg asymmetric encryption).
      */
-    sourceTrusted: boolean;
+    readonly sourceTrusted: boolean;
 
     /**
      *
-     * Decrypts megolm session data retrieved from backup.
+     * Decrypt megolm session data retrieved from backup.
      *
      * @param ciphertexts - a Record of sessionId to session data.
      *
      * @returns An array of decrypted `IMegolmSessionData`
      */
-    decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
+    decryptSessions(ciphertexts: Record<string, KeyBackupSession>): Promise<IMegolmSessionData[]>;
 
     /**
-     * Used to free any resources if needed.
+     * Free any resources held by this decryptor.
+     *
+     * Should be called once the decryptor is no longer needed.
      */
     free(): void;
 }

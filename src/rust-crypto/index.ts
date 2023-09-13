@@ -65,6 +65,9 @@ export async function initRustCrypto(
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );
+    await olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
+        rustCrypto.onUserIdentityUpdated(userId),
+    );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
     //

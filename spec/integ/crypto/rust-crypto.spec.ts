@@ -87,4 +87,19 @@ describe("MatrixClient.clearStores", () => {
         await matrixClient.clearStores();
         expect(await indexedDB.databases()).toHaveLength(0);
     });
+
+    it("should not fail in environments without indexedDB", async () => {
+        // eslint-disable-next-line no-global-assign
+        indexedDB = undefined!;
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        await matrixClient.stopClient();
+
+        await matrixClient.clearStores();
+        // No error thrown in clearStores
+    });
 });
