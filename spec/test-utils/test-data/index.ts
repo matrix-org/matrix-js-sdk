@@ -5,8 +5,7 @@
 
 import { IDeviceKeys, IMegolmSessionData } from "../../../src/@types/crypto";
 import { IDownloadKeyResult } from "../../../src";
-import { KeyBackupInfo } from "../../../src/crypto-api";
-import { IKeyBackupSession } from "../../../src/crypto/keybackup";
+import { KeyBackupSession, KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 
 /* eslint-disable comma-dangle */
 
@@ -179,7 +178,7 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
 };
 
 /** The key from MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
-export const CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
+export const CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "first_message_index": 1,
     "forwarded_count": 0,
     "is_verified": false,
@@ -359,7 +358,7 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
 };
 
 /** The key from BOB_MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
-export const BOB_CURVE25519_KEY_BACKUP_DATA: IKeyBackupSession = {
+export const BOB_CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "first_message_index": 1,
     "forwarded_count": 0,
     "is_verified": false,
