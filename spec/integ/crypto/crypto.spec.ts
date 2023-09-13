@@ -631,100 +631,105 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(decryptedEvent.getContent().body).toEqual("42");
     });
 
-    it("Encryption fails with expected UISI error", async () => {
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await startClientAndAwaitFirstSync();
+    describe("Unable to decrypt error codes", function () {
+        it("Encryption fails with expected UISI error", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
 
-        const awaitUISI = new Promise<void>((resolve) => {
-            aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                const error = err as DecryptionError;
-                if (error.code == "MEGOLM_UNKNOWN_INBOUND_SESSION_ID") {
-                    resolve();
-                }
+            const awaitUISI = new Promise<void>((resolve) => {
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                    const error = err as DecryptionError;
+                    if (error.code == "MEGOLM_UNKNOWN_INBOUND_SESSION_ID") {
+                        resolve();
+                    }
+                });
             });
+
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                    },
+                },
+            };
+
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            await awaitUISI;
         });
 
-        // Alice gets both the events in a single sync
-        const syncResponse = {
-            next_batch: 1,
-            rooms: {
-                join: {
-                    [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
-                },
-            },
-        };
+        it("Encryption fails with expected Unknown Index error", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
 
-        syncResponder.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceClient);
-
-        await awaitUISI;
-    });
-
-    it("Encryption fails with expected Unknown Index error", async () => {
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await startClientAndAwaitFirstSync();
-
-        const awaitUnknownIndex = new Promise<void>((resolve) => {
-            aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                const error = err as DecryptionError;
-                if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
-                    resolve();
-                }
+            const awaitUnknownIndex = new Promise<void>((resolve) => {
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                    const error = err as DecryptionError;
+                    if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
+                        resolve();
+                    }
+                });
             });
+
+            await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
+
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                    },
+                },
+            };
+
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            await awaitUnknownIndex;
         });
 
-        await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
+        it("Encryption fails with Unable to decrypt for other errors", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
 
-        // Alice gets both the events in a single sync
-        const syncResponse = {
-            next_batch: 1,
-            rooms: {
-                join: {
-                    [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
-                },
-            },
-        };
+            await aliceClient.getCrypto()!.importRoomKeys([testData.MEGOLM_SESSION_DATA]);
 
-        syncResponder.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceClient);
-
-        await awaitUnknownIndex;
-    });
-
-    it("Encryption fails with Unable to decrypt for other errors", async () => {
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await startClientAndAwaitFirstSync();
-
-        await aliceClient.getCrypto()!.importRoomKeys([testData.MEGOLM_SESSION_DATA]);
-
-        const awaitDecryptionError = new Promise<void>((resolve) => {
-            aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                const error = err as DecryptionError;
-                // rust and libolm can't have an exact 1:1 mapping for all errors,
-                // but some errors are part of API and should match
-                if (error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" && error.code != "OLM_UNKNOWN_MESSAGE_INDEX") {
-                    resolve();
-                }
+            const awaitDecryptionError = new Promise<void>((resolve) => {
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                    const error = err as DecryptionError;
+                    // rust and libolm can't have an exact 1:1 mapping for all errors,
+                    // but some errors are part of API and should match
+                    if (
+                        error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" &&
+                        error.code != "OLM_UNKNOWN_MESSAGE_INDEX"
+                    ) {
+                        resolve();
+                    }
+                });
             });
-        });
 
-        const malformedEvent: Partial<IEvent> = JSON.parse(JSON.stringify(testData.ENCRYPTED_EVENT));
-        malformedEvent.content!.ciphertext = "AwgAEnAkBmciEAyhh1j6DCk29UXJ7kv/kvayUNfuNT0iAioLxcXjFX";
+            const malformedEvent: Partial<IEvent> = JSON.parse(JSON.stringify(testData.ENCRYPTED_EVENT));
+            malformedEvent.content!.ciphertext = "AwgAEnAkBmciEAyhh1j6DCk29UXJ7kv/kvayUNfuNT0iAioLxcXjFX";
 
-        // Alice gets both the events in a single sync
-        const syncResponse = {
-            next_batch: 1,
-            rooms: {
-                join: {
-                    [testData.TEST_ROOM_ID]: { timeline: { events: [malformedEvent] } },
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [malformedEvent] } },
+                    },
                 },
-            },
-        };
+            };
 
-        syncResponder.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceClient);
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
 
-        await awaitDecryptionError;
+            await awaitDecryptionError;
+        });
     });
 
     it("Alice receives a megolm message before the session keys", async () => {
