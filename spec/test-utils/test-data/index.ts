@@ -363,7 +363,7 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!room:id",
-        "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+        "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
         "session_id": "/2K+V777vipCxPZ0gpY9qcpz1DYaXwuMRIu0UEP0Wa0",
         "session_key": "AQAAAAAclzWVMeWBKH+B/WMowa3rb4ma3jEl6n5W4GCs9ue65CruzD3ihX+85pZ9hsV9Bf6fvhjp76WNRajoJYX0UIt7aosjmu0i+H+07hEQ0zqTKpVoSH0ykJ6stAMhdr6Q4uW5crBmdTTBIsqmoWsNJZKKoE2+ldYrZ1lrFeaJbjBIY/9ivle++74qQsT2dIKWPanKc9Q2Gl8LjESLtFBD9Fmt",
         "sender_claimed_keys": {
@@ -374,7 +374,7 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!room:id",
-        "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+        "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
         "session_id": "+07YOpSgdZ1X9le3n3NMByw0V1B0H0Djnbm76jgmWoo",
         "session_key": "AQAAAAAjWfIMo9+BWS8IvhfsQuomxXXXGy11tJs0ej505xxd1RzOIP4ftq3MbZYsfH8kqSMBc2l1Ym2u3Dksv2/nR0zGQeNIgOxeMuwHU3Ry7+DdV1I96blPylVCCn/f5RAy6smKoaeylptPdXgVXmw3YBBUVYpHpm+xCIUUp9foAdb8hftO2DqUoHWdV/ZXt59zTAcsNFdQdB9A4525u+o4JlqK",
         "sender_claimed_keys": {
@@ -388,7 +388,7 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
 export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!room:id",
-    "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+    "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
     "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
     "session_key": "AQAAAADZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9XoinBNIWr/gkyepuAKiQqemlc8J5amD9OkmbVkmnrxP1uyYMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
@@ -401,7 +401,7 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
 export const BOB_RATCHTED_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!room:id",
-    "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+    "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
     "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
     "session_key": "AQAAAAHZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9Xoil2JdGx9oPqR0dFVh661Aqs86rJRbQ4IeRiuEm35VMxboMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
@@ -416,7 +416,7 @@ export const BOB_CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "forwarded_count": 0,
     "is_verified": false,
     "session_data": {
-        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAMW+71BJqIPQW910vV7SX3IcGylnoUcS3doVkJZiprXytXMP89AKcgv5Dj7mS2ZdvNGE+Atro74bzZ5yot5BrE0ZE5SjoUBPLaLMMu9HopLIV+qx01Rc3F0wmkocSPo51N0nv6wvO5Cst0FiOGHDK6oTVyVbL6ncmvNz2n1YQf9z1R25CstCEjmoANz0wzImzQD+Q85rzeUknZraem/xZ3Cq+nk72ZWedT9hZWDVupnuXqRaE9xiget5+xjtyO0ZLBYjxAK7jzf2eqot/3dn8wnnDjZQxr64QJ+9c84KstmvXrTjE8nAu93aANnFmXDW5YIZ0iwYfMzdLlOqHTcAxz85//iQc1FKNg8nPr244OmsZHkMQMNBbf+fjL2TNc2aJOmHdGCJGmi/huyw7q+reVPhbsbAjHwQKH2qWPpmgyhsStdY0SZluWt9onJGqtVpn1+hDr73Bsl1/drR+uSbc/gcphYmbmGbq+0MlrJTXZoYxLb5p8Cs0xZCayeByNO0sdSL8/UiQmAEIq0csGSoZSN2SMMRm5Ol0ywh3lo2obn7jQy2phQK1H0NNrLdmRODEEqMA3P6aY69NMRypT8TpZV0Res33UPRVUnvi45FMCZE8o9xJsK5kbMh3b1Zb4zNhw",
+        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAMW+71BJqIPQW910vV7SX3IcGylnoUcS3doVkJZiprXytXMP89AKcgv5Dj7mS2ZdvNGE+Atro74bzZ5yot5BrE0ZE5SjoUBPLaLMMu9HopLIV+qx01Rc3F0wmkocSPo51N0nv6wvO5Cst0FiOGHDK6r1pFlgDEJLmBkOyC4e8oMVbKTJzsSQVbJ8tJ37xuhI+T5P0ZlmiqKDqYRp8uh50w+txLEixYhEUunFgCTt1DAmiS9pLNYhLyl1ggwuQjzZe+AV6timbRxNJy18/AEcPomJw7z/pxYIiNLHRKOC13Wp8kGWx9cOgfMQ5KmBuLS8psGiLTBkfWPLOfNYqjbeqAR+OGZQoS6hUjbBYU7QuFa4FOYBHkNB2UqNsdsMb9qB/qs7QGTSb8Lok5YjW1c81BUpmIyKvuqnKma0MZskrpTYGQD2eJDABFCZwLFm+LgDyUTeSiV5xguYztLrHOk8LHKo9M8dIZgoBjeFVJxyjbcXKsVS3aQkMXKCrRlKLqhZTws/ZJwVfW9DbktZ9dT+tRZQvI7tjJofojcLX61AGJDnqUf5+2Gv1tEnmUI953gIzc8NlcFabPOsDsZEODt7MdOCTPT3w29umyhKbCsslpb64LoS/AB2QRPRCgkJS7snRA",
         "ephemeral": "oO0VX84OUIzm2i/12zAhTWOZT5IFRH5mXaKZ8fXkCgU",
         "mac": "lEfHlqfJQwU"
     }
@@ -440,7 +440,7 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     "sender": "@alice:localhost",
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
-        "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
+        "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
         "ciphertext": "AwgAEnA/mEqZm2lSrhoG11OpDqsohGSBJWsudbuoItLlivmpFZQHrKMbE6z/dhCTwUi76vwfRCtf4tyPMD845cqZH1nL0bowq3/awyzZ8Q263Y3WrLfkUTFBU6oPF/IULUFZZuw6kLdfd5g5+uigvqUhFFpICoj7KNHznv4sFNssd00/WgJquZ6PRt6e1v6ANFNiZPAwghIL+kBc6pb8i6MUWt9JnXilJhTqFDHdXiY4qkaKBWbwebC26PYM",
         "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
         "device_id": "TEST_DEVICE"

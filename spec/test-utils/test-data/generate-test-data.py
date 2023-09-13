@@ -63,7 +63,7 @@ BOB_DATA = {
     # any 32-byte string can be an ed25519 private key.
     "TEST_DEVICE_PRIVATE_KEY_BYTES": b"Deadbeefdeadbeefdeadbeefdeadbeef",
     # any 32-byte string can be an curve25519 private key.
-    "TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES": b"deadmuledeadmuledeadmuledeadmule",
+    "TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES": b"Deadmuledeadmuledeadmuledeadmule",
 
     "MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Doyouspeakwhaaaaaaaaaaaaaaaaaale",
     "USER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Useruseruseruseruseruseruseruser",
