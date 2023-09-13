@@ -84,7 +84,7 @@ def main() -> None:
  */
 
 import {{ IDeviceKeys, IMegolmSessionData }} from "../../../src/@types/crypto";
-import {{ IDownloadKeyResult }} from "../../../src";
+import {{ IDownloadKeyResult, IEvent }} from "../../../src";
 import {{ KeyBackupSession, KeyBackupInfo }} from "../../../src/crypto-api/keybackup";
 
 /* eslint-disable comma-dangle */
