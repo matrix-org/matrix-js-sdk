@@ -43,6 +43,8 @@ ALICE_DATA = {
     "TEST_ROOM_ID": "!room:id",
     # any 32-byte string can be an ed25519 private key.
     "TEST_DEVICE_PRIVATE_KEY_BYTES": b"deadbeefdeadbeefdeadbeefdeadbeef",
+    # any 32-byte string can be an curve25519 private key.
+    "TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES": b"deadmuledeadmuledeadmuledeadmule",
 
     "MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"doyouspeakwhaaaaaaaaaaaaaaaaaale",
     "USER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"useruseruseruseruseruseruseruser",
@@ -60,6 +62,8 @@ BOB_DATA = {
     "TEST_ROOM_ID": "!room:id",
     # any 32-byte string can be an ed25519 private key.
     "TEST_DEVICE_PRIVATE_KEY_BYTES": b"Deadbeefdeadbeefdeadbeefdeadbeef",
+    # any 32-byte string can be an curve25519 private key.
+    "TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES": b"Deadmuledeadmuledeadmuledeadmule",
 
     "MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Doyouspeakwhaaaaaaaaaaaaaaaaaale",
     "USER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Useruseruseruseruseruseruseruser",
@@ -80,7 +84,7 @@ def main() -> None:
  */
 
 import {{ IDeviceKeys, IMegolmSessionData }} from "../../../src/@types/crypto";
-import {{ IDownloadKeyResult }} from "../../../src";
+import {{ IDownloadKeyResult, IEvent }} from "../../../src";
 import {{ KeyBackupSession, KeyBackupInfo }} from "../../../src/crypto-api/keybackup";
 
 /* eslint-disable comma-dangle */
@@ -102,6 +106,11 @@ def build_test_data(user_data, prefix = "") -> str:
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
              user_data["TEST_DEVICE_PRIVATE_KEY_BYTES"]
         )
+
+    device_curve_key = x25519.X25519PrivateKey.from_private_bytes(
+             user_data["TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES"]
+        )
+
     b64_public_key = encode_base64(
         private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
@@ -169,9 +178,10 @@ def build_test_data(user_data, prefix = "") -> str:
         user_data["TEST_USER_ID"]: {f"ed25519:{user_data['TEST_DEVICE_ID']}": sig}
     }
 
-    set_of_exported_room_keys = [build_exported_megolm_key(), build_exported_megolm_key()]
+    set_of_exported_room_keys = [build_exported_megolm_key(device_curve_key)[0], build_exported_megolm_key(device_curve_key)[0]]
 
-    additional_exported_room_key = build_exported_megolm_key()
+    additional_exported_room_key, additional_exported_ed_key = build_exported_megolm_key(device_curve_key)
+    ratcheted_exported_room_key = symetric_ratchet_step_of_megolm_key(additional_exported_room_key, additional_exported_ed_key)
 
     otk_to_sign = {
         "key": user_data['OTK']
@@ -193,6 +203,8 @@ def build_test_data(user_data, prefix = "") -> str:
 
 
     backed_up_room_key = encrypt_megolm_key_for_backup(additional_exported_room_key, backup_decryption_key.public_key())
+
+    clear_event, encrypted_event = generate_encrypted_event_content(additional_exported_room_key, additional_exported_ed_key, device_curve_key)
 
     backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
 
@@ -252,8 +264,19 @@ export const {prefix}MEGOLM_SESSION_DATA: IMegolmSessionData = {
         json.dumps(additional_exported_room_key, indent=4)
 };
 
+/** A ratcheted version of {prefix}MEGOLM_SESSION_DATA */
+export const {prefix}RATCHTED_MEGOLM_SESSION_DATA: IMegolmSessionData = {
+        json.dumps(ratcheted_exported_room_key, indent=4)
+};
+
 /** The key from {prefix}MEGOLM_SESSION_DATA, encrypted for backup using `m.megolm_backup.v1.curve25519-aes-sha2` algorithm*/
 export const {prefix}CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {json.dumps(backed_up_room_key, indent=4)};
+
+/** A test clear event */
+export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, indent=4)};
+
+/** The encrypted CLEAR_EVENT by MEGOLM_SESSION_DATA */
+export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
 """
 
 
@@ -350,10 +373,11 @@ def sign_json(json_object: dict, private_key: ed25519.Ed25519PrivateKey) -> str:
 
     return signature_base64
 
-def build_exported_megolm_key() -> dict:
+def build_exported_megolm_key(device_curve_key: x25519.X25519PrivateKey) -> tuple[dict, ed25519.Ed25519PrivateKey]:
     """
     Creates an exported megolm room key, as per https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md#session-export-format
     that can be imported via importRoomKeys API.
+    Returns the exported key, the matching privat edKey (needed to encrypt)
     """
     index = 0
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32))
@@ -369,8 +393,10 @@ def build_exported_megolm_key() -> dict:
 
     megolm_export = {
         "algorithm": "m.megolm.v1.aes-sha2",
-        "room_id": "!roomA:example.org",
-        "sender_key": "/Bu9e34hUClhddpf4E5gu5qEAdMY31+1A9HbiAeeQgo",
+        "room_id": "!room:id",
+        "sender_key": encode_base64(
+            device_curve_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        ),
         "session_id": encode_base64(
             private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         ),
@@ -378,6 +404,53 @@ def build_exported_megolm_key() -> dict:
         "sender_claimed_keys": {
             "ed25519": encode_base64(ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32)).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
         },
+        "forwarding_curve25519_key_chain": [],
+    }
+
+    return megolm_export, private_key
+
+def symetric_ratchet_step_of_megolm_key(previous: dict , megolm_private_key: ed25519.Ed25519PrivateKey) -> dict:
+
+    """
+    Very simple ratchet step from 0 to 1
+    Used to generate a ratcheted key to test unknown message index.
+    """
+    session_key: str = previous["session_key"]
+
+    # Get the megolm R0 from the export format
+    decoded = base64.b64decode(session_key.encode("ascii"))
+    ri = decoded[5:133]
+
+    ri0 = ri[0:32]
+    ri1 = ri[32:64]
+    ri2 = ri[64:96]
+    ri3 = ri[96:128]
+
+    h = hmac.HMAC(ri3, hashes.SHA256())
+    h.update(b'x\03')
+    ri1_3 = h.finalize()
+
+    index = 1
+    private_key = megolm_private_key
+
+    # exported key, start with version byte
+    exported_key = bytearray(b'\x01')
+    exported_key += index.to_bytes(4, 'big')
+    exported_key += ri0
+    exported_key += ri1
+    exported_key += ri2
+    exported_key += ri1_3
+    # KPub
+    exported_key += private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+
+    megolm_export = {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "room_id": "!room:id",
+        "sender_key": previous["sender_key"],
+        "session_id": previous["session_id"],
+        "session_key": encode_base64(exported_key),
+        "sender_claimed_keys": previous["sender_claimed_keys"],
         "forwarding_curve25519_key_chain": [],
     }
 
@@ -499,7 +572,7 @@ def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519
 
     ct = encryptor.update(padded_data) + encryptor.finalize()
 
-    # The ratchet index i, and the cipher-text​, are then packed
+    # The ratchet index i, and the cipher-text, are then packed
     # into a message as described in Message format. Then the entire message
     # (including the version bytes and all payload bytes) are passed through
     # HMAC-SHA-256. The first 8 bytes of the MAC are appended to the message.

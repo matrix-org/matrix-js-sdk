@@ -69,6 +69,7 @@ import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../common-crypto/base64";
+import { DecryptionError } from "../crypto/algorithms";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -1392,28 +1393,69 @@ class EventDecryptor {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        const res = (await this.olmMachine.decryptRoomEvent(
-            JSON.stringify({
-                event_id: event.getId(),
-                type: event.getWireType(),
-                sender: event.getSender(),
-                state_key: event.getStateKey(),
-                content: event.getWireContent(),
-                origin_server_ts: event.getTs(),
-            }),
-            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-        )) as RustSdkCryptoJs.DecryptedRoomEvent;
+        try {
+            const res = (await this.olmMachine.decryptRoomEvent(
+                JSON.stringify({
+                    event_id: event.getId(),
+                    type: event.getWireType(),
+                    sender: event.getSender(),
+                    state_key: event.getStateKey(),
+                    content: event.getWireContent(),
+                    origin_server_ts: event.getTs(),
+                }),
+                new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+            )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
-        // Success. We can remove the event from the pending list, if
-        // that hasn't already happened.
-        this.removeEventFromPendingList(event);
+            // Success. We can remove the event from the pending list, if
+            // that hasn't already happened.
+            this.removeEventFromPendingList(event);
 
-        return {
-            clearEvent: JSON.parse(res.event),
-            claimedEd25519Key: res.senderClaimedEd25519Key,
-            senderCurve25519Key: res.senderCurve25519Key,
-            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
-        };
+            return {
+                clearEvent: JSON.parse(res.event),
+                claimedEd25519Key: res.senderClaimedEd25519Key,
+                senderCurve25519Key: res.senderCurve25519Key,
+                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+            };
+        } catch (err) {
+            // We need to map back to regular decryption errors (used for analytics for example)
+            // The DecryptionErrors are used by react-sdk so is implicitly part of API, but poorly typed
+            if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
+                const content = event.getWireContent();
+                let jsError;
+                switch (err.code) {
+                    case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey: {
+                        jsError = new DecryptionError(
+                            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            "The sender's device has not sent us the keys for this message.",
+                            {
+                                session: content.sender_key + "|" + content.session_id,
+                            },
+                        );
+                        break;
+                    }
+                    case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex: {
+                        jsError = new DecryptionError(
+                            "OLM_UNKNOWN_MESSAGE_INDEX",
+                            "The sender's device has not sent us the keys for this message at this index.",
+                            {
+                                session: content.sender_key + "|" + content.session_id,
+                            },
+                        );
+                        break;
+                    }
+                    // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
+                    // Just put it on the `UNABLE_TO_DECRYPT` bucket.
+                    default: {
+                        jsError = new DecryptionError("UNABLE_TO_DECRYPT", err.description, {
+                            session: content.sender_key + "|" + content.session_id,
+                        });
+                        break;
+                    }
+                }
+                throw jsError;
+            }
+            throw new DecryptionError("UNABLE_TO_DECRYPT", "Unknown error");
+        }
     }
 
     /**
