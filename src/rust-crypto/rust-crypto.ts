@@ -1443,16 +1443,8 @@ class EventDecryptor {
                         );
                         break;
                     }
-                    case RustSdkCryptoJs.DecryptionErrorCode.MismatchedIdentityKeys: {
-                        jsError = new DecryptionError(
-                            "MISMATCHED_IDENTITY_KEYS",
-                            "Decryption failed because of mismatched identity keys of the sending device and those recorded in the to-device message",
-                            {
-                                session: content.sender_key + "|" + content.session_id,
-                            },
-                        );
-                        break;
-                    }
+                    // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
+                    // Just put it on the `UNABLE_TO_DECRYPT` bucket.
                     default: {
                         jsError = new DecryptionError("UNABLE_TO_DECRYPT", err.description, {
                             session: content.sender_key + "|" + content.session_id,
