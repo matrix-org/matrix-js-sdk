@@ -456,7 +456,6 @@ def symetric_ratchet_step_of_megolm_key(previous: dict , megolm_private_key: ed2
 
     return megolm_export
 
-
 def encrypt_megolm_key_for_backup(session_data: dict, backup_public_key: x25519.X25519PublicKey) -> dict:
 
     """
