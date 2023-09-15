@@ -2333,14 +2333,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                             type: "m.secret_storage.default_key",
                             content: {
                                 key: secretStorageKey,
-                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
                             },
                         },
                         // Needed for secretStorage.getKey or secretStorage.hasKey
                         {
                             type: `m.secret_storage.key.${secretStorageKey}`,
                             content: {
-                                key: secretStorageKey,
                                 algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
                             },
                         },
