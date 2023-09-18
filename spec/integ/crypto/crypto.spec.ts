@@ -39,6 +39,7 @@ import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
     Category,
+    ClientEvent,
     createClient,
     CryptoEvent,
     IClaimOTKsResult,
@@ -68,7 +69,7 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
@@ -2292,9 +2293,56 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             privateKey: Uint8Array.of(32, 33),
         });
 
+        /**
+         * The account data events to be returned by the sync.
+         * Will be updated when fecthMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
+         * Will be used by `sendSyncResponseWithUpdatedAccountData`
+         */
+        let accountDataEvents: any[] = [];
+
+        function updateAccountData(type: string, content: any) {
+            const existing = accountDataEvents.find((event) => {
+                if (event.type == type) return event;
+            });
+            if (existing) {
+                existing.content = content;
+            } else {
+                accountDataEvents.push({
+                    type,
+                    content,
+                });
+            }
+        }
+
+        function mockGetAccountData() {
+            fetchMock.get(
+                `path:/_matrix/client/v3/user/:userId/account_data/:type`,
+                (url) => {
+                    const type = url.split("/").pop();
+                    const existing = accountDataEvents.find((event) => {
+                        if (event.type == type) return event;
+                    });
+                    if (existing) {
+                        // return it
+                        return {
+                            status: 200,
+                            body: existing.content,
+                        };
+                    } else {
+                        // 404
+                        return {
+                            status: 404,
+                            body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
+                        };
+                    }
+                },
+                { overwriteRoutes: true },
+            );
+        }
+
         beforeEach(async () => {
             createSecretStorageKey.mockClear();
-
+            accountDataEvents = [];
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
         });
@@ -2311,6 +2359,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     `express:/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`,
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
+                        const type = url.split("/").pop();
+                        // update account data for sync response
+                        updateAccountData(type!, content);
                         resolve(content.encrypted);
                         return {};
                     },
@@ -2324,27 +2375,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          * https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
          * @param secretStorageKey
          */
-        function sendSyncResponse(secretStorageKey: string) {
-            syncResponder.sendOrQueueSyncResponse({
-                next_batch: 1,
-                account_data: {
-                    events: [
-                        {
-                            type: "m.secret_storage.default_key",
-                            content: {
-                                key: secretStorageKey,
-                            },
-                        },
-                        // Needed for secretStorage.getKey or secretStorage.hasKey
-                        {
-                            type: `m.secret_storage.key.${secretStorageKey}`,
-                            content: {
-                                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
-                            },
-                        },
-                    ],
-                },
-            });
+        function sendSyncResponseWithUpdatedAccountData() {
+            try {
+                syncResponder.sendOrQueueSyncResponse({
+                    next_batch: 1,
+                    account_data: {
+                        events: accountDataEvents,
+                    },
+                });
+            } catch (err) {
+                // It's ok if it fails here, the sync response is cumulative and will contain
+                // the latest account data.
+            }
         }
 
         /**
@@ -2359,10 +2401,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.put(
                     "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
                     (url: string, options: RequestInit) => {
+                        const type = url.split("/").pop();
                         const content = JSON.parse(options.body as string);
+
+                        // update account data for sync response
+                        updateAccountData(type!, content);
+
                         if (content.key) {
                             resolve(content.key);
                         }
+                        sendSyncResponseWithUpdatedAccountData();
                         return {};
                     },
                     { overwriteRoutes: true },
@@ -2377,11 +2425,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     `express:/_matrix/client/v3/user/:userId/account_data/m.megolm_backup.v1`,
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
+                        // update account data for sync response
+                        updateAccountData("m.megolm_backup.v1", content);
                         resolve(content.encrypted);
                         return {};
                     },
                     { overwriteRoutes: true },
                 );
+            });
+        }
+
+        function awaitAccountDataUpdate(type: string): Promise<void> {
+            return new Promise((resolve) => {
+                aliceClient.on(ClientEvent.AccountData, (ev: MatrixEvent): void => {
+                    if (ev.getType() === type) {
+                        resolve();
+                    }
+                });
             });
         }
 
@@ -2422,32 +2482,41 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
 
             // Wait for the key to be uploaded in the account data
-            const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
-
-            // Return the newly created key in the sync response
-            sendSyncResponse(secretStorageKey);
+            await awaitSecretStorageKeyStoredInAccountData();
 
             // Wait for the cross signing keys to be uploaded
             await Promise.all(setupPromises);
 
             // wait for bootstrapSecretStorage to finished
             await bootstrapPromise;
+
+            // Return the newly created key in the sync response
+            sendSyncResponseWithUpdatedAccountData();
+
             // Finally ensure backup is working
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+
             await backupStatusUpdate;
         }
 
         describe("bootstrapSecretStorage", () => {
+            // Doesn't work with legacy. Legacy will try to bootstrap even without private key which is buggy.
             newBackendOnly(
                 "should throw an error if we are unable to create a key because createSecretStorageKey is not set",
                 async () => {
                     await expect(
                         aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true }),
                     ).rejects.toThrow("unable to create a new secret storage key, createSecretStorageKey is not set");
+
+                    expect(await aliceClient.getCrypto()!.isSecretStorageReady()).toStrictEqual(false);
                 },
             );
 
-            it("should create a new key", async () => {
+            it("Should create a 4S key", async () => {
+                mockGetAccountData();
+
+                const awaitAccountData = awaitAccountDataUpdate("m.secret_storage.default_key");
+
                 const bootstrapPromise = aliceClient
                     .getCrypto()!
                     .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
@@ -2456,10 +2525,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+                sendSyncResponseWithUpdatedAccountData();
 
                 // Finally, wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
+
+                // await account data updated before getting default key.
+                await awaitAccountData;
 
                 const defaultKeyId = await aliceClient.secretStorage.getDefaultKeyId();
                 // Check that the uploaded key in stored in the secret storage
@@ -2468,29 +2540,29 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(defaultKeyId).toBe(secretStorageKey);
             });
 
-            newBackendOnly(
-                "should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set",
-                async () => {
-                    const bootstrapPromise = aliceClient
-                        .getCrypto()!
-                        .bootstrapSecretStorage({ createSecretStorageKey });
+            it("should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set", async () => {
+                const awaitAccountDataClientUpdate = awaitAccountDataUpdate("m.secret_storage.default_key");
 
-                    // Wait for the key to be uploaded in the account data
-                    const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+                const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
 
-                    // Return the newly created key in the sync response
-                    sendSyncResponse(secretStorageKey);
+                // Wait for the key to be uploaded in the account data
+                await awaitSecretStorageKeyStoredInAccountData();
 
-                    // Wait for bootstrapSecretStorage to finished
-                    await bootstrapPromise;
+                // Return the newly created key in the sync response
+                sendSyncResponseWithUpdatedAccountData();
 
-                    // Call again bootstrapSecretStorage
-                    await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+                // Wait for bootstrapSecretStorage to finished
+                await bootstrapPromise;
 
-                    // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
-                    expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
-                },
-            );
+                // On legacy we need to wait for ClientEvent.AccountData before calling bootstrap again.
+                await awaitAccountDataClientUpdate;
+
+                // Call again bootstrapSecretStorage
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
+
+                // createSecretStorageKey should be called only on the first run of bootstrapSecretStorage
+                expect(createSecretStorageKey).toHaveBeenCalledTimes(1);
+            });
 
             it("should create a new key if setupNewSecretStorage is at true even if an AES key is already in the secret storage", async () => {
                 let bootstrapPromise = aliceClient
@@ -2498,10 +2570,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
-                let secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+                await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+                sendSyncResponseWithUpdatedAccountData();
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2512,10 +2584,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     .bootstrapSecretStorage({ setupNewSecretStorage: true, createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
-                secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+                await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+                sendSyncResponseWithUpdatedAccountData();
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2539,7 +2611,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponse(secretStorageKey);
+                sendSyncResponseWithUpdatedAccountData();
 
                 // Wait for the cross signing keys to be uploaded
                 const [masterKey, userSigningKey, selfSigningKey] = await Promise.all([
@@ -2560,6 +2632,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             it("should create a new megolm backup", async () => {
                 const backupVersion = "abc";
                 await bootstrapSecurity(backupVersion);
+
+                expect(await aliceClient.getCrypto()!.isSecretStorageReady()).toStrictEqual(true);
 
                 // Expect a backup to be available and used
                 const activeBackup = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
@@ -2596,7 +2670,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 "path:/_matrix/client/v3/room_keys/version",
                                 {
                                     status: 404,
-                                    body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
+                                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
                                 },
                                 { overwriteRoutes: true },
                             );
