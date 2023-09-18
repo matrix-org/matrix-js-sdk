@@ -283,6 +283,10 @@ export class SyncAccumulator {
         // * equivalent to "no state"
         switch (category) {
             case Category.Invite: // (5)
+                if (this.knockRooms[roomId]) {
+                    // was previously knock, now invite, need to delete knock state
+                    delete this.knockRooms[roomId];
+                }
                 this.accumulateInviteState(roomId, data as IInvitedRoom);
                 break;
 
@@ -303,7 +307,10 @@ export class SyncAccumulator {
                 break;
 
             case Category.Leave:
-                if (this.inviteRooms[roomId]) {
+                if (this.knockRooms[roomId]) {
+                    // delete knock state on leave
+                    delete this.knockRooms[roomId];
+                } else if (this.inviteRooms[roomId]) {
                     // (4)
                     delete this.inviteRooms[roomId];
                 } else {
