@@ -42,6 +42,7 @@ import {
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
+    EventShieldReason,
     GeneratedSecretStorageKey,
     ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
@@ -788,10 +789,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
      */
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
-        return {
-            shieldColour: EventShieldColour.NONE,
-            shieldReason: null,
-        };
+        return this.eventDecryptor.getEncryptionInfoForEvent(event);
     }
 
     /**
@@ -1484,14 +1482,7 @@ class EventDecryptor {
 
         try {
             const res = (await this.olmMachine.decryptRoomEvent(
-                JSON.stringify({
-                    event_id: event.getId(),
-                    type: event.getWireType(),
-                    sender: event.getSender(),
-                    state_key: event.getStateKey(),
-                    content: event.getWireContent(),
-                    origin_server_ts: event.getTs(),
-                }),
+                stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
             )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
@@ -1549,6 +1540,20 @@ class EventDecryptor {
         }
     }
 
+    public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
+        if (!event.getClearContent()) {
+            // not successfully decrypted
+            return null;
+        }
+
+        const encryptionInfo = await this.olmMachine.getRoomEventEncryptionInfo(
+            stringifyEvent(event),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        );
+
+        return rustEncryptionInfoToJsEncryptionInfo(encryptionInfo);
+    }
+
     /**
      * Look for events which are waiting for a given megolm session
      *
@@ -1604,6 +1609,61 @@ class EventDecryptor {
             }
         }
     }
+}
+
+function stringifyEvent(event: MatrixEvent): string {
+    return JSON.stringify({
+        event_id: event.getId(),
+        type: event.getWireType(),
+        sender: event.getSender(),
+        state_key: event.getStateKey(),
+        content: event.getWireContent(),
+        origin_server_ts: event.getTs(),
+    });
+}
+
+function rustEncryptionInfoToJsEncryptionInfo(
+    encryptionInfo: RustSdkCryptoJs.EncryptionInfo | undefined,
+): EventEncryptionInfo | null {
+    if (encryptionInfo === undefined) {
+        // not decrypted here
+        return null;
+    }
+
+    // TODO: use strict shield semantics.
+    const shieldState = encryptionInfo.shieldState(false);
+
+    let shieldColour: EventShieldColour;
+    switch (shieldState.color) {
+        case RustSdkCryptoJs.ShieldColor.Grey:
+            shieldColour = EventShieldColour.GREY;
+            break;
+        case RustSdkCryptoJs.ShieldColor.None:
+            shieldColour = EventShieldColour.NONE;
+            break;
+        default:
+            shieldColour = EventShieldColour.RED;
+    }
+
+    let shieldReason: EventShieldReason | null;
+    if (shieldState.message === null) {
+        shieldReason = null;
+    } else if (shieldState.message === "Encrypted by an unverified user.") {
+        shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
+    } else if (shieldState.message === "Encrypted by a device not verified by its owner.") {
+        shieldReason = EventShieldReason.UNSIGNED_DEVICE;
+    } else if (
+        shieldState.message === "The authenticity of this encrypted message can't be guaranteed on this device."
+    ) {
+        shieldReason = EventShieldReason.AUTHENTICITY_NOT_GUARANTEED;
+    } else if (shieldState.message === "Encrypted by an unknown or deleted device.") {
+        shieldReason = EventShieldReason.UNKNOWN_DEVICE;
+    } else {
+        logger.warn(`Unknown shield state message '${shieldState.message}'`);
+        shieldReason = EventShieldReason.UNKNOWN;
+    }
+
+    return { shieldColour, shieldReason };
 }
 
 type RustCryptoEvents =

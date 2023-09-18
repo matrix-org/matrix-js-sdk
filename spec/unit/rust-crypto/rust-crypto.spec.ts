@@ -30,6 +30,7 @@ import {
     IHttpOpts,
     IToDeviceEvent,
     MatrixClient,
+    MatrixEvent,
     MatrixHttpApi,
     TypedEventEmitter,
 } from "../../../src";
@@ -38,7 +39,13 @@ import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
+import {
+    CryptoCallbacks,
+    EventShieldColour,
+    EventShieldReason,
+    ImportRoomKeysOpts,
+    VerificationRequest,
+} from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 
@@ -370,6 +377,111 @@ describe("RustCrypto", () => {
 
             const res = rustCrypto.getEventEncryptionInfo(event);
             expect(res.encrypted).toBeTruthy();
+        });
+    });
+
+    describe(".getEncryptionInfoForEvent", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getRoomEventEncryptionInfo: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        async function makeEncryptedEvent(): Promise<MatrixEvent> {
+            const encryptedEvent = mkEvent({
+                event: true,
+                type: "m.room.encrypted",
+                content: { algorithm: "fake_alg" },
+                room: "!room:id",
+            });
+            encryptedEvent.event.event_id = "$event:id";
+            const mockCryptoBackend = {
+                decryptEvent: () =>
+                    ({
+                        clearEvent: { content: { body: "1234" } },
+                    } as unknown as IEventDecryptionResult),
+            } as unknown as CryptoBackend;
+            await encryptedEvent.attemptDecryption(mockCryptoBackend);
+            return encryptedEvent;
+        }
+
+        it("should handle unencrypted events", async () => {
+            const event = mkEvent({ event: true, type: "m.room.message", content: { body: "xyz" } });
+            const res = await rustCrypto.getEncryptionInfoForEvent(event);
+            expect(res).toBe(null);
+            expect(olmMachine.getRoomEventEncryptionInfo).not.toHaveBeenCalled();
+        });
+
+        it("passes the event into the OlmMachine", async () => {
+            const encryptedEvent = await makeEncryptedEvent();
+            const res = await rustCrypto.getEncryptionInfoForEvent(encryptedEvent);
+            expect(res).toBe(null);
+            expect(olmMachine.getRoomEventEncryptionInfo).toHaveBeenCalledTimes(1);
+            const [passedEvent, passedRoom] = olmMachine.getRoomEventEncryptionInfo.mock.calls[0];
+            expect(passedRoom.toString()).toEqual("!room:id");
+            expect(JSON.parse(passedEvent)).toStrictEqual(
+                expect.objectContaining({
+                    event_id: "$event:id",
+                }),
+            );
+        });
+
+        it.each([
+            [RustSdkCryptoJs.ShieldColor.None, EventShieldColour.NONE],
+            [RustSdkCryptoJs.ShieldColor.Grey, EventShieldColour.GREY],
+            [RustSdkCryptoJs.ShieldColor.Red, EventShieldColour.RED],
+        ])("gets the right shield color (%i)", async (rustShield, expectedShield) => {
+            const mockEncryptionInfo = {
+                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: null }),
+            } as unknown as RustSdkCryptoJs.EncryptionInfo;
+            olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
+
+            const res = await rustCrypto.getEncryptionInfoForEvent(await makeEncryptedEvent());
+            expect(mockEncryptionInfo.shieldState).toHaveBeenCalledWith(false);
+            expect(res).not.toBe(null);
+            expect(res!.shieldColour).toEqual(expectedShield);
+        });
+
+        it.each([
+            [null, null],
+            ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
+            ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
+            [
+                "The authenticity of this encrypted message can't be guaranteed on this device.",
+                EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            ],
+            ["Encrypted by an unknown or deleted device.", EventShieldReason.UNKNOWN_DEVICE],
+            ["bloop", EventShieldReason.UNKNOWN],
+        ])("gets the right shield reason (%s)", async (rustReason, expectedReason) => {
+            // suppress the warning from the unknown shield reason
+            jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            const mockEncryptionInfo = {
+                shieldState: jest
+                    .fn()
+                    .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, message: rustReason }),
+            } as unknown as RustSdkCryptoJs.EncryptionInfo;
+            olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
+
+            const res = await rustCrypto.getEncryptionInfoForEvent(await makeEncryptedEvent());
+            expect(mockEncryptionInfo.shieldState).toHaveBeenCalledWith(false);
+            expect(res).not.toBe(null);
+            expect(res!.shieldReason).toEqual(expectedReason);
         });
     });
 
