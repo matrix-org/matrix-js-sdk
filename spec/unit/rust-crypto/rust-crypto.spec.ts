@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { Mocked } from "jest-mock";
+import { mocked, Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
@@ -40,6 +40,7 @@ import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingReque
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { CryptoCallbacks, ImportRoomKeysOpts, VerificationRequest } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
+import { defer } from "../../../src/utils";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -272,6 +273,31 @@ describe("RustCrypto", () => {
             await makeRequestPromise;
             expect(olmMachine.outgoingRequests).toHaveBeenCalled();
             expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledWith(testReq);
+        });
+
+        it("should go round the loop again if another sync completes while the first `outgoingRequests` is running", async () => {
+            // the first call to `outgoingMessages` will return a promise which blocks for a while
+            const firstOutgoingRequestsDefer = defer<Array<any>>();
+            mocked(olmMachine.outgoingRequests).mockReturnValueOnce(firstOutgoingRequestsDefer.promise);
+
+            // the second will return a KeysQueryRequest.
+            const testReq = new KeysQueryRequest("1234", "{}");
+            outgoingRequestQueue.push([testReq]);
+
+            // the first sync completes, triggering the first call to `outgoingMessages`
+            rustCrypto.onSyncCompleted({});
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
+
+            // a second /sync completes before the first call to `outgoingRequests` completes. It shouldn't trigger
+            // a second call immediately, but should queue one up.
+            rustCrypto.onSyncCompleted({});
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
+
+            // the first call now completes, *with an empty result*, which would normally cause us to exit the loop, but
+            // we should have a second call queued. It should trigger a call to `makeOutgoingRequest`.
+            firstOutgoingRequestsDefer.resolve([]);
+            await awaitCallToMakeOutgoingRequest();
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
         });
 
         it("stops looping when stop() is called", async () => {

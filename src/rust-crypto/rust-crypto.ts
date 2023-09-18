@@ -96,6 +96,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     /** whether {@link outgoingRequestLoop} is currently running */
     private outgoingRequestLoopRunning = false;
 
+    /**
+     * whether we check the outgoing requests queue again after the current check finishes.
+     *
+     * This should never be `true` unless `outgoingRequestLoopRunning` is also true.
+     */
+    private outgoingRequestLoopOneMoreLoop = false;
+
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
@@ -1375,6 +1382,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("missing roomId in the event");
         }
 
+        logger.debug(`Incoming verification event ${event.getId()} type ${event.getType()} from ${event.getSender()}`);
+
         await this.olmMachine.receiveVerificationEvent(
             JSON.stringify({
                 event_id: event.getId(),
@@ -1386,6 +1395,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }),
             new RustSdkCryptoJs.RoomId(roomId),
         );
+
+        // that may have caused us to queue up outgoing requests, so make sure we send them.
+        this.outgoingRequestLoop();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1394,24 +1406,56 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private async outgoingRequestLoop(): Promise<void> {
+    /** start the outgoing request loop if it is not already running */
+    private outgoingRequestLoop(): void {
         if (this.outgoingRequestLoopRunning) {
+            // The loop is already running, but we have reason to believe that there may be new items in the queue.
+            //
+            // There is potential for a race whereby the item is added *after* `OlmMachine.outgoingRequests` checks
+            // the queue, but *before* it returns. In such a case, the item could sit there unnoticed for some time.
+            //
+            // In order to circumvent the race, we set a flag which tells the loop to go round once again even if the
+            // queue appears to be empty.
+            this.outgoingRequestLoopOneMoreLoop = true;
             return;
+        }
+        // fire off the loop in the background
+        this.outgoingRequestLoopInner().catch((e) => {
+            logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
+        });
+    }
+
+    private async outgoingRequestLoopInner(): Promise<void> {
+        /* istanbul ignore if */
+        if (this.outgoingRequestLoopRunning) {
+            throw new Error("Cannot run two outgoing request loops");
         }
         this.outgoingRequestLoopRunning = true;
         try {
             while (!this.stopped) {
+                // we clear the "one more loop" flag just before calling `OlmMachine.outgoingRequests()`, so we can tell
+                // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
+                this.outgoingRequestLoopOneMoreLoop = false;
+
+                logger.debug("Calling OlmMachine.outgoingRequests()");
                 const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
-                if (outgoingRequests.length == 0 || this.stopped) {
-                    // no more messages to send (or we have been told to stop): exit the loop
+
+                if (this.stopped) {
+                    // we've been told to stop while `outgoingRequests` was running: exit the loop without processing
+                    // any of the returned requests (anything important will happen next time the client starts.)
                     return;
                 }
+
+                if (outgoingRequests.length === 0 && !this.outgoingRequestLoopOneMoreLoop) {
+                    // `OlmMachine.outgoingRequests` returned no messages, and there was no call to
+                    // `this.outgoingRequestLoop()` while it was running. We can stop the loop for a while.
+                    return;
+                }
+
                 for (const msg of outgoingRequests) {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
                 }
             }
-        } catch (e) {
-            logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
         } finally {
             this.outgoingRequestLoopRunning = false;
         }
