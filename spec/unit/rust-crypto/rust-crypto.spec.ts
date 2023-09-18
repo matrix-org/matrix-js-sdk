@@ -56,6 +56,55 @@ afterEach(() => {
     fetchMock.reset();
 });
 
+describe("initRustCrypto", () => {
+    function makeTestOlmMachine(): Mocked<OlmMachine> {
+        return {
+            registerRoomKeyUpdatedCallback: jest.fn(),
+            registerUserIdentityUpdatedCallback: jest.fn(),
+            outgoingRequests: jest.fn(),
+        } as unknown as Mocked<OlmMachine>;
+    }
+
+    it("passes through the store params", async () => {
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+
+        await initRustCrypto(
+            {} as MatrixClient["http"],
+            TEST_USER,
+            TEST_DEVICE_ID,
+            {} as ServerSideSecretStorage,
+            {} as CryptoCallbacks,
+            "storePrefix",
+            "storePassphrase",
+        );
+
+        expect(OlmMachine.initialize).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            "storePrefix",
+            "storePassphrase",
+        );
+    });
+
+    it("suppresses the storePassphrase if storePrefix is unset", async () => {
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+
+        await initRustCrypto(
+            {} as MatrixClient["http"],
+            TEST_USER,
+            TEST_DEVICE_ID,
+            {} as ServerSideSecretStorage,
+            {} as CryptoCallbacks,
+            null,
+            "storePassphrase",
+        );
+
+        expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
+    });
+});
+
 describe("RustCrypto", () => {
     describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
@@ -812,5 +861,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
 }

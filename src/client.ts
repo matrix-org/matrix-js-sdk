@@ -343,7 +343,14 @@ export interface ICreateClientOpts {
     deviceToImport?: IExportedDevice;
 
     /**
-     * Key used to pickle olm objects or other sensitive data.
+     * Encryption key used for encrypting sensitive data (such as e2ee keys) in storage.
+     *
+     * This must be set to the same value every time the client is initialised for the same device.
+     *
+     * If unset, either a hardcoded key or no encryption at all is used, depending on the Crypto implementation.
+     *
+     * No particular requirement is placed on the key data (it is fed into an HKDF to generate the actual encryption
+     * keys).
      */
     pickleKey?: string;
 
@@ -1193,7 +1200,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public store: Store;
     public deviceId: string | null;
     public credentials: { userId: string | null };
+
+    /**
+     * Encryption key used for encrypting sensitive data (such as e2ee keys) in storage.
+     *
+     * As supplied in the constructor via {@link IMatrixClientCreateOpts#pickleKey}.
+     *
+     * If unset, either a hardcoded key or no encryption at all is used, depending on the Crypto implementation.
+     *
+     * @deprecated this should be a private property.
+     */
     public pickleKey?: string;
+
     public scheduler?: MatrixScheduler;
     public clientRunning = false;
     public timelineSupport = false;
@@ -2279,6 +2297,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.secretStorage,
             this.cryptoCallbacks,
             useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
+            this.pickleKey,
         );
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
