@@ -48,8 +48,6 @@ interface IOpts extends IBaseOpts {
     dbName?: string;
     /** Optional factory to spin up a Worker to execute the IDB transactions within. */
     workerFactory?: () => Worker;
-    /** User-id of the logged-in user */
-    userId?: string;
 }
 
 type EventHandlerMap = {
@@ -115,9 +113,9 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         if (opts.workerFactory) {
-            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName, opts.userId);
+            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
         } else {
-            this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName, opts.userId);
+            this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
         }
     }
 
