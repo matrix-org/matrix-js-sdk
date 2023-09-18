@@ -1348,6 +1348,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             this.outgoingRequestLoopOneMoreLoop = true;
             return;
         }
+        // fire off the loop in the background
         this.outgoingRequestLoopInner().catch((e) => {
             logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
         });
@@ -1361,13 +1362,25 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestLoopRunning = true;
         try {
             while (!this.stopped) {
+                // we clear the "one more loop" flag just before calling `OlmMachine.outgoingRequests()`, so we can tell
+                // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
                 this.outgoingRequestLoopOneMoreLoop = false;
+
                 logger.debug("Calling OlmMachine.outgoingRequests()");
                 const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
-                if ((outgoingRequests.length === 0 && !this.outgoingRequestLoopOneMoreLoop) || this.stopped) {
-                    // no more messages to send (or we have been told to stop): exit the loop
+
+                if (this.stopped) {
+                    // we've been told to stop while `outgoingRequests` was running: exit the loop without processing
+                    // any of the returned requests (anything important will happen next time the client starts.)
                     return;
                 }
+
+                if (outgoingRequests.length === 0 && !this.outgoingRequestLoopOneMoreLoop) {
+                    // `OlmMachine.outgoingRequests` returned no messages, and there was no call to
+                    // `this.outgoingRequestLoop()` while it was running. We can stop the loop for a while.
+                    return;
+                }
+
                 for (const msg of outgoingRequests) {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
                 }
