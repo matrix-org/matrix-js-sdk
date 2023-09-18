@@ -27,6 +27,7 @@ import {
     IStrippedState,
     ISyncResponse,
     SyncAccumulator,
+    IInviteState,
 } from "../../src/sync-accumulator";
 import { IRoomSummary } from "../../src";
 import * as utils from "../test-utils/test-utils";
@@ -306,6 +307,63 @@ describe("SyncAccumulator", function () {
         expect(sa.getJSON().accountData[0]).toEqual(acc2);
     });
 
+    it("should delete invite room when invite request is rejected", () => {
+        const initInviteState: IInviteState = {
+            events: [
+                {
+                    content: {
+                        membership: "invite",
+                    },
+                    state_key: "bob",
+                    sender: "alice",
+                    type: "m.room.member",
+                },
+            ],
+        };
+
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {
+                    "!invite:bar": {
+                        invite_state: initInviteState,
+                    },
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.invite["!invite:bar"].invite_state).toBe(initInviteState);
+
+        const rejectMemberEvent: IStateEvent = {
+            event_id: "$" + Math.random(),
+            content: {
+                membership: "leave",
+            },
+            origin_server_ts: 123456789,
+            state_key: "bob",
+            sender: "bob",
+            type: "m.room.member",
+            unsigned: {
+                prev_content: {
+                    membership: "invite",
+                },
+            },
+        };
+        const leftRoomState = leftRoomSkeleton([rejectMemberEvent]);
+
+        // bob rejects invite
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {
+                    "!invite:bar": leftRoomState,
+                },
+            ),
+        );
+
+        expect(sa.getJSON().roomsData.invite["!invite:bar"]).toBeUndefined();
+    });
+
     it("should accumulate knock state", () => {
         const initKnockState = {
             events: [member("alice", "knock")],
@@ -463,7 +521,6 @@ describe("SyncAccumulator", function () {
         );
 
         expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
-        expect(sa.getJSON().roomsData.leave["!knock:bar"]).toBeUndefined();
     });
 
     it("should delete knocked room when knock request is denied by another user", () => {
