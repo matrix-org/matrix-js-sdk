@@ -108,13 +108,20 @@ export class CrossSigningIdentity {
      *   * Upload the private keys to SSSS, if it is set up
      */
     private async resetCrossSigning(authUploadDeviceSigningKeys?: UIAuthCallback<void>): Promise<void> {
+        // XXX: We must find a way to make this atomic, currently if the user do not remember is account password
+        // or 4S passphrase/key the process will fail in a bad state, with keys rotated but not uploaded or saved in 4S.
         const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
 
+        // If 4s is configured we need to udpate it.
+        const hasKey = await this.secretStorage.hasKey();
+        if (hasKey) {
+            // Update 4S before uploading cross-signing keys
+            await this.exportCrossSigningKeysToStorage();
+        }
         logger.log("bootStrapCrossSigning: publishing keys to server");
         for (const req of outgoingRequests) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
         }
-        await this.exportCrossSigningKeysToStorage();
     }
 
     /**
@@ -123,6 +130,9 @@ export class CrossSigningIdentity {
      * (If secret storage is *not* configured, we assume that the export will happen when it is set up)
      */
     private async exportCrossSigningKeysToStorage(): Promise<void> {
-        // TODO
+        const exported: RustSdkCryptoJs.CrossSigningKeyExport = await this.olmMachine.exportCrossSigningKeys();
+        this.secretStorage.store("m.cross_signing.master", exported.masterKey!);
+        this.secretStorage.store("m.cross_signing.self_signing", exported.self_signing_key!);
+        this.secretStorage.store("m.cross_signing.user_signing", exported.userSigningKey!);
     }
 }
