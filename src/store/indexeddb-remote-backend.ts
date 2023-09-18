@@ -42,8 +42,13 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param workerFactory - Factory which produces a Worker
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
+     * @param userId - User-id of the logged-in user
      */
-    public constructor(private readonly workerFactory: () => Worker, private readonly dbName?: string) {}
+    public constructor(
+        private readonly workerFactory: () => Worker,
+        private readonly dbName?: string,
+        private readonly userId?: string,
+    ) {}
 
     /**
      * Attempt to connect to the database. This can fail if the user does not
@@ -148,8 +153,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             this.worker = this.workerFactory();
             this.worker.onmessage = this.onWorkerMessage;
 
-            // tell the worker the db name.
-            this.startPromise = this.doCmd("setupWorker", [this.dbName]).then(() => {
+            // tell the worker the db name and user-id.
+            this.startPromise = this.doCmd("setupWorker", [this.dbName, this.userId]).then(() => {
                 logger.log("IndexedDB worker is ready");
             });
         }

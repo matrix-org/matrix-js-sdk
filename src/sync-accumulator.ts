@@ -35,6 +35,11 @@ interface IOpts {
      * Default: 50.
      */
     maxTimelineEntries?: number;
+
+    /**
+     * User-id of the logged-in user
+     */
+    userId?: string;
 }
 
 export interface IMinimalEvent {
@@ -207,6 +212,7 @@ export class SyncAccumulator {
     private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
     private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
     private knockRooms: Record<string, IKnockedRoom> = {}; // $roomId: { ... sync 'knock' json data ... }
+    private leaveRooms: Record<string, ILeftRoom> = {}; // $roomId: { ... sync 'leave' json data ... }
     private joinRooms: { [roomId: string]: IRoom } = {};
     // the /sync token which corresponds to the last time rooms were
     // accumulated. We remember this so that any caller can obtain a
@@ -214,7 +220,7 @@ export class SyncAccumulator {
     // streaming from without losing events.
     private nextBatch: string | null = null;
 
-    public constructor(private readonly opts: IOpts = {}) {
+    public constructor(private readonly opts: IOpts) {
         this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }
 
@@ -283,6 +289,10 @@ export class SyncAccumulator {
         // * equivalent to "no state"
         switch (category) {
             case Category.Invite: // (5)
+                if (this.knockRooms[roomId]) {
+                    // was previously knock, now invite, need to delete knock state
+                    delete this.knockRooms[roomId];
+                }
                 this.accumulateInviteState(roomId, data as IInvitedRoom);
                 break;
 
@@ -302,8 +312,24 @@ export class SyncAccumulator {
                 this.accumulateJoinState(roomId, data as IJoinedRoom, fromDatabase);
                 break;
 
-            case Category.Leave:
-                if (this.inviteRooms[roomId]) {
+            case Category.Leave: {
+                const leftRoom = data as ILeftRoom;
+                const knockLeave: "deny" | "cancel" | undefined = findMemberKnockLeaveState(leftRoom, this.opts.userId);
+                if (this.knockRooms[roomId]) {
+                    if (knockLeave === "deny") {
+                        // stores a left room state with room name in leaveRooms when user knock request is denied
+                        const knockEvents = this.knockRooms[roomId].knock_state.events;
+                        const roomNameEvent = knockEvents.find(
+                            (e) => e.type === EventType.RoomName && e.state_key === "",
+                        );
+                        this.leaveRooms[roomId] = addNameIfMissing(roomId, leftRoom, roomNameEvent);
+                    }
+
+                    // delete knock state on leave
+                    delete this.knockRooms[roomId];
+                } else if (knockLeave === "deny") {
+                    this.leaveRooms[roomId] = leftRoom;
+                } else if (this.inviteRooms[roomId]) {
                     // (4)
                     delete this.inviteRooms[roomId];
                 } else {
@@ -311,6 +337,7 @@ export class SyncAccumulator {
                     delete this.joinRooms[roomId];
                 }
                 break;
+            }
 
             default:
                 logger.error("Unknown cateogory: ", category);
@@ -548,10 +575,15 @@ export class SyncAccumulator {
             // it is unclear *when* we can safely remove the room from the DB.
             // Instead, we assume that if you're loading from the DB, you've
             // refreshed the page, which means you've seen the kick/ban already.
+            // Another exception is when user knock is denied: in this case
+            // leave state is stored to the DB.
             leave: {},
         };
         Object.keys(this.inviteRooms).forEach((roomId) => {
             data.invite[roomId] = this.inviteRooms[roomId];
+        });
+        Object.keys(this.leaveRooms).forEach((roomId) => {
+            data.leave[roomId] = this.leaveRooms[roomId];
         });
         Object.keys(this.knockRooms).forEach((roomId) => {
             data.knock[roomId] = this.knockRooms[roomId];
@@ -681,4 +713,69 @@ function setState(eventMap: Record<string, Record<string, IStateEvent>>, event: 
         eventMap[event.type] = Object.create(null);
     }
     eventMap[event.type][(event as IStateEvent).state_key] = event as IStateEvent;
+}
+
+/**
+ * Finds user's "m.room.member" event with "leave" membership and "knock" previous membership then
+ * checks if request was denied by another user or cancelled by user himself.
+ * @param leftRoom - leftRoom event
+ * @param userId - user id
+ * @returns "deny" user knock request was denied, "cancel" if cancelled by user himself, undefined otherwise
+ */
+export function findMemberKnockLeaveState(leftRoom: ILeftRoom, userId?: string): "deny" | "cancel" | undefined {
+    if (!userId) {
+        return undefined;
+    }
+
+    const event = [...leftRoom.state.events, ...leftRoom.timeline.events]
+        .reverse()
+        .find(
+            (e) =>
+                e.type === "m.room.member" &&
+                (e as IStateEvent).state_key === userId &&
+                e.content.membership === "leave" &&
+                e.unsigned?.prev_content?.membership === "knock",
+        );
+    if (event) {
+        return event.sender !== (event as IStateEvent).state_key ? "deny" : "cancel";
+    } else {
+        return undefined;
+    }
+}
+
+/**
+ * Adds name to a ILeftRoom state is missing.
+ * @param roomId - roomId
+ * @param leftRoom - leftRoom event
+ * @param roomNameEvent - roomName event
+ * @returns new instance of ILeftRoom if anything changed
+ */
+export function addNameIfMissing(roomId: string, leftRoom: ILeftRoom, roomNameEvent?: IStrippedState): ILeftRoom {
+    if (!roomNameEvent) {
+        return leftRoom;
+    }
+
+    const hasNameEvent = [...leftRoom.state.events, ...leftRoom.timeline.events].some(
+        (e) => e.type === EventType.RoomName && (e as IStateEvent).state_key === "",
+    );
+
+    if (hasNameEvent) {
+        return leftRoom;
+    } else {
+        const newRoomNameEvent: IStateEvent = {
+            event_id: "$fake-name-event-" + roomId,
+            state_key: "",
+            type: EventType.RoomName,
+            content: roomNameEvent.content,
+            sender: roomNameEvent.sender,
+            origin_server_ts: new Date().getTime(),
+        };
+        return {
+            state: {
+                events: [newRoomNameEvent, ...leftRoom.state.events],
+            },
+            timeline: leftRoom.timeline,
+            account_data: leftRoom.account_data,
+        };
+    }
 }

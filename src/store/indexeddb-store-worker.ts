@@ -69,7 +69,7 @@ export class IndexedDBStoreWorker {
             case "setupWorker":
                 // this is the 'indexedDB' global (where global != window
                 // because it's a web worker and there is no window).
-                this.backend = new LocalIndexedDBStoreBackend(indexedDB, msg.args[0]);
+                this.backend = new LocalIndexedDBStoreBackend(indexedDB, msg.args[0], msg.args[1]);
                 prom = Promise.resolve();
                 break;
             case "connect":

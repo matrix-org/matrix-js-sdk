@@ -142,10 +142,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * `window.indexedDB`
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
+     * @param userId - User-id of the logged-in user
      */
-    public constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
+    public constructor(private readonly indexedDB: IDBFactory, dbName = "default", userId?: string) {
         this.dbName = "matrix-js-sdk:" + dbName;
-        this.syncAccumulator = new SyncAccumulator();
+        this.syncAccumulator = new SyncAccumulator({ userId });
     }
 
     /**
