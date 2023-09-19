@@ -162,6 +162,7 @@ describe("RustCrypto", () => {
         it("returns sensible values on a default client", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockResolvedValue(null),
+                getKey: jest.fn().mockResolvedValue(["key", {}]),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
@@ -182,6 +183,7 @@ describe("RustCrypto", () => {
         it("throws if `stop` is called mid-call", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockResolvedValue(null),
+                getKey: jest.fn().mockResolvedValue(null),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
