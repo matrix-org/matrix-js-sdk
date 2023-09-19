@@ -65,34 +65,42 @@ export class CrossSigningIdentity {
             privateKeysInSecretStorage,
         });
 
-        if (!olmDeviceHasKeys && !privateKeysInSecretStorage) {
-            logger.log(
-                "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
-            );
-            await this.resetCrossSigning(opts.authUploadDeviceSigningKeys);
-        } else if (olmDeviceHasKeys) {
-            logger.log("bootStrapCrossSigning: Olm device has private keys: exporting to secret storage");
-            await this.exportCrossSigningKeysToStorage();
-        } else if (privateKeysInSecretStorage) {
-            logger.log(
-                "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
-                    "in secret storage, reading storage and caching locally",
-            );
-            await this.olmMachine.importCrossSigningKeys(
-                masterKeyFromSecretStorage,
-                selfSigningKeyFromSecretStorage,
-                userSigningKeyFromSecretStorage,
-            );
+        if (olmDeviceHasKeys) {
+            if (!privateKeysInSecretStorage) {
+                // the device has the keys but they are not in 4S, so update it
+                logger.log("bootStrapCrossSigning: Olm device has private keys: exporting to secret storage");
+                await this.exportCrossSigningKeysToStorage();
+            } else {
+                logger.log("bootStrapCrossSigning: Olm device has private keys and they are saved in 4S, do nothing");
+            }
+        } /* (!olmDeviceHasKeys) */ else {
+            if (privateKeysInSecretStorage) {
+                // they are in 4S, so import from there
+                logger.log(
+                    "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
+                        "in secret storage, reading storage and caching locally",
+                );
+                await this.olmMachine.importCrossSigningKeys(
+                    masterKeyFromSecretStorage,
+                    selfSigningKeyFromSecretStorage,
+                    userSigningKeyFromSecretStorage,
+                );
 
-            // Get the current device
-            const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-                this.olmMachine.userId,
-                this.olmMachine.deviceId,
-            );
+                // Get the current device
+                const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+                    this.olmMachine.userId,
+                    this.olmMachine.deviceId,
+                );
 
-            // Sign the device with our cross-signing key and upload the signature
-            const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
-            await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                // Sign the device with our cross-signing key and upload the signature
+                const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+            } else {
+                logger.log(
+                    "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
+                );
+                await this.resetCrossSigning(opts.authUploadDeviceSigningKeys);
+            }
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the
