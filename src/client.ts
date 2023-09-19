@@ -3313,10 +3313,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get information about the current key backup.
-     * @returns Information object from API or null
+     * Get information about the current key backup from the server.
      *
-     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
+     * Performs some basic validity checks on the shape of the result, and raises an error if it is not as expected.
+     *
+     * **Note**: there is no (supported) way to distinguish between "failure to talk to the server" and "another client
+     * uploaded a key backup version using an algorithm I don't understand.
+     *
+     * @returns Information object from API, or null if no backup is present on the server.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res: IKeyBackupInfo;
