@@ -14,7 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { secretStorageContainsCrossSigningKeys } from "../../../src/rust-crypto/secret-storage";
+import {
+    secretStorageCanAccessSecrets,
+    secretStorageContainsCrossSigningKeys,
+} from "../../../src/rust-crypto/secret-storage";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
 
 describe("secret-storage", () => {
@@ -22,6 +25,7 @@ describe("secret-storage", () => {
         it("should return false when the master cross-signing key is not stored in secret storage", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockReturnValue(false),
+                getKey: jest.fn().mockResolvedValue(["SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S", {}]),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -35,6 +39,7 @@ describe("secret-storage", () => {
                     if (type === "m.cross_signing.master") return { secretStorageKey: {} };
                     else return { secretStorageKey2: {} };
                 },
+                getKey: jest.fn().mockResolvedValue(["SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S", {}]),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -51,19 +56,86 @@ describe("secret-storage", () => {
                         return { secretStorageKey2: {} };
                     }
                 },
+                getKey: jest.fn().mockResolvedValue(["secretStorageKey", {}]),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
             expect(result).toBeFalsy();
         });
 
-        it("should return true when there is shared secret storage key between master, user signing and self signing keys", async () => {
+        it("should return true when there is shared secret storage key between master, user signing and self signing keys with default key", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockReturnValue({ secretStorageKey: {} }),
+                getKey: jest.fn().mockResolvedValue(["secretStorageKey", {}]),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
             expect(result).toBeTruthy();
+        });
+
+        it("should return false when there is shared secret storage key between master, user signing and self signing keys without default key", async () => {
+            const secretStorage = {
+                isStored: jest.fn().mockResolvedValue({ defaultKey: {} }),
+                getKey: jest.fn().mockResolvedValue(["anotherCommonKey", {}]),
+            } as unknown as ServerSideSecretStorage;
+
+            const result = await secretStorageContainsCrossSigningKeys(secretStorage);
+            expect(result).toBeFalsy();
+        });
+    });
+
+    describe("Secret storage access", () => {
+        it("Check canAccessSecrets", async () => {
+            const secretStorage = {
+                isStored: jest.fn((secretName) => {
+                    if (secretName == "secretA") {
+                        return { bbbb: {} };
+                    } else if (secretName == "secretB") {
+                        return { bbbb: {} };
+                    } else if (secretName == "secretC") {
+                        return { cccc: {} };
+                    } else if (secretName == "secretD") {
+                        return { dddd: {} };
+                    } else if (secretName == "secretE") {
+                        return { aaaa: {}, bbbb: {} };
+                    } else {
+                        null;
+                    }
+                }),
+                getKey: jest.fn((keyId) => {
+                    if (["aaaa", "bbbb", "cccc", "dddd"].includes(keyId)) {
+                        return [keyId, {}];
+                    } else if (keyId == null) {
+                        // default key
+                        return ["aaaa", {}];
+                    } else {
+                        return null;
+                    }
+                }),
+            } as unknown as ServerSideSecretStorage;
+
+            expect(await secretStorageCanAccessSecrets(secretStorage, "aaaa", ["secretE"])).toStrictEqual(true);
+            expect(await secretStorageCanAccessSecrets(secretStorage, null, ["secretE"])).toStrictEqual(true);
+            expect(await secretStorageCanAccessSecrets(secretStorage, "bbbb", ["secretA", "secretB"])).toStrictEqual(
+                true,
+            );
+            expect(
+                await secretStorageCanAccessSecrets(secretStorage, "bbbb", ["secretA", "secretB", "Unknown"]),
+            ).toStrictEqual(false);
+            expect(await secretStorageCanAccessSecrets(secretStorage, null, ["secretA", "secretB"])).toStrictEqual(
+                false,
+            );
+            expect(
+                await secretStorageCanAccessSecrets(secretStorage, "bbbb", ["secretA", "secretB", "secretC"]),
+            ).toStrictEqual(false);
+            expect(
+                await secretStorageCanAccessSecrets(secretStorage, "bbbb", ["secretA", "secretB", "secretE"]),
+            ).toStrictEqual(true);
+            expect(
+                await secretStorageCanAccessSecrets(secretStorage, null, ["secretA", "secretB", "secretE"]),
+            ).toStrictEqual(false);
+            expect(await secretStorageCanAccessSecrets(secretStorage, null, [])).toStrictEqual(true);
+            expect(await secretStorageCanAccessSecrets(secretStorage, "unknown", ["secretE"])).toStrictEqual(false);
         });
     });
 });

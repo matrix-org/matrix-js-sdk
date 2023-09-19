@@ -56,7 +56,7 @@ import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
-import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
@@ -615,31 +615,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#isSecretStorageReady}
      */
     public async isSecretStorageReady(): Promise<boolean> {
-        const secretStorageKeyTuple = await this.secretStorage.getKey();
-        if (!secretStorageKeyTuple) return false;
-
-        const [keyId] = secretStorageKeyTuple;
-
-        // Get the master signing keys stored into the secret storage
-        const secretStorageMasterKeys = (await this.secretStorage.isStored("m.cross_signing.master")) || {};
-        // Get the user signing keys stored into the secret storage
-        const secretStorageUserSigningKeys = (await this.secretStorage.isStored(`m.cross_signing.user_signing`)) || {};
-        // Get the self signing keys stored into the secret storage
-        const secretStorageSelfSigningKeys = (await this.secretStorage.isStored(`m.cross_signing.self_signing`)) || {};
-        // Get the megolm backup stored into the secret storage
-        const secretStorageSelfbackupKey = (await this.secretStorage.isStored(`m.megolm_backup.v1`)) || {};
+        const secretsToCheck = [
+            "m.cross_signing.master",
+            "m.cross_signing.user_signing",
+            "m.cross_signing.self_signing",
+        ];
 
         const keyBackupEnabled = (await this.backupManager.getActiveBackupVersion()) != null;
 
-        // Check if all secrets are encrypted with correct key
-        // XXX it's not clear from the doc if we should check that the keys are known locally, but
-        // the legacy code is not checking that.
-        return (
-            keyId in secretStorageMasterKeys &&
-            keyId in secretStorageUserSigningKeys &&
-            keyId in secretStorageSelfSigningKeys &&
-            (!keyBackupEnabled || keyId in secretStorageSelfbackupKey)
-        );
+        if (keyBackupEnabled) {
+            secretsToCheck.push("m.megolm_backup.v1");
+        }
+
+        return secretStorageCanAccessSecrets(this.secretStorage, null, secretsToCheck);
     }
 
     /**
