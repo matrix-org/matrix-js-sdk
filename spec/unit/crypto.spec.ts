@@ -258,7 +258,7 @@ describe("Crypto", function () {
                 const event = await buildEncryptedEvent();
                 expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
                     shieldColour: EventShieldColour.RED,
-                    shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
                 });
             });
 

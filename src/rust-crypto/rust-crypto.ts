@@ -1649,6 +1649,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
     if (shieldState.message === null) {
         shieldReason = null;
     } else if (shieldState.message === "Encrypted by an unverified user.") {
+        // this case isn't actually used with lax shield semantics.
         shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
     } else if (shieldState.message === "Encrypted by a device not verified by its owner.") {
         shieldReason = EventShieldReason.UNSIGNED_DEVICE;
