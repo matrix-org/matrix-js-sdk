@@ -54,6 +54,7 @@ const TEST_DEVICE_ID = "TEST_DEVICE";
 
 afterEach(() => {
     fetchMock.reset();
+    jest.restoreAllMocks();
 });
 
 describe("initRustCrypto", () => {
@@ -445,10 +446,6 @@ describe("RustCrypto", () => {
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
             );
-        });
-
-        afterEach(() => {
-            jest.restoreAllMocks();
         });
 
         async function makeEncryptedEvent(): Promise<MatrixEvent> {
