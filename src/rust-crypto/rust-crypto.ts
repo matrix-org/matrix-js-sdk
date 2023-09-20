@@ -637,7 +637,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             secretsToCheck.push("m.megolm_backup.v1");
         }
 
-        return secretStorageCanAccessSecrets(this.secretStorage, null, secretsToCheck);
+        return secretStorageCanAccessSecrets(this.secretStorage, secretsToCheck);
     }
 
     /**

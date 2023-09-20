@@ -25,7 +25,7 @@ import { ServerSideSecretStorage } from "../secret-storage";
  * @internal
  */
 export async function secretStorageContainsCrossSigningKeys(secretStorage: ServerSideSecretStorage): Promise<boolean> {
-    return secretStorageCanAccessSecrets(secretStorage, null, [
+    return secretStorageCanAccessSecrets(secretStorage, [
         "m.cross_signing.master",
         "m.cross_signing.user_signing",
         "m.cross_signing.self_signing",
@@ -34,10 +34,9 @@ export async function secretStorageContainsCrossSigningKeys(secretStorage: Serve
 
 /**
  *
- * Check that the secret storage can access the given secrets using the given key.
+ * Check that the secret storage can access the given secrets using the default key.
  *
  * @param secretStorage - The secret store using account data
- * @param keyId - The keyId to check against, null for default key
  * @param secretNames - The secret names to check
  * @returns True if all the given secrets are accessible and encrypted with the given key.
  *
@@ -45,19 +44,16 @@ export async function secretStorageContainsCrossSigningKeys(secretStorage: Serve
  */
 export async function secretStorageCanAccessSecrets(
     secretStorage: ServerSideSecretStorage,
-    keyId: string | null,
     secretNames: string[],
 ): Promise<boolean> {
-    const secretStorageKeyTuple = await secretStorage.getKey(keyId);
-    if (!secretStorageKeyTuple) return false;
-
-    const [secretKeyId] = secretStorageKeyTuple;
+    const defaultKeyId = await secretStorage.getDefaultKeyId();
+    if (!defaultKeyId) return false;
 
     for (const secretName of secretNames) {
         // check which keys this particular secret is encrypted with
         const record = (await secretStorage.isStored(secretName)) || {};
         // if it's not encrypted with the right key, there is no point continuing
-        if (!(secretKeyId in record)) return false;
+        if (!(defaultKeyId in record)) return false;
     }
 
     return true;
