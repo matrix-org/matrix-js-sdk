@@ -1552,7 +1552,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.clientOpts.threadSupport = this.clientOpts.experimentalThreadSupport;
         }
 
-        this.syncApi.sync();
+        this.syncApi.sync().catch((e) => logger.info("Sync startup aborted with an error:", e));
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
