@@ -2289,11 +2289,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          * Will be updated when fecthMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
          * Will be used by `sendSyncResponseWithUpdatedAccountData`
          */
-        let accountDataEvents: any[];
+        let accountDataEvents: Map<String, any>;
 
         beforeEach(async () => {
             createSecretStorageKey.mockClear();
-            accountDataEvents = [];
+            accountDataEvents = new Map();
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
         });
@@ -2308,17 +2308,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         function updateAccountData(type: string, content: any) {
-            const existing = accountDataEvents.find((event) => {
-                if (event.type == type) return event;
-            });
-            if (existing) {
-                existing.content = content;
-            } else {
-                accountDataEvents.push({
-                    type,
-                    content,
-                });
-            }
+            accountDataEvents.set(type, content);
         }
 
         function mockGetAccountData() {
@@ -2326,9 +2316,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 `path:/_matrix/client/v3/user/:userId/account_data/:type`,
                 (url) => {
                     const type = url.split("/").pop();
-                    const existing = accountDataEvents.find((event) => {
-                        if (event.type == type) return event;
-                    });
+                    const existing = accountDataEvents.get(type!);
                     if (existing) {
                         // return it
                         return {
@@ -2377,7 +2365,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 syncResponder.sendOrQueueSyncResponse({
                     next_batch: 1,
                     account_data: {
-                        events: accountDataEvents,
+                        events: Array.from(accountDataEvents, ([type, content]) => ({
+                            type: type,
+                            content: content,
+                        })),
                     },
                 });
             } catch (err) {
