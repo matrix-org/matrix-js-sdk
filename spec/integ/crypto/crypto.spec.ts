@@ -2285,6 +2285,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("Secret Storage and Key Backup", () => {
         /**
+         * The account data events to be returned by the sync.
+         * Will be updated when fecthMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
+         * Will be used by `sendSyncResponseWithUpdatedAccountData`
+         */
+        let accountDataEvents: any[];
+
+        beforeEach(async () => {
+            createSecretStorageKey.mockClear();
+            accountDataEvents = [];
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
+
+        /**
          * Create a fake secret storage key
          * Async because `bootstrapSecretStorage` expect an async method
          */
@@ -2292,13 +2306,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             keyInfo: {}, // Returning undefined here used to cause a crash
             privateKey: Uint8Array.of(32, 33),
         });
-
-        /**
-         * The account data events to be returned by the sync.
-         * Will be updated when fecthMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
-         * Will be used by `sendSyncResponseWithUpdatedAccountData`
-         */
-        let accountDataEvents: any[] = [];
 
         function updateAccountData(type: string, content: any) {
             const existing = accountDataEvents.find((event) => {
@@ -2340,13 +2347,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
         }
 
-        beforeEach(async () => {
-            createSecretStorageKey.mockClear();
-            accountDataEvents = [];
-            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await startClientAndAwaitFirstSync();
-        });
-
         /**
          * Create a mock to respond to the PUT request `/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`
          * Resolved when the cross signing key is uploaded
@@ -2370,10 +2370,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         /**
-         * Send in the sync response the provided `secretStorageKey` into the account_data field
-         * The key is set for the `m.secret_storage.default_key` and `m.secret_storage.key.${secretStorageKey}` events
-         * https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
-         * @param secretStorageKey
+         * Send in the sync response the current account data events, as stored by `accountDataEvents`.
          */
         function sendSyncResponseWithUpdatedAccountData() {
             try {
@@ -2500,7 +2497,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         describe("bootstrapSecretStorage", () => {
-            // Doesn't work with legacy. Legacy will try to bootstrap even without private key which is buggy.
+            // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
             newBackendOnly(
                 "should throw an error if we are unable to create a key because createSecretStorageKey is not set",
                 async () => {
@@ -2554,7 +2551,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
-                // On legacy we need to wait for ClientEvent.AccountData before calling bootstrap again.
+                // On legacy crypto we need to wait for ClientEvent.AccountData before calling bootstrap again.
                 await awaitAccountDataClientUpdate;
 
                 // Call again bootstrapSecretStorage

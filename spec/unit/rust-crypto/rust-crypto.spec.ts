@@ -210,12 +210,10 @@ describe("RustCrypto", () => {
     });
 
     it("isSecretStorageReady", async () => {
-        const rustCrypto = await makeTestRustCrypto();
         const mockSecretStorage = {
             getKey: jest.fn().mockResolvedValue(null),
-        };
-        // @ts-ignore private property
-        rustCrypto.secretStorage = mockSecretStorage;
+        } as unknown as Mocked<ServerSideSecretStorage>;
+        const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, mockSecretStorage);
         await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
     });
 

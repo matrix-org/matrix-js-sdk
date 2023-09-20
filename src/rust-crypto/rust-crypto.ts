@@ -623,12 +623,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#isSecretStorageReady}
      */
     public async isSecretStorageReady(): Promise<boolean> {
+        // make sure that the cross-signing keys are stored
         const secretsToCheck = [
             "m.cross_signing.master",
             "m.cross_signing.user_signing",
             "m.cross_signing.self_signing",
         ];
 
+        // if key backup is active, we also need to check that the backup decryption key is stored
         const keyBackupEnabled = (await this.backupManager.getActiveBackupVersion()) != null;
 
         if (keyBackupEnabled) {

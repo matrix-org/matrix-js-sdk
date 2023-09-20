@@ -63,7 +63,7 @@ describe("secret-storage", () => {
             expect(result).toBeFalsy();
         });
 
-        it("should return true when there is shared secret storage key between master, user signing and self signing keys with default key", async () => {
+        it("should return true when master, user signing and self signing keys are all encrypted with default key", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockReturnValue({ secretStorageKey: {} }),
                 getKey: jest.fn().mockResolvedValue(["secretStorageKey", {}]),
@@ -73,7 +73,7 @@ describe("secret-storage", () => {
             expect(result).toBeTruthy();
         });
 
-        it("should return false when there is shared secret storage key between master, user signing and self signing keys without default key", async () => {
+        it("should return false when master, user signing and self signing keys are all encrypted with a non-default key", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockResolvedValue({ defaultKey: {} }),
                 getKey: jest.fn().mockResolvedValue(["anotherCommonKey", {}]),
@@ -82,9 +82,7 @@ describe("secret-storage", () => {
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
             expect(result).toBeFalsy();
         });
-    });
 
-    describe("Secret storage access", () => {
         it("Check canAccessSecrets", async () => {
             const secretStorage = {
                 isStored: jest.fn((secretName) => {

@@ -39,7 +39,7 @@ export async function secretStorageContainsCrossSigningKeys(secretStorage: Serve
  * @param secretStorage - The secret store using account data
  * @param keyId - The keyId to check against, null for default key
  * @param secretNames - The secret names to check
- * @returns True if all the given secret are accessible and encrypted with the given key.
+ * @returns True if all the given secrets are accessible and encrypted with the given key.
  *
  * @internal
  */
@@ -53,13 +53,12 @@ export async function secretStorageCanAccessSecrets(
 
     const [secretKeyId] = secretStorageKeyTuple;
 
-    const records = [];
-
-    for (let index = 0; index < secretNames.length; index++) {
-        const secretName = secretNames[index];
+    for (const secretName of secretNames) {
+        // check which keys this particular secret is encrypted with
         const record = (await secretStorage.isStored(secretName)) || {};
-        records.push(record);
+        // if it's not encrypted with the right key, there is no point continuing
+        if (!(secretKeyId in record)) return false;
     }
 
-    return records.every((record) => secretKeyId in record);
+    return true;
 }
