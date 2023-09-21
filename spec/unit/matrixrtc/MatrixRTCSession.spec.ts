@@ -57,6 +57,7 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships[0].scope).toEqual("m.room");
         expect(sess?.memberships[0].application).toEqual("m.call");
         expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+        expect(sess?.memberships[0].membershipID).toEqual("bloop");
         expect(sess?.memberships[0].isExpired()).toEqual(false);
     });
 
