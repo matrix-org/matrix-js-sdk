@@ -2291,13 +2291,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          */
         let accountDataEvents: Map<String, any>;
 
-        beforeEach(async () => {
-            createSecretStorageKey.mockClear();
-            accountDataEvents = new Map();
-            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await startClientAndAwaitFirstSync();
-        });
-
         /**
          * Create a fake secret storage key
          * Async because `bootstrapSecretStorage` expect an async method
@@ -2307,9 +2300,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             privateKey: Uint8Array.of(32, 33),
         });
 
-        function updateAccountData(type: string, content: any) {
-            accountDataEvents.set(type, content);
-        }
+        beforeEach(async () => {
+            createSecretStorageKey.mockClear();
+            accountDataEvents = new Map();
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+        });
 
         function mockGetAccountData() {
             fetchMock.get(
@@ -2349,7 +2345,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         const content = JSON.parse(options.body as string);
                         const type = url.split("/").pop();
                         // update account data for sync response
-                        updateAccountData(type!, content);
+                        accountDataEvents.set(type!, content);
                         resolve(content.encrypted);
                         return {};
                     },
@@ -2372,6 +2368,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     },
                 });
             } catch (err) {
+                // Might fail with "Cannot queue more than one /sync response" if called too often.
                 // It's ok if it fails here, the sync response is cumulative and will contain
                 // the latest account data.
             }
@@ -2393,7 +2390,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         const content = JSON.parse(options.body as string);
 
                         // update account data for sync response
-                        updateAccountData(type!, content);
+                        accountDataEvents.set(type!, content);
 
                         if (content.key) {
                             resolve(content.key);
@@ -2414,7 +2411,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
                         // update account data for sync response
-                        updateAccountData("m.megolm_backup.v1", content);
+                        accountDataEvents.set("m.megolm_backup.v1", content);
                         resolve(content.encrypted);
                         return {};
                     },

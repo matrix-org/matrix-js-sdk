@@ -632,7 +632,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // if key backup is active, we also need to check that the backup decryption key is stored
         const keyBackupEnabled = (await this.backupManager.getActiveBackupVersion()) != null;
-
         if (keyBackupEnabled) {
             secretsToCheck.push("m.megolm_backup.v1");
         }

@@ -82,47 +82,47 @@ describe("secret-storage", () => {
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
             expect(result).toBeFalsy();
         });
+    });
 
-        it("Check canAccessSecrets", async () => {
-            const secretStorage = {
-                isStored: jest.fn((secretName) => {
-                    if (secretName == "secretA") {
-                        return { aaaa: {} };
-                    } else if (secretName == "secretB") {
-                        return { bbbb: {} };
-                    } else if (secretName == "secretC") {
-                        return { cccc: {} };
-                    } else if (secretName == "secretD") {
-                        return { aaaa: {} };
-                    } else if (secretName == "secretE") {
-                        return { aaaa: {}, bbbb: {} };
-                    } else {
-                        null;
-                    }
-                }),
-                getDefaultKeyId: jest.fn().mockResolvedValue("aaaa"),
-            } as unknown as ServerSideSecretStorage;
+    it("Check canAccessSecrets", async () => {
+        const secretStorage = {
+            isStored: jest.fn((secretName) => {
+                if (secretName == "secretA") {
+                    return { aaaa: {} };
+                } else if (secretName == "secretB") {
+                    return { bbbb: {} };
+                } else if (secretName == "secretC") {
+                    return { cccc: {} };
+                } else if (secretName == "secretD") {
+                    return { aaaa: {} };
+                } else if (secretName == "secretE") {
+                    return { aaaa: {}, bbbb: {} };
+                } else {
+                    null;
+                }
+            }),
+            getDefaultKeyId: jest.fn().mockResolvedValue("aaaa"),
+        } as unknown as ServerSideSecretStorage;
 
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretE"])).toStrictEqual(true);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA"])).toStrictEqual(true);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretC"])).toStrictEqual(false);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD"])).toStrictEqual(true);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretC"])).toStrictEqual(false);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretC", "secretA"])).toStrictEqual(false);
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "secretB"])).toStrictEqual(
-                false,
-            );
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "Unknown"])).toStrictEqual(
-                false,
-            );
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretE"])).toStrictEqual(true);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA"])).toStrictEqual(true);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretC"])).toStrictEqual(false);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD"])).toStrictEqual(true);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretC"])).toStrictEqual(false);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretC", "secretA"])).toStrictEqual(false);
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "secretB"])).toStrictEqual(
+            false,
+        );
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "Unknown"])).toStrictEqual(
+            false,
+        );
 
-            expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "secretE"])).toStrictEqual(
-                true,
-            );
-            expect(
-                await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretC", "secretD", "secretE"]),
-            ).toStrictEqual(false);
-            expect(await secretStorageCanAccessSecrets(secretStorage, [])).toStrictEqual(true);
-        });
+        expect(await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretD", "secretE"])).toStrictEqual(
+            true,
+        );
+        expect(
+            await secretStorageCanAccessSecrets(secretStorage, ["secretA", "secretC", "secretD", "secretE"]),
+        ).toStrictEqual(false);
+        expect(await secretStorageCanAccessSecrets(secretStorage, [])).toStrictEqual(true);
     });
 });
