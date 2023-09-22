@@ -120,7 +120,7 @@ export class CrossSigningIdentity {
         // or 4S passphrase/key the process will fail in a bad state, with keys rotated but not uploaded or saved in 4S.
         const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
 
-        // If 4s is configured we need to udpate it.
+        // If 4S is configured we need to udpate it.
         const hasKey = await this.secretStorage.hasKey();
         if (hasKey) {
             // Update 4S before uploading cross-signing keys
