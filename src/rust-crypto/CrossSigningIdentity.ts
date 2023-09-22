@@ -121,8 +121,7 @@ export class CrossSigningIdentity {
         const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
 
         // If 4S is configured we need to udpate it.
-        const hasKey = await this.secretStorage.hasKey();
-        if (hasKey) {
+        if (await this.secretStorage.hasKey()) {
             // Update 4S before uploading cross-signing keys
             await this.exportCrossSigningKeysToStorage();
         }
