@@ -122,7 +122,9 @@ export class CrossSigningIdentity {
 
         // If 4S is configured we need to udpate it.
         if (await this.secretStorage.hasKey()) {
-            // Update 4S before uploading cross-signing keys
+            // Update 4S before uploading cross-signing keys, to stay consistent with legacy that asks
+            // 4S passphrase before asking for account password.
+            // Ultimately should be made atomic and resistent to forgotten password/passphrase.
             await this.exportCrossSigningKeysToStorage();
         }
         logger.log("bootStrapCrossSigning: publishing keys to server");
@@ -137,9 +139,21 @@ export class CrossSigningIdentity {
      * (If secret storage is *not* configured, we assume that the export will happen when it is set up)
      */
     private async exportCrossSigningKeysToStorage(): Promise<void> {
-        const exported: RustSdkCryptoJs.CrossSigningKeyExport = await this.olmMachine.exportCrossSigningKeys();
-        this.secretStorage.store("m.cross_signing.master", exported.masterKey!);
-        this.secretStorage.store("m.cross_signing.self_signing", exported.self_signing_key!);
-        this.secretStorage.store("m.cross_signing.user_signing", exported.userSigningKey!);
+        const exported: RustSdkCryptoJs.CrossSigningKeyExport | null = await this.olmMachine.exportCrossSigningKeys();
+        if (exported?.masterKey) {
+            this.secretStorage.store("m.cross_signing.master", exported.masterKey);
+        } else {
+            logger.error(`Cannot export MSK to secret storage, private key unknown`);
+        }
+        if (exported?.self_signing_key) {
+            this.secretStorage.store("m.cross_signing.self_signing", exported.self_signing_key);
+        } else {
+            logger.error(`Cannot export SSK to secret storage, private key unknown`);
+        }
+        if (exported?.userSigningKey) {
+            this.secretStorage.store("m.cross_signing.user_signing", exported.userSigningKey);
+        } else {
+            logger.error(`Cannot export USK to secret storage, private key unknown`);
+        }
     }
 }
