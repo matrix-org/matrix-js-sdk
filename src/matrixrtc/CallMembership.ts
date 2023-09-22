@@ -29,6 +29,7 @@ export interface CallMembershipData {
     created_ts?: number;
     expires: number;
     foci_active?: Focus[];
+    membershipID: string;
 }
 
 export class CallMembership {
@@ -62,6 +63,10 @@ export class CallMembership {
 
     public get scope(): CallScope {
         return this.data.scope;
+    }
+
+    public get membershipID(): string {
+        return this.data.membershipID;
     }
 
     public createdTs(): number {

@@ -26,6 +26,7 @@ const membershipTemplate: CallMembershipData = {
     application: "m.call",
     device_id: "AAAAAAA",
     expires: 60 * 60 * 1000,
+    membershipID: "bloop",
 };
 
 const mockFocus = { type: "mock" };
@@ -56,6 +57,7 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships[0].scope).toEqual("m.room");
         expect(sess?.memberships[0].application).toEqual("m.call");
         expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+        expect(sess?.memberships[0].membershipID).toEqual("bloop");
         expect(sess?.memberships[0].isExpired()).toEqual(false);
     });
 
@@ -219,6 +221,7 @@ describe("MatrixRTCSession", () => {
                             device_id: "AAAAAAA",
                             expires: 3600000,
                             foci_active: [{ type: "mock" }],
+                            membershipID: expect.stringMatching(".*"),
                         },
                     ],
                 },
@@ -286,6 +289,7 @@ describe("MatrixRTCSession", () => {
                                 expires: 3600000 * 2,
                                 foci_active: [{ type: "mock" }],
                                 created_ts: 1000,
+                                membershipID: expect.stringMatching(".*"),
                             },
                         ],
                     },
@@ -357,6 +361,7 @@ describe("MatrixRTCSession", () => {
                         device_id: "AAAAAAA",
                         expires: 3600000,
                         foci_active: [mockFocus],
+                        membershipID: expect.stringMatching(".*"),
                     },
                 ],
             },
@@ -388,6 +393,7 @@ describe("MatrixRTCSession", () => {
                         device_id: "OTHERDEVICE",
                         expires: 3600000,
                         created_ts: 1000,
+                        membershipID: expect.stringMatching(".*"),
                     },
                     {
                         application: "m.call",
@@ -396,6 +402,7 @@ describe("MatrixRTCSession", () => {
                         device_id: "AAAAAAA",
                         expires: 3600000,
                         foci_active: [mockFocus],
+                        membershipID: expect.stringMatching(".*"),
                     },
                 ],
             },
