@@ -116,7 +116,7 @@ export class CrossSigningIdentity {
      *   * Upload the private keys to SSSS, if it is set up
      */
     private async resetCrossSigning(authUploadDeviceSigningKeys?: UIAuthCallback<void>): Promise<void> {
-        // XXX: We must find a way to make this atomic, currently if the user do not remember is account password
+        // XXX: We must find a way to make this atomic, currently if the user does not remember his account password
         // or 4S passphrase/key the process will fail in a bad state, with keys rotated but not uploaded or saved in 4S.
         const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
 
