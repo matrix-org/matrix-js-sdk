@@ -77,7 +77,7 @@ describe("CrossSigningIdentity", () => {
             expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
         });
 
-        it("Shoud update 4S on reset if 4S is set", async () => {
+        it("Shoud update 4S on reset if 4S is set up", async () => {
             olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
             secretStorage.hasKey.mockResolvedValue(true);
             olmMachine.exportCrossSigningKeys.mockResolvedValue({
