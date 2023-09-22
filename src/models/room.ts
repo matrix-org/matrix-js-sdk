@@ -1473,7 +1473,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.threadNotifications.clear();
         }
-        this.emit(RoomEvent.UnreadNotifications);
+        this.emit(RoomEvent.UnreadNotifications, undefined);
     }
 
     /**
@@ -2514,7 +2514,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvent.LocalEchoUpdated, event, this);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this, undefined, undefined);
     }
 
     /**
