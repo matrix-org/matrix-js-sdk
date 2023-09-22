@@ -3719,7 +3719,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         targetSessionId?: string,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
         const storedKey = await this.secretStorage.get("m.megolm_backup.v1");

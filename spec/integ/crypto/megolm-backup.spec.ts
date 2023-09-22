@@ -237,6 +237,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(1);
 
             await awaitKeyCached;
+
+            // The key should be now cached
+            const afterCache = await aliceClient.restoreKeyBackupWithCache(undefined, undefined, check!.backupInfo!);
+
+            expect(afterCache.imported).toStrictEqual(1);
         });
 
         it("recover specific session from backup", async function () {
