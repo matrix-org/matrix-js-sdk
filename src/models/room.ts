@@ -1476,7 +1476,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.threadNotifications.clear();
         }
-        this.emit(RoomEvent.UnreadNotifications);
+        this.emit(RoomEvent.UnreadNotifications, undefined, undefined);
     }
 
     /**
@@ -1486,7 +1486,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
         this.notificationCounts[type] = count;
-        this.emit(RoomEvent.UnreadNotifications, this.notificationCounts);
+        this.emit(RoomEvent.UnreadNotifications, this.notificationCounts, undefined);
     }
 
     public setUnread(type: NotificationCountType, count: number): void {
@@ -2517,7 +2517,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvent.LocalEchoUpdated, event, this);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this, undefined, undefined);
     }
 
     /**

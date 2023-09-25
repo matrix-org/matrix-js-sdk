@@ -305,7 +305,7 @@ export class RoomWidgetClient extends MatrixClient {
     private setSyncState(state: SyncState): void {
         const oldState = this.syncState;
         this.syncState = state;
-        this.emit(ClientEvent.Sync, state, oldState);
+        this.emit(ClientEvent.Sync, state, oldState, undefined);
     }
 
     private async ack(ev: CustomEvent<IWidgetApiRequest>): Promise<void> {

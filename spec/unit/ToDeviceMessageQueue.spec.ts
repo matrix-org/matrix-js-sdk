@@ -31,7 +31,7 @@ describe("onResumedSync", () => {
         onSendToDeviceSuccess = () => {};
         resumeSync = (newState, oldState) => {
             shouldFailSendToDevice = false;
-            mockClient.emit(ClientEvent.Sync, newState, oldState);
+            mockClient.emit(ClientEvent.Sync, newState, oldState, undefined);
         };
 
         store = new StubStore();
