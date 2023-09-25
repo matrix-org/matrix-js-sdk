@@ -2675,7 +2675,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 await aliceClient.getCrypto()!.importRoomKeys([newKey]);
 
-                // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
+                // The backup loop waits a random amount of time to avoid different clients firing at the same time.
                 jest.runAllTimers();
 
                 const keyBackupData = await awaitKeyUploaded;
