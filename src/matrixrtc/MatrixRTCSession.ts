@@ -23,6 +23,7 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixEvent } from "../matrix";
+import { randomString } from "../randomstring";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -53,6 +54,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // How many ms after we joined the call, that our membership should expire, or undefined
     // if we're not yet joined
     private relativeExpiry: number | undefined;
+
+    // An identifier for our membership of the call. This will allow us to easily recognise
+    // whether a membership was sent by this session or is stale from some other time.
+    // It also forces our membership events to be unique, because otherwise we could try
+    // to overwrite a membership from a previous session but it would do nothing because the
+    // event content would be identical. We need the origin_server_ts to update though, so
+    // forcing unique content fixes this.
+    private membershipId: string | undefined;
 
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
     private expiryTimeout?: ReturnType<typeof setTimeout>;
@@ -174,6 +183,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Joining call session in room ${this.room.roomId}`);
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
+        this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
@@ -195,6 +205,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
+        this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
         this.triggerCallMembershipEventUpdate();
     }
@@ -249,6 +260,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (this.relativeExpiry === undefined) {
             throw new Error("Tried to create our own membership event when we're not joined!");
         }
+        if (this.membershipId === undefined) {
+            throw new Error("Tried to create our own membership event when we have no membership ID!");
+        }
 
         const m: CallMembershipData = {
             call_id: "",
@@ -257,6 +271,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
             foci_active: this.activeFoci,
+            membershipID: this.membershipId,
         };
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
@@ -373,7 +388,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
         let myPrevMembership;
         try {
-            if (myCallMemberEvent && myPrevMembershipData) {
+            if (myCallMemberEvent && myPrevMembershipData && myPrevMembershipData.membershipID === this.membershipId) {
                 myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
             }
         } catch (e) {
