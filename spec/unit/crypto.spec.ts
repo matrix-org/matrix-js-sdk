@@ -15,11 +15,16 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from "../../src/logger";
-import { MemoryStore } from "../../src";
+import { DeviceVerification, MemoryStore } from "../../src";
 import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestManager";
 import { RoomMember } from "../../src/models/room-member";
 import { IStore } from "../../src/store";
 import { IRoomEncryption, RoomList } from "../../src/crypto/RoomList";
+import { EventShieldColour, EventShieldReason } from "../../src/crypto-api";
+import { UserTrustLevel } from "../../src/crypto/CrossSigning";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
+import * as testData from "../test-utils/test-data";
 
 const Olm = global.Olm;
 
@@ -111,13 +116,14 @@ describe("Crypto", function () {
     });
 
     describe("encrypted events", function () {
-        it("provides encryption information", async function () {
+        it("provides encryption information for events from unverified senders", async function () {
             const client = new TestClient("@alice:example.com", "deviceid").client;
             await client.initCrypto();
 
             // unencrypted event
             const event = {
                 getId: () => "$event_id",
+                getSender: () => "@bob:example.com",
                 getSenderKey: () => null,
                 getWireContent: () => {
                     return {};
@@ -126,6 +132,8 @@ describe("Crypto", function () {
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
+
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toBe(null);
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
             event.getSenderKey = () => "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
@@ -141,6 +149,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.authenticated).toBeFalsy();
             expect(encryptionInfo.sender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, megolm key from backup
             event.getForwardingCurve25519KeyChain = () => [];
             event.isKeySourceUntrusted = () => true;
@@ -155,6 +168,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
             device.keys["ed25519:FLIBBLE"] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
@@ -165,7 +183,113 @@ describe("Crypto", function () {
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeTruthy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
+            });
+
             client.stopClient();
+        });
+
+        describe("provides encryption information for events from verified senders", function () {
+            const testDeviceId = testData.BOB_TEST_DEVICE_ID;
+            const testDevice = testData.BOB_SIGNED_TEST_DEVICE_DATA;
+
+            let client: MatrixClient;
+            beforeEach(async () => {
+                client = new TestClient("@alice:example.com", "deviceid").client;
+                await client.initCrypto();
+
+                // mock out the verification check
+                client.crypto!.checkUserTrust = (userId) => new UserTrustLevel(true, false, false);
+            });
+
+            afterEach(() => {
+                client.stopClient();
+            });
+
+            async function buildEncryptedEvent(
+                decryptionResult: Partial<EventDecryptionResult> = {},
+            ): Promise<MatrixEvent> {
+                const mockCryptoBackend = {
+                    decryptEvent: async (event: MatrixEvent): Promise<EventDecryptionResult> => {
+                        return {
+                            claimedEd25519Key: testDevice.keys["ed25519:" + testDeviceId],
+                            clearEvent: {
+                                room_id: "!room_id",
+                                type: "m.room.message",
+                                content: { body: "test" },
+                            },
+                            forwardingCurve25519KeyChain: [],
+                            senderCurve25519Key: testDevice.keys["curve25519:" + testDeviceId],
+                            ...decryptionResult,
+                        };
+                    },
+                } as unknown as CryptoBackend;
+
+                const event = new MatrixEvent({
+                    event_id: "$event_id",
+                    sender: testData.BOB_TEST_USER_ID,
+                    type: "m.room.encrypted",
+                    content: { algorithm: "m.megolm.v1.aes-sha2" },
+                });
+                await event.attemptDecryption(mockCryptoBackend);
+                return event;
+            }
+
+            it("unknown device", async () => {
+                const event = await buildEncryptedEvent();
+                expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                    shieldColour: EventShieldColour.GREY,
+                    shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                });
+            });
+
+            it("known but unsigned device", async () => {
+                client.crypto!.deviceList.storeDevicesForUser(testData.BOB_TEST_USER_ID, {
+                    [testDeviceId]: {
+                        keys: testDevice.keys,
+                        algorithms: testDevice.algorithms,
+                        verified: DeviceVerification.Unverified,
+                        known: true,
+                    },
+                });
+
+                const event = await buildEncryptedEvent();
+                expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                    shieldColour: EventShieldColour.RED,
+                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
+                });
+            });
+
+            describe("known and verified device", () => {
+                beforeEach(() => {
+                    client.crypto!.deviceList.storeDevicesForUser(testData.BOB_TEST_USER_ID, {
+                        [testDeviceId]: {
+                            keys: testDevice.keys,
+                            algorithms: testDevice.algorithms,
+                            verified: DeviceVerification.Verified,
+                            known: true,
+                        },
+                    });
+                });
+
+                it("regular key", async () => {
+                    const event = await buildEncryptedEvent();
+                    expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                        shieldColour: EventShieldColour.NONE,
+                        shieldReason: null,
+                    });
+                });
+
+                it("unauthenticated key", async () => {
+                    const event = await buildEncryptedEvent({ untrusted: true });
+                    expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                        shieldColour: EventShieldColour.GREY,
+                        shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+                    });
+                });
+            });
         });
 
         it("doesn't throw an error when attempting to decrypt a redacted event", async () => {

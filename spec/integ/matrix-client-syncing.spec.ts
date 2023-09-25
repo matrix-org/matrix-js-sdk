@@ -38,6 +38,7 @@ import {
     Room,
     IndexedDBStore,
     RelationType,
+    EventType,
 } from "../../src";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
@@ -222,9 +223,122 @@ describe("MatrixClient syncing", () => {
             expect(fires).toBe(3);
         });
 
-        it("should honour lazyLoadMembers if user is not a guest", () => {
-            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
+        it("should emit RoomEvent.MyMembership for knock->leave->knock cycles", async () => {
+            await client!.initCrypto();
 
+            const roomId = "!cycles:example.org";
+
+            // First sync: an knock
+            const knockSyncRoomSection = {
+                knock: {
+                    [roomId]: {
+                        knock_state: {
+                            events: [
+                                {
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: "knock",
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: knockSyncRoomSection,
+            });
+
+            // Second sync: a leave (reject of some kind)
+            httpBackend!.when("POST", "/leave").respond(200, {});
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    leave: {
+                        [roomId]: {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            state: {
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: "leave",
+                                        },
+                                        prev_content: {
+                                            membership: "knock",
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                            timeline: {
+                                limited: false,
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: "leave",
+                                        },
+                                        prev_content: {
+                                            membership: "knock",
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            });
+
+            // Third sync: another knock
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: knockSyncRoomSection,
+            });
+
+            // First fire: an initial knock
+            let fires = 0;
+            client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                // Room, string, string
+                fires++;
+                expect(room.roomId).toBe(roomId);
+                expect(membership).toBe("knock");
+                expect(oldMembership).toBeFalsy();
+
+                // Second fire: a leave
+                client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                    fires++;
+                    expect(room.roomId).toBe(roomId);
+                    expect(membership).toBe("leave");
+                    expect(oldMembership).toBe("knock");
+
+                    // Third/final fire: a second knock
+                    client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                        fires++;
+                        expect(room.roomId).toBe(roomId);
+                        expect(membership).toBe("knock");
+                        expect(oldMembership).toBe("leave");
+                    });
+                });
+
+                // For maximum safety, "leave" the room after we register the handler
+                client!.leave(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(fires).toBe(3);
+        });
+
+        it("should honour lazyLoadMembers if user is not a guest", () => {
             httpBackend!
                 .when("GET", "/sync")
                 .check((req) => {
@@ -241,8 +355,6 @@ describe("MatrixClient syncing", () => {
         it("should not honour lazyLoadMembers if user is a guest", () => {
             httpBackend!.expectedRequests = [];
             httpBackend!.when("GET", "/versions").respond(200, {});
-            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
-
             httpBackend!
                 .when("GET", "/sync")
                 .check((req) => {
@@ -283,6 +395,46 @@ describe("MatrixClient syncing", () => {
             });
 
             // First fire: an initial invite
+            let fires = 0;
+            client!.once(ClientEvent.Room, (room) => {
+                fires++;
+                expect(room.roomId).toBe(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(fires).toBe(1);
+        });
+
+        it("should emit ClientEvent.Room when knocked while crypto is disabled", async () => {
+            const roomId = "!knock:example.org";
+
+            // First sync: a knock
+            const knockSyncRoomSection = {
+                knock: {
+                    [roomId]: {
+                        knock_state: {
+                            events: [
+                                {
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: "knock",
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: knockSyncRoomSection,
+            });
+
+            // First fire: an initial knock
             let fires = 0;
             client!.once(ClientEvent.Room, (room) => {
                 fires++;
@@ -361,6 +513,7 @@ describe("MatrixClient syncing", () => {
                 join: {},
                 invite: {},
                 leave: {},
+                knock: {},
             },
         };
 
@@ -392,9 +545,7 @@ describe("MatrixClient syncing", () => {
                             type: "m.room.create",
                             room: roomOne,
                             user: selfUserId,
-                            content: {
-                                creator: selfUserId,
-                            },
+                            content: {},
                         }),
                     ],
                 },
@@ -580,9 +731,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -614,9 +763,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomTwo,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -761,7 +908,6 @@ describe("MatrixClient syncing", () => {
                         room: roomOne,
                         user: otherUserId,
                         content: {
-                            creator: otherUserId,
                             room_version: "9",
                         },
                     });
@@ -847,7 +993,6 @@ describe("MatrixClient syncing", () => {
                         room: roomOne,
                         user: otherUserId,
                         content: {
-                            creator: otherUserId,
                             room_version: testMeta.roomVersion,
                         },
                     });
@@ -1375,9 +1520,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         } as Partial<IJoinedRoom>,
@@ -1474,9 +1617,7 @@ describe("MatrixClient syncing", () => {
                                     type: "m.room.create",
                                     room: roomOne,
                                     user: selfUserId,
-                                    content: {
-                                        creator: selfUserId,
-                                    },
+                                    content: {},
                                 }),
                             ],
                         },
@@ -1589,6 +1730,66 @@ describe("MatrixClient syncing", () => {
                     eventId: "$event1:localhost",
                 });
             });
+        });
+
+        it("should apply encrypted notification logic for events within the same sync blob", async () => {
+            const roomId = "!room123:server";
+            const syncData = {
+                rooms: {
+                    join: {
+                        [roomId]: {
+                            ephemeral: {
+                                events: [],
+                            },
+                            timeline: {
+                                events: [
+                                    utils.mkEvent({
+                                        room: roomId,
+                                        event: true,
+                                        skey: "",
+                                        type: EventType.RoomEncryption,
+                                        content: {},
+                                    }),
+                                    utils.mkMessage({
+                                        room: roomId,
+                                        user: otherUserId,
+                                        msg: "hello",
+                                    }),
+                                ],
+                            },
+                            state: {
+                                events: [
+                                    utils.mkMembership({
+                                        room: roomId,
+                                        mship: "join",
+                                        user: otherUserId,
+                                    }),
+                                    utils.mkMembership({
+                                        room: roomId,
+                                        mship: "join",
+                                        user: selfUserId,
+                                    }),
+                                    utils.mkEvent({
+                                        type: "m.room.create",
+                                        room: roomId,
+                                        user: selfUserId,
+                                        content: {},
+                                    }),
+                                ],
+                            },
+                        },
+                    },
+                },
+            } as unknown as ISyncResponse;
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+            client!.startClient();
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeInstanceOf(Room);
+            expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
         });
     });
 

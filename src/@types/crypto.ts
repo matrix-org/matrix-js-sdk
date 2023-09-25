@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IClearEvent } from "../models/event";
 import type { ISignatures } from "./signed";
 
 export type OlmGroupSessionExtraData = {
@@ -22,33 +21,8 @@ export type OlmGroupSessionExtraData = {
     sharedHistory?: boolean;
 };
 
-/**
- * The result of a (successful) call to {@link Crypto.decryptEvent}
- */
-export interface IEventDecryptionResult {
-    /**
-     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
-     */
-    clearEvent: IClearEvent;
-    /**
-     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
-     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
-     */
-    forwardingCurve25519KeyChain?: string[];
-    /**
-     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
-     */
-    senderCurve25519Key?: string;
-    /**
-     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
-     */
-    claimedEd25519Key?: string;
-    untrusted?: boolean;
-    /**
-     * The sender doesn't authorize the unverified devices to decrypt his messages
-     */
-    encryptedDisabledForUnverifiedDevices?: boolean;
-}
+// Backwards compatible re-export
+export type { EventDecryptionResult as IEventDecryptionResult } from "../common-crypto/CryptoBackend";
 
 interface Extensible {
     [key: string]: any;

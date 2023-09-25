@@ -19,7 +19,7 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import { Filter, KnockRoomOpts, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -73,7 +73,7 @@ describe("MatrixClient", function () {
 
         it("should upload the file", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     expect(req.queryParams?.filename).toEqual("hi.txt");
@@ -108,7 +108,7 @@ describe("MatrixClient", function () {
 
         it("should parse errors into a MatrixError", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     // @ts-ignore private property
@@ -202,6 +202,84 @@ describe("MatrixClient", function () {
             });
             await httpBackend.flushAllExpected();
             expect((await prom).roomId).toBe(roomId);
+        });
+    });
+
+    describe("knockRoom", function () {
+        const roomId = "!some-room-id:example.org";
+        const reason = "some reason";
+        const viaServers = "example.com";
+
+        type TestCase = [string, KnockRoomOpts];
+        const testCases: TestCase[] = [
+            ["should knock a room", {}],
+            ["should knock a room for a reason", { reason }],
+            ["should knock a room via given servers", { viaServers }],
+            ["should knock a room for a reason via given servers", { reason, viaServers }],
+        ];
+
+        it.each(testCases)("%s", async (_, opts) => {
+            httpBackend
+                .when("POST", "/knock/" + encodeURIComponent(roomId))
+                .check((request) => {
+                    expect(request.data).toEqual({ reason: opts.reason });
+                    expect(request.queryParams).toEqual({ server_name: opts.viaServers });
+                })
+                .respond(200, { room_id: roomId });
+
+            const prom = client.knockRoom(roomId, opts);
+            await httpBackend.flushAllExpected();
+            expect((await prom).room_id).toBe(roomId);
+        });
+
+        it("should no-op if you've already knocked a room", function () {
+            const room = new Room(roomId, client, userId);
+
+            client.fetchRoomEvent = () =>
+                Promise.resolve({
+                    type: "test",
+                    content: {},
+                });
+
+            room.addLiveEvents([
+                utils.mkMembership({
+                    user: userId,
+                    room: roomId,
+                    mship: "knock",
+                    event: true,
+                }),
+            ]);
+
+            httpBackend.verifyNoOutstandingRequests();
+            store.storeRoom(room);
+            client.knockRoom(roomId);
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        describe("errors", function () {
+            type TestCase = [number, { errcode: string; error?: string }, string];
+            const testCases: TestCase[] = [
+                [
+                    403,
+                    { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
+                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                ],
+                [
+                    500,
+                    { errcode: "INTERNAL_SERVER_ERROR" },
+                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
+                ],
+            ];
+
+            it.each(testCases)("should handle %s error", async (code, { errcode, error }, snapshot) => {
+                httpBackend.when("POST", "/knock/" + encodeURIComponent(roomId)).respond(code, { errcode, error });
+
+                const prom = client.knockRoom(roomId);
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    expect(prom).rejects.toMatchInlineSnapshot(snapshot),
+                ]);
+            });
         });
     });
 
@@ -630,7 +708,7 @@ describe("MatrixClient", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
             httpBackend
-                .when("DELETE", "/_matrix/client/r0/devices/my_device")
+                .when("DELETE", "/_matrix/client/v3/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
@@ -1024,10 +1102,6 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
             httpBackend
                 .when("POST", "/register/email/requestToken")
@@ -1047,10 +1121,6 @@ describe("MatrixClient", function () {
     describe("inviteByThreePid", () => {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/invite")
@@ -1086,10 +1156,6 @@ describe("MatrixClient", function () {
                     },
                 ],
             };
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/createRoom")
@@ -1574,6 +1640,82 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+
+    describe("getFallbackAuthUrl", () => {
+        it("should return fallback url", () => {
+            expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
+                `"http://alice.localhost.test.server/_matrix/client/v3/auth/loginType/fallback/web?session=authSessionId"`,
+            );
+        });
+    });
+
+    describe("addThreePidOnly", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/add")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.addThreePidOnly({
+                    client_secret: "secret",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("bindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/bind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        id_server: "server",
+                        id_access_token: "token",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.bindThreePid({
+                    client_secret: "secret",
+                    id_server: "server",
+                    id_access_token: "token",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("unbindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/unbind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        medium: "email",
+                        address: "alice@server.com",
+                        id_server: "identity.localhost",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1847,7 +1989,6 @@ const buildEventCreate = () =>
     new MatrixEvent({
         age: 80126105,
         content: {
-            creator: "@andybalaam-test1:matrix.org",
             room_version: "6",
         },
         event_id: "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",

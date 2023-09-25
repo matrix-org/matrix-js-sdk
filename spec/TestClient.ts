@@ -32,8 +32,6 @@ import { syncPromise } from "./test-utils/test-utils";
 import { createClient, IStartClientOpts } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
 import { MockStorageApi } from "./MockStorageApi";
-import { encodeUri } from "../src/utils";
-import { IKeyBackupSession } from "../src/crypto/keybackup";
 import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
 import { ISyncResponder } from "./test-utils/SyncResponder";
 
@@ -92,7 +90,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
         logger.log(this + ": starting");
         this.httpBackend.when("GET", "/versions").respond(200, {
             // we have tests that rely on support for lazy-loading members
-            versions: ["r0.5.0"],
+            versions: ["v1.1"],
         });
         this.httpBackend.when("GET", "/pushrules").respond(200, {});
         this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -212,21 +210,6 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
             });
             return response;
         });
-    }
-
-    /**
-     * Set up expectations that the client will query key backups for a particular session
-     */
-    public expectKeyBackupQuery(roomId: string, sessionId: string, status: number, response: IKeyBackupSession) {
-        this.httpBackend
-            .when(
-                "GET",
-                encodeUri("/room_keys/keys/$roomId/$sessionId", {
-                    $roomId: roomId,
-                    $sessionId: sessionId,
-                }),
-            )
-            .respond(status, response);
     }
 
     /**

@@ -17,8 +17,9 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 
-import { RustVerificationRequest } from "../../../src/rust-crypto/verification";
+import { isVerificationEvent, RustVerificationRequest } from "../../../src/rust-crypto/verification";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { EventType, MatrixEvent, MsgType } from "../../../src";
 
 describe("VerificationRequest", () => {
     describe("pending", () => {
@@ -77,6 +78,40 @@ describe("VerificationRequest", () => {
                 "Still no verifier after startSas() call",
             );
         });
+    });
+});
+
+describe("isVerificationEvent", () => {
+    it.each([
+        [EventType.KeyVerificationCancel],
+        [EventType.KeyVerificationDone],
+        [EventType.KeyVerificationMac],
+        [EventType.KeyVerificationStart],
+        [EventType.KeyVerificationKey],
+        [EventType.KeyVerificationReady],
+        [EventType.KeyVerificationAccept],
+    ])("should return true with %s event", (eventType) => {
+        const event = new MatrixEvent({
+            type: eventType,
+        });
+        expect(isVerificationEvent(event)).toBe(true);
+    });
+
+    it("should return true with EventType.RoomMessage and MsgType.KeyVerificationRequest", () => {
+        const event = new MatrixEvent({
+            type: EventType.RoomMessage,
+            content: {
+                msgtype: MsgType.KeyVerificationRequest,
+            },
+        });
+        expect(isVerificationEvent(event)).toBe(true);
+    });
+
+    it("should return false with a non verification event", () => {
+        const event = new MatrixEvent({
+            type: EventType.RoomName,
+        });
+        expect(isVerificationEvent(event)).toBe(false);
     });
 });
 

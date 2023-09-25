@@ -51,3 +51,17 @@ export class KeySignatureUploadError extends Error {
         super(message);
     }
 }
+
+/**
+ * It is invalid to call most methods once {@link MatrixClient#stopClient} has been called.
+ *
+ * This error will be thrown if you attempt to do so.
+ *
+ * {@link MatrixClient#stopClient} itself is an exception to this: it may safely be called multiple times on the same
+ * instance.
+ */
+export class ClientStoppedError extends Error {
+    public constructor() {
+        super("MatrixClient has been stopped");
+    }
+}

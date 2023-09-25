@@ -201,7 +201,7 @@ describe("MatrixClient", function () {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: unstableFeatures,
-                versions: ["r0.6.0", "r0.6.1"],
+                versions: ["v1.1"],
             });
         }
         const next = httpLookups.shift();
@@ -2266,7 +2266,6 @@ describe("MatrixClient", function () {
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
             return new MatrixEvent({
                 content: {
-                    "creator": "@daryl:alexandria.example.com",
                     "m.federate": true,
                     "predecessor": {
                         event_id: "id_of_last_event",

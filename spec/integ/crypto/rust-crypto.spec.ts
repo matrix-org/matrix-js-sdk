@@ -41,7 +41,7 @@ describe("MatrixClient.initRustCrypto", () => {
         await expect(() => unknownDeviceClient.initRustCrypto()).rejects.toThrow("unknown deviceId");
     });
 
-    it("should create the indexed dbs", async () => {
+    it("should create the indexed db", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",
             userId: "@alice:localhost",
@@ -53,7 +53,25 @@ describe("MatrixClient.initRustCrypto", () => {
 
         await matrixClient.initRustCrypto();
 
-        // should have two dbs now
+        // should have an indexed db now
+        const databaseNames = (await indexedDB.databases()).map((db) => db.name);
+        expect(databaseNames).toEqual(expect.arrayContaining(["matrix-js-sdk::matrix-sdk-crypto"]));
+    });
+
+    it("should create the meta db if given a pickleKey", async () => {
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+            pickleKey: "testKey",
+        });
+
+        // No databases.
+        expect(await indexedDB.databases()).toHaveLength(0);
+
+        await matrixClient.initRustCrypto();
+
+        // should have two indexed dbs now
         const databaseNames = (await indexedDB.databases()).map((db) => db.name);
         expect(databaseNames).toEqual(
             expect.arrayContaining(["matrix-js-sdk::matrix-sdk-crypto", "matrix-js-sdk::matrix-sdk-crypto-meta"]),
@@ -78,6 +96,7 @@ describe("MatrixClient.clearStores", () => {
             baseUrl: "http://test.server",
             userId: "@alice:localhost",
             deviceId: "aliceDevice",
+            pickleKey: "testKey",
         });
 
         await matrixClient.initRustCrypto();
@@ -86,5 +105,20 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.clearStores();
         expect(await indexedDB.databases()).toHaveLength(0);
+    });
+
+    it("should not fail in environments without indexedDB", async () => {
+        // eslint-disable-next-line no-global-assign
+        indexedDB = undefined!;
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        await matrixClient.stopClient();
+
+        await matrixClient.clearStores();
+        // No error thrown in clearStores
     });
 });

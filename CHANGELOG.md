@@ -1,3 +1,82 @@
+Changes in [28.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.1.0-rc.1) (2023-09-05)
+============================================================================================================
+
+## 🦖 Deprecations
+ * Deprecate `MatrixClient.checkUserTrust` ([\#3691](https://github.com/matrix-org/matrix-js-sdk/pull/3691)).
+ * Deprecate `MatrixClient.{prepare,create}KeyBackupVersion` in favour of new `CryptoApi.resetKeyBackup` API ([\#3689](https://github.com/matrix-org/matrix-js-sdk/pull/3689)).
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * Allow calls without ICE/TURN/STUN servers ([\#3695](https://github.com/matrix-org/matrix-js-sdk/pull/3695)).
+ * Emit summary update event ([\#3687](https://github.com/matrix-org/matrix-js-sdk/pull/3687)). Fixes vector-im/element-web#26033.
+ * ElementR: Update `CryptoApi.userHasCrossSigningKeys` ([\#3646](https://github.com/matrix-org/matrix-js-sdk/pull/3646)). Contributed by @florianduros.
+ * Add `join_rule` field to /publicRooms response ([\#3673](https://github.com/matrix-org/matrix-js-sdk/pull/3673)). Contributed by @charlynguyen.
+ * Use sender instead of content.creator field on m.room.create events ([\#3675](https://github.com/matrix-org/matrix-js-sdk/pull/3675)).
+
+## 🐛 Bug Fixes
+ * Provide better error for ICE Server SyntaxError ([\#3694](https://github.com/matrix-org/matrix-js-sdk/pull/3694)). Fixes vector-im/element-web#21804.
+ * Legacy crypto: re-check key backup after `bootstrapSecretStorage` ([\#3692](https://github.com/matrix-org/matrix-js-sdk/pull/3692)). Fixes vector-im/element-web#26115.
+
+Changes in [28.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.0.0) (2023-08-29)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Set minimum supported Matrix 1.1 version (drop legacy r0 versions) ([\#3007](https://github.com/matrix-org/matrix-js-sdk/pull/3007)). Fixes vector-im/element-web#16876.
+
+## 🦖 Deprecations
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * ElementR: Add `CryptoApi.requestVerificationDM` ([\#3643](https://github.com/matrix-org/matrix-js-sdk/pull/3643)). Contributed by @florianduros.
+ * Implement `CryptoApi.checkKeyBackupAndEnable` ([\#3633](https://github.com/matrix-org/matrix-js-sdk/pull/3633)). Fixes vector-im/crypto-internal#111 and vector-im/crypto-internal#112.
+
+## 🐛 Bug Fixes
+ * ElementR: Process all verification events, not just requests ([\#3650](https://github.com/matrix-org/matrix-js-sdk/pull/3650)). Contributed by @florianduros.
+
+Changes in [27.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.2.0) (2023-08-15)
+==================================================================================================
+
+## 🦖 Deprecations
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * Allow knocking rooms ([\#3647](https://github.com/matrix-org/matrix-js-sdk/pull/3647)). Contributed by @charlynguyen.
+ * Bump pagination limit to account for threaded events ([\#3638](https://github.com/matrix-org/matrix-js-sdk/pull/3638)).
+ * ElementR: Add `CryptoApi.findVerificationRequestDMInProgress` ([\#3601](https://github.com/matrix-org/matrix-js-sdk/pull/3601)). Contributed by @florianduros.
+ * Export more into the public interface ([\#3614](https://github.com/matrix-org/matrix-js-sdk/pull/3614)).
+
+## 🐛 Bug Fixes
+ * Fix wrong handling of encrypted rooms when loading them from sync accumulator ([\#3640](https://github.com/matrix-org/matrix-js-sdk/pull/3640)). Fixes vector-im/element-web#25803.
+ * Skip processing thread roots and fetching threads list when support is disabled ([\#3642](https://github.com/matrix-org/matrix-js-sdk/pull/3642)).
+ * Ensure we don't overinflate the total notification count ([\#3634](https://github.com/matrix-org/matrix-js-sdk/pull/3634)). Fixes vector-im/element-web#25803.
+
+Changes in [27.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.1.0) (2023-08-01)
+==================================================================================================
+
+## 🦖 Deprecations
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * ElementR: Add `CryptoApi.getCrossSigningKeyId` ([\#3619](https://github.com/matrix-org/matrix-js-sdk/pull/3619)). Contributed by @florianduros.
+ * ElementR: Stub `CheckOwnCrossSigningTrust`, import cross signing keys and verify local device in `bootstrapCrossSigning` ([\#3608](https://github.com/matrix-org/matrix-js-sdk/pull/3608)). Contributed by @florianduros.
+ * Specify /preview_url requests as low priority ([\#3609](https://github.com/matrix-org/matrix-js-sdk/pull/3609)). Fixes vector-im/element-web#7292.
+ * Element-R: support for displaying QR codes during verification ([\#3588](https://github.com/matrix-org/matrix-js-sdk/pull/3588)). Fixes vector-im/crypto-internal#124.
+ * Add support for scanning QR codes during verification, with Rust crypto ([\#3565](https://github.com/matrix-org/matrix-js-sdk/pull/3565)).
+ * Add methods to influence set_presence on /sync API calls ([\#3578](https://github.com/matrix-org/matrix-js-sdk/pull/3578)).
+
+## 🐛 Bug Fixes
+ * Fix threads ending up with chunks of their timelines missing ([\#3618](https://github.com/matrix-org/matrix-js-sdk/pull/3618)). Fixes vector-im/element-web#24466.
+ * Ensure we do not clobber a newer RR with an older unthreaded one ([\#3617](https://github.com/matrix-org/matrix-js-sdk/pull/3617)). Fixes vector-im/element-web#25806.
+ * Fix registration check your emails stage regression ([\#3616](https://github.com/matrix-org/matrix-js-sdk/pull/3616)).
+ * Fix how `Room::eventShouldLiveIn` handles replies to unknown parents ([\#3615](https://github.com/matrix-org/matrix-js-sdk/pull/3615)). Fixes vector-im/element-web#22603.
+ * Only send threaded read receipts if threads support is enabled ([\#3612](https://github.com/matrix-org/matrix-js-sdk/pull/3612)).
+ * ElementR: Fix `userId` parameter usage in `CryptoApi#getVerificationRequestsToDeviceInProgress` ([\#3611](https://github.com/matrix-org/matrix-js-sdk/pull/3611)). Contributed by @florianduros.
+ * Fix edge cases around non-thread relations to thread roots and read receipts ([\#3607](https://github.com/matrix-org/matrix-js-sdk/pull/3607)).
+ * Fix read receipt sending behaviour around thread roots ([\#3600](https://github.com/matrix-org/matrix-js-sdk/pull/3600)).
+ * Export typed event emitter key types ([\#3597](https://github.com/matrix-org/matrix-js-sdk/pull/3597)). Fixes #3506.
+ * Element-R: ensure that `userHasCrossSigningKeys` uses up-to-date data ([\#3599](https://github.com/matrix-org/matrix-js-sdk/pull/3599)). Fixes vector-im/element-web#25773.
+ * Fix sending `auth: null` due to broken types around UIA ([\#3594](https://github.com/matrix-org/matrix-js-sdk/pull/3594)).
+
 Changes in [27.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v27.0.0) (2023-07-18)
 ==================================================================================================
 

@@ -75,7 +75,12 @@ export class OutgoingRequestProcessor {
         } else if (msg instanceof SignatureUploadRequest) {
             resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
         } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(Method.Put, "/_matrix/client/v3/room_keys/keys", {}, msg.body);
+            resp = await this.rawJsonRequest(
+                Method.Put,
+                "/_matrix/client/v3/room_keys/keys",
+                { version: msg.version },
+                msg.body,
+            );
         } else if (msg instanceof ToDeviceRequest) {
             const path =
                 `/_matrix/client/v3/sendToDevice/${encodeURIComponent(msg.event_type)}/` +
@@ -83,7 +88,7 @@ export class OutgoingRequestProcessor {
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof RoomMessageRequest) {
             const path =
-                `/_matrix/client/v3/room/${encodeURIComponent(msg.room_id)}/send/` +
+                `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof SigningKeysUploadRequest) {
@@ -100,7 +105,20 @@ export class OutgoingRequestProcessor {
         }
 
         if (msg.id) {
-            await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
+            try {
+                await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
+            } catch (e) {
+                // Ignore errors which are caused by the olmMachine having been freed. The exact error message depends
+                // on whether we are using a release or develop build of rust-sdk-crypto-wasm.
+                if (
+                    e instanceof Error &&
+                    (e.message === "Attempt to use a moved value" || e.message === "null pointer passed to rust")
+                ) {
+                    logger.log(`Ignoring error '${e.message}': client is likely shutting down`);
+                } else {
+                    throw e;
+                }
+            }
         }
     }
 

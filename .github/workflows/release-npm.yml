@@ -11,7 +11,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: 🔧 Yarn cache
               uses: actions/setup-node@v3
@@ -24,7 +24,7 @@ jobs:
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@5a85faf05d2ade2d5b6682bfe5359915d5159c6c # v2.2.1
+              uses: JS-DevTools/npm-publish@fe72237be0920f7a0cafd6a966c9b929c9466e9b # v2.2.2
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public

@@ -41,6 +41,7 @@ export * from "./models/thread";
 export * from "./models/typed-event-emitter";
 export * from "./models/user";
 export * from "./models/device";
+export * from "./models/search-result";
 export * from "./scheduler";
 export * from "./filter";
 export * from "./timeline-window";
@@ -49,36 +50,57 @@ export * from "./service-types";
 export * from "./store/memory";
 export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
+export * from "./crypto/store/localStorage-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
 export * from "./content-repo";
+export * from "./@types/uia";
 export * from "./@types/event";
 export * from "./@types/PushRules";
 export * from "./@types/partials";
 export * from "./@types/requests";
 export * from "./@types/search";
+export * from "./@types/beacon";
+export * from "./@types/topic";
+export * from "./@types/location";
+export * from "./@types/threepids";
+export * from "./@types/auth";
+export * from "./@types/polls";
+export * from "./@types/local_notifications";
+export * from "./@types/registration";
+export * from "./@types/read_receipts";
+export * from "./@types/crypto";
+export * from "./@types/extensible_events";
+export * from "./@types/IIdentityServerProvider";
 export * from "./models/room-summary";
+export * from "./models/event-status";
 export * as ContentHelpers from "./content-helpers";
 export * as SecretStorage from "./secret-storage";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
-export { createNewMatrixCall } from "./webrtc/call";
+export { createNewMatrixCall, CallEvent } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
 export {
+    GroupCall,
     GroupCallEvent,
     GroupCallIntent,
     GroupCallState,
     GroupCallType,
     GroupCallStatsReportEvent,
 } from "./webrtc/groupCall";
-export type { GroupCall } from "./webrtc/groupCall";
 export { CryptoEvent } from "./crypto";
+export { SyncState, SetPresence } from "./sync";
+export type { ISyncStateData as SyncStateData } from "./sync";
 export { SlidingSyncEvent } from "./sliding-sync";
 export { MediaHandlerEvent } from "./webrtc/mediaHandler";
-export { CallEvent } from "./webrtc/call";
 export { CallFeedEvent } from "./webrtc/callFeed";
 export { StatsReport } from "./webrtc/stats/statsReport";
-export { RelationsEvent } from "./models/relations";
+export { Relations, RelationsEvent } from "./models/relations";
+export { TypedEventEmitter } from "./models/typed-event-emitter";
 export { LocalStorageErrors } from "./store/local-storage-events-emitter";
+export { IdentityProviderBrand, SSOAction } from "./@types/auth";
+export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth";
+export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces";
+export { LocationAssetType } from "./@types/location";
 
 /**
  * Types supporting cryptography.

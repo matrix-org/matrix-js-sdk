@@ -31,6 +31,8 @@ import {
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { TypedReEmitter } from "../ReEmitter";
+import { MatrixEvent } from "../models/event";
+import { EventType, MsgType } from "../@types/event";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -699,4 +701,29 @@ export function verificationMethodIdentifierToMethod(method: string): RustSdkCry
         throw new Error(`Unknown verification method ${method}`);
     }
     return meth;
+}
+
+/**
+ * Return true if the event's type matches that of an in-room verification event
+ *
+ * @param event - MatrixEvent
+ * @returns
+ *
+ * @internal
+ */
+export function isVerificationEvent(event: MatrixEvent): boolean {
+    switch (event.getType()) {
+        case EventType.KeyVerificationCancel:
+        case EventType.KeyVerificationDone:
+        case EventType.KeyVerificationMac:
+        case EventType.KeyVerificationStart:
+        case EventType.KeyVerificationKey:
+        case EventType.KeyVerificationReady:
+        case EventType.KeyVerificationAccept:
+            return true;
+        case EventType.RoomMessage:
+            return event.getContent().msgtype === MsgType.KeyVerificationRequest;
+        default:
+            return false;
+    }
 }

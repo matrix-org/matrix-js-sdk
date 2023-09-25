@@ -32,7 +32,10 @@ import { ICryptoCallbacks } from "../crypto";
  * @param secretStorage - Interface to server-side secret storage.
  * @param cryptoCallbacks - Crypto callbacks provided by the application
  * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
- *     If unset, a memory store will be used.
+ *     If `null`, a memory store will be used.
+ * @param storePassphrase - a passphrase to use to encrypt the indexeddbs created by rust-crypto.
+ *     Ignored if `storePrefix` is null. If this is `undefined` (and `storePrefix` is not null), the indexeddbs
+ *     will be unencrypted.
  *
  * @internal
  */
@@ -43,6 +46,7 @@ export async function initRustCrypto(
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
     storePrefix: string | null,
+    storePassphrase: string | undefined,
 ): Promise<RustCrypto> {
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
@@ -59,11 +63,14 @@ export async function initRustCrypto(
         u,
         d,
         storePrefix ?? undefined,
-        (storePrefix && "test pass") ?? undefined,
+        (storePrefix && storePassphrase) ?? undefined,
     );
     const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
+    );
+    await olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
+        rustCrypto.onUserIdentityUpdated(userId),
     );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.

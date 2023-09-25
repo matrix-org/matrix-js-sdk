@@ -84,6 +84,7 @@ export class GroupCallEventHandler {
     }
 
     public stop(): void {
+        this.client.removeListener(ClientEvent.Room, this.onRoomsChanged);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
@@ -132,7 +133,7 @@ export class GroupCallEventHandler {
             break;
         }
 
-        logger.info(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
+        logger.debug(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
         this.getRoomDeferred(room.roomId).resolve!();
     }
 
@@ -189,6 +190,8 @@ export class GroupCallEventHandler {
             content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
+            this.client.useLivekitForGroupCalls,
+            content["io.element.livekit_service_url"],
         );
 
         this.groupCalls.set(room.roomId, groupCall);

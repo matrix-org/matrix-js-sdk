@@ -179,7 +179,6 @@ describe("MatrixClient syncing", () => {
                             events: [
                                 {
                                     content: {
-                                        creator: userB,
                                         room_version: "9",
                                     },
                                     origin_server_ts: 1,
@@ -377,6 +376,7 @@ describe("MatrixClient syncing", () => {
                 },
                 [Category.Leave]: {},
                 [Category.Invite]: {},
+                [Category.Knock]: {},
             },
         };
     }

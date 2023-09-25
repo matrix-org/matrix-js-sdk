@@ -45,6 +45,18 @@ export interface IJoinRoomOpts {
     viaServers?: string[];
 }
 
+export interface KnockRoomOpts {
+    /**
+     * The reason for the knock.
+     */
+    reason?: string;
+
+    /**
+     * The server names to try and knock through in addition to those that are automatically chosen.
+     */
+    viaServers?: string | string[];
+}
+
 export interface IRedactOpts {
     reason?: string;
     /**
@@ -178,12 +190,6 @@ export interface IBindThreePidBody {
     id_server: string;
     // Some older identity servers have no auth enabled
     id_access_token: string | null;
-    sid: string;
-}
-
-export interface IAddThreePidBody {
-    client_secret: string;
-    id_server: string;
     sid: string;
 }
 

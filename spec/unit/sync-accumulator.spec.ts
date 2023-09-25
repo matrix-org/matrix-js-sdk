@@ -16,8 +16,21 @@ limitations under the License.
 */
 
 import { ReceiptType } from "../../src/@types/read_receipts";
-import { IJoinedRoom, ISyncResponse, SyncAccumulator } from "../../src/sync-accumulator";
+import {
+    IJoinedRoom,
+    IInvitedRoom,
+    IKnockedRoom,
+    IKnockState,
+    ILeftRoom,
+    IRoomEvent,
+    IStateEvent,
+    IStrippedState,
+    ISyncResponse,
+    SyncAccumulator,
+    IInviteState,
+} from "../../src/sync-accumulator";
 import { IRoomSummary } from "../../src";
+import * as utils from "../test-utils/test-utils";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl
@@ -92,6 +105,13 @@ describe("SyncAccumulator", function () {
                         timeline: {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
+                        },
+                    },
+                },
+                knock: {
+                    "!knock": {
+                        knock_state: {
+                            events: [member("alice", "knock")],
                         },
                     },
                 },
@@ -285,6 +305,268 @@ describe("SyncAccumulator", function () {
         } as unknown as ISyncResponse);
         expect(sa.getJSON().accountData.length).toEqual(1);
         expect(sa.getJSON().accountData[0]).toEqual(acc2);
+    });
+
+    it("should delete invite room when invite request is rejected", () => {
+        const initInviteState: IInviteState = {
+            events: [
+                {
+                    content: {
+                        membership: "invite",
+                    },
+                    state_key: "bob",
+                    sender: "alice",
+                    type: "m.room.member",
+                },
+            ],
+        };
+
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {
+                    "!invite:bar": {
+                        invite_state: initInviteState,
+                    },
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.invite["!invite:bar"].invite_state).toBe(initInviteState);
+
+        const rejectMemberEvent: IStateEvent = {
+            event_id: "$" + Math.random(),
+            content: {
+                membership: "leave",
+            },
+            origin_server_ts: 123456789,
+            state_key: "bob",
+            sender: "bob",
+            type: "m.room.member",
+            unsigned: {
+                prev_content: {
+                    membership: "invite",
+                },
+            },
+        };
+        const leftRoomState = leftRoomSkeleton([rejectMemberEvent]);
+
+        // bob rejects invite
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {
+                    "!invite:bar": leftRoomState,
+                },
+            ),
+        );
+
+        expect(sa.getJSON().roomsData.invite["!invite:bar"]).toBeUndefined();
+    });
+
+    it("should accumulate knock state", () => {
+        const initKnockState = {
+            events: [member("alice", "knock")],
+        };
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: initKnockState,
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.knock["!knock:bar"].knock_state).toBe(initKnockState);
+
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 1",
+                                },
+                            }) as IStrippedState,
+                        ],
+                    },
+                },
+            ),
+        );
+
+        expect(
+            sa.getJSON().roomsData.knock["!knock:bar"].knock_state.events.find((e) => e.type === "m.room.name")?.content
+                .name,
+        ).toEqual("Room 1");
+
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 2",
+                                },
+                            }) as IStrippedState,
+                        ],
+                    },
+                },
+            ),
+        );
+
+        expect(
+            sa.getJSON().roomsData.knock["!knock:bar"].knock_state.events.find((e) => e.type === "m.room.name")?.content
+                .name,
+        ).toEqual("Room 2");
+    });
+
+    it("should delete knocked room when knock request is approved", () => {
+        const initKnockState = makeKnockState();
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: initKnockState,
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.knock["!knock:bar"].knock_state).toBe(initKnockState);
+
+        // alice approves bob's knock request
+        const inviteStateEvents = [
+            {
+                content: {
+                    membership: "invite",
+                },
+                state_key: "bob",
+                sender: "alice",
+                type: "m.room.member",
+            },
+        ];
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {
+                    "!knock:bar": {
+                        invite_state: {
+                            events: inviteStateEvents,
+                        },
+                    },
+                },
+            ),
+        );
+
+        expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
+        expect(sa.getJSON().roomsData.invite["!knock:bar"].invite_state.events).toEqual(inviteStateEvents);
+    });
+
+    it("should delete knocked room when knock request is cancelled by user himself", () => {
+        // bob cancels his knock state
+        const memberEvent: IStateEvent = {
+            event_id: "$" + Math.random(),
+            content: {
+                membership: "leave",
+            },
+            origin_server_ts: 123456789,
+            state_key: "bob",
+            sender: "bob",
+            type: "m.room.member",
+            unsigned: {
+                prev_content: {
+                    membership: "knock",
+                },
+            },
+        };
+        const leftRoomState = leftRoomSkeleton([memberEvent]);
+
+        const initKnockState = makeKnockState();
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: initKnockState,
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.knock["!knock:bar"].knock_state).toBe(initKnockState);
+
+        // bob cancels his knock request
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {
+                    "!knock:bar": leftRoomState,
+                },
+            ),
+        );
+
+        expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
+    });
+
+    it("should delete knocked room when knock request is denied by another user", () => {
+        // alice denies bob knock state
+        const memberEvent: IStateEvent = {
+            event_id: "$" + Math.random(),
+            content: {
+                membership: "leave",
+            },
+            origin_server_ts: 123456789,
+            state_key: "bob",
+            sender: "alice",
+            type: "m.room.member",
+            unsigned: {
+                prev_content: {
+                    membership: "knock",
+                },
+            },
+        };
+        const leftRoomState = leftRoomSkeleton([memberEvent]);
+
+        const initKnockState = makeKnockState();
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: initKnockState,
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.knock["!knock:bar"].knock_state).toBe(initKnockState);
+
+        // alice denies bob's knock request
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {
+                    "!knock:bar": leftRoomState,
+                },
+            ),
+        );
+
+        expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
     });
 
     it("should accumulate read receipts", () => {
@@ -601,7 +883,12 @@ describe("SyncAccumulator", function () {
     });
 });
 
-function syncSkeleton(joinObj: Partial<IJoinedRoom>): ISyncResponse {
+function syncSkeleton(
+    joinObj: Partial<IJoinedRoom>,
+    invite?: Record<string, IInvitedRoom>,
+    leave?: Record<string, ILeftRoom>,
+    knockObj?: Partial<IKnockedRoom>,
+): ISyncResponse {
     joinObj = joinObj || {};
     return {
         next_batch: "abc",
@@ -609,8 +896,46 @@ function syncSkeleton(joinObj: Partial<IJoinedRoom>): ISyncResponse {
             join: {
                 "!foo:bar": joinObj,
             },
+            invite,
+            leave,
+            knock: knockObj
+                ? {
+                      "!knock:bar": knockObj,
+                  }
+                : undefined,
         },
     } as unknown as ISyncResponse;
+}
+
+function leftRoomSkeleton(timelineEvents: Array<IRoomEvent | IStateEvent> = []): ILeftRoom {
+    return {
+        state: {
+            events: [],
+        },
+        timeline: {
+            events: timelineEvents,
+            prev_batch: "something",
+        },
+        account_data: {
+            events: [],
+        },
+    };
+}
+
+function makeKnockState(): IKnockState {
+    return {
+        events: [
+            utils.mkEvent({
+                user: "alice",
+                room: "!knock:bar",
+                type: "m.room.name",
+                content: {
+                    name: "Room",
+                },
+            }) as IStrippedState,
+            member("bob", "knock"),
+        ],
+    };
 }
 
 function msg(localpart: string, text: string) {

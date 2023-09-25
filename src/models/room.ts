@@ -146,6 +146,7 @@ export enum RoomEvent {
     CurrentStateUpdated = "Room.CurrentStateUpdated",
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
     UnreadNotifications = "Room.UnreadNotifications",
+    Summary = "Room.Summary",
 }
 
 export type RoomEmittedEvents =
@@ -290,6 +291,14 @@ export type RoomEventHandlerMap = {
     [RoomEvent.HistoryImportedWithinTimeline]: (markerEvent: MatrixEvent, room: Room) => void;
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
+    /**
+     * Fires when a new room summary is returned by `/sync`.
+     *
+     * See https://spec.matrix.org/v1.8/client-server-api/#_matrixclientv3sync_roomsummary
+     * for full details
+     * @param summary - the room summary object
+     */
+    [RoomEvent.Summary]: (summary: IRoomSummary) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
      * Fires when a new poll instance is added to the room state
@@ -569,7 +578,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        return createEvent?.getContent()["creator"] ?? null;
+        return createEvent?.getSender() ?? null;
     }
 
     /**
@@ -840,7 +849,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @returns the membership type (join | leave | invite) for the logged in user
+     * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
     public getMyMembership(): string {
         return this.selfMembership ?? "leave";
@@ -1499,6 +1508,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return userId !== this.myUserId;
             });
         }
+
+        this.emit(RoomEvent.Summary, summary);
     }
 
     /**
@@ -1877,6 +1888,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Takes the given thread root events and creates threads for them.
      */
     public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
+        if (!this.client.supportsThreads()) return;
         for (const rootEvent of events) {
             EventTimeline.setEventMetadata(rootEvent, this.currentState, toStartOfTimeline);
             if (!this.getThread(rootEvent.getId()!)) {
@@ -2031,6 +2043,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
+        if (!this.client.supportsThreads()) return;
         if (this.threadsTimelineSets.length === 0) return;
 
         const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
@@ -2157,7 +2170,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        if (!parentEventId) {
+        // Due to replies not being typical relations and being used as fallbacks for threads relations
+        // If we bypass the if case above then we know we are not a thread, so if we are still a reply
+        // then we know that we must be in the main timeline. Same goes if we have no associated parent event.
+        if (!parentEventId || !!event.replyEventId) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2931,12 +2947,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
                         // If the read receipt sent for the logged in user matches
                         // the last event of the live timeline, then we know for a fact
-                        // that the user has read that message.
-                        // We can mark the room as read and not wait for the local echo
-                        // from synapse
+                        // that the user has read that message, so we can mark the room
+                        // as read and not wait for the remote echo from synapse.
+                        //
                         // This needs to be done after the initial sync as we do not want this
                         // logic to run whilst the room is being initialised
-                        if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
+                        //
+                        // We only do this for non-synthetic receipts, because
+                        // our intention is to do this when the user really did
+                        // just read a message, not when we are e.g. receiving
+                        // an event during the sync. More explanation at:
+                        // https://github.com/matrix-org/matrix-js-sdk/issues/3684
+                        if (!synthetic && this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
                             if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);

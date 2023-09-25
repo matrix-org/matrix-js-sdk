@@ -20,7 +20,9 @@ import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
 import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
-import { KeyBackupInfo } from "./crypto-api/keybackup";
+import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
+import { ISignatures } from "./@types/signed";
+import { MatrixEvent } from "./models/event";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -36,16 +38,6 @@ export interface CryptoApi {
      * If true, all unverified devices will be blacklisted by default
      */
     globalBlacklistUnverifiedDevices: boolean;
-
-    /**
-     * Checks if the user has previously published cross-signing keys
-     *
-     * This means downloading the devicelist for the user and checking if the list includes
-     * the cross-signing pseudo-device.
-     *
-     * @returns true if the user has previously published cross-signing keys
-     */
-    userHasCrossSigningKeys(): Promise<boolean>;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
@@ -88,6 +80,22 @@ export interface CryptoApi {
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
+     * Check if the given user has published cross-signing keys.
+     *
+     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is not tracked locally and downloadUncached is set to true,
+     *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
+     * - Otherwise, return false
+     *
+     * @param userId - the user ID to check. Defaults to the local user.
+     * @param downloadUncached - If true, download the device list for users whose device list we are not
+     *    currently tracking. Defaults to false, in which case `false` will be returned for such users.
+     *
+     * @returns true if the cross signing keys are available.
+     */
+    userHasCrossSigningKeys(userId?: string, downloadUncached?: boolean): Promise<boolean>;
+
+    /**
      * Get the device information for the given list of users.
      *
      * For any users whose device lists are cached (due to sharing an encrypted room with the user), the
@@ -126,6 +134,14 @@ export interface CryptoApi {
     getTrustCrossSignedDevices(): boolean;
 
     /**
+     * Get the verification status of a given user.
+     *
+     * @param userId - The ID of the user to check.
+     *
+     */
+    getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.
@@ -135,6 +151,22 @@ export interface CryptoApi {
      *     encryption); otherwise the verification status of the device.
      */
     getDeviceVerificationStatus(userId: string, deviceId: string): Promise<DeviceVerificationStatus | null>;
+
+    /**
+     * Mark the given device as locally verified.
+     *
+     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * a cross-signing signature for it.
+     *
+     * @param userId - owner of the device
+     * @param deviceId - unique identifier for the device.
+     * @param verified - whether to mark the device as verified. Defaults to 'true'.
+     *
+     * @throws an error if the device is unknown, or has not published any encryption keys.
+     *
+     * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
+     */
+    setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
     /**
      * Checks whether cross signing:
@@ -147,6 +179,8 @@ export interface CryptoApi {
      * return true.
      *
      * @returns True if cross-signing is ready to be used on this device
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     isCrossSigningReady(): Promise<boolean>;
 
@@ -211,7 +245,10 @@ export interface CryptoApi {
     /**
      * Get the status of our cross-signing keys.
      *
-     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and whether the private keys are in secret storage.
+     * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
+     * whether the private keys are in secret storage.
+     *
+     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 
@@ -228,6 +265,16 @@ export interface CryptoApi {
      *      The private key should be disposed of after displaying to the use.
      */
     createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey>;
+
+    /**
+     * Get information about the encryption of the given event.
+     *
+     * @param event - the event to get information for
+     *
+     * @returns `null` if the event is not encrypted, or has not (yet) been successfully decrypted. Otherwise, an
+     *      object with information about the encryption of the event.
+     */
+    getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -250,8 +297,29 @@ export interface CryptoApi {
      * @param roomId - the room to use for verification
      *
      * @returns the VerificationRequest that is in progress, if any
+     * @deprecated prefer `userId` parameter variant.
      */
     findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
+
+    /**
+     * Finds a DM verification request that is already in progress for the given room and user.
+     *
+     * @param roomId - the room to use for verification.
+     * @param userId - search for a verification request for the given user.
+     *
+     * @returns the VerificationRequest that is in progress, if any.
+     */
+    findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined;
+
+    /**
+     * Request a key verification from another user, using a DM.
+     *
+     * @param userId - the user to request verification with.
+     * @param roomId - the room to use for verification.
+     *
+     * @returns resolves to a VerificationRequest when the request has been sent to the other party.
+     */
+    requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest>;
 
     /**
      * Send a verification request to our other devices.
@@ -284,6 +352,73 @@ export interface CryptoApi {
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
     requestDeviceVerification(userId: string, deviceId: string): Promise<VerificationRequest>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Secure key backup
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Fetch the backup decryption key we have saved in our store.
+     *
+     * This can be used for gossiping the key to other devices.
+     *
+     * @returns the key, if any, or null
+     */
+    getSessionBackupPrivateKey(): Promise<Uint8Array | null>;
+
+    /**
+     * Store the backup decryption key.
+     *
+     * This should be called if the client has received the key from another device via secret sharing (gossiping).
+     *
+     * @param key - the backup decryption key
+     */
+    storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
+
+    /**
+     * Get the current status of key backup.
+     *
+     * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
+     */
+    getActiveSessionBackupVersion(): Promise<string | null>;
+
+    /**
+     * Determine if a key backup can be trusted.
+     *
+     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     */
+    isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
+
+    /**
+     * Force a re-check of the key backup and enable/disable it as appropriate.
+     *
+     * Fetches the current backup information from the server. If there is a backup, and it is trusted, starts
+     * backing up to it; otherwise, disables backups.
+     *
+     * @returns `null` if there is no backup on the server. Otherwise, data on the backup as returned by the server,
+     *   and trust information (as returned by {@link isKeyBackupTrusted}).
+     */
+    checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null>;
+
+    /**
+     * Creates a new key backup version.
+     *
+     * If there are existing backups they will be replaced.
+     *
+     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * callback will be called)
+     * and the backup engine will be started.
+     */
+    resetKeyBackup(): Promise<void>;
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
 /**
@@ -298,6 +433,46 @@ export interface BootstrapCrossSigningOpts {
      * will not be uploaded to the server (which seems like a bad thing?).
      */
     authUploadDeviceSigningKeys?: UIAuthCallback<void>;
+}
+
+/**
+ * Represents the ways in which we trust a user
+ */
+export class UserVerificationStatus {
+    public constructor(
+        private readonly crossSigningVerified: boolean,
+        private readonly crossSigningVerifiedBefore: boolean,
+        private readonly tofu: boolean,
+    ) {}
+
+    /**
+     * @returns true if this user is verified via any means
+     */
+    public isVerified(): boolean {
+        return this.isCrossSigningVerified();
+    }
+
+    /**
+     * @returns true if this user is verified via cross signing
+     */
+    public isCrossSigningVerified(): boolean {
+        return this.crossSigningVerified;
+    }
+
+    /**
+     * @returns true if we ever verified this user before (at least for
+     * the history of verifications observed by this device).
+     */
+    public wasCrossSigningVerified(): boolean {
+        return this.crossSigningVerifiedBefore;
+    }
+
+    /**
+     * @returns true if this user's key is trusted on first use
+     */
+    public isTofu(): boolean {
+        return this.tofu;
+    }
 }
 
 export class DeviceVerificationStatus {
@@ -480,6 +655,17 @@ export enum CrossSigningKey {
 }
 
 /**
+ * Information on one of the cross-signing keys.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+ */
+export interface CrossSigningKeyInfo {
+    keys: { [algorithm: string]: string };
+    signatures?: ISignatures;
+    usage: string[];
+    user_id: string;
+}
+
+/**
  * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
  */
 export interface GeneratedSecretStorageKey {
@@ -488,6 +674,58 @@ export interface GeneratedSecretStorageKey {
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
+}
+
+/**
+ *  Result type of {@link CryptoApi#getEncryptionInfoForEvent}.
+ */
+export interface EventEncryptionInfo {
+    /** "Shield" to be shown next to this event representing its verification status */
+    shieldColour: EventShieldColour;
+
+    /**
+     * `null` if `shieldColour` is `EventShieldColour.NONE`; otherwise a reason code for the shield in `shieldColour`.
+     */
+    shieldReason: EventShieldReason | null;
+}
+
+/**
+ * Types of shield to be shown for {@link EventEncryptionInfo#shieldColour}.
+ */
+export enum EventShieldColour {
+    NONE,
+    GREY,
+    RED,
+}
+
+/**
+ * Reason codes for {@link EventEncryptionInfo#shieldReason}.
+ */
+export enum EventShieldReason {
+    /** An unknown reason from the crypto library (if you see this, it is a bug in matrix-js-sdk). */
+    UNKNOWN,
+
+    /** "Encrypted by an unverified user." */
+    UNVERIFIED_IDENTITY,
+
+    /** "Encrypted by a device not verified by its owner." */
+    UNSIGNED_DEVICE,
+
+    /** "Encrypted by an unknown or deleted device." */
+    UNKNOWN_DEVICE,
+
+    /**
+     * "The authenticity of this encrypted message can't be guaranteed on this device."
+     *
+     * ie: the key has been forwarded, or retrieved from an insecure backup.
+     */
+    AUTHENTICITY_NOT_GUARANTEED,
+
+    /**
+     * The (deprecated) sender_key field in the event does not match the Ed25519 key of the device that sent us the
+     * decryption keys.
+     */
+    MISMATCHED_SENDER_KEY,
 }
 
 export * from "./crypto-api/verification";

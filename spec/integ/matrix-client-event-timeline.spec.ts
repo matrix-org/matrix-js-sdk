@@ -107,9 +107,7 @@ const INITIAL_SYNC_DATA = {
                         utils.mkEvent({
                             type: "m.room.create",
                             user: userId,
-                            content: {
-                                creator: userId,
-                            },
+                            content: {},
                             event: false,
                         }),
                     ],
@@ -207,7 +205,7 @@ function startClient(httpBackend: HttpBackend, client: MatrixClient) {
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
 
-    client.startClient();
+    client.startClient({ threadSupport: true });
 
     // set up a promise which will resolve once the client is initialised
     const prom = new Promise<void>((resolve) => {
@@ -1342,7 +1340,7 @@ describe("MatrixClient event timelines", function () {
         function respondToContext(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/context/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1360,7 +1358,7 @@ describe("MatrixClient event timelines", function () {
         function respondToEvent(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/event/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/event/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1371,7 +1369,7 @@ describe("MatrixClient event timelines", function () {
         function respondToMessagesRequest(): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/messages", {
                     $roomId: roomId,
                 }),
             );
@@ -2025,6 +2023,25 @@ describe("MatrixClient event timelines", function () {
                 .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function () {
                     return THREAD_ROOT;
+                });
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function () {
+                    return THREAD_ROOT;
+                });
+            httpBackend
+                .when(
+                    "GET",
+                    "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                        encodeURIComponent(THREAD_ROOT.event_id!) +
+                        "/" +
+                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                )
+                .respond(200, function () {
+                    return {
+                        chunk: [THREAD_REPLY],
+                    };
                 });
             await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
