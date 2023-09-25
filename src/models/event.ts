@@ -226,7 +226,7 @@ export type MatrixEventHandlerMap = {
      * @param event - The matrix event which has been decrypted
      * @param err - The error that occurred during decryption, or `undefined` if no error occurred.
      */
-    [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
+    [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err: Error | undefined) => void;
     [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
     [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
     [MatrixEventEvent.LocalEventIdReplaced]: (event: MatrixEvent) => void;

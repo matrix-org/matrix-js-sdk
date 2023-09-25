@@ -77,8 +77,8 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
         isScreensharing: boolean,
-        feed?: CallFeed,
-        sourceId?: string,
+        feed: CallFeed | undefined,
+        sourceId: string | undefined,
     ) => void;
     [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [GroupCallEvent.ParticipantsChanged]: (participants: Map<RoomMember, Map<string, ParticipantState>>) => void;

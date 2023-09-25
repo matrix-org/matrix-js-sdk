@@ -175,7 +175,7 @@ export type RoomEventHandlerMap = {
      * @param membership - The new membership value
      * @param prevMembership - The previous membership value
      */
-    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership: string | undefined) => void;
     /**
      * Fires whenever a room's tags are updated.
      * @param event - The tags event
@@ -204,7 +204,7 @@ export type RoomEventHandlerMap = {
      * });
      * ```
      */
-    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
+    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent: MatrixEvent | undefined) => void;
     /**
      * Fires whenever a receipt is received for a room
      * @param event - The receipt event
@@ -283,13 +283,16 @@ export type RoomEventHandlerMap = {
     [RoomEvent.LocalEchoUpdated]: (
         event: MatrixEvent,
         room: Room,
-        oldEventId?: string,
-        oldStatus?: EventStatus | null,
+        oldEventId: string | undefined,
+        oldStatus: EventStatus | null | undefined,
     ) => void;
     [RoomEvent.OldStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
     [RoomEvent.CurrentStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
     [RoomEvent.HistoryImportedWithinTimeline]: (markerEvent: MatrixEvent, room: Room) => void;
-    [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
+    [RoomEvent.UnreadNotifications]: (
+        unreadNotifications: NotificationCount | undefined,
+        threadId: string | undefined,
+    ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     /**
      * Fires when a new room summary is returned by `/sync`.

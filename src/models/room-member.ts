@@ -43,7 +43,7 @@ export type RoomMemberEventHandlerMap = {
      * });
      * ```
      */
-    [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership?: string) => void;
+    [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership: string | undefined) => void;
     /**
      * Fires whenever any room member's name changes.
      * @param event - The matrix event which caused this event to fire.

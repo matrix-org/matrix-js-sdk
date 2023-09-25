@@ -122,7 +122,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
-    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions?: IMarkerFoundOptions) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions: IMarkerFoundOptions | undefined) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
