@@ -2683,11 +2683,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.get("express:/_matrix/client/v3/room_keys/keys", keyBackupData);
 
                 // should be able to restore from 4S
-                const importReult = await aliceClient.restoreKeyBackupWithSecretStorage(
-                    check!.backupInfo!,
-                    undefined,
-                    undefined,
-                );
+                const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
                 expect(importReult.imported).toStrictEqual(1);
             });
 
