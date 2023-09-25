@@ -1,10 +1,9 @@
 name: Build downstream artifacts
 on:
-    # We only want the Rust Crypto Cypress tests on merge queue to prevent regressions
-    # from creeping in. They take a long time to run and consume 4 concurrent runners.
-    # Anyone working on Rust Crypto is able to run the tests locally if required.
     merge_group:
         types: [checks_requested]
+
+    pull_request: {}
 
     # For now at least, we don't run this or the cypress-tests against pushes
     # to develop or master.
