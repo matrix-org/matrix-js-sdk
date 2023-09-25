@@ -55,5 +55,5 @@ jobs:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Cypress skipped
-                  context: "${ github.workflow }} / cypress"
+                  context: "${{ github.workflow }} / cypress"
                   sha: "${{ github.event.workflow_run.head_sha }}"
