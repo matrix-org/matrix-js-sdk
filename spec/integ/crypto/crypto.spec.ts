@@ -73,6 +73,7 @@ import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
+import { IKeyBackup } from "../../../src/crypto/backup";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -2635,6 +2636,57 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         describe("Manage Key Backup", () => {
+            beforeEach(async () => {
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it("Should be able to restore from 4S after bootstrap", async () => {
+                const backupVersion = "1";
+                await bootstrapSecurity(backupVersion);
+
+                const check = await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+
+                // Import a new key that should be uploaded
+                const newKey = testData.MEGOLM_SESSION_DATA;
+
+                const awaitKeyUploaded = new Promise<IKeyBackup>((resolve) => {
+                    fetchMock.put(
+                        "path:/_matrix/client/v3/room_keys/keys",
+                        (url, request) => {
+                            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            resolve(uploadPayload);
+                            return {
+                                status: 200,
+                                body: {
+                                    count: 1,
+                                    etag: "abcdefg",
+                                },
+                            };
+                        },
+                        {
+                            overwriteRoutes: true,
+                        },
+                    );
+                });
+
+                await aliceClient.getCrypto()!.importRoomKeys([newKey]);
+
+                // The backup loop waits a random amount of time to avoid different clients firing at the same time.
+                jest.runAllTimers();
+
+                const keyBackupData = await awaitKeyUploaded;
+
+                fetchMock.get("express:/_matrix/client/v3/room_keys/keys", keyBackupData);
+
+                // should be able to restore from 4S
+                const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
+                expect(importResult.imported).toStrictEqual(1);
+            });
+
             it("Reset key backup should create a new backup and update 4S", async () => {
                 // First set up 4S and key backup
                 const backupVersion = "1";
