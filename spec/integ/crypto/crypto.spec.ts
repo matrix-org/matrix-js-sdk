@@ -2684,7 +2684,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 // should be able to restore from 4S
                 const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
-                expect(importReult.imported).toStrictEqual(1);
+                expect(importResult.imported).toStrictEqual(1);
             });
 
             it("Reset key backup should create a new backup and update 4S", async () => {
