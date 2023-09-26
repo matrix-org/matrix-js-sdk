@@ -15,6 +15,11 @@ concurrency:
 jobs:
     cypress:
         name: Cypress
+
+        # We only want to run the cypress tests on merge queue to prevent regressions
+        # from creeping in. They take a long time to run and consume 4 concurrent runners.
+        if: github.event.workflow_run.event == 'merge_group'
+
         uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@v3.80.1
         permissions:
             actions: read
@@ -29,3 +34,26 @@ jobs:
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
             rust-crypto: true
+
+    # We want to make the cypress tests a required check for the merge queue.
+    #
+    # Unfortunately, github doesn't distinguish between "checks needed for branch
+    # protection" (ie, the things that must pass before the PR will even be added
+    # to the merge queue) and "checks needed in the merge queue". We just have to add
+    # the check to the branch protection list.
+    #
+    # Ergo, if we know we're not going to run the cypress tests, we need to add a
+    # passing status check manually.
+    mark_skipped:
+        if: github.event.workflow_run.event != 'merge_group'
+        permissions:
+            statuses: write
+        runs-on: ubuntu-latest
+        steps:
+            - uses: Sibz/github-status-action@650dd1a882a76dbbbc4576fb5974b8d22f29847f # v1.1.6
+              with:
+                  authToken: "${{ secrets.GITHUB_TOKEN }}"
+                  state: success
+                  description: Cypress skipped
+                  context: "${{ github.workflow }} / cypress"
+                  sha: "${{ github.event.workflow_run.head_sha }}"
