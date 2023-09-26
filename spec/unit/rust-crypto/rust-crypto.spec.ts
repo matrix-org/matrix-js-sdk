@@ -54,6 +54,56 @@ const TEST_DEVICE_ID = "TEST_DEVICE";
 
 afterEach(() => {
     fetchMock.reset();
+    jest.restoreAllMocks();
+});
+
+describe("initRustCrypto", () => {
+    function makeTestOlmMachine(): Mocked<OlmMachine> {
+        return {
+            registerRoomKeyUpdatedCallback: jest.fn(),
+            registerUserIdentityUpdatedCallback: jest.fn(),
+            outgoingRequests: jest.fn(),
+        } as unknown as Mocked<OlmMachine>;
+    }
+
+    it("passes through the store params", async () => {
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+
+        await initRustCrypto(
+            {} as MatrixClient["http"],
+            TEST_USER,
+            TEST_DEVICE_ID,
+            {} as ServerSideSecretStorage,
+            {} as CryptoCallbacks,
+            "storePrefix",
+            "storePassphrase",
+        );
+
+        expect(OlmMachine.initialize).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            "storePrefix",
+            "storePassphrase",
+        );
+    });
+
+    it("suppresses the storePassphrase if storePrefix is unset", async () => {
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+
+        await initRustCrypto(
+            {} as MatrixClient["http"],
+            TEST_USER,
+            TEST_DEVICE_ID,
+            {} as ServerSideSecretStorage,
+            {} as CryptoCallbacks,
+            null,
+            "storePassphrase",
+        );
+
+        expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
+    });
 });
 
 describe("RustCrypto", () => {
@@ -162,6 +212,7 @@ describe("RustCrypto", () => {
         it("returns sensible values on a default client", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockResolvedValue(null),
+                getDefaultKeyId: jest.fn().mockResolvedValue("key"),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
@@ -182,6 +233,7 @@ describe("RustCrypto", () => {
         it("throws if `stop` is called mid-call", async () => {
             const secretStorage = {
                 isStored: jest.fn().mockResolvedValue(null),
+                getDefaultKeyId: jest.fn().mockResolvedValue(null),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
@@ -208,7 +260,10 @@ describe("RustCrypto", () => {
     });
 
     it("isSecretStorageReady", async () => {
-        const rustCrypto = await makeTestRustCrypto();
+        const mockSecretStorage = {
+            getDefaultKeyId: jest.fn().mockResolvedValue(null),
+        } as unknown as Mocked<ServerSideSecretStorage>;
+        const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, mockSecretStorage);
         await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
     });
 
@@ -396,10 +451,6 @@ describe("RustCrypto", () => {
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
             );
-        });
-
-        afterEach(() => {
-            jest.restoreAllMocks();
         });
 
         async function makeEncryptedEvent(): Promise<MatrixEvent> {
@@ -812,5 +863,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null);
+    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
 }

@@ -57,7 +57,7 @@ import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
 import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
-import { secretStorageContainsCrossSigningKeys } from "./secret-storage";
+import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
@@ -623,7 +623,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#isSecretStorageReady}
      */
     public async isSecretStorageReady(): Promise<boolean> {
-        return false;
+        // make sure that the cross-signing keys are stored
+        const secretsToCheck = [
+            "m.cross_signing.master",
+            "m.cross_signing.user_signing",
+            "m.cross_signing.self_signing",
+        ];
+
+        // if key backup is active, we also need to check that the backup decryption key is stored
+        const keyBackupEnabled = (await this.backupManager.getActiveBackupVersion()) != null;
+        if (keyBackupEnabled) {
+            secretsToCheck.push("m.megolm_backup.v1");
+        }
+
+        return secretStorageCanAccessSecrets(this.secretStorage, secretsToCheck);
     }
 
     /**
@@ -1649,6 +1662,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
     if (shieldState.message === null) {
         shieldReason = null;
     } else if (shieldState.message === "Encrypted by an unverified user.") {
+        // this case isn't actually used with lax shield semantics.
         shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
     } else if (shieldState.message === "Encrypted by a device not verified by its owner.") {
         shieldReason = EventShieldReason.UNSIGNED_DEVICE;

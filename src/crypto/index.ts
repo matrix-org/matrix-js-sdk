@@ -2738,6 +2738,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const senderId = event.getSender();
         if (!senderId || encryptionInfo.mismatchedSender) {
             // something definitely wrong is going on here
+
+            // previously: E2EState.Warning -> E2ePadlockUnverified -> Red/"Encrypted by an unverified session"
             return {
                 shieldColour: EventShieldColour.RED,
                 shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
@@ -2750,11 +2752,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // shield, otherwise if the user isn't cross-signed then
             // nothing's needed
             if (!encryptionInfo.authenticated) {
+                // previously: E2EState.Unauthenticated -> E2ePadlockUnauthenticated -> Grey/"The authenticity of this encrypted message can't be guaranteed on this device."
                 return {
                     shieldColour: EventShieldColour.GREY,
                     shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
                 };
             } else {
+                // previously: E2EState.Normal -> no icon
                 return { shieldColour: EventShieldColour.NONE, shieldReason: null };
             }
         }
@@ -2765,6 +2769,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             (await this.getDeviceVerificationStatus(senderId, encryptionInfo.sender.deviceId));
 
         if (!eventSenderTrust) {
+            // previously: E2EState.Unknown -> E2ePadlockUnknown -> Grey/"Encrypted by a deleted session"
             return {
                 shieldColour: EventShieldColour.GREY,
                 shieldReason: EventShieldReason.UNKNOWN_DEVICE,
@@ -2772,19 +2777,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         if (!eventSenderTrust.isVerified()) {
+            // previously: E2EState.Warning -> E2ePadlockUnverified -> Red/"Encrypted by an unverified session"
             return {
                 shieldColour: EventShieldColour.RED,
-                shieldReason: EventShieldReason.UNVERIFIED_IDENTITY,
+                shieldReason: EventShieldReason.UNSIGNED_DEVICE,
             };
         }
 
         if (!encryptionInfo.authenticated) {
+            // previously: E2EState.Unauthenticated -> E2ePadlockUnauthenticated -> Grey/"The authenticity of this encrypted message can't be guaranteed on this device."
             return {
                 shieldColour: EventShieldColour.GREY,
                 shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
             };
         }
 
+        // previously: E2EState.Verified -> no icon
         return { shieldColour: EventShieldColour.NONE, shieldReason: null };
     }
 

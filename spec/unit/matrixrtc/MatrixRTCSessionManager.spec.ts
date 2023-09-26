@@ -26,6 +26,7 @@ const membershipTemplate: CallMembershipData = {
     application: "m.call",
     device_id: "AAAAAAA",
     expires: 60 * 60 * 1000,
+    membershipID: "bloop",
 };
 
 describe("MatrixRTCSessionManager", () => {

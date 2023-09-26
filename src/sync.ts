@@ -1604,6 +1604,17 @@ export class SyncApi {
      * @param connDidFail - True if a connectivity failure has been detected. Optional.
      */
     private pokeKeepAlive(connDidFail = false): void {
+        if (!this.running) {
+            // we are in a keepAlive, retrying to connect, but the syncronization
+            // was stopped, so we are stopping the retry.
+            clearTimeout(this.keepAliveTimer);
+            if (this.connectionReturnedDefer) {
+                this.connectionReturnedDefer.reject("SyncApi.stop() was called");
+                this.connectionReturnedDefer = undefined;
+            }
+            return;
+        }
+
         const success = (): void => {
             clearTimeout(this.keepAliveTimer);
             if (this.connectionReturnedDefer) {
