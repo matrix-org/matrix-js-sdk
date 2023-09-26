@@ -69,6 +69,9 @@ export enum EventType {
     Reaction = "m.reaction",
     PollStart = "org.matrix.msc3381.poll.start",
 
+    Breakout = "m.breakout",
+    PrefixedBreakout = "org.matrix.msc3985.breakout",
+
     // Room ephemeral events
     Typing = "m.typing",
     Receipt = "m.receipt",
