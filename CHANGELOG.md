@@ -1,5 +1,5 @@
-Changes in [28.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.2.0-rc.1) (2023-09-19)
-============================================================================================================
+Changes in [28.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.2.0) (2023-09-26)
+==================================================================================================
 
 ## 🦖 Deprecations
  * Implement `getEncryptionInfoForEvent` and deprecate `getEventEncryptionInfo` ([\#3693](https://github.com/matrix-org/matrix-js-sdk/pull/3693)).
