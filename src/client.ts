@@ -220,6 +220,12 @@ import {
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
+import {
+    BreakoutEventContent,
+    BreakoutEventContentRooms,
+    ExistingBreakoutRoom,
+    NewBreakoutRoom,
+} from "./@types/breakout";
 
 export type Store = IStore;
 
@@ -4446,6 +4452,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         beaconInfoContent: MBeaconInfoEventContent,
     ): Promise<ISendEventResponse> {
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
+    }
+
+    public async createBreakoutRooms(
+        parentRoomId: string,
+        rooms: (NewBreakoutRoom | ExistingBreakoutRoom)[],
+    ): Promise<ISendEventResponse> {
+        if (rooms.length === 0) {
+            throw new Error("Called with an empty array of rooms");
+        }
+
+        const breakoutContentRooms: BreakoutEventContentRooms = {};
+
+        for (const room of rooms) {
+            if (room.hasOwnProperty("roomId")) {
+                breakoutContentRooms[(room as ExistingBreakoutRoom).roomId] = {
+                    via: [],
+                    users: room.users,
+                };
+            } else if (room.hasOwnProperty("roomName")) {
+                const { room_id: roomId } = await this.createRoom({ name: (room as NewBreakoutRoom).roomName });
+                breakoutContentRooms[roomId] = {
+                    via: [],
+                    users: room.users,
+                };
+            } else {
+                throw new Error("Bad room passed");
+            }
+        }
+
+        return this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
+            "m.breakout": breakoutContentRooms,
+        } as BreakoutEventContent);
     }
 
     public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
