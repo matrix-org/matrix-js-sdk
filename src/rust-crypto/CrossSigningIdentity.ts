@@ -140,6 +140,7 @@ export class CrossSigningIdentity {
      */
     private async exportCrossSigningKeysToStorage(): Promise<void> {
         const exported: RustSdkCryptoJs.CrossSigningKeyExport | null = await this.olmMachine.exportCrossSigningKeys();
+        /* istanbul ignore else (this function is only called when we know the olm machine has keys) */
         if (exported?.masterKey) {
             this.secretStorage.store("m.cross_signing.master", exported.masterKey);
         } else {
