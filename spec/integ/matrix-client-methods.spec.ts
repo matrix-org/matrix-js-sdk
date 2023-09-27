@@ -1227,7 +1227,7 @@ describe("MatrixClient", function () {
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
         });
 
-        it("should hit the stable endpoint when capability is disabled", async () => {
+        it("should still hit the stable endpoint when capability is disabled (but present)", async () => {
             httpBackend
                 .when("GET", "/capabilities")
                 .respond(200, { capabilities: { "m.get_login_token": { enabled: false } } });
