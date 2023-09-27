@@ -244,19 +244,12 @@ export interface LoginResponse {
 
 /**
  * The result of a successful `m.login.token` issuance request as per https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv1loginget_token
- *
  */
 export interface LoginTokenPostResponse {
     /**
      * The token to use with `m.login.token` to authenticate.
      */
     login_token: string;
-    /**
-     * Expiration in seconds.
-     *
-     * @deprecated this is only provided for compatibility with original revision of [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882).
-     */
-    expires_in: number;
     /**
      * Expiration in milliseconds.
      */
