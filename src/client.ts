@@ -521,10 +521,20 @@ export interface IThreadsCapability extends ICapability {}
 
 export interface IGetLoginTokenCapability extends ICapability {}
 
+/**
+ * @deprecated use {@link IGetLoginTokenCapability} instead
+ */
+export type IMSC3882GetLoginTokenCapability = IGetLoginTokenCapability;
+
 export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
     "m.get_login_token",
     "org.matrix.msc3882.get_login_token",
 );
+
+/**
+ * @deprecated use {@link GET_LOGIN_TOKEN_CAPABILITY} instead
+ */
+export const UNSTABLE_MSC3882_CAPABILITY = GET_LOGIN_TOKEN_CAPABILITY;
 
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
