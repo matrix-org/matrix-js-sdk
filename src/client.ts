@@ -8026,16 +8026,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
 
-        const usesStable = !!capabilities["m.get_login_token"];
-        const usesUnstableRevision1 = !usesStable && !!capabilities["org.matrix.msc3882.get_login_token"];
-        // use stable endpoint if capability is exposed otherwise use old unstable r0 endpoint
-        const endpoint =
-            usesStable || usesUnstableRevision1
-                ? "/login/get_token" // endpoint for stable + unstable r1
-                : "/login/token"; // unstable r0 endpoint
-
-        // determine whether to use stable or unstable prefix
-        const prefix = usesStable ? ClientPrefix.V1 : `${ClientPrefix.Unstable}/org.matrix.msc3882`;
+        let endpoint: string;
+        if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.name]) {
+            // use the stable endpoint
+            endpoint = `${ClientPrefix.V1}/login/get_token`;
+        } else if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.altName as string]) {
+            // newer unstable r1 endpoint
+            endpoint = `${ClientPrefix.Unstable}/org.matrix.msc3882/login/get_token`;
+        } else {
+            // old unstable r0 endpoint
+            endpoint = `${ClientPrefix.Unstable}/org.matrix.msc3882/login/token`;
+        }
 
         const body: UIARequest<{}> = { auth };
         const res = await this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
@@ -8043,7 +8044,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             endpoint,
             undefined, // no query params
             body,
-            { prefix },
         );
 
         // the representation of expires_in changed from unstable revision 0 to unstable revision 1 so we cross populate
