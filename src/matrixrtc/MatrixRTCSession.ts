@@ -186,7 +186,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This will not unsubscribe from updates: remember to call unsubscribe() separately if
      * desired.
      */
-    public leaveRoomSession(): void {
+    public async leaveRoomSession(): Promise<void> {
         if (!this.isJoined()) {
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
             return;
@@ -196,7 +196,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
-        this.triggerCallMembershipEventUpdate();
+        await this.triggerCallMembershipEventUpdate();
     }
 
     /**
@@ -396,7 +396,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
         };
 
-        let resendDelay;
+        let resendDelay = 0;
         try {
             await this.client.sendStateEvent(
                 this.room.roomId,
@@ -413,6 +413,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
         }
 
-        if (resendDelay) this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, resendDelay);
+        if (resendDelay) {
+            await new Promise((resolve) => setTimeout(resolve, resendDelay));            
+            await this.triggerCallMembershipEventUpdate();
+        }
     }
 }
