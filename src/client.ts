@@ -8044,6 +8044,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             endpoint,
             undefined, // no query params
             body,
+            { prefix: "" },
         );
 
         // the representation of expires_in changed from unstable revision 0 to unstable revision 1 so we cross populate
