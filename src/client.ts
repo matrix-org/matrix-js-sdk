@@ -8030,7 +8030,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.name]) {
             // use the stable endpoint
             endpoint = `${ClientPrefix.V1}/login/get_token`;
-        } else if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.altName as string]) {
+        } else if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.altName!]) {
             // newer unstable r1 endpoint
             endpoint = `${ClientPrefix.Unstable}/org.matrix.msc3882/login/get_token`;
         } else {
