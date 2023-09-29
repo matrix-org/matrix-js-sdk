@@ -62,7 +62,7 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
@@ -1406,6 +1406,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }),
             new RustSdkCryptoJs.RoomId(roomId),
         );
+
+        if (
+            event.getType() === EventType.RoomMessage &&
+            event.getContent().msgtype === MsgType.KeyVerificationRequest
+        ) {
+            const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
+                new RustSdkCryptoJs.UserId(event.getSender()!),
+                event.getId()!,
+            );
+
+            if (!request) {
+                logger.warn(
+                    `Unable to find rust-side VerificationRequest for just-received verification request ${event.getId()}`,
+                );
+            } else {
+                this.emit(
+                    CryptoEvent.VerificationRequestReceived,
+                    new RustVerificationRequest(
+                        request,
+                        this.outgoingRequestProcessor,
+                        this._supportedVerificationMethods,
+                    ),
+                );
+            }
+        }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
         this.outgoingRequestLoop();
