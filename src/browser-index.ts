@@ -40,8 +40,4 @@ if (indexedDB) {
     matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
 }
 
-// We export 3 things to make browserify happy as well as downstream projects.
-// It's awkward, but required.
 export * from "./matrix";
-export default matrixcs; // keep export for browserify package deps
-global.matrixcs = matrixcs;
