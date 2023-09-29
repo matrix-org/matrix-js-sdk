@@ -22,7 +22,6 @@ import { IDBFactory } from "fake-indexeddb";
 import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
-import type { IDeviceKeys } from "../../../src/@types/crypto";
 import * as testUtils from "../../test-utils/test-utils";
 import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import {
@@ -74,6 +73,16 @@ import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/cr
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
+import {
+    createOlmSession,
+    createOlmAccount,
+    encryptGroupSessionKey,
+    encryptMegolmEvent,
+    encryptMegolmEventRawPlainText,
+    encryptOlmEvent,
+    establishOlmSession,
+    getTestOlmAccountKeys,
+} from "./olm-utils";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -81,197 +90,6 @@ afterEach(() => {
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
-
-// start an Olm session with a given recipient
-async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: IE2EKeyReceiver): Promise<Olm.Session> {
-    const keys = await recipientTestClient.awaitOneTimeKeyUpload();
-    const otkId = Object.keys(keys)[0];
-    const otk = keys[otkId];
-
-    const session = new global.Olm.Session();
-    session.create_outbound(olmAccount, recipientTestClient.getDeviceKey(), otk.key);
-    return session;
-}
-
-// IToDeviceEvent isn't exported by src/sync-accumulator.ts
-interface ToDeviceEvent {
-    content: IContent;
-    sender: string;
-    type: string;
-}
-
-/** encrypt an event with an existing olm session */
-function encryptOlmEvent(opts: {
-    /** the sender's user id */
-    sender?: string;
-    /** the sender's curve25519 key */
-    senderKey: string;
-    /** the sender's ed25519 key */
-    senderSigningKey: string;
-    /** the olm session to use for encryption */
-    p2pSession: Olm.Session;
-    /** the recipient's user id */
-    recipient: string;
-    /** the recipient's curve25519 key */
-    recipientCurve25519Key: string;
-    /** the recipient's ed25519 key */
-    recipientEd25519Key: string;
-    /** the payload of the message */
-    plaincontent?: object;
-    /** the event type of the payload */
-    plaintype?: string;
-}): ToDeviceEvent {
-    expect(opts.senderKey).toBeTruthy();
-    expect(opts.p2pSession).toBeTruthy();
-    expect(opts.recipient).toBeTruthy();
-
-    const plaintext = {
-        content: opts.plaincontent || {},
-        recipient: opts.recipient,
-        recipient_keys: {
-            ed25519: opts.recipientEd25519Key,
-        },
-        keys: {
-            ed25519: opts.senderSigningKey,
-        },
-        sender: opts.sender || "@bob:xyz",
-        type: opts.plaintype || "m.test",
-    };
-
-    return {
-        content: {
-            algorithm: "m.olm.v1.curve25519-aes-sha2",
-            ciphertext: {
-                [opts.recipientCurve25519Key]: opts.p2pSession.encrypt(JSON.stringify(plaintext)),
-            },
-            sender_key: opts.senderKey,
-        },
-        sender: opts.sender || "@bob:xyz",
-        type: "m.room.encrypted",
-    };
-}
-
-// encrypt an event with megolm
-function encryptMegolmEvent(opts: {
-    senderKey: string;
-    groupSession: Olm.OutboundGroupSession;
-    plaintext?: Partial<IEvent>;
-    room_id?: string;
-}): IEvent {
-    expect(opts.senderKey).toBeTruthy();
-    expect(opts.groupSession).toBeTruthy();
-
-    const plaintext = opts.plaintext || {};
-    if (!plaintext.content) {
-        plaintext.content = {
-            body: "42",
-            msgtype: "m.text",
-        };
-    }
-    if (!plaintext.type) {
-        plaintext.type = "m.room.message";
-    }
-    if (!plaintext.room_id) {
-        expect(opts.room_id).toBeTruthy();
-        plaintext.room_id = opts.room_id;
-    }
-    return encryptMegolmEventRawPlainText({
-        senderKey: opts.senderKey,
-        groupSession: opts.groupSession,
-        plaintext,
-    });
-}
-
-function encryptMegolmEventRawPlainText(opts: {
-    senderKey: string;
-    groupSession: Olm.OutboundGroupSession;
-    plaintext: Partial<IEvent>;
-    origin_server_ts?: number;
-}): IEvent {
-    return {
-        event_id: "$test_megolm_event_" + Math.random(),
-        sender: opts.plaintext.sender ?? "@not_the_real_sender:example.com",
-        origin_server_ts: opts.plaintext.origin_server_ts ?? 1672944778000,
-        content: {
-            algorithm: "m.megolm.v1.aes-sha2",
-            ciphertext: opts.groupSession.encrypt(JSON.stringify(opts.plaintext)),
-            device_id: "testDevice",
-            sender_key: opts.senderKey,
-            session_id: opts.groupSession.session_id(),
-        },
-        type: "m.room.encrypted",
-        unsigned: {},
-    };
-}
-
-/** build an encrypted room_key event to share a group session, using an existing olm session */
-function encryptGroupSessionKey(opts: {
-    /** recipient's user id */
-    recipient: string;
-    /** the recipient's curve25519 key */
-    recipientCurve25519Key: string;
-    /** the recipient's ed25519 key */
-    recipientEd25519Key: string;
-    /** sender's olm account */
-    olmAccount: Olm.Account;
-    /** sender's olm session with the recipient */
-    p2pSession: Olm.Session;
-    groupSession: Olm.OutboundGroupSession;
-    room_id?: string;
-}): Partial<IEvent> {
-    const senderKeys = JSON.parse(opts.olmAccount.identity_keys());
-    return encryptOlmEvent({
-        senderKey: senderKeys.curve25519,
-        senderSigningKey: senderKeys.ed25519,
-        recipient: opts.recipient,
-        recipientCurve25519Key: opts.recipientCurve25519Key,
-        recipientEd25519Key: opts.recipientEd25519Key,
-        p2pSession: opts.p2pSession,
-        plaincontent: {
-            algorithm: "m.megolm.v1.aes-sha2",
-            room_id: opts.room_id,
-            session_id: opts.groupSession.session_id(),
-            session_key: opts.groupSession.session_key(),
-        },
-        plaintype: "m.room_key",
-    });
-}
-
-/**
- * Establish an Olm Session with the test user
- *
- * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
- * establish an Olm session.
- *
- * @param testClient - the MatrixClient under test, which we expect to upload account keys, and to make a
- *    /sync request which we will respond to.
- * @param keyReceiver - an IE2EKeyReceiver which will intercept the /keys/upload request from the client under test
- * @param syncResponder - an ISyncResponder which will intercept /sync requests from the client under test
- * @param peerOlmAccount: an OlmAccount which will be used to initiate the Olm session.
- */
-async function establishOlmSession(
-    testClient: MatrixClient,
-    keyReceiver: IE2EKeyReceiver,
-    syncResponder: ISyncResponder,
-    peerOlmAccount: Olm.Account,
-): Promise<Olm.Session> {
-    const peerE2EKeys = JSON.parse(peerOlmAccount.identity_keys());
-    const p2pSession = await createOlmSession(peerOlmAccount, keyReceiver);
-    const olmEvent = encryptOlmEvent({
-        senderKey: peerE2EKeys.curve25519,
-        senderSigningKey: peerE2EKeys.ed25519,
-        recipient: testClient.getUserId()!,
-        recipientCurve25519Key: keyReceiver.getDeviceKey(),
-        recipientEd25519Key: keyReceiver.getSigningKey(),
-        p2pSession: p2pSession,
-    });
-    syncResponder.sendOrQueueSyncResponse({
-        next_batch: 1,
-        to_device: { events: [olmEvent] },
-    });
-    await syncPromise(testClient);
-    return p2pSession;
-}
 
 /**
  * Expect that the client shares keys with the given recipient
@@ -461,20 +279,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
      * @returns The fake query response
      */
     function getTestKeysQueryResponse(userId: string): IDownloadKeyResult {
-        const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
-        const testDeviceKeys: IDeviceKeys = {
-            algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
-            device_id: "DEVICE_ID",
-            keys: {
-                "curve25519:DEVICE_ID": testE2eKeys.curve25519,
-                "ed25519:DEVICE_ID": testE2eKeys.ed25519,
-            },
-            user_id: userId,
-        };
-        const j = anotherjson.stringify(testDeviceKeys);
-        const sig = testOlmAccount.sign(j);
-        testDeviceKeys.signatures = { [userId]: { "ed25519:DEVICE_ID": sig } };
-
+        const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, userId, "DEVICE_ID");
         return {
             device_keys: { [userId]: { DEVICE_ID: testDeviceKeys } },
             failures: {},
@@ -552,9 +357,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await initCrypto(aliceClient);
 
             // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
-            await Olm.init();
-            testOlmAccount = new Olm.Account();
-            testOlmAccount.create();
+            testOlmAccount = await createOlmAccount();
             const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
             testSenderKey = testE2eKeys.curve25519;
         },
