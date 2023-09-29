@@ -37,7 +37,7 @@ function makeMockClient(opts: {
     userId: string;
     deviceId: string;
     deviceKey?: string;
-    msc3882Enabled: boolean;
+    getLoginTokenEnabled: boolean;
     msc3882r0Only: boolean;
     msc3886Enabled: boolean;
     devices?: Record<string, Partial<DeviceInfo>>;
@@ -54,7 +54,7 @@ function makeMockClient(opts: {
         getVersions() {
             return {
                 unstable_features: {
-                    "org.matrix.msc3882": opts.msc3882Enabled,
+                    "org.matrix.msc3882": opts.getLoginTokenEnabled,
                     "org.matrix.msc3886": opts.msc3886Enabled,
                 },
             };
@@ -64,8 +64,8 @@ function makeMockClient(opts: {
                 ? {}
                 : {
                       capabilities: {
-                          "org.matrix.msc3882.get_login_token": {
-                              enabled: opts.msc3882Enabled,
+                          "m.get_login_token": {
+                              enabled: opts.getLoginTokenEnabled,
                           },
                       },
                   };
@@ -122,7 +122,7 @@ describe("Rendezvous", function () {
             userId: "@alice:example.com",
             deviceId: "DEVICEID",
             msc3886Enabled: false,
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: true,
         });
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
@@ -180,10 +180,10 @@ describe("Rendezvous", function () {
     });
 
     async function testNoProtocols({
-        msc3882Enabled,
+        getLoginTokenEnabled,
         msc3882r0Only,
     }: {
-        msc3882Enabled: boolean;
+        getLoginTokenEnabled: boolean;
         msc3882r0Only: boolean;
     }) {
         const aliceTransport = makeTransport("Alice");
@@ -198,7 +198,7 @@ describe("Rendezvous", function () {
             userId: "alice",
             deviceId: "ALICE",
             msc3886Enabled: false,
-            msc3882Enabled,
+            getLoginTokenEnabled,
             msc3882r0Only,
         });
         const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
@@ -241,11 +241,11 @@ describe("Rendezvous", function () {
     }
 
     it("no protocols - r0", async function () {
-        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: true });
+        await testNoProtocols({ getLoginTokenEnabled: false, msc3882r0Only: true });
     });
 
-    it("no protocols - r1", async function () {
-        await testNoProtocols({ msc3882Enabled: false, msc3882r0Only: false });
+    it("no protocols - stable", async function () {
+        await testNoProtocols({ getLoginTokenEnabled: false, msc3882r0Only: false });
     });
 
     it("new device declines protocol with outcome unsupported", async function () {
@@ -260,7 +260,7 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: false,
             msc3886Enabled: false,
         });
@@ -319,7 +319,7 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: false,
             msc3886Enabled: false,
         });
@@ -378,7 +378,7 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: false,
             msc3886Enabled: false,
         });
@@ -439,7 +439,7 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: false,
             msc3886Enabled: false,
         });
@@ -508,7 +508,7 @@ describe("Rendezvous", function () {
         const alice = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
-            msc3882Enabled: true,
+            getLoginTokenEnabled: true,
             msc3882r0Only: false,
             msc3886Enabled: false,
             devices,
