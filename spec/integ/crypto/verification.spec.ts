@@ -925,7 +925,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         /**
-         * Return a verification request event from Bob
+         * Return a plaintext verification request event from Bob to Alice
          * @see https://spec.matrix.org/v1.7/client-server-api/#mkeyverificationrequest
          */
         function createVerificationRequestEvent(): IRoomEvent {
@@ -949,11 +949,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         }
 
         /**
-         * Create a to-device event
-         * @param groupSession
-         * @param p2pSession
+         * Create a to-device event from Bob to Alice, sharing the group session key
+         * @param groupSession - group session key to share
+         * @param p2pSession - test Olm session to encrypt the key with
          */
-        function createToDeviceEvent(groupSession: Olm.OutboundGroupSession, p2pSession: Olm.Session): Partial<IEvent> {
+        function encryptGroupSessionKeyForAlice(
+            groupSession: Olm.OutboundGroupSession,
+            p2pSession: Olm.Session,
+        ): Partial<IEvent> {
             return encryptGroupSessionKey({
                 recipient: aliceClient.getUserId()!,
                 recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
@@ -969,7 +972,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
          * Create and encrypt a verification request event
          * @param groupSession
          */
-        function createEncryptedMessage(groupSession: Olm.OutboundGroupSession): IEvent {
+        function createEncryptedVerificationRequest(groupSession: Olm.OutboundGroupSession): IEvent {
             const testOlmAccountKeys = JSON.parse(testOlmAccount.identity_keys());
             return encryptMegolmEvent({
                 senderKey: testOlmAccountKeys.curve25519,
@@ -979,7 +982,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             });
         }
 
-        it("Verification request from Bob to Alice", async () => {
+        it("Plaintext verification request from Bob to Alice", async () => {
             // Tell alice she is sharing a room with bob
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1007,18 +1010,22 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request).not.toBeDefined();
         });
 
-        it("Process encrypted verification request", async () => {
+        it("Encrypted verification request from Bob to Alice", async () => {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
             // make the room_key event, but don't send it yet
-            const toDeviceEvent = createToDeviceEvent(groupSession, p2pSession);
+            const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
 
             // Add verification request from Bob to Alice in the DM between them
             syncResponder.sendOrQueueSyncResponse({
                 next_batch: 1,
-                rooms: { join: { [TEST_ROOM_ID]: { timeline: { events: [createEncryptedMessage(groupSession)] } } } },
+                rooms: {
+                    join: {
+                        [TEST_ROOM_ID]: { timeline: { events: [createEncryptedVerificationRequest(groupSession)] } },
+                    },
+                },
             });
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
@@ -1030,7 +1037,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await awaitDecryption(matrixEvent);
             expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
-            // Send the Bob's keys
+            // Send Bob the room keys
             syncResponder.sendOrQueueSyncResponse({
                 next_batch: 2,
                 to_device: {
@@ -1053,20 +1060,24 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly(
-            "If Bob keys are not received in the 5mins after the verification request, the request is ignored",
+            "If the verification request is not decrypted within 5 minutes, the request is ignored",
             async () => {
                 const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
                 const groupSession = new Olm.OutboundGroupSession();
                 groupSession.create();
 
                 // make the room_key event, but don't send it yet
-                const toDeviceEvent = createToDeviceEvent(groupSession, p2pSession);
+                const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
 
                 // Add verification request from Bob to Alice in the DM between them
                 syncResponder.sendOrQueueSyncResponse({
                     next_batch: 1,
                     rooms: {
-                        join: { [TEST_ROOM_ID]: { timeline: { events: [createEncryptedMessage(groupSession)] } } },
+                        join: {
+                            [TEST_ROOM_ID]: {
+                                timeline: { events: [createEncryptedVerificationRequest(groupSession)] },
+                            },
+                        },
                     },
                 });
                 // Wait for the sync response to be processed
@@ -1082,7 +1093,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 // Advance time by 5mins, the verification request should be ignored after that
                 jest.advanceTimersByTime(5 * 60 * 1000);
 
-                // Send the Bob's keys
+                // Send Bob the room keys
                 syncResponder.sendOrQueueSyncResponse({
                     next_batch: 2,
                     to_device: {
