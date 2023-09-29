@@ -1023,7 +1023,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // Send Bob the room keys
             returnToDeviceMessageFromSync(toDeviceEvent);
-            await syncPromise(aliceClient);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             await jest.advanceTimersByTimeAsync(10);
@@ -1066,7 +1065,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
                 // Send Bob the room keys
                 returnToDeviceMessageFromSync(toDeviceEvent);
-                await syncPromise(aliceClient);
 
                 // Wait for the message to be decrypted
                 await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
