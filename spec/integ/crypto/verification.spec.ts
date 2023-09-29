@@ -24,13 +24,11 @@ import { createHash } from "crypto";
 import Olm from "@matrix-org/olm";
 
 import {
-    Category,
     createClient,
     CryptoEvent,
     IContent,
     ICreateClientOpts,
     IEvent,
-    IRoomEvent,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -71,7 +69,7 @@ import {
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { createOlmSession, encryptGroupSessionKey, encryptMegolmEvent } from "./olm-utils";
+import { createOlmSession, encryptGroupSessionKey, encryptMegolmEvent, ToDeviceEvent } from "./olm-utils";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -928,7 +926,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
          * Return a plaintext verification request event from Bob to Alice
          * @see https://spec.matrix.org/v1.7/client-server-api/#mkeyverificationrequest
          */
-        function createVerificationRequestEvent(): IRoomEvent {
+        function createVerificationRequestEvent(): IEvent {
             return {
                 content: {
                     body: "Verification request from Bob to Alice",
@@ -956,7 +954,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         function encryptGroupSessionKeyForAlice(
             groupSession: Olm.OutboundGroupSession,
             p2pSession: Olm.Session,
-        ): Partial<IEvent> {
+        ): ToDeviceEvent {
             return encryptGroupSessionKey({
                 recipient: aliceClient.getUserId()!,
                 recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
@@ -983,12 +981,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         }
 
         it("Plaintext verification request from Bob to Alice", async () => {
-            // Tell alice she is sharing a room with bob
-            const syncResponse = getSyncResponse(["@bob:xyz"]);
-
             // Add verification request from Bob to Alice in the DM between them
-            syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push(createVerificationRequestEvent());
-            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            returnRoomMessageFromSync(TEST_ROOM_ID, createVerificationRequestEvent());
+
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
 
@@ -1000,11 +995,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         it("Verification request not found", async () => {
-            // Tell alice she is sharing a room with bob
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            // Wait for the sync response to be processed
-            await syncPromise(aliceClient);
-
             // Expect to not find any verification request
             const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
             expect(request).not.toBeDefined();
@@ -1019,14 +1009,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
 
             // Add verification request from Bob to Alice in the DM between them
-            syncResponder.sendOrQueueSyncResponse({
-                next_batch: 1,
-                rooms: {
-                    join: {
-                        [TEST_ROOM_ID]: { timeline: { events: [createEncryptedVerificationRequest(groupSession)] } },
-                    },
-                },
-            });
+            returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
+
             // Wait for the sync response to be processed
             await syncPromise(aliceClient);
 
@@ -1038,12 +1022,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
             // Send Bob the room keys
-            syncResponder.sendOrQueueSyncResponse({
-                next_batch: 2,
-                to_device: {
-                    events: [toDeviceEvent],
-                },
-            });
+            returnToDeviceMessageFromSync(toDeviceEvent);
             await syncPromise(aliceClient);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
@@ -1070,16 +1049,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
 
                 // Add verification request from Bob to Alice in the DM between them
-                syncResponder.sendOrQueueSyncResponse({
-                    next_batch: 1,
-                    rooms: {
-                        join: {
-                            [TEST_ROOM_ID]: {
-                                timeline: { events: [createEncryptedVerificationRequest(groupSession)] },
-                            },
-                        },
-                    },
-                });
+                returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
+
                 // Wait for the sync response to be processed
                 await syncPromise(aliceClient);
 
@@ -1094,12 +1065,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 jest.advanceTimersByTime(5 * 60 * 1000);
 
                 // Send Bob the room keys
-                syncResponder.sendOrQueueSyncResponse({
-                    next_batch: 2,
-                    to_device: {
-                        events: [toDeviceEvent],
-                    },
-                });
+                returnToDeviceMessageFromSync(toDeviceEvent);
                 await syncPromise(aliceClient);
 
                 // Wait for the message to be decrypted
@@ -1141,6 +1107,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
         syncResponder.sendOrQueueSyncResponse({ to_device: { events: [ev] } });
+    }
+
+    function returnRoomMessageFromSync(roomId: string, ev: IEvent): void {
+        syncResponder.sendOrQueueSyncResponse({
+            next_batch: 1,
+            rooms: {
+                join: {
+                    [roomId]: { timeline: { events: [ev] } },
+                },
+            },
+        });
     }
 });
 

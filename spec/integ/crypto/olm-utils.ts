@@ -75,7 +75,7 @@ export async function createOlmSession(
 }
 
 // IToDeviceEvent isn't exported by src/sync-accumulator.ts
-interface ToDeviceEvent {
+export interface ToDeviceEvent {
     content: IContent;
     sender: string;
     type: string;
@@ -199,7 +199,7 @@ export function encryptGroupSessionKey(opts: {
     p2pSession: Olm.Session;
     groupSession: Olm.OutboundGroupSession;
     room_id?: string;
-}): Partial<IEvent> {
+}): ToDeviceEvent {
     const senderKeys = JSON.parse(opts.olmAccount.identity_keys());
     return encryptOlmEvent({
         senderKey: senderKeys.curve25519,
