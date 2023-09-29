@@ -47,8 +47,8 @@ import {
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
 import {
-    CRYPTO_BACKENDS,
     awaitDecryption,
+    CRYPTO_BACKENDS,
     emitPromise,
     getSyncResponse,
     InitCrypto,
@@ -979,7 +979,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             });
         }
 
-        newBackendOnly("Verification request from Bob to Alice", async () => {
+        it("Verification request from Bob to Alice", async () => {
             // Tell alice she is sharing a room with bob
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -996,7 +996,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request?.otherUserId).toBe("@bob:xyz");
         });
 
-        newBackendOnly("Verification request not found", async () => {
+        it("Verification request not found", async () => {
             // Tell alice she is sharing a room with bob
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             // Wait for the sync response to be processed
@@ -1007,7 +1007,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request).not.toBeDefined();
         });
 
-        newBackendOnly("Process encrypted verification request", async () => {
+        it("Process encrypted verification request", async () => {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
@@ -1038,6 +1038,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 },
             });
             await syncPromise(aliceClient);
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
 
             // Wait for the message to be decrypted
             await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
