@@ -980,6 +980,34 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             });
         }
 
+        it("Verification request not found", async () => {
+            // Expect to not find any verification request
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            expect(request).not.toBeDefined();
+        });
+
+        it("ignores old verification requests", async () => {
+            const eventHandler = jest.fn();
+            aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
+
+            const verificationRequestEvent = createVerificationRequestEvent();
+            verificationRequestEvent.origin_server_ts -= 1000000;
+            returnRoomMessageFromSync(TEST_ROOM_ID, verificationRequestEvent);
+
+            await syncPromise(aliceClient);
+
+            // make sure the event has arrived
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
+            expect(matrixEvent.getId()).toEqual(verificationRequestEvent.event_id);
+
+            // check that an event has not been raised, and that the request is not found
+            expect(eventHandler).not.toHaveBeenCalled();
+            expect(
+                aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
+            ).not.toBeDefined();
+        });
+
         it("Plaintext verification request from Bob to Alice", async () => {
             // Add verification request from Bob to Alice in the DM between them
             returnRoomMessageFromSync(TEST_ROOM_ID, createVerificationRequestEvent());
@@ -995,12 +1023,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request?.roomId).toBe(TEST_ROOM_ID);
             expect(request?.isSelfVerification).toBe(false);
             expect(request?.otherUserId).toBe("@bob:xyz");
-        });
-
-        it("Verification request not found", async () => {
-            // Expect to not find any verification request
-            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            expect(request).not.toBeDefined();
         });
 
         it("Encrypted verification request from Bob to Alice", async () => {

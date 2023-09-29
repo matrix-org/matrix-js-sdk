@@ -1417,8 +1417,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             );
 
             if (!request) {
-                logger.warn(
-                    `Unable to find rust-side VerificationRequest for just-received verification request ${event.getId()}`,
+                // There are multiple reasons this can happen; probably the most likely is that the event is too old.
+                logger.info(
+                    `Ignoring just-received verification request ${event.getId()} which did not start a rust-side verification`,
                 );
             } else {
                 this.emit(
