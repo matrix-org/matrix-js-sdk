@@ -21,12 +21,16 @@ import { MockResponse } from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
+import Olm from "@matrix-org/olm";
 
 import {
+    Category,
     createClient,
     CryptoEvent,
     IContent,
     ICreateClientOpts,
+    IEvent,
+    IRoomEvent,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -42,9 +46,17 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, emitPromise, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import {
+    CRYPTO_BACKENDS,
+    awaitDecryption,
+    emitPromise,
+    getSyncResponse,
+    InitCrypto,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
+    BOB_ONE_TIME_KEYS,
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
     BOB_SIGNED_TEST_DEVICE_DATA,
     BOB_TEST_USER_ID,
@@ -55,11 +67,11 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
-    BOB_ONE_TIME_KEYS,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { createOlmSession, encryptGroupSessionKey, encryptMegolmEvent } from "./olm-utils";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -895,6 +907,195 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(verificationRequest.isSelfVerification).toBe(false);
             expect(verificationRequest.otherUserId).toBe(BOB_TEST_USER_ID);
         });
+    });
+
+    describe("Incoming verification in a DM", () => {
+        let testOlmAccount: Olm.Account;
+
+        beforeEach(async () => {
+            // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+            await Olm.init();
+            testOlmAccount = new Olm.Account();
+            testOlmAccount.create();
+
+            aliceClient = await startTestClient();
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
+            await syncPromise(aliceClient);
+        });
+
+        /**
+         * Return a verification request event from Bob
+         * @see https://spec.matrix.org/v1.7/client-server-api/#mkeyverificationrequest
+         */
+        function createVerificationRequestEvent(): IRoomEvent {
+            return {
+                content: {
+                    body: "Verification request from Bob to Alice",
+                    from_device: "BobDevice",
+                    methods: ["m.sas.v1"],
+                    msgtype: "m.key.verification.request",
+                    to: aliceClient.getUserId()!,
+                },
+                event_id: "$143273582443PhrSn:example.org",
+                origin_server_ts: Date.now(),
+                room_id: TEST_ROOM_ID,
+                sender: "@bob:xyz",
+                type: "m.room.message",
+                unsigned: {
+                    age: 1234,
+                },
+            };
+        }
+
+        /**
+         * Create a to-device event
+         * @param groupSession
+         * @param p2pSession
+         */
+        function createToDeviceEvent(groupSession: Olm.OutboundGroupSession, p2pSession: Olm.Session): Partial<IEvent> {
+            return encryptGroupSessionKey({
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
+                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
+                olmAccount: testOlmAccount,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: TEST_ROOM_ID,
+            });
+        }
+
+        /**
+         * Create and encrypt a verification request event
+         * @param groupSession
+         */
+        function createEncryptedMessage(groupSession: Olm.OutboundGroupSession): IEvent {
+            const testOlmAccountKeys = JSON.parse(testOlmAccount.identity_keys());
+            return encryptMegolmEvent({
+                senderKey: testOlmAccountKeys.curve25519,
+                groupSession: groupSession,
+                room_id: TEST_ROOM_ID,
+                plaintext: createVerificationRequestEvent(),
+            });
+        }
+
+        newBackendOnly("Verification request from Bob to Alice", async () => {
+            // Tell alice she is sharing a room with bob
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+
+            // Add verification request from Bob to Alice in the DM between them
+            syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push(createVerificationRequestEvent());
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+        });
+
+        newBackendOnly("Verification request not found", async () => {
+            // Tell alice she is sharing a room with bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            // Expect to not find any verification request
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            expect(request).not.toBeDefined();
+        });
+
+        newBackendOnly("Process encrypted verification request", async () => {
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+
+            // make the room_key event, but don't send it yet
+            const toDeviceEvent = createToDeviceEvent(groupSession, p2pSession);
+
+            // Add verification request from Bob to Alice in the DM between them
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                rooms: { join: { [TEST_ROOM_ID]: { timeline: { events: [createEncryptedMessage(groupSession)] } } } },
+            });
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
+
+            // wait for a first attempt at decryption: should fail
+            await awaitDecryption(matrixEvent);
+            expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
+
+            // Send the Bob's keys
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 2,
+                to_device: {
+                    events: [toDeviceEvent],
+                },
+            });
+            await syncPromise(aliceClient);
+
+            // Wait for the message to be decrypted
+            await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+        });
+
+        newBackendOnly(
+            "If Bob keys are not received in the 5mins after the verification request, the request is ignored",
+            async () => {
+                const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+                const groupSession = new Olm.OutboundGroupSession();
+                groupSession.create();
+
+                // make the room_key event, but don't send it yet
+                const toDeviceEvent = createToDeviceEvent(groupSession, p2pSession);
+
+                // Add verification request from Bob to Alice in the DM between them
+                syncResponder.sendOrQueueSyncResponse({
+                    next_batch: 1,
+                    rooms: {
+                        join: { [TEST_ROOM_ID]: { timeline: { events: [createEncryptedMessage(groupSession)] } } },
+                    },
+                });
+                // Wait for the sync response to be processed
+                await syncPromise(aliceClient);
+
+                const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+                const matrixEvent = room.getLiveTimeline().getEvents()[0];
+
+                // wait for a first attempt at decryption: should fail
+                await awaitDecryption(matrixEvent);
+                expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
+
+                // Advance time by 5mins, the verification request should be ignored after that
+                jest.advanceTimersByTime(5 * 60 * 1000);
+
+                // Send the Bob's keys
+                syncResponder.sendOrQueueSyncResponse({
+                    next_batch: 2,
+                    to_device: {
+                        events: [toDeviceEvent],
+                    },
+                });
+                await syncPromise(aliceClient);
+
+                // Wait for the message to be decrypted
+                await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
+
+                const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+                // the request should not be present
+                expect(request).not.toBeDefined();
+            },
+        );
     });
 
     async function startTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
