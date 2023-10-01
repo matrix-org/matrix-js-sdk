@@ -332,7 +332,29 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (!res.ok) {
-            throw parseErrorResponse(res, await res.text());
+            const err = parseErrorResponse(res, await res.text());
+
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !!this.opts.tokenRefresher && !opts.retryWithRefreshedToken) {
+                const setToken = (newToken) => {
+                    console.log('hhhh refreshToken.setting token', newToken, this);
+                    this.opts.accessToken = newToken;
+                }
+                const newToken = await this.opts.tokenRefresher.doRefreshAccessToken();
+                // we set a new token successfully
+                console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
+
+                this.opts.accessToken = newToken;
+
+                return this.requestOtherUrl(method, url, body, {
+                    ...opts, retryWithRefreshedToken: true,
+                    headers: {
+                        ...opts.headers,
+                        Authorization: "Bearer " + this.opts.accessToken
+                    }
+                });
+            } else {
+                throw err;
+            }
         }
 
         if (this.opts.onlyData) {
