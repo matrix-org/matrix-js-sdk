@@ -1,4 +1,20 @@
-Changes in [28.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.1.0-rc.1) (2023-09-05)
+Changes in [28.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.2.0) (2023-09-26)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Implement `getEncryptionInfoForEvent` and deprecate `getEventEncryptionInfo` ([\#3693](https://github.com/matrix-org/matrix-js-sdk/pull/3693)).
+ * **The Browserify artifact is being deprecated, scheduled for removal in the October 10th release cycle. (#3189)**
+
+## ✨ Features
+ * Delete knocked room when knock membership changes ([\#3729](https://github.com/matrix-org/matrix-js-sdk/pull/3729)). Contributed by @maheichyk.
+ * Introduce MatrixRTCSession lower level group call primitive ([\#3663](https://github.com/matrix-org/matrix-js-sdk/pull/3663)).
+ * Sync knock rooms ([\#3703](https://github.com/matrix-org/matrix-js-sdk/pull/3703)). Contributed by @maheichyk.
+
+## 🐛 Bug Fixes
+ * Dont access indexed db when undefined ([\#3707](https://github.com/matrix-org/matrix-js-sdk/pull/3707)). Contributed by @finsterwalder.
+ * Don't reset unread count when adding a synthetic receipt ([\#3706](https://github.com/matrix-org/matrix-js-sdk/pull/3706)). Fixes #3684. Contributed by @andybalaam.
+
+Changes in [28.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v28.1.0) (2023-09-12)
 ============================================================================================================
 
 ## 🦖 Deprecations
