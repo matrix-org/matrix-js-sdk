@@ -4457,33 +4457,40 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async createBreakoutRooms(
         parentRoomId: string,
         rooms: (NewBreakoutRoom | ExistingBreakoutRoom)[],
-    ): Promise<ISendEventResponse> {
+    ): Promise<{ newRooms: ExistingBreakoutRoom[]; response: ISendEventResponse }> {
         if (rooms.length === 0) {
             throw new Error("Called with an empty array of rooms");
         }
 
         const breakoutContentRooms: BreakoutEventContentRooms = {};
+        const newRooms: ExistingBreakoutRoom[] = [];
 
         for (const room of rooms) {
             if (room.hasOwnProperty("roomId")) {
-                breakoutContentRooms[(room as ExistingBreakoutRoom).roomId] = {
+                const roomId = (room as ExistingBreakoutRoom).roomId;
+                breakoutContentRooms[roomId] = {
                     via: [],
                     users: room.users,
                 };
+                newRooms.push({ roomId, users: room.users } as ExistingBreakoutRoom);
             } else if (room.hasOwnProperty("roomName")) {
                 const { room_id: roomId } = await this.createRoom({ name: (room as NewBreakoutRoom).roomName });
                 breakoutContentRooms[roomId] = {
                     via: [],
                     users: room.users,
                 };
+                newRooms.push({ roomId, users: room.users } as ExistingBreakoutRoom);
             } else {
                 throw new Error("Bad room passed");
             }
         }
 
-        return this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
-            "m.breakout": breakoutContentRooms,
-        } as BreakoutEventContent);
+        return {
+            newRooms,
+            response: await this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
+                "m.breakout": breakoutContentRooms,
+            } as BreakoutEventContent),
+        };
     }
 
     public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
