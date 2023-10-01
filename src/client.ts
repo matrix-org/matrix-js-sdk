@@ -862,7 +862,7 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+export interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
     room_type?: RoomType;
     membership?: string;
     is_encrypted: boolean;

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IRoomSummary } from "../client";
+
 export interface BreakoutEventContentRoom {
     via: string[];
     users: string[];
@@ -37,4 +39,8 @@ export interface NewBreakoutRoom extends BreakoutRoomBase {
 
 export interface ExistingBreakoutRoom extends BreakoutRoomBase {
     roomId: string;
+}
+
+export interface ExistingBreakoutRoomWithSummary extends ExistingBreakoutRoom {
+    roomSummary: IRoomSummary;
 }
