@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
+import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
 import { IDelegatedAuthConfig } from "../client";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
@@ -199,6 +199,7 @@ export const completeAuthorizationCodeGrant = async (
     oidcClientSettings: IDelegatedAuthConfig & { clientId: string };
     tokenResponse: BearerTokenResponse;
     homeserverUrl: string;
+    idTokenClaims: IdTokenClaims;
     identityServerUrl?: string;
 }> => {
     /**
@@ -250,6 +251,7 @@ export const completeAuthorizationCodeGrant = async (
             tokenResponse: normalizedTokenResponse,
             homeserverUrl: userState.homeserverUrl,
             identityServerUrl: userState.identityServerUrl,
+            idTokenClaims: signinResponse.profile,
         };
     } catch (error) {
         logger.error("Oidc login failed", error);
