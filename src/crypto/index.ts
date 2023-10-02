@@ -134,7 +134,7 @@ export const verificationMethods = {
 export type VerificationMethod = keyof typeof verificationMethods | string;
 
 export function isCryptoAvailable(): boolean {
-    return Boolean(global.Olm);
+    return Boolean(globalThis.Olm);
 }
 
 // minimum time between attempting to unwedge an Olm session, if we succeeded

@@ -201,7 +201,7 @@ import {
     threadFilterTypeToFilter,
 } from "./models/thread";
 import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon";
-import { UnstableValue } from "./NamespacedValue";
+import { NamespacedValue, UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
@@ -519,9 +519,22 @@ export interface IChangePasswordCapability extends ICapability {}
 
 export interface IThreadsCapability extends ICapability {}
 
-export interface IMSC3882GetLoginTokenCapability extends ICapability {}
+export interface IGetLoginTokenCapability extends ICapability {}
 
-export const UNSTABLE_MSC3882_CAPABILITY = new UnstableValue("m.get_login_token", "org.matrix.msc3882.get_login_token");
+/**
+ * @deprecated use {@link IGetLoginTokenCapability} instead
+ */
+export type IMSC3882GetLoginTokenCapability = IGetLoginTokenCapability;
+
+export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
+    "m.get_login_token",
+    "org.matrix.msc3882.get_login_token",
+);
+
+/**
+ * @deprecated use {@link GET_LOGIN_TOKEN_CAPABILITY} instead
+ */
+export const UNSTABLE_MSC3882_CAPABILITY = GET_LOGIN_TOKEN_CAPABILITY;
 
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
@@ -536,8 +549,8 @@ export interface Capabilities {
     "m.change_password"?: IChangePasswordCapability;
     "m.room_versions"?: IRoomVersionsCapability;
     "io.element.thread"?: IThreadsCapability;
-    [UNSTABLE_MSC3882_CAPABILITY.name]?: IMSC3882GetLoginTokenCapability;
-    [UNSTABLE_MSC3882_CAPABILITY.altName]?: IMSC3882GetLoginTokenCapability;
+    "m.get_login_token"?: IGetLoginTokenCapability;
+    "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
 }
 
 /** @deprecated prefer {@link CrossSigningKeyInfo}. */
@@ -8002,7 +8015,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Make a request for an `m.login.token` to be issued as per
      * [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882).
      * The server may require User-Interactive auth.
-     * Note that this is UNSTABLE and subject to breaking changes without notice.
+     *
+     * Compatibility with unstable implementations of MSC3882 is deprecated and will be removed in a future release.
+     *
      * @param auth - Optional. Auth data to supply for User-Interactive auth.
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
@@ -8010,10 +8025,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
         // use capabilities to determine which revision of the MSC is being used
         const capabilities = await this.getCapabilities();
-        // use r1 endpoint if capability is exposed otherwise use old r0 endpoint
-        const endpoint = UNSTABLE_MSC3882_CAPABILITY.findIn(capabilities)
-            ? "/org.matrix.msc3882/login/get_token" // r1 endpoint
-            : "/org.matrix.msc3882/login/token"; // r0 endpoint
+
+        let endpoint: string;
+        if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.name]) {
+            // use the stable endpoint
+            endpoint = `${ClientPrefix.V1}/login/get_token`;
+        } else if (capabilities[GET_LOGIN_TOKEN_CAPABILITY.altName!]) {
+            // newer unstable r1 endpoint
+            endpoint = `${ClientPrefix.Unstable}/org.matrix.msc3882/login/get_token`;
+        } else {
+            // old unstable r0 endpoint
+            endpoint = `${ClientPrefix.Unstable}/org.matrix.msc3882/login/token`;
+        }
 
         const body: UIARequest<{}> = { auth };
         const res = await this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
@@ -8021,10 +8044,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             endpoint,
             undefined, // no query params
             body,
-            { prefix: ClientPrefix.Unstable },
+            { prefix: "" },
         );
 
-        // the representation of expires_in changed from revision 0 to revision 1 so we populate
+        // the representation of expires_in changed from unstable revision 0 to unstable revision 1 so we cross populate
         if ("login_token" in res) {
             if (typeof res.expires_in_ms === "number") {
                 res.expires_in = Math.floor(res.expires_in_ms / 1000);
