@@ -24,22 +24,34 @@ import { logger } from "../logger";
 
 /**
  * @experimental
+ * Class responsible to refreshing OIDC access tokens
  */
 export abstract class OidcTokenRefresher {
     public readonly oidcClientReady!: Promise<void>;
     private oidcClient!: OidcClient;
-    private idTokenClaims!: IdTokenClaims;
     private inflightRefreshRequest?: ReturnType<TokenRefreshFunction>;
 
     public constructor(
+        /**
+         * Delegated auth config as found in matrix client .well-known
+         */
         authConfig: IDelegatedAuthConfig,
+        /**
+         * id of this client as registered with the OP
+         */
         clientId: string,
+        /**
+         * redirectUri as registered with OP
+         */
         redirectUri: string,
         deviceId: string,
-        idTokenClaims: IdTokenClaims,
+        /**
+         * idTokenClaims as returned from authorization grant
+         * used to validate tokens
+         */
+        private readonly idTokenClaims: IdTokenClaims,
     ) {
         this.oidcClientReady = this.initialiseOidcClient(authConfig, clientId, deviceId, redirectUri);
-        this.idTokenClaims = idTokenClaims;
     }
 
     private async initialiseOidcClient(
@@ -62,6 +74,13 @@ export abstract class OidcTokenRefresher {
         });
     }
 
+    /**
+     * Attempt token refresh using given access token
+     * When successful, persist new tokens
+     * @param refreshToken - refresh token to use in request with token issuer
+     * @returns tokens - Promise that resolves with new access and refresh tokens
+     * @throws when token refresh fails
+     */
     public async doRefreshAccessToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
         if (!this.inflightRefreshRequest) {
             this.inflightRefreshRequest = this.getNewToken(refreshToken);
