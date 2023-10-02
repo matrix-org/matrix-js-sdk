@@ -983,7 +983,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         it("Verification request not found", async () => {
             // Expect to not find any verification request
             const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            expect(request).not.toBeDefined();
+            expect(request).toBeUndefined();
         });
 
         it("ignores old verification requests", async () => {
