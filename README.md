@@ -51,15 +51,14 @@ if you do not have it already.
 ```javascript
 import * as sdk from "matrix-js-sdk";
 const client = sdk.createClient({ baseUrl: "https://matrix.org" });
-client.publicRooms(function (err, data) {
-    console.log("Public Rooms: %s", JSON.stringify(data));
-});
+const data = await client.publicRooms({ limit: 10 });
+console.log("Public Rooms: %s", JSON.stringify(data));
 ```
 
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
 
-You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officially supported.
 
 To start the client:
 
@@ -70,7 +69,7 @@ await client.startClient({ initialSyncLimit: 10 });
 You can perform a call to `/sync` to get the current state of the client:
 
 ```javascript
-client.once("sync", function (state, prevState, res) {
+client.once(sdk.ClientEvent.Sync, function (state, prevState, res) {
     if (state === "PREPARED") {
         console.log("prepared");
     } else {
@@ -87,29 +86,32 @@ const content = {
     body: "message text",
     msgtype: "m.text",
 };
-client.sendEvent("roomId", "m.room.message", content, "", (err, res) => {
-    console.log(err);
-});
+const res = await client.sendEvent("roomId", "m.room.message", content, "");
+console.log(res);
 ```
 
 To listen for message events:
 
 ```javascript
-client.on("Room.timeline", function (event, room, toStartOfTimeline) {
+client.on(sdk.RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (event.getType() !== "m.room.message") {
         return; // only use messages
     }
-    console.log(event.event.content.body);
+    console.log(event.event.content?.body);
 });
 ```
 
 By default, the `matrix-js-sdk` client uses the `MemoryStore` to store events as they are received. For example to iterate through the currently stored timeline for a room:
 
 ```javascript
-Object.keys(client.store.rooms).forEach((roomId) => {
-    client.getRoom(roomId).timeline.forEach((t) => {
+Object.keys(client.store.getRooms()).forEach((roomId) => {
+    client
+      .getRoom(roomId)
+      ?.getLiveTimeline()
+      .getEvents()
+      .forEach((t) => {
         console.log(t.event);
-    });
+      });
 });
 ```
 
@@ -156,12 +158,12 @@ are updated.
 
 ```javascript
 // Listen for low-level MatrixEvents
-client.on("event", function (event) {
+client.on(sdk.ClientEvent.Event, function (event) {
     console.log(event.getType());
 });
 
 // Listen for typing changes
-client.on("RoomMember.typing", function (event, member) {
+client.on(sdk.RoomMemberEvent.Typing, function (event, member) {
     if (member.typing) {
         console.log(member.name + " is typing...");
     } else {
@@ -223,7 +225,7 @@ const matrixClient = sdk.createClient({
 ### Automatically join rooms when invited
 
 ```javascript
-matrixClient.on("RoomMember.membership", function (event, member) {
+matrixClient.on(sdk.RoomMemberEvent.Membership, function (event, member) {
     if (member.membership === "invite" && member.userId === myUserId) {
         matrixClient.joinRoom(member.roomId).then(function () {
             console.log("Auto-joined %s", member.roomId);
@@ -237,7 +239,7 @@ matrixClient.startClient();
 ### Print out messages for all rooms
 
 ```javascript
-matrixClient.on("Room.timeline", function (event, room, toStartOfTimeline) {
+matrixClient.on(sdk.RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
@@ -247,7 +249,7 @@ matrixClient.on("Room.timeline", function (event, room, toStartOfTimeline) {
     console.log(
         // the room name will update with m.room.name events automatically
         "(%s) %s :: %s",
-        room.name,
+        room?.name,
         event.getSender(),
         event.getContent().body,
     );
@@ -269,7 +271,7 @@ Output:
 ### Print out membership lists whenever they are changed
 
 ```javascript
-matrixClient.on("RoomState.members", function (event, state, member) {
+matrixClient.on(sdk.RoomStateEvent.Members, function (event, state, member) {
     const room = matrixClient.getRoom(state.roomId);
     if (!room) {
         return;
