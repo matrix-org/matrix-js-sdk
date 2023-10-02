@@ -133,7 +133,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         path: string,
         queryParams?: QueryDict,
         body?: Body,
-        paramOpts: IRequestOpts = {},
+        paramOpts: IRequestOpts & { doNotAttemptTokenRefresh?: boolean } = {},
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
 
@@ -161,23 +161,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
         } catch (error) {
             const err = error as MatrixError;
 
-            console.log('HHHHHHHHHH CATCH', err.errcode, err, opts, opts.retryWithRefreshedToken);
-            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.retryWithRefreshedToken) {
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
                 const shouldRetry = await this.tryRefreshToken();
                 // if we got a new token retry the request
                 if (shouldRetry) {
-                    // we set a new token successfully
-                    console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
-                    // @TODO(kerrya) don't mutate params (opts, qp)
-                    // this function modifies these params :/ so the retry call may be with different params
                     return this.authedRequest(method, path, queryParams, body, {
                         ...paramOpts,
-                        retryWithRefreshedToken: true
+                        doNotAttemptTokenRefresh: true
                     });
                 }
             }
             // otherwise continue with error handling
-
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
@@ -263,7 +257,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> & {doNotAttemptTokenRefresh?: boolean} = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
@@ -332,29 +326,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (!res.ok) {
-            const err = parseErrorResponse(res, await res.text());
-
-            if (err.errcode === "M_UNKNOWN_TOKEN" && !!this.opts.tokenRefresher && !opts.retryWithRefreshedToken) {
-                const setToken = (newToken) => {
-                    console.log('hhhh refreshToken.setting token', newToken, this);
-                    this.opts.accessToken = newToken;
-                }
-                const newToken = await this.opts.tokenRefresher.doRefreshAccessToken();
-                // we set a new token successfully
-                console.log('hhh', 'retrying request after refreshing token', this.opts.accessToken);
-
-                this.opts.accessToken = newToken;
-
-                return this.requestOtherUrl(method, url, body, {
-                    ...opts, retryWithRefreshedToken: true,
-                    headers: {
-                        ...opts.headers,
-                        Authorization: "Bearer " + this.opts.accessToken
-                    }
-                });
-            } else {
-                throw err;
-            }
+            throw parseErrorResponse(res, await res.text());
         }
 
         if (this.opts.onlyData) {

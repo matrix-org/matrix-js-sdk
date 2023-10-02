@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClient, SigninResponse, UseRefreshTokenArgs, WebStorageStateStore } from "oidc-client-ts";
+import { OidcClient, WebStorageStateStore } from "oidc-client-ts";
+import { TokenRefreshFunction } from "..";
 import { IDelegatedAuthConfig } from "../client";
-import { MatrixClient } from "../client";
 
 import { generateScope } from "./authorize";
 import { discoverAndValidateAuthenticationConfig } from "./discovery";
 
-export class OidcTokenRefresher {
+export abstract class OidcTokenRefresher {
     private oidcClient!: OidcClient;
 
     constructor(
-        private refreshToken: string,
         authConfig: IDelegatedAuthConfig,
         clientId: string,
         redirectUri: string,
@@ -50,30 +49,43 @@ export class OidcTokenRefresher {
         });
     }
 
-    public async doRefreshAccessToken (): Promise<string> {
+    public async doRefreshAccessToken (refreshToken: string): ReturnType<TokenRefreshFunction> {
         // @TODO something here with only one inflight refresh attempt
-        return this.getNewToken();
+        const tokens = await this.getNewToken(refreshToken);
+
+        // await this.persistTokens(tokens);
+
+        return tokens;
     }
 
-    private async getNewToken(): Promise<string> {
+    /**
+     * Persist the new tokens after successfully refreshing
+     * @param accessToken new access token
+     * @param refreshToken OPTIONAL new refresh token 
+     */
+    public abstract persistTokens({ accessToken, refreshToken }: {
+        accessToken: string, refreshToken?: string
+    }): Promise<void>;
+
+    private async getNewToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
         if (!this.oidcClient) {
             throw new Error("No client TODO")
         }
 
         const refreshTokenState = {
-            refresh_token: this.refreshToken,
+            refresh_token: refreshToken,
             session_state: 'test',
             data: undefined,
         }
         const response = await this.oidcClient.useRefreshToken({
             state: refreshTokenState, timeoutInSeconds: 300 });
 
-        this.refreshToken = response.refresh_token;
-        this.expiresAt = response.expires_at;
-
         // TODO persist tokens in storage
         console.log('hhhh doRefreshAccessToken', response);
 
-        return response.access_token;
+        return {
+            accessToken: response.access_token,
+            refreshToken: response.refresh_token,
+        }
     }
 }
