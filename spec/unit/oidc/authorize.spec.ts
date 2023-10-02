@@ -284,6 +284,7 @@ describe("oidc authorization", () => {
                     expires_at: result.tokenResponse.expires_at,
                     scope,
                 },
+                idTokenClaims: result.idTokenClaims,
             });
         });
 
@@ -325,6 +326,7 @@ describe("oidc authorization", () => {
                     expires_at: result.tokenResponse.expires_at,
                     scope,
                 },
+                idTokenClaims: result.idTokenClaims,
             });
 
             expect(result.tokenResponse.token_type).toEqual("Bearer");
