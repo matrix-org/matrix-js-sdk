@@ -1,6 +1,6 @@
 This is a functional terminal app which allows you to see the room list for a user, join rooms, send messages and view room membership lists.
 
-To try it out, you will need to edit `app.js` to configure it for your `homeserver`, `access_token` and `user_id`. Then run:
+To try it out, you will need to edit `app.js` to configure it for your `baseUrl`, `accessToken` and `userId`. Then run:
 
 ```
  $ npm install

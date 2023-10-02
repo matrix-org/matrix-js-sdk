@@ -4,11 +4,13 @@
     "description": "",
     "main": "app.js",
     "scripts": {
-        "preinstall": "npm install ../.."
+        "build": "cd ../.. && yarn build:dev",
+        "start": "node app.js"
     },
     "author": "",
     "license": "Apache 2.0",
     "dependencies": {
-        "cli-color": "^1.0.0"
+        "cli-color": "^1.0.0",
+        "matrix-js-sdk": "file:../../lib"
     }
 }

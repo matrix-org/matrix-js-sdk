@@ -11,7 +11,7 @@
         "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
         "clean": "rimraf lib dist",
         "build": "yarn build:dev && yarn build:compile-browser && yarn build:minify-browser",
-        "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
+        "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types && echo '{ \"main\": \"./index.js\" }' > lib/package.json",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
         "build:compile-browser": "mkdir dist && BROWSERIFYSWAP_ENV='no-rust-crypto' browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
