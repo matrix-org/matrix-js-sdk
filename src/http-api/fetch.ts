@@ -47,7 +47,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
         checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
         opts.onlyData = !!opts.onlyData;
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
-        
     }
 
     public abort(): void {
@@ -137,7 +136,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
 
-        let opts = { ...paramOpts };
+        const opts = { ...paramOpts };
 
         if (this.opts.accessToken) {
             if (this.opts.useAuthorizationHeader) {
@@ -167,7 +166,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 if (shouldRetry) {
                     return this.authedRequest(method, path, queryParams, body, {
                         ...paramOpts,
-                        doNotAttemptTokenRefresh: true
+                        doNotAttemptTokenRefresh: true,
                     });
                 }
             }
@@ -188,9 +187,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         try {
-            const {
-                accessToken, refreshToken,
-            } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
+            const { accessToken, refreshToken } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             // successfully got new tokens
@@ -257,7 +254,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> & {doNotAttemptTokenRefresh?: boolean} = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> & {
+            doNotAttemptTokenRefresh?: boolean;
+        } = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);

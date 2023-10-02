@@ -14,26 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClient, WebStorageStateStore } from "oidc-client-ts";
-import { TokenRefreshFunction } from "..";
-import { IDelegatedAuthConfig } from "../client";
+import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
+import { TokenRefreshFunction } from "../http-api";
+import { IDelegatedAuthConfig } from "../client";
 import { generateScope } from "./authorize";
 import { discoverAndValidateAuthenticationConfig } from "./discovery";
 
 export abstract class OidcTokenRefresher {
     private oidcClient!: OidcClient;
+    private idTokenClaims!: IdTokenClaims;
 
-    constructor(
+    public constructor(
         authConfig: IDelegatedAuthConfig,
         clientId: string,
         redirectUri: string,
         deviceId: string,
+        idTokenClaims: IdTokenClaims,
     ) {
         this.initialiseOidcClient(authConfig, clientId, deviceId, redirectUri);
+        this.idTokenClaims = idTokenClaims;
     }
 
-    private async initialiseOidcClient(authConfig: IDelegatedAuthConfig, clientId: string, deviceId: string, redirectUri: string): Promise<void> {
+    private async initialiseOidcClient(
+        authConfig: IDelegatedAuthConfig,
+        clientId: string,
+        deviceId: string,
+        redirectUri: string,
+    ): Promise<void> {
         const config = await discoverAndValidateAuthenticationConfig(authConfig);
 
         const scope = await generateScope(deviceId);
@@ -44,48 +52,51 @@ export abstract class OidcTokenRefresher {
             scope,
             redirect_uri: redirectUri,
             authority: config.metadata.issuer,
-            // @TODO(kerrya) need this?
             stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
         });
     }
 
-    public async doRefreshAccessToken (refreshToken: string): ReturnType<TokenRefreshFunction> {
-        // @TODO something here with only one inflight refresh attempt
+    public async doRefreshAccessToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
+        // @TODO(kerrya) something here with only one inflight refresh attempt
         const tokens = await this.getNewToken(refreshToken);
 
-        // await this.persistTokens(tokens);
+        await this.persistTokens(tokens);
 
         return tokens;
     }
 
     /**
      * Persist the new tokens after successfully refreshing
-     * @param accessToken new access token
-     * @param refreshToken OPTIONAL new refresh token 
+     * @param accessToken - new access token
+     * @param refreshToken - OPTIONAL new refresh token
      */
-    public abstract persistTokens({ accessToken, refreshToken }: {
-        accessToken: string, refreshToken?: string
+    public abstract persistTokens({
+        accessToken,
+        refreshToken,
+    }: {
+        accessToken: string;
+        refreshToken?: string;
     }): Promise<void>;
 
     private async getNewToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
         if (!this.oidcClient) {
-            throw new Error("No client TODO")
+            throw new Error("No client TODO");
         }
 
         const refreshTokenState = {
             refresh_token: refreshToken,
-            session_state: 'test',
+            session_state: "test",
             data: undefined,
-        }
+            profile: this.idTokenClaims,
+        };
         const response = await this.oidcClient.useRefreshToken({
-            state: refreshTokenState, timeoutInSeconds: 300 });
-
-        // TODO persist tokens in storage
-        console.log('hhhh doRefreshAccessToken', response);
+            state: refreshTokenState,
+            timeoutInSeconds: 300,
+        });
 
         return {
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
-        }
+        };
     }
 }
