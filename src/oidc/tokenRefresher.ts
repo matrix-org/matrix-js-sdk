@@ -20,10 +20,16 @@ import { TokenRefreshFunction } from "../http-api";
 import { IDelegatedAuthConfig } from "../client";
 import { generateScope } from "./authorize";
 import { discoverAndValidateAuthenticationConfig } from "./discovery";
+import { logger } from "../logger";
 
+/**
+ * @experimental
+ */
 export abstract class OidcTokenRefresher {
+    public readonly oidcClientReady!: Promise<void>;
     private oidcClient!: OidcClient;
     private idTokenClaims!: IdTokenClaims;
+    private inflightRefreshRequest?: ReturnType<TokenRefreshFunction>;
 
     public constructor(
         authConfig: IDelegatedAuthConfig,
@@ -32,7 +38,7 @@ export abstract class OidcTokenRefresher {
         deviceId: string,
         idTokenClaims: IdTokenClaims,
     ) {
-        this.initialiseOidcClient(authConfig, clientId, deviceId, redirectUri);
+        this.oidcClientReady = this.initialiseOidcClient(authConfig, clientId, deviceId, redirectUri);
         this.idTokenClaims = idTokenClaims;
     }
 
@@ -44,7 +50,7 @@ export abstract class OidcTokenRefresher {
     ): Promise<void> {
         const config = await discoverAndValidateAuthenticationConfig(authConfig);
 
-        const scope = await generateScope(deviceId);
+        const scope = generateScope(deviceId);
 
         this.oidcClient = new OidcClient({
             ...config.metadata,
@@ -57,12 +63,19 @@ export abstract class OidcTokenRefresher {
     }
 
     public async doRefreshAccessToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
-        // @TODO(kerrya) something here with only one inflight refresh attempt
-        const tokens = await this.getNewToken(refreshToken);
-
-        await this.persistTokens(tokens);
-
-        return tokens;
+        if (!this.inflightRefreshRequest) {
+            this.inflightRefreshRequest = this.getNewToken(refreshToken);
+        }
+        try {
+            const tokens = await this.inflightRefreshRequest;
+            await this.persistTokens(tokens);
+            return tokens;
+        } catch (error) {
+            logger.error("Failed to refresh access token", error);
+            throw error;
+        } finally {
+            this.inflightRefreshRequest = undefined;
+        }
     }
 
     /**
@@ -80,7 +93,7 @@ export abstract class OidcTokenRefresher {
 
     private async getNewToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
         if (!this.oidcClient) {
-            throw new Error("No client TODO");
+            throw new Error("Cannot get new token before OIDC client is initialised.");
         }
 
         const refreshTokenState = {
@@ -89,6 +102,7 @@ export abstract class OidcTokenRefresher {
             data: undefined,
             profile: this.idTokenClaims,
         };
+
         const response = await this.oidcClient.useRefreshToken({
             state: refreshTokenState,
             timeoutInSeconds: 300,
