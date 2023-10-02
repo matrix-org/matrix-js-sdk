@@ -41,3 +41,4 @@ if (indexedDB) {
 }
 
 export * from "./matrix";
+global.matrixcs = matrixcs;
