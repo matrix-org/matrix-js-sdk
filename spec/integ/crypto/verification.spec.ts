@@ -980,24 +980,49 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             });
         }
 
+        it("Verification request not found", async () => {
+            // Expect to not find any verification request
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            expect(request).toBeUndefined();
+        });
+
+        it("ignores old verification requests", async () => {
+            const eventHandler = jest.fn();
+            aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
+
+            const verificationRequestEvent = createVerificationRequestEvent();
+            verificationRequestEvent.origin_server_ts -= 1000000;
+            returnRoomMessageFromSync(TEST_ROOM_ID, verificationRequestEvent);
+
+            await syncPromise(aliceClient);
+
+            // make sure the event has arrived
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
+            expect(matrixEvent.getId()).toEqual(verificationRequestEvent.event_id);
+
+            // check that an event has not been raised, and that the request is not found
+            expect(eventHandler).not.toHaveBeenCalled();
+            expect(
+                aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
+            ).not.toBeDefined();
+        });
+
         it("Plaintext verification request from Bob to Alice", async () => {
             // Add verification request from Bob to Alice in the DM between them
             returnRoomMessageFromSync(TEST_ROOM_ID, createVerificationRequestEvent());
 
-            // Wait for the sync response to be processed
-            await syncPromise(aliceClient);
+            // Wait for the request to be received
+            const request1 = await emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+            expect(request1.roomId).toBe(TEST_ROOM_ID);
+            expect(request1.isSelfVerification).toBe(false);
+            expect(request1.otherUserId).toBe("@bob:xyz");
 
             const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
             // Expect to find the verification request received during the sync
             expect(request?.roomId).toBe(TEST_ROOM_ID);
             expect(request?.isSelfVerification).toBe(false);
             expect(request?.otherUserId).toBe("@bob:xyz");
-        });
-
-        it("Verification request not found", async () => {
-            // Expect to not find any verification request
-            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-            expect(request).not.toBeDefined();
         });
 
         it("Encrypted verification request from Bob to Alice", async () => {
@@ -1021,14 +1046,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await awaitDecryption(matrixEvent);
             expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
+            const requestEventPromise = emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+
             // Send Bob the room keys
             returnToDeviceMessageFromSync(toDeviceEvent);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
             await jest.advanceTimersByTimeAsync(10);
 
-            // Wait for the message to be decrypted
-            await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
+            // Wait for the request to be decrypted
+            const request1 = await requestEventPromise;
+            expect(request1.roomId).toBe(TEST_ROOM_ID);
+            expect(request1.isSelfVerification).toBe(false);
+            expect(request1.otherUserId).toBe("@bob:xyz");
 
             const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
             // Expect to find the verification request received during the sync
