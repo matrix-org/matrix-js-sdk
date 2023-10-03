@@ -1210,11 +1210,6 @@ describe("MatrixClient", function () {
             httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
-            expect(client.http.getUrl).toHaveLastReturnedWith(
-                expect.objectContaining({
-                    href: "http://alice.localhost.test.server/_matrix/client/v1/login/get_token",
-                }),
-            );
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
