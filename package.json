@@ -10,12 +10,10 @@
         "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
         "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
         "clean": "rimraf lib dist",
-        "build": "yarn build:dev && yarn build:compile-browser && yarn build:minify-browser",
+        "build": "yarn build:dev",
         "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
-        "build:compile-browser": "mkdir dist && BROWSERIFYSWAP_ENV='no-rust-crypto' browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
-        "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
         "gendoc": "typedoc",
         "lint": "yarn lint:types && yarn lint:js",
         "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
@@ -97,8 +95,6 @@
         "allchange": "^1.0.6",
         "babel-jest": "^29.0.0",
         "babelify": "^10.0.0",
-        "browserify": "^17.0.0",
-        "browserify-swap": "^0.2.2",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
         "eslint": "8.49.0",
@@ -136,25 +132,5 @@
         "outputDirectory": "coverage",
         "outputName": "jest-sonar-report.xml",
         "relativePaths": true
-    },
-    "browserify": {
-        "transform": [
-            "browserify-swap",
-            [
-                "babelify",
-                {
-                    "sourceMaps": "inline",
-                    "presets": [
-                        "@babel/preset-env",
-                        "@babel/preset-typescript"
-                    ]
-                }
-            ]
-        ]
-    },
-    "browserify-swap": {
-        "no-rust-crypto": {
-            "src/rust-crypto/index.ts$": "./src/rust-crypto/browserify-index.ts"
-        }
     }
 }

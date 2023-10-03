@@ -17,7 +17,7 @@ jobs:
         timeout-minutes: 10
         strategy:
             matrix:
-                specs: [browserify, integ, unit]
+                specs: [integ, unit]
                 node: [18, latest]
         steps:
             - name: Checkout code
@@ -31,10 +31,6 @@ jobs:
 
             - name: Install dependencies
               run: "yarn install"
-
-            - name: Build
-              if: matrix.specs == 'browserify'
-              run: "yarn build"
 
             - name: Get number of CPU cores
               id: cpu-cores
