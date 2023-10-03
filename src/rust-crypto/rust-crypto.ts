@@ -1691,7 +1691,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
     }
 
     let shieldReason: EventShieldReason | null;
-    if (shieldState.message === null) {
+    if (shieldState.message === undefined) {
         shieldReason = null;
     } else if (shieldState.message === "Encrypted by an unverified user.") {
         // this case isn't actually used with lax shield semantics.
