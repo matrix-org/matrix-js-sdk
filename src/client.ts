@@ -7707,6 +7707,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the refresh token associated with this account.
+     * @returns The refresh_token or null
+     */
+    public getRefreshToken(): string | null {
+        return this.http.opts.refreshToken || null;
+    }
+
+    /**
      * Set the access token associated with this account.
      * @param token - The new access token.
      */
