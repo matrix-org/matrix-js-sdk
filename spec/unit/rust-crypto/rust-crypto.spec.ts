@@ -796,6 +796,32 @@ describe("RustCrypto", () => {
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
         });
 
+        it("can't store if no current version'", async () => {
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto(mockHttpApi);
+            fetchMock.get(
+                "path:/_matrix/client/v3/room_keys/version",
+                {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                },
+                {
+                    overwriteRoutes: true,
+                },
+            );
+            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(fetched).toEqual(null);
+        });
+
         it("can save and restore a key with version", async () => {
             const key = "testtesttesttesttesttesttesttest";
             const rustCrypto = await makeTestRustCrypto();
