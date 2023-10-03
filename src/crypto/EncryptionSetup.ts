@@ -151,8 +151,8 @@ export class EncryptionSetupBuilder {
             });
         }
         // store session backup key in cache
-        if (this.sessionBackupPrivateKey) {
-            await crypto.storeSessionBackupPrivateKey(this.sessionBackupPrivateKey, this.keyBackupInfo?.version);
+        if (this.sessionBackupPrivateKey && this.keyBackupInfo?.version) {
+            await crypto.storeSessionBackupPrivateKey(this.sessionBackupPrivateKey, this.keyBackupInfo.version);
         }
     }
 }

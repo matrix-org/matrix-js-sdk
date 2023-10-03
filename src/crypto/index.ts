@@ -1302,7 +1302,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // make sure we have a Uint8Array, rather than a string
         if (typeof encodedKey === "string") {
             key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(encodedKey) || encodedKey));
-            await this.storeSessionBackupPrivateKey(key);
+            // legacy crypto doesn't care about the version
+            await this.storeSessionBackupPrivateKey(key, "");
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
@@ -1317,7 +1318,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param key - the private key
      * @returns a promise so you can catch failures
      */
-    public async storeSessionBackupPrivateKey(key: ArrayLike<number>, version?: string): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: ArrayLike<number>, version: string): Promise<void> {
         if (!(key instanceof Uint8Array)) {
             // eslint-disable-next-line @typescript-eslint/no-base-to-string
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);

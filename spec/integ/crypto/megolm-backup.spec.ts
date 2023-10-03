@@ -186,7 +186,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         const aliceCrypto = aliceClient.getCrypto()!;
         await aliceCrypto.storeSessionBackupPrivateKey(
             Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-            testData.SIGNED_BACKUP_DATA.version,
+            testData.SIGNED_BACKUP_DATA.version!,
         );
 
         // start after saving the private key
@@ -661,7 +661,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version,
+                testData.SIGNED_BACKUP_DATA.version!,
             );
 
             const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
@@ -675,7 +675,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version,
+                testData.SIGNED_BACKUP_DATA.version!,
             );
 
             const backup: KeyBackupInfo = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
