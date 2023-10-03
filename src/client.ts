@@ -3864,6 +3864,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
+        if (!backupInfo.version) {
+            throw new Error("Backup version must be defined");
+        }
+
         let totalKeyCount = 0;
         let keys: IMegolmSessionData[] = [];
 
@@ -3880,14 +3884,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             // Cache the key, if possible.
             // This is async.
-            if (backupInfo.version != null) {
-                this.cryptoBackend
-                    .storeSessionBackupPrivateKey(privKey, backupInfo.version)
-                    .catch((e) => {
-                        logger.warn("Error caching session backup key:", e);
-                    })
-                    .then(cacheCompleteCallback);
-            }
+            this.cryptoBackend
+                .storeSessionBackupPrivateKey(privKey, backupInfo.version)
+                .catch((e) => {
+                    logger.warn("Error caching session backup key:", e);
+                })
+                .then(cacheCompleteCallback);
 
             if (progressCallback) {
                 progressCallback({

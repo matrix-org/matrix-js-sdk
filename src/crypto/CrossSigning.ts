@@ -741,7 +741,7 @@ export async function requestKeysDuringVerification(
                 logger.info("Got key backup key, decoding...");
                 const decodedKey = decodeBase64(base64Key);
                 logger.info("Decoded backup key, storing...");
-                await client.crypto!.storeSessionBackupPrivateKey(Uint8Array.from(decodedKey), "1");
+                await client.crypto!.storeSessionBackupPrivateKey(Uint8Array.from(decodedKey));
                 logger.info("Backup key stored. Starting backup restore...");
                 const backupInfo = await client.getKeyBackupVersion();
                 // no need to await for this - just let it go in the bg

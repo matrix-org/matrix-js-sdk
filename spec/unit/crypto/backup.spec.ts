@@ -377,7 +377,7 @@ describe("MegolmBackup", function () {
             return client
                 .initCrypto()
                 .then(() => {
-                    return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32), "1");
+                    return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32));
                 })
                 .then(() => {
                     return cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
@@ -696,7 +696,7 @@ describe("MegolmBackup", function () {
 
         it("has working cache functions", async function () {
             const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
-            await client.crypto!.storeSessionBackupPrivateKey(key, "1");
+            await client.crypto!.storeSessionBackupPrivateKey(key);
             const result = await client.crypto!.getSessionBackupPrivateKey();
             expect(new Uint8Array(result!)).toEqual(key);
         });
