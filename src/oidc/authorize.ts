@@ -52,7 +52,7 @@ export type AuthorizationParams = {
  * @returns scope
  */
 export const generateScope = (deviceId?: string): string => {
-    const safeDeviceId = deviceId || randomString(10);
+    const safeDeviceId = deviceId ?? randomString(10);
     return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
