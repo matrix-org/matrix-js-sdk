@@ -18,6 +18,9 @@ import { MatrixError } from "./errors";
 
 export type Body = Record<string, any> | BodyInit;
 
+/**
+ * @experimental
+ */
 export type TokenRefreshFunction = (refreshToken: string) => Promise<{
     accessToken: string;
     refreshToken?: string;
