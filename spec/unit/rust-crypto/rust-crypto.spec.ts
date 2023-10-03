@@ -781,9 +781,16 @@ describe("RustCrypto", () => {
 
     describe("get|storeSessionBackupPrivateKey", () => {
         it("can save and restore a key", async () => {
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
             const key = "testtesttesttesttesttesttesttest";
-            const rustCrypto = await makeTestRustCrypto();
-            rustCrypto.getActiveSessionBackupVersion = jest.fn().mockReturnValue("1");
+            const rustCrypto = await makeTestRustCrypto(mockHttpApi);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+                overwriteRoutes: true,
+            });
             await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);

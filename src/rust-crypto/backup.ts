@@ -285,7 +285,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      *
      * @returns Information object from API or null if there is no active backup.
      */
-    private async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
+    public async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
         try {
             return await this.http.authedRequest<KeyBackupInfo>(
                 Method.Get,
