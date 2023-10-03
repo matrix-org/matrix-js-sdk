@@ -783,7 +783,16 @@ describe("RustCrypto", () => {
         it("can save and restore a key", async () => {
             const key = "testtesttesttesttesttesttesttest";
             const rustCrypto = await makeTestRustCrypto();
+            rustCrypto.getActiveSessionBackupVersion = jest.fn().mockReturnValue("1");
             await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+
+        it("can save and restore a key with version", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key), "1");
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
         });

@@ -374,8 +374,21 @@ export interface CryptoApi {
      * This should be called if the client has received the key from another device via secret sharing (gossiping).
      *
      * @param key - the backup decryption key
+     *
+     * @deprecated prefer `version` parameter variant.
      */
     storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
+
+    /**
+     * Store the backup decryption key.
+     *
+     * This should be called if the client has received the key from another device via secret sharing (gossiping).
+     *
+     * @param key - the backup decryption key
+     * @param version - the backup version corresponding to this decryption key
+     *
+     */
+    storeSessionBackupPrivateKey(key: Uint8Array, version?: string): Promise<void>;
 
     /**
      * Get the current status of key backup.

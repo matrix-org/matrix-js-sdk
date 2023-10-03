@@ -3881,7 +3881,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Cache the key, if possible.
             // This is async.
             this.cryptoBackend
-                .storeSessionBackupPrivateKey(privKey)
+                .storeSessionBackupPrivateKey(privKey, backupInfo?.version)
                 .catch((e) => {
                     logger.warn("Error caching session backup key:", e);
                 })

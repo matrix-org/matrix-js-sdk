@@ -1179,7 +1179,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // write the key to 4S
         const privateKey = info.privateKey;
         await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
-        await this.storeSessionBackupPrivateKey(privateKey);
+        await this.storeSessionBackupPrivateKey(privateKey, version);
 
         await this.backupManager.checkAndStart();
     }
@@ -1317,7 +1317,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param key - the private key
      * @returns a promise so you can catch failures
      */
-    public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: ArrayLike<number>, version?: string): Promise<void> {
         if (!(key instanceof Uint8Array)) {
             // eslint-disable-next-line @typescript-eslint/no-base-to-string
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);

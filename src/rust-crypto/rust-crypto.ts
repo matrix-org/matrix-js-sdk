@@ -1006,11 +1006,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      *
      * @param key - the backup decryption key
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: Uint8Array, version?: string): Promise<void> {
         const base64Key = encodeBase64(key);
 
-        // TODO get version from backupManager
-        await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
+        const activeVersion = version ?? (await this.getActiveSessionBackupVersion());
+        if (!activeVersion) {
+            logger.warn("Trying to store a backup private key but there is no active backup");
+            return;
+        }
+        await this.olmMachine.saveBackupDecryptionKey(
+            RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
+            activeVersion,
+        );
     }
 
     /**
