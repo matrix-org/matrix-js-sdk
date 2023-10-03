@@ -863,6 +863,44 @@ describe("RustCrypto", () => {
             expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
         });
     });
+
+    describe("onUserIdentityUpdated", () => {
+        it("raises KeyBackupStatus event when identify change", async () => {
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+
+            const olmMachine = {
+                getIdentity: jest.fn(),
+                // Force the backup to be trusted by the olmMachine
+                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(true) }),
+                isBackupEnabled: jest.fn().mockReturnValue(true),
+                getBackupKeys: jest.fn(),
+                enableBackupV1: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+
+            const rustCrypto = new RustCrypto(
+                olmMachine,
+                mockHttpApi,
+                testData.TEST_USER_ID,
+                testData.TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+
+            // Return the key backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            // Wait for the key backup to be available
+            const keyBackupStatusPromise = new Promise<boolean>((resolve) =>
+                rustCrypto.once(CryptoEvent.KeyBackupStatus, resolve),
+            );
+            await rustCrypto.onUserIdentityUpdated(new RustSdkCryptoJs.UserId(testData.TEST_USER_ID));
+            expect(await keyBackupStatusPromise).toBe(true);
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing

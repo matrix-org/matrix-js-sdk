@@ -62,7 +62,7 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
@@ -1346,6 +1346,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async onUserIdentityUpdated(userId: RustSdkCryptoJs.UserId): Promise<void> {
         const newVerification = await this.getUserVerificationStatus(userId.toString());
         this.emit(CryptoEvent.UserTrustStatusChanged, userId.toString(), newVerification);
+
+        // If our own user identity has changed, we may now trust the key backup where we did not before.
+        // So, re-check the key backup status and enable it if available.
+        if (userId.toString() === this.userId) {
+            await this.checkKeyBackupAndEnable();
+        }
     }
 
     /**
@@ -1413,6 +1419,32 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }),
             new RustSdkCryptoJs.RoomId(roomId),
         );
+
+        if (
+            event.getType() === EventType.RoomMessage &&
+            event.getContent().msgtype === MsgType.KeyVerificationRequest
+        ) {
+            const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
+                new RustSdkCryptoJs.UserId(event.getSender()!),
+                event.getId()!,
+            );
+
+            if (!request) {
+                // There are multiple reasons this can happen; probably the most likely is that the event is too old.
+                logger.info(
+                    `Ignoring just-received verification request ${event.getId()} which did not start a rust-side verification`,
+                );
+            } else {
+                this.emit(
+                    CryptoEvent.VerificationRequestReceived,
+                    new RustVerificationRequest(
+                        request,
+                        this.outgoingRequestProcessor,
+                        this._supportedVerificationMethods,
+                    ),
+                );
+            }
+        }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
         this.outgoingRequestLoop();
