@@ -1339,6 +1339,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async onUserIdentityUpdated(userId: RustSdkCryptoJs.UserId): Promise<void> {
         const newVerification = await this.getUserVerificationStatus(userId.toString());
         this.emit(CryptoEvent.UserTrustStatusChanged, userId.toString(), newVerification);
+
+        // If our own user identity has changed, we may now trust the key backup where we did not before.
+        // So, re-check the key backup status and enable it if available.
+        if (userId.toString() === this.userId) {
+            await this.checkKeyBackupAndEnable();
+        }
     }
 
     /**
