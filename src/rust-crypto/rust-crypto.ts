@@ -1223,10 +1223,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // start tracking devices for any users already known to be in this room.
         const members = await room.getEncryptionTargetMembers();
-        logger.debug(
-            `[${room.roomId} encryption] starting to track devices for: `,
-            members.map((u) => `${u.userId} (${u.membership})`),
-        );
         await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
     }
 
@@ -1518,7 +1514,10 @@ class EventDecryptor {
     public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine, private readonly crypto: RustCrypto) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        logger.info("Attempting decryption of event", event);
+        logger.info(
+            `Attempting decryption of event ${event.getId()} in ${event.getRoomId()} from ${event.getSender()}`,
+        );
+
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
@@ -1691,7 +1690,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
     }
 
     let shieldReason: EventShieldReason | null;
-    if (shieldState.message === null) {
+    if (shieldState.message === undefined) {
         shieldReason = null;
     } else if (shieldState.message === "Encrypted by an unverified user.") {
         // this case isn't actually used with lax shield semantics.

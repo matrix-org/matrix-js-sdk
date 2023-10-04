@@ -498,7 +498,7 @@ describe("RustCrypto", () => {
             [RustSdkCryptoJs.ShieldColor.Red, EventShieldColour.RED],
         ])("gets the right shield color (%i)", async (rustShield, expectedShield) => {
             const mockEncryptionInfo = {
-                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: null }),
+                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: undefined }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
@@ -509,7 +509,7 @@ describe("RustCrypto", () => {
         });
 
         it.each([
-            [null, null],
+            [undefined, null],
             ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
             ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
             [

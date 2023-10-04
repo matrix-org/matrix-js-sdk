@@ -65,15 +65,14 @@ export class RoomEncryptor {
      * @param member - new membership state
      */
     public onRoomMembership(member: RoomMember): void {
-        this.prefixedLogger.debug(`${member.membership} event for ${member.userId}`);
-
         if (
             member.membership == "join" ||
             (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
-            this.prefixedLogger.debug(`starting to track devices for: ${member.userId}`);
-            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]);
+            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
+                this.prefixedLogger.error("Unable to update tracked users", e);
+            });
         }
 
         // TODO: handle leaves (including our own)
