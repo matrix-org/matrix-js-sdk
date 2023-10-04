@@ -115,8 +115,7 @@ describe("OidcTokenRefresher", () => {
             const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
-            const refreshToken = "refresh-token";
-            const result = await refresher.doRefreshAccessToken(refreshToken);
+            const result = await refresher.doRefreshAccessToken("refresh-token");
 
             expect(fetchMock).toHaveFetched(config.metadata.token_endpoint, {
                 method: "POST",
@@ -134,8 +133,7 @@ describe("OidcTokenRefresher", () => {
             // spy on our stub
             jest.spyOn(refresher, "persistTokens");
 
-            const refreshToken = "refresh-token";
-            await refresher.doRefreshAccessToken(refreshToken);
+            await refresher.doRefreshAccessToken("refresh-token");
 
             expect(refresher.persistTokens).toHaveBeenCalledWith({
                 accessToken: "new-access-token",
@@ -214,8 +212,7 @@ describe("OidcTokenRefresher", () => {
             const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
-            const refreshToken = "refreshToken";
-            await expect(refresher.doRefreshAccessToken(refreshToken)).rejects.toThrow();
+            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
         });
 
         it("should make fresh request after a failed request", async () => {
@@ -248,10 +245,8 @@ describe("OidcTokenRefresher", () => {
             // reset call counts
             fetchMock.resetHistory();
 
-            const refreshToken = "refresh-token";
-
             // first call fails
-            await expect(refresher.doRefreshAccessToken(refreshToken)).rejects.toThrow();
+            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
 
             // call again after first request resolves
             const result = await refresher.doRefreshAccessToken("first-new-refresh-token");
