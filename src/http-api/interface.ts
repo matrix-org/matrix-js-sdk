@@ -21,10 +21,14 @@ export type Body = Record<string, any> | BodyInit;
 /**
  * @experimental
  */
-export type TokenRefreshFunction = (refreshToken: string) => Promise<{
+export type AccessTokens = {
     accessToken: string;
     refreshToken?: string;
-}>;
+};
+/**
+ * @experimental
+ */
+export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 

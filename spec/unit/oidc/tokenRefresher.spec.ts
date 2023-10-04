@@ -19,9 +19,9 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
-import { IdTokenClaims } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig, OidcTokenRefresher } from "../../../src";
+import { OidcTokenRefresher } from "../../../src";
+import { logger } from "../../../src/logger";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("OidcTokenRefresher", () => {
@@ -38,22 +38,8 @@ describe("OidcTokenRefresher", () => {
         sub: "123",
         iat: 123,
     };
+    // used to mock a valid token response, as consumed by OidcClient library
     const scope = `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
-    class TestClass extends OidcTokenRefresher {
-        public constructor(
-            authConfig: IDelegatedAuthConfig,
-            clientId: string,
-            redirectUri: string,
-            deviceId: string,
-            idTokenClaims: IdTokenClaims,
-        ) {
-            super(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
-        }
-
-        public async persistTokens(_tokens: { accessToken: string; refreshToken?: string | undefined }): Promise<void> {
-            // NOOP
-        }
-    }
 
     const config = makeDelegatedAuthConfig(authConfig.issuer);
 
@@ -85,11 +71,31 @@ describe("OidcTokenRefresher", () => {
     });
 
     afterEach(() => {
+        jest.restoreAllMocks();
         fetchMock.resetBehavior();
     });
 
+    it("throws when oidc client cannot be initialised", async () => {
+        jest.spyOn(logger, "error");
+        fetchMock.get(
+            `${config.metadata.issuer}.well-known/openid-configuration`,
+            {
+                ok: false,
+                status: 404,
+            },
+            { overwriteRoutes: true },
+        );
+        const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+        await expect(refresher.oidcClientReady).rejects.toThrow();
+        expect(logger.error).toHaveBeenCalledWith(
+            "Failed to initialise OIDC client.",
+            // error from OidcClient
+            expect.any(Error),
+        );
+    });
+
     it("initialises oidc client", async () => {
-        const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+        const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
         await refresher.oidcClientReady;
 
         // @ts-ignore peek at private property to see we initialised the client correctly
@@ -105,14 +111,14 @@ describe("OidcTokenRefresher", () => {
 
     describe("doRefreshAccessToken()", () => {
         it("should throw when oidcClient has not been initialised", async () => {
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow(
                 "Cannot get new token before OIDC client is initialised.",
             );
         });
 
         it("should refresh the tokens", async () => {
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
             const result = await refresher.doRefreshAccessToken("refresh-token");
@@ -128,7 +134,7 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should persist the new tokens", async () => {
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // spy on our stub
             jest.spyOn(refresher, "persistTokens");
@@ -166,7 +172,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: false },
                 );
 
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
             fetchMock.resetHistory();
@@ -209,7 +215,7 @@ describe("OidcTokenRefresher", () => {
                 { overwriteRoutes: true },
             );
 
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
             await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
@@ -240,7 +246,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: false },
                 );
 
-            const refresher = new TestClass(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
             fetchMock.resetHistory();
