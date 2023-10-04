@@ -1005,12 +1005,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
      *
      * @param key - the backup decryption key
+     * @param version - the backup version for this key.
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: Uint8Array, version?: string): Promise<void> {
         const base64Key = encodeBase64(key);
 
-        // TODO get version from backupManager
-        await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
+        if (!version) {
+            throw new Error("storeSessionBackupPrivateKey: version is required");
+        }
+
+        await this.olmMachine.saveBackupDecryptionKey(
+            RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
+            version,
+        );
     }
 
     /**

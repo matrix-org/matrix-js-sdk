@@ -783,9 +783,22 @@ describe("RustCrypto", () => {
         it("can save and restore a key", async () => {
             const key = "testtesttesttesttesttesttesttest";
             const rustCrypto = await makeTestRustCrypto();
-            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            await rustCrypto.storeSessionBackupPrivateKey(
+                new TextEncoder().encode(key),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+
+        it("fails to save a key if version not provided", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() => rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key))).rejects.toThrow(
+                "storeSessionBackupPrivateKey: version is required",
+            );
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(fetched).toBeNull();
         });
     });
 
