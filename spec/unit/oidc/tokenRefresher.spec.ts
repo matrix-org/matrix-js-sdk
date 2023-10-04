@@ -24,7 +24,7 @@ import { IdTokenClaims } from "oidc-client-ts";
 import { IDelegatedAuthConfig, OidcTokenRefresher } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
-describe("TokenRefresher()", () => {
+describe("OidcTokenRefresher", () => {
     const authConfig = {
         issuer: "https://issuer.org/",
     };
