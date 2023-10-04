@@ -185,7 +185,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * and stops scheduled updates.
      * This will not unsubscribe from updates: remember to call unsubscribe() separately if
      * desired.
-     * The membership update required to leave the session will retry if it fails. 
+     * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      */
