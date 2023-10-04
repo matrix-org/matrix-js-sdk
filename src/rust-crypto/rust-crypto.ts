@@ -70,7 +70,7 @@ import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
-import { encodeBase64 } from "../common-crypto/base64";
+import { decodeBase64, encodeBase64 } from "../common-crypto/base64";
 import { DecryptionError } from "../crypto/algorithms";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
@@ -1347,6 +1347,46 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // So, re-check the key backup status and enable it if available.
         if (userId.toString() === this.userId) {
             await this.checkKeyBackupAndEnable();
+        }
+    }
+
+    /**
+     * Callback for `OlmMachine.registerReceiveSecretCallback`.
+     *
+     * Called by the rust-sdk whenever a secret is received.
+     * The gossipped secrets are received using the `m.secret.send` event type
+     * and are guaranteed to have been received over a 1-to-1 Olm
+     * Session from a verified device.
+     *
+     * The only secret this is currently broadcasted is the `m.megolm_backup.v1`.
+     *
+     * @param name - the secret name
+     * @param base64 - the secret value base 64 encoded
+     */
+    public async onReceiveSecret(name: string, base64: string): Promise<void> {
+        logger.debug(`onReceiveSecret: Received secret ${name}`);
+        if (name === "m.megolm_backup.v1") {
+            // We need the current version, and it's a good time to check if trusted
+            const info = (await this.backupManager.checkKeyBackupAndEnable(true))?.backupInfo;
+            if (info?.version) {
+                const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64);
+
+                const authPublickey = (info.auth_data as Curve25519AuthData)?.public_key;
+                const backupMatchesSavedPrivateKey =
+                    authPublickey === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
+
+                if (!backupMatchesSavedPrivateKey) {
+                    logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
+                    // just ignore the secret
+                    return;
+                }
+
+                await this.storeSessionBackupPrivateKey(decodeBase64(base64), info.version);
+                // XXXX at this point we should probably try to download the backup and import the keys,
+                // or at least retry for the current decryption failures?
+                // Maybe add some signaling when a new secret is received, and let clients handle it?
+                // as it's where the restore from backup APIs are
+            }
         }
     }
 

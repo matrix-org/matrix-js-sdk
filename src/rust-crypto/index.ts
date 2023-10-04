@@ -73,6 +73,10 @@ export async function initRustCrypto(
         rustCrypto.onUserIdentityUpdated(userId),
     );
 
+    await olmMachine.registerReceiveSecretCallback((name: string, base64: string) =>
+        rustCrypto.onReceiveSecret(name, base64),
+    );
+
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
     //
     // This is primarily a fudge to get it to correctly populate the `users_for_key_query` list, so that future
