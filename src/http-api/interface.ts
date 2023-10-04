@@ -18,10 +18,17 @@ import { MatrixError } from "./errors";
 
 export type Body = Record<string, any> | BodyInit;
 
-export type TokenRefreshFunction = (refreshToken: string) => Promise<{
+/**
+ * @experimental
+ */
+export type AccessTokens = {
     accessToken: string;
     refreshToken?: string;
-}>;
+};
+/**
+ * @experimental
+ */
+export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 

@@ -16,7 +16,7 @@ limitations under the License.
 
 import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
-import { TokenRefreshFunction } from "../http-api";
+import { AccessTokens } from "../http-api";
 import { IDelegatedAuthConfig } from "../client";
 import { generateScope } from "./authorize";
 import { discoverAndValidateAuthenticationConfig } from "./discovery";
@@ -24,12 +24,21 @@ import { logger } from "../logger";
 
 /**
  * @experimental
- * Class responsible to refreshing OIDC access tokens
+ * Class responsible for refreshing OIDC access tokens
+ *
+ * Client implementations will likely want to override {@link persistTokens} to persist tokens after successful refresh
+ *
+ * You can then use {@link doRefreshAccessToken} in {@link ICreateClientOpts.tokenRefreshFunction}.
  */
-export abstract class OidcTokenRefresher {
+export class OidcTokenRefresher {
+    /**
+     * Used to determine the OidcClient has been initialised
+     * and is ready to start refreshing tokens
+     * throws when client initialisation fails
+     */
     public readonly oidcClientReady!: Promise<void>;
     private oidcClient!: OidcClient;
-    private inflightRefreshRequest?: ReturnType<TokenRefreshFunction>;
+    private inflightRefreshRequest?: Promise<AccessTokens>;
 
     public constructor(
         /**
@@ -44,6 +53,9 @@ export abstract class OidcTokenRefresher {
          * redirectUri as registered with OP
          */
         redirectUri: string,
+        /**
+         * Device ID of current session
+         */
         deviceId: string,
         /**
          * idTokenClaims as returned from authorization grant
@@ -60,57 +72,55 @@ export abstract class OidcTokenRefresher {
         deviceId: string,
         redirectUri: string,
     ): Promise<void> {
-        const config = await discoverAndValidateAuthenticationConfig(authConfig);
+        try {
+            const config = await discoverAndValidateAuthenticationConfig(authConfig);
 
-        const scope = generateScope(deviceId);
+            const scope = generateScope(deviceId);
 
-        this.oidcClient = new OidcClient({
-            ...config.metadata,
-            client_id: clientId,
-            scope,
-            redirect_uri: redirectUri,
-            authority: config.metadata.issuer,
-            stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
-        });
+            this.oidcClient = new OidcClient({
+                ...config.metadata,
+                client_id: clientId,
+                scope,
+                redirect_uri: redirectUri,
+                authority: config.metadata.issuer,
+                stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+            });
+        } catch (error) {
+            logger.error("Failed to initialise OIDC client.", error);
+            throw new Error("Failed to initialise OIDC client.");
+        }
     }
 
     /**
-     * Attempt token refresh using given access token
-     * When successful, persist new tokens
+     * Attempt token refresh using given refresh token
      * @param refreshToken - refresh token to use in request with token issuer
      * @returns tokens - Promise that resolves with new access and refresh tokens
      * @throws when token refresh fails
      */
-    public async doRefreshAccessToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
+    public async doRefreshAccessToken(refreshToken: string): Promise<AccessTokens> {
         if (!this.inflightRefreshRequest) {
-            this.inflightRefreshRequest = this.getNewToken(refreshToken);
+            this.inflightRefreshRequest = this.getNewTokens(refreshToken);
         }
         try {
             const tokens = await this.inflightRefreshRequest;
-            await this.persistTokens(tokens);
             return tokens;
-        } catch (error) {
-            logger.error("Failed to refresh access token", error);
-            throw error;
         } finally {
             this.inflightRefreshRequest = undefined;
         }
     }
 
     /**
-     * Persist the new tokens after successfully refreshing
+     * Persist the new tokens
+     * Called after tokens are successfully refreshed
+     * This function is intended to be overriden by the consumer when persistence is necessary
      * @param accessToken - new access token
      * @param refreshToken - OPTIONAL new refresh token
      */
-    public abstract persistTokens({
-        accessToken,
-        refreshToken,
-    }: {
-        accessToken: string;
-        refreshToken?: string;
-    }): Promise<void>;
+    public async persistTokens(_tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
+        // NOOP
+    }
 
-    private async getNewToken(refreshToken: string): ReturnType<TokenRefreshFunction> {
+    private async getNewTokens(refreshToken: string): Promise<AccessTokens> {
         if (!this.oidcClient) {
             throw new Error("Cannot get new token before OIDC client is initialised.");
         }
@@ -127,9 +137,13 @@ export abstract class OidcTokenRefresher {
             timeoutInSeconds: 300,
         });
 
-        return {
+        const tokens = {
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
         };
+
+        await this.persistTokens(tokens);
+
+        return tokens;
     }
 }
