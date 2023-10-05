@@ -73,8 +73,15 @@ export async function initRustCrypto(
         rustCrypto.onUserIdentityUpdated(userId),
     );
 
-    await olmMachine.registerReceiveSecretCallback((name: string, base64: string) =>
-        rustCrypto.onReceiveSecret(name, base64),
+    // check first if some secrets are pending for process. The registerReceiveSecretCallback will be
+    // triggered only for new secrets.
+    const pendingValues: string[] = await olmMachine.getSecretsFromInbox("m.megolm_backup.v1");
+    pendingValues.forEach((value) => {
+        rustCrypto.onReceiveSecret("m.megolm_backup.v1", value);
+    });
+
+    await olmMachine.registerReceiveSecretCallback((name: string, value: string) =>
+        rustCrypto.onReceiveSecret(name, value),
     );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.

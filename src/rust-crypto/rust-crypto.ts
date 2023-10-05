@@ -1363,13 +1363,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param name - the secret name
      * @param base64 - the secret value base 64 encoded
      */
-    public async onReceiveSecret(name: string, base64: string): Promise<void> {
+    public async onReceiveSecret(name: string, value: string): Promise<void> {
         logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
             // We need the current version, and it's a good time to check if trusted
             const info = (await this.backupManager.checkKeyBackupAndEnable(true))?.backupInfo;
             if (info?.version) {
-                const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64);
+                const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(value);
 
                 const authPublickey = (info.auth_data as Curve25519AuthData)?.public_key;
                 const backupMatchesSavedPrivateKey =
@@ -1381,7 +1381,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     return;
                 }
 
-                await this.storeSessionBackupPrivateKey(decodeBase64(base64), info.version);
+                await this.storeSessionBackupPrivateKey(decodeBase64(value), info.version);
                 // XXXX at this point we should probably try to download the backup and import the keys,
                 // or at least retry for the current decryption failures?
                 // Maybe add some signaling when a new secret is received, and let clients handle it?
