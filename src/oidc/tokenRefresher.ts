@@ -31,9 +31,10 @@ import { logger } from "../logger";
  */
 export class OidcTokenRefresher {
     /**
-     * Used to determine the OidcClient has been initialised
-     * and is ready to start refreshing tokens
-     * throws when client initialisation fails
+     * Promise which will complete once the OidcClient has been initialised
+     * and is ready to start refreshing tokens.
+     *
+     * Will reject if the client initialisation fails.
      */
     public readonly oidcClientReady!: Promise<void>;
     private oidcClient!: OidcClient;
