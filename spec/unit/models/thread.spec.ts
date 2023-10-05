@@ -675,6 +675,41 @@ describe("Thread", () => {
             });
         });
     });
+
+    describe("addEvent", () => {
+        describe("Given server support for threads", () => {
+            let previousThreadHasServerSideSupport: FeatureSupport;
+
+            beforeAll(() => {
+                previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+                Thread.hasServerSideSupport = FeatureSupport.Stable;
+            });
+
+            afterAll(() => {
+                Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
+            });
+
+            it.only("Adds events even if they appear out of order", async () => {
+                const client = createClient();
+                const user = "@alice:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+
+                // When two messages come in but the later one has an older timestamp
+                const message1 = createThreadMessage(thread.id, user, room, "message1");
+                const message2 = createThreadMessage(thread.id, user, room, "message2");
+                message2.localTimestamp -= 10000;
+                await thread.addEvent(message1, false);
+                await thread.addEvent(message2, false);
+
+                // Then both events end up in the timeline
+                const lastEvent = thread.timeline.at(-1)!;
+                const secondLastEvent = thread.timeline.at(-2)!;
+                expect(lastEvent).toBe(message2);
+                expect(secondLastEvent).toBe(message1);
+            });
+        });
+    });
 });
 
 /**
