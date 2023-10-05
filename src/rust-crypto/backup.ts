@@ -82,7 +82,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Get the backup version we are currently backing up to, if any
      */
     public async getActiveBackupVersion(): Promise<string | null> {
-        if (!this.olmMachine.isBackupEnabled()) return null;
+        if (!(await this.olmMachine.isBackupEnabled())) return null;
         return this.activeBackupVersion;
     }
 

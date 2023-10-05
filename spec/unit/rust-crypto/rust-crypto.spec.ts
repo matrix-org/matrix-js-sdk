@@ -498,7 +498,7 @@ describe("RustCrypto", () => {
             [RustSdkCryptoJs.ShieldColor.Red, EventShieldColour.RED],
         ])("gets the right shield color (%i)", async (rustShield, expectedShield) => {
             const mockEncryptionInfo = {
-                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: null }),
+                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: undefined }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
@@ -509,7 +509,7 @@ describe("RustCrypto", () => {
         });
 
         it.each([
-            [null, null],
+            [undefined, null],
             ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
             ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
             [
@@ -783,9 +783,22 @@ describe("RustCrypto", () => {
         it("can save and restore a key", async () => {
             const key = "testtesttesttesttesttesttesttest";
             const rustCrypto = await makeTestRustCrypto();
-            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            await rustCrypto.storeSessionBackupPrivateKey(
+                new TextEncoder().encode(key),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+
+        it("fails to save a key if version not provided", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() => rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key))).rejects.toThrow(
+                "storeSessionBackupPrivateKey: version is required",
+            );
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(fetched).toBeNull();
         });
     });
 
