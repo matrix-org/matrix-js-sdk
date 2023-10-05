@@ -110,9 +110,10 @@ export class OidcTokenRefresher {
     }
 
     /**
-     * Persist the new tokens
-     * Called after tokens are successfully refreshed
-     * This function is intended to be overriden by the consumer when persistence is necessary
+     * Persist the new tokens, called after tokens are successfully refreshed.
+     *
+     * This function is intended to be overriden by the consumer when persistence is necessary.
+     *
      * @param accessToken - new access token
      * @param refreshToken - OPTIONAL new refresh token
      */

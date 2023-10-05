@@ -25,6 +25,8 @@ import { logger } from "../../../src/logger";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("OidcTokenRefresher", () => {
+    // OidcTokenRefresher props
+    // see class declaration for info
     const authConfig = {
         issuer: "https://issuer.org/",
     };
@@ -41,6 +43,7 @@ describe("OidcTokenRefresher", () => {
     // used to mock a valid token response, as consumed by OidcClient library
     const scope = `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
 
+    // auth config used in mocked calls to OP .well-known
     const config = makeDelegatedAuthConfig(authConfig.issuer);
 
     const makeTokenResponse = (accessToken: string, refreshToken?: string) => ({
