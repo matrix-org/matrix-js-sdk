@@ -392,7 +392,10 @@ export class RustVerificationRequest
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
     public async generateQRCode(): Promise<Buffer | undefined> {
-        const innerVerifier: RustSdkCryptoJs.Qr = await this.inner.generateQrCode();
+        const innerVerifier: RustSdkCryptoJs.Qr | undefined = await this.inner.generateQrCode();
+        // If we are unable to generate a QRCode, we return undefined
+        if (!innerVerifier) return;
+
         return Buffer.from(innerVerifier.toBytes());
     }
 
