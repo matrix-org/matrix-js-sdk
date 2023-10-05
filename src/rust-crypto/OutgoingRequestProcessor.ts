@@ -164,13 +164,6 @@ export class OutgoingRequestProcessor {
             prefix: "",
         };
 
-        try {
-            const response = await this.http.authedRequest<string>(method, path, queryParams, body, opts);
-            logger.info(`rust-crypto: successfully made HTTP request: ${method} ${path}`);
-            return response;
-        } catch (e) {
-            logger.warn(`rust-crypto: error making HTTP request: ${method} ${path}: ${e}`);
-            throw e;
-        }
+        return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
     }
 }
