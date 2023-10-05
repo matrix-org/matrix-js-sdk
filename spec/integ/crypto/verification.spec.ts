@@ -148,6 +148,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             // pretend that we have another device, which we will verify
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
+
+            fetchMock.put(
+                new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`),
+                { ok: false, status: 404 },
+                { overwriteRoutes: true },
+            );
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
