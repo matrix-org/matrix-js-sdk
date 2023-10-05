@@ -28,7 +28,6 @@ import { logger } from "../logger";
  *
  * Client implementations will likely want to override {@link persistTokens} to persist tokens after successful refresh
  *
- * You can then use {@link doRefreshAccessToken} in {@link ICreateClientOpts.tokenRefreshFunction}.
  */
 export class OidcTokenRefresher {
     /**
