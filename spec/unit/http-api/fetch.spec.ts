@@ -239,11 +239,11 @@ describe("FetchHttpApi", () => {
     });
 
     describe("authedRequest", () => {
-        it("should not include token if unset", () => {
-            const fetchFn = jest.fn();
+        it("should not include token if unset", async () => {
+            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
-            api.authedRequest(Method.Post, "/account/password");
+            await api.authedRequest(Method.Post, "/account/password");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
         });
 
@@ -272,6 +272,7 @@ describe("FetchHttpApi", () => {
                     ok: true,
                     status: 200,
                 };
+
                 describe("without a tokenRefreshFunction", () => {
                     it("should emit logout and throw", async () => {
                         const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
