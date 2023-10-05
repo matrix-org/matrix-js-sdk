@@ -254,9 +254,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> & {
-            doNotAttemptTokenRefresh?: boolean;
-        } = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
