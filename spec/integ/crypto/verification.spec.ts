@@ -498,6 +498,29 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(VerificationPhase.Done);
         });
 
+        it("can try to generate a QR code when QR code is not supported", async () => {
+            aliceClient = await startTestClient();
+            // we need cross-signing keys for a QR code verification
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can only use SaS
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice tries to generate a QR Code but it's unavailable
+            const qrCodeBuffer = await request.generateQRCode();
+            expect(qrCodeBuffer).toBeUndefined();
+        });
+
         newBackendOnly("can verify another by scanning their QR code", async () => {
             aliceClient = await startTestClient();
             // we need cross-signing keys for a QR code verification
