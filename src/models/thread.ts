@@ -367,6 +367,21 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.timelineSet.relations?.aggregateParentEvent(event);
             this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
             return;
+        } else if (this.initialEventsFetched) {
+            // If initial events have not been fetched, we are OK to throw away
+            // this event, because we are about to fetch all the events for this
+            // thread from the server.
+            // If not, this looks like a bug - we should always add the event to
+            // the thread.
+            logger.error(
+                `Not adding event ${event.getId()} to thread timeline!
+                isNewestReply=${isNewestReply}
+                toStartOfTimeline=${toStartOfTimeline}
+                Thread.hasServerSideSupport=${Thread.hasServerSideSupport}
+                event.isRelation(RelationType.Annotation)=${event.isRelation(RelationType.Annotation)}
+                event.isRelation(RelationType.Replace)=${event.isRelation(RelationType.Replace)}
+                `,
+            );
         }
 
         if (
