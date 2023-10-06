@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from "../../logger";
+import { logger, Logger } from "../../logger";
 import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
 import { MemoryCryptoStore } from "./memory-crypto-store";
 import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
@@ -697,12 +697,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     reject with that exception. On synchronous backends, the
      *     exception will propagate to the caller of the getFoo method.
      */
-    public doTxn<T>(
-        mode: Mode,
-        stores: Iterable<string>,
-        func: (txn: IDBTransaction) => T,
-        log?: PrefixedLogger,
-    ): Promise<T> {
+    public doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: IDBTransaction) => T, log?: Logger): Promise<T> {
         return this.backend!.doTxn<T>(mode, stores, func as (txn: unknown) => T, log);
     }
 }
