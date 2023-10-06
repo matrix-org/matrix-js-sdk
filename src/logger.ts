@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import log, { Logger } from "loglevel";
+import loglevel from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
 // Namespaces allow you to turn on/off the logging for specific parts of the
@@ -30,7 +30,7 @@ const DEFAULT_NAMESPACE = "matrix";
 // to avoid the issue, we override the methodFactory of loglevel that binds to the
 // console methods at initialization time by a factory that looks up the console methods
 // when logging so we always get the current value of console methods.
-log.methodFactory = function (methodName, logLevel, loggerName) {
+loglevel.methodFactory = function (methodName, logLevel, loggerName) {
     return function (this: PrefixedLogger, ...args): void {
         /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
@@ -57,15 +57,15 @@ log.methodFactory = function (methodName, logLevel, loggerName) {
  * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
-export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
-logger.setLevel(log.levels.DEBUG, false);
+export const logger = loglevel.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
+logger.setLevel(loglevel.levels.DEBUG, false);
 
-export interface PrefixedLogger extends Logger {
+export interface PrefixedLogger extends loglevel.Logger {
     withPrefix: (prefix: string) => PrefixedLogger;
     prefix: string;
 }
 
-function extendLogger(logger: Logger): void {
+function extendLogger(logger: loglevel.Logger): void {
     (<PrefixedLogger>logger).withPrefix = function (prefix: string): PrefixedLogger {
         const existingPrefix = this.prefix || "";
         return getPrefixedLogger(existingPrefix + prefix);
@@ -75,12 +75,12 @@ function extendLogger(logger: Logger): void {
 extendLogger(logger);
 
 function getPrefixedLogger(prefix: string): PrefixedLogger {
-    const prefixLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`) as PrefixedLogger;
+    const prefixLogger = loglevel.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`) as PrefixedLogger;
     if (prefixLogger.prefix !== prefix) {
         // Only do this setup work the first time through, as loggers are saved by name.
         extendLogger(prefixLogger);
         prefixLogger.prefix = prefix;
-        prefixLogger.setLevel(log.levels.DEBUG, false);
+        prefixLogger.setLevel(loglevel.levels.DEBUG, false);
     }
     return prefixLogger;
 }
