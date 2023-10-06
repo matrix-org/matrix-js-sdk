@@ -2322,6 +2322,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             rustCrypto.onLiveEventFromSync(event);
         });
 
+        rustCrypto.on(CryptoEvent.BackupPrivateKeyCached, (info) => {
+            // do not await this, as it can be long.
+            // XXX We need new APIs to do this properly. To avoid having several restore going on at the same time,
+            // there should be proper progress reporting, and a way to cancel a restore.
+            this.restoreKeyBackupWithCache(undefined, undefined, info).then(() => {
+                logger.info("Backup restored.");
+            });
+        });
+
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [
             CryptoEvent.VerificationRequestReceived,

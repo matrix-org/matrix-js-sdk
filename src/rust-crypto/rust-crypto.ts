@@ -1382,10 +1382,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 }
 
                 await this.storeSessionBackupPrivateKey(decodeBase64(value), info.version);
-                // XXXX at this point we should probably try to download the backup and import the keys,
-                // or at least retry for the current decryption failures?
-                // Maybe add some signaling when a new secret is received, and let clients handle it?
-                // as it's where the restore from backup APIs are
+
+                // Emit an event that we have a new backup decryption key, so that client can automatically
+                // start importing all keys from the backup.
+                this.emit(CryptoEvent.BackupPrivateKeyCached, info);
             }
         }
     }
@@ -1761,7 +1761,8 @@ function rustEncryptionInfoToJsEncryptionInfo(
 type RustCryptoEvents =
     | CryptoEvent.VerificationRequestReceived
     | CryptoEvent.UserTrustStatusChanged
-    | RustBackupCryptoEvents;
+    | RustBackupCryptoEvents
+    | CryptoEvent.BackupPrivateKeyCached;
 
 type RustCryptoEventMap = {
     /**
@@ -1773,4 +1774,10 @@ type RustCryptoEventMap = {
      * Fires when the trust status of a user changes.
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
+
+
+    /**
+     * Fires when the backup decryption key is received via secret sharing.
+     */
+    [CryptoEvent.BackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
 } & RustBackupCryptoEventMap;

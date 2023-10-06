@@ -245,6 +245,15 @@ export enum CryptoEvent {
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
+
+    /**
+     * Fires when a new valid backup decryption key is in cache.
+     * 
+     * The payload is the `KeyBackupInfo`.
+     * 
+     * This event is only fired by the rust crypto backend.
+     */
+    BackupPrivateKeyCached = "crypto.BackupPrivateKeyCached",
 }
 
 export type CryptoEventHandlerMap = {
