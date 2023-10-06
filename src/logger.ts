@@ -17,6 +17,52 @@ limitations under the License.
 
 import loglevel from "loglevel";
 
+/** Logger interface used within the js-sdk codebase */
+export interface Logger {
+    /**
+     * Output trace message to the logger, with stack trace.
+     *
+     * @param msg - Data to log.
+     */
+    trace(...msg: any[]): void;
+
+    /**
+     * Output debug message to the logger.
+     *
+     * @param msg - Data to log.
+     */
+    debug(...msg: any[]): void;
+
+    /**
+     * Output info message to the logger.
+     *
+     * @param msg - Data to log.
+     */
+    info(...msg: any[]): void;
+
+    /**
+     * Output warn message to the logger.
+     *
+     * @param msg - Data to log.
+     */
+    warn(...msg: any[]): void;
+
+    /**
+     * Output error message to the logger.
+     *
+     * @param msg - Data to log.
+     */
+    error(...msg: any[]): void;
+
+    /**
+     * Create a child logger.
+     *
+     * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
+     *    use this as a prefix; others use a different mechanism.
+     */
+    getChild(namespace: string): Logger;
+}
+
 // This is to demonstrate, that you can use any namespace you want.
 // Namespaces allow you to turn on/off the logging for specific parts of the
 // application.
@@ -54,25 +100,26 @@ loglevel.methodFactory = function (methodName, logLevel, loggerName) {
 };
 
 /**
- * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
- * Can be tailored down to specific use cases if needed.
+ * Implementation of {@link Logger} based on `loglevel`.
+ *
+ * @deprecated this shouldn't be public; prefer {@link Logger}.
  */
-export const logger = loglevel.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
-logger.setLevel(loglevel.levels.DEBUG, false);
-
-export interface PrefixedLogger extends loglevel.Logger {
+export interface PrefixedLogger extends loglevel.Logger, Logger {
+    /** @deprecated prefer {@link Logger.getChild} */
     withPrefix: (prefix: string) => PrefixedLogger;
+
+    /** @deprecated internal property */
     prefix: string;
 }
 
+/** Internal utility function to turn a `loglevel.Logger` into a `PrefixedLogger` */
 function extendLogger(logger: loglevel.Logger): void {
-    (<PrefixedLogger>logger).withPrefix = function (prefix: string): PrefixedLogger {
+    const prefixedLogger = <PrefixedLogger>logger;
+    prefixedLogger.getChild = prefixedLogger.withPrefix = function (prefix: string): PrefixedLogger {
         const existingPrefix = this.prefix || "";
         return getPrefixedLogger(existingPrefix + prefix);
     };
 }
-
-extendLogger(logger);
 
 function getPrefixedLogger(prefix: string): PrefixedLogger {
     const prefixLogger = loglevel.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`) as PrefixedLogger;
@@ -84,3 +131,11 @@ function getPrefixedLogger(prefix: string): PrefixedLogger {
     }
     return prefixLogger;
 }
+
+/**
+ * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
+ * Can be tailored down to specific use cases if needed.
+ */
+export const logger = loglevel.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
+logger.setLevel(loglevel.levels.DEBUG, false);
+extendLogger(logger);
