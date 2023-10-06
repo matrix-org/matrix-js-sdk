@@ -90,7 +90,39 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     private reEmitter: TypedReEmitter<ThreadEmittedEvents, ThreadEventHandlerMap>;
 
+    /**
+     * The last event in this thread, if we don't yet have this in the timeline.
+     *
+     * When we run processRootEvent (which I think happens during the setting-up
+     * of the thread), we set this to the event pointed to by the server in
+     * latest_event https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/3440-threading-via-relations.md#event-format
+     * that came through with the thread root.
+     *
+     * Later, when we have populated the timeline, this is set to undefined, so
+     * that methods like replyToEvent fall through to use lastReply, which looks
+     * in the timeline for the latest event that is a "thread reply" i.e.
+     * directly refers to the thread root with an m.thread relation.
+     *
+     * So it looks like this is only really relevant when initialEventsFetched
+     * is false, because as soon as the initial events have been fetched, we
+     * should have a timeline (I think).
+     *
+     * If all replies in this thread are redacted, this is set to the root
+     * event. I'm not clear what the meaning of this is, since usually after the
+     * initial events have been fetched, lastEvent should be undefined.
+     * In fact, the whole usage inside onRedaction looks suspect - it may be
+     * that we were thinking lastEvent always refers to the actual last event,
+     * but it only does so before initialEventsFetched becomes true.
+     *
+     * The usage of lastEvent inside onEcho looks suspicious, since I'd think we
+     * probably mean replyToEvent there - we are trying not to echo a duplicate
+     * event, and we probably want that behaviour even after
+     * initialEventsFetched has become true.
+     *
+     * -- andyb
+     */
     private lastEvent: MatrixEvent | undefined;
+
     private replyCount = 0;
     private lastPendingEvent: MatrixEvent | undefined;
     private pendingReplyCount = 0;
