@@ -24,7 +24,7 @@ import type { PkSigning } from "@matrix-org/olm";
 import type { IOneTimeKey } from "../@types/crypto";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
-import { logger } from "../logger";
+import { Logger, logger } from "../logger";
 import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
 import { MatrixEvent } from "../models/event";
@@ -215,7 +215,7 @@ export async function ensureOlmSessionsForDevices(
     force = false,
     otkTimeout?: number,
     failedServers?: string[],
-    log = logger,
+    log: Logger = logger,
 ): Promise<Map<string, Map<string, IOlmSessionResult>>> {
     const devicesWithoutSession: [string, string][] = [
         // [userId, deviceId], ...
@@ -319,7 +319,7 @@ export async function ensureOlmSessionsForDevices(
         for (const resolver of resolveSession.values()) {
             resolver();
         }
-        log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
+        log.debug(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
     }
 
