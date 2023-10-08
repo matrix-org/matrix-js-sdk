@@ -48,6 +48,7 @@ import {
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
+import { logger } from "../../../src/logger";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -71,6 +72,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -93,6 +95,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -315,6 +318,7 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixHttpApi<any>,
                 TEST_USER,
@@ -444,6 +448,7 @@ describe("RustCrypto", () => {
                 getRoomEventEncryptionInfo: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -618,6 +623,7 @@ describe("RustCrypto", () => {
                 getDevice: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -836,6 +842,7 @@ describe("RustCrypto", () => {
                 getIdentity: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -882,6 +889,7 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             const rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 mockHttpApi,
                 testData.TEST_USER_ID,
@@ -914,5 +922,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+    return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
 }

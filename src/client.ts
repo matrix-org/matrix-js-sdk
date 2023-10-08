@@ -2320,6 +2320,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // needed.
         const RustCrypto = await import("./rust-crypto");
         const rustCrypto = await RustCrypto.initRustCrypto(
+            this.logger,
             this.http,
             userId,
             deviceId,
