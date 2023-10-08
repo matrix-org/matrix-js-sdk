@@ -1349,6 +1349,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             extraParams: opts.queryParams,
             localTimeoutMs: opts.localTimeoutMs,
             useAuthorizationHeader: opts.useAuthorizationHeader,
+            logger: this.logger,
         });
 
         if (opts.deviceToImport) {

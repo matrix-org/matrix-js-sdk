@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixError } from "./errors";
+import { Logger } from "../logger";
 
 export type Body = Record<string, any> | BodyInit;
 
@@ -31,6 +32,9 @@ export interface IHttpOpts {
 
     onlyData?: boolean;
     localTimeoutMs?: number;
+
+    /** Optional logger instance. If provided, requests and responses will be logged. */
+    logger?: Logger;
 }
 
 export interface IRequestOpts extends Pick<RequestInit, "priority"> {
