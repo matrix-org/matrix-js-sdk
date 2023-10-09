@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from "../../logger";
+import { Logger, logger } from "../../logger";
 import { deepCompare } from "../../utils";
 import {
     CryptoStore,
@@ -906,7 +906,7 @@ export class Backend implements CryptoStore {
         mode: Mode,
         stores: string | string[],
         func: (txn: IDBTransaction) => T,
-        log: PrefixedLogger = logger,
+        log: Logger = logger,
     ): Promise<T> {
         let startTime: number;
         let description: string;

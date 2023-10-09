@@ -21,7 +21,7 @@ limitations under the License.
 import { v4 as uuidv4 } from "uuid";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
-import { logger, PrefixedLogger } from "../../logger";
+import { logger, Logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
@@ -246,12 +246,12 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     };
 
     protected readonly roomId: string;
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     public constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
         this.roomId = params.roomId;
-        this.prefixedLogger = logger.withPrefix(`[${this.roomId} encryption]`);
+        this.prefixedLogger = logger.getChild(`[${this.roomId} encryption]`);
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
         this.sessionRotationPeriodMs = params.config?.rotation_period_ms ?? 7 * 24 * 3600 * 1000;
@@ -333,7 +333,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
 
         // need to make a brand new session?
         if (session?.needsRotation(this.sessionRotationPeriodMsgs, this.sessionRotationPeriodMs)) {
-            this.prefixedLogger.log("Starting new megolm session because we need to rotate.");
+            this.prefixedLogger.debug("Starting new megolm session because we need to rotate.");
             session = null;
         }
 
@@ -343,9 +343,9 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         }
 
         if (!session) {
-            this.prefixedLogger.log("Starting new megolm session");
+            this.prefixedLogger.debug("Starting new megolm session");
             session = await this.prepareNewSession(sharedHistory);
-            this.prefixedLogger.log(`Started new megolm session ${session.sessionId}`);
+            this.prefixedLogger.debug(`Started new megolm session ${session.sessionId}`);
             this.outboundSessions[session.sessionId] = session;
         }
 
@@ -968,12 +968,12 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         for (let i = 0; i < userDeviceMaps.length; i++) {
             try {
                 await this.sendBlockedNotificationsToDevices(session, userDeviceMaps[i], payload);
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     `Completed blacklist notification for ${session.sessionId} ` +
                         `(slice ${i + 1}/${userDeviceMaps.length})`,
                 );
             } catch (e) {
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     `blacklist notification for ${session.sessionId} ` +
                         `(slice ${i + 1}/${userDeviceMaps.length}) failed`,
                 );
@@ -1054,7 +1054,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * @returns Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IMegolmEncryptedContent> {
-        this.prefixedLogger.log("Starting to encrypt event");
+        this.prefixedLogger.debug("Starting to encrypt event");
 
         if (this.encryptionPreparation != null) {
             // If we started sending keys, wait for it to be done.
@@ -1291,12 +1291,12 @@ export class MegolmDecryption extends DecryptionAlgorithm {
     private olmlib = olmlib;
 
     protected readonly roomId: string;
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     public constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
         super(params);
         this.roomId = params.roomId;
-        this.prefixedLogger = logger.withPrefix(`[${this.roomId} decryption]`);
+        this.prefixedLogger = logger.getChild(`[${this.roomId} decryption]`);
     }
 
     /**
@@ -1740,7 +1740,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             "readwrite",
             ["parked_shared_history"],
             (txn) => this.crypto.cryptoStore.addParkedSharedHistory(roomKey.roomId, parkedData, txn),
-            logger.withPrefix("[addParkedSharedHistory]"),
+            logger.getChild("[addParkedSharedHistory]"),
         );
     }
 
@@ -1955,7 +1955,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     return null;
                 }
 
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     "sharing keys for session " +
                         body.sender_key +
                         "|" +
@@ -2051,7 +2051,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     this.crypto.backupManager.backupGroupSession(session.sender_key, session.session_id).catch((e) => {
                         // This throws if the upload failed, but this is fine
                         // since it will have written it to the db and will retry.
-                        this.prefixedLogger.log("Failed to back up megolm session", e);
+                        this.prefixedLogger.debug("Failed to back up megolm session", e);
                     });
                 }
                 // have another go at decrypting events sent with this session.
@@ -2135,7 +2135,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
 
         const sharedHistorySessions = await this.olmDevice.getSharedHistoryInboundGroupSessions(this.roomId);
-        this.prefixedLogger.log(
+        this.prefixedLogger.debug(
             `Sharing history in with users ${Array.from(devicesByUser.keys())}`,
             sharedHistorySessions.map(([senderKey, sessionId]) => `${senderKey}|${sessionId}`),
         );
@@ -2178,20 +2178,20 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             for (const [userId, deviceMessages] of contentMap) {
                 for (const [deviceId, content] of deviceMessages) {
                     if (!hasCiphertext(content)) {
-                        this.prefixedLogger.log("No ciphertext for device " + userId + ":" + deviceId + ": pruning");
+                        this.prefixedLogger.debug("No ciphertext for device " + userId + ":" + deviceId + ": pruning");
                         deviceMessages.delete(deviceId);
                     }
                 }
                 // No devices left for that user? Strip that too.
                 if (deviceMessages.size === 0) {
-                    this.prefixedLogger.log("Pruned all devices for user " + userId);
+                    this.prefixedLogger.debug("Pruned all devices for user " + userId);
                     contentMap.delete(userId);
                 }
             }
 
             // Is there anything left?
             if (contentMap.size === 0) {
-                this.prefixedLogger.log("No users left to send to: aborting");
+                this.prefixedLogger.debug("No users left to send to: aborting");
                 return;
             }
 
