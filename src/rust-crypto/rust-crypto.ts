@@ -153,6 +153,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
+
+        // Check and start in background the key backup connection
+        this.checkKeyBackupAndEnable();
     }
 
     /**
