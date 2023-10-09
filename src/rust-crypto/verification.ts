@@ -585,6 +585,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
             case QrState.Cancelled:
                 return VerificationPhase.Cancelled;
             default:
+                // istanbul ignore next (should be unreachable)
                 throw new Error(`Unknown qr code state ${innerState}`);
         }
     }
