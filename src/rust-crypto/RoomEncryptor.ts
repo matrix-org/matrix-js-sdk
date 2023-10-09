@@ -19,7 +19,7 @@ import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matr
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
-import { logger, PrefixedLogger } from "../logger";
+import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
@@ -30,7 +30,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
  * @internal
  */
 export class RoomEncryptor {
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
@@ -45,7 +45,7 @@ export class RoomEncryptor {
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
-        this.prefixedLogger = logger.withPrefix(`[${room.roomId} encryption]`);
+        this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
     }
 
     /**
