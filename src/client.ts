@@ -298,7 +298,7 @@ export interface ICreateClientOpts {
     refreshToken?: string;
 
     /**
-     * Function used to attempt refreshing the access token
+     * Function used to attempt refreshing access and refresh tokens
      * Called by http-api when a possibly expired token is encountered
      * and a refreshToken is found
      */
@@ -7715,7 +7715,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The refresh_token or null
      */
     public getRefreshToken(): string | null {
-        return this.http.opts.refreshToken || null;
+        return this.http.opts.refreshToken ?? null;
     }
 
     /**

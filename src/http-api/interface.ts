@@ -26,11 +26,12 @@ export type AccessTokens = {
     accessToken: string;
     refreshToken?: string;
 };
-// @TODO(kerrya) add link to IHttpOpts and CreateClientOpts when token refresh is added there
 /**
  * @experimental
  * Function that performs token refresh using the given refreshToken.
  * Returns a promise that resolves to the refreshed access and (optional) refresh tokens.
+ *
+ * Can be passed to HttpApi instance as {@link IHttpOpts.tokenRefreshFunction} during client creation {@link ICreateClientOpts}
  */
 export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
@@ -42,7 +43,14 @@ export interface IHttpOpts {
     extraParams?: Record<string, string>;
 
     accessToken?: string;
+    /**
+     * Used in conjunction with tokenRefreshFunction to attempt token refresh
+     */
     refreshToken?: string;
+    /**
+     * Function to attempt token refresh when a possibly expired token is encountered
+     * Optional, only called when a refreshToken is present
+     */
     tokenRefreshFunction?: TokenRefreshFunction;
     useAuthorizationHeader?: boolean; // defaults to true
 
