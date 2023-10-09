@@ -80,6 +80,7 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
+import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -921,6 +922,39 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 }),
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
+        });
+
+        it("should send a m.unverified code in toDevices messages for an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
+            aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            // tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceClient);
+
+            // force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // wait to receive the toDevice message and get the unverified bob devices from the payload
+            const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
+                fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
+                    const content = JSON.parse(request.body as string);
+                    resolve(content.messages["@bob:xyz"]["DEVICE_ID"]);
+                    return {};
+                });
+            });
+
+            // mock text message endpoint
+            fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
+
+            await aliceClient.sendTextMessage(ROOM_ID, "test");
+
+            // Finally, check that toDevice messages has the m.unverified code
+            const toDeviceContent = await toDevicePromise;
+            expect(toDeviceContent.code).toBe("m.unverified");
         });
     });
 
