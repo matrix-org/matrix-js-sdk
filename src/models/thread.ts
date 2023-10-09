@@ -93,16 +93,16 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     /**
      * The last event in this thread, if we don't yet have this in the timeline.
      *
-     * When we run processRootEvent (which I think happens during the setting-up
-     * of the thread), we set this to the event pointed to by the server in
-     * `latest_event` [1] that came through with the thread root.
+     * When we run {@link processRootEvent} (which I think happens during the
+     * setting-up of the thread), we set this to the event pointed to by the
+     * server in `latest_event` [1] that came through with the thread root.
      *
      * [1]: https://spec.matrix.org/v1.8/client-server-api/#server-side-aggregation-of-mthread-relationships
      *
      * Later, when we have populated the timeline, this is set to undefined, so
-     * that methods like replyToEvent fall through to use lastReply, which looks
-     * in the timeline for the latest event that is a "thread reply" i.e.
-     * directly refers to the thread root with an m.thread relation.
+     * that methods like {@link replyToEvent} fall through to use lastReply,
+     * which looks in the timeline for the latest event that is a "thread reply"
+     * i.e. directly refers to the thread root with an m.thread relation.
      *
      * So it looks like this is only really relevant when initialEventsFetched
      * is false, because as soon as the initial events have been fetched, we
@@ -115,9 +115,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * that we were thinking lastEvent always refers to the actual last event,
      * but it only does so before initialEventsFetched becomes true.
      *
-     * The usage of lastEvent inside onEcho looks suspicious, since I'd think we
-     * probably mean replyToEvent there - we are trying not to echo a duplicate
-     * event, and we probably want that behaviour even after
+     * The usage of lastEvent inside {@link onEcho} looks suspicious, since I'd
+     * think we probably mean {@link replyToEvent} there - we are trying not to
+     * echo a duplicate event, and we probably want that behaviour even after
      * initialEventsFetched has become true.
      *
      * -- andyb
@@ -379,10 +379,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             // reference to something that is, then we have two cases:
 
             if (!this.initialEventsFetched) {
-                // Either we haven't yet fetched events from the server. In this
-                // case, when we do, the events we get back might only be the
-                // first-order ones, so this event (which is second-order - a
-                // reference to something directly in the thread) needs to be
+                // Case 1: we haven't yet fetched events from the server. In
+                // this case, when we do, the events we get back might only be
+                // the first-order ones, so this event (which is second-order -
+                // a reference to something directly in the thread) needs to be
                 // kept so we can replay it when the first-order ones turn up.
 
                 /**
@@ -396,8 +396,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                  */
                 this.replayEvents?.push(event);
             } else {
-                // Or this is happening later, and we have a timeline. In this
-                // case, these events might be out-of order.
+                // Case 2: this is happening later, and we have a timeline. In
+                // this case, these events might be out-of order.
                 //
                 // Specifically, if the server doesn't support recursion, so we
                 // only get these events through sync, they might be coming
