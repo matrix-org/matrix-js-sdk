@@ -22,7 +22,7 @@ import { TrackingStatus } from "../DeviceList";
 import { IRoomEncryption } from "../RoomList";
 import { IDevice } from "../deviceinfo";
 import { ICrossSigningInfo } from "../CrossSigning";
-import { PrefixedLogger } from "../../logger";
+import { Logger } from "../../logger";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { MatrixEvent } from "../../models/event";
 import { DehydrationManager } from "../dehydration";
@@ -144,7 +144,7 @@ export interface CryptoStore {
     takeParkedSharedHistory(roomId: string, txn?: unknown): Promise<ParkedSharedHistory[]>;
 
     // Session key backups
-    doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: PrefixedLogger): Promise<T>;
+    doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: Logger): Promise<T>;
 }
 
 export type Mode = "readonly" | "readwrite";

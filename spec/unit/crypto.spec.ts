@@ -1106,7 +1106,7 @@ describe("Crypto", function () {
 
     describe("Secret storage", function () {
         it("creates secret storage even if there is no keyInfo", async function () {
-            jest.spyOn(logger, "log").mockImplementation(() => {});
+            jest.spyOn(logger, "debug").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
