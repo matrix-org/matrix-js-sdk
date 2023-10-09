@@ -26,6 +26,7 @@ import Olm from "@matrix-org/olm";
 import {
     createClient,
     CryptoEvent,
+    DeviceVerification,
     IContent,
     ICreateClientOpts,
     IEvent,
@@ -54,10 +55,12 @@ import {
 } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
+    BACKUP_DECRYPTION_KEY_BASE64,
     BOB_ONE_TIME_KEYS,
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
     BOB_SIGNED_TEST_DEVICE_DATA,
     BOB_TEST_USER_ID,
+    CURVE25519_KEY_BACKUP_DATA,
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
@@ -69,7 +72,16 @@ import {
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { createOlmSession, encryptGroupSessionKey, encryptMegolmEvent, ToDeviceEvent } from "./olm-utils";
+import {
+    bootstrapCrossSigningTestOlmAccount,
+    createOlmSession,
+    encryptGroupSessionKey,
+    encryptMegolmEvent,
+    encryptSecretSend,
+    ToDeviceEvent,
+} from "./olm-utils";
+import { KeyBackupInfo } from "../../../src/crypto-api";
+import { encodeBase64 } from "../../../src/crypto/olmlib";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -1106,6 +1118,236 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         );
     });
 
+    describe("Secrets are gossiped after verification", () => {
+        // we use a legacy olm session as the existing session,
+        // this will give us access to low level olm functions in order to
+        // simulate a backup key request with proper olm encryption.
+        let testOlmAccount: Olm.Account;
+        const olmDeviceId = "OLM_DEVICE";
+        let usermasterPubKey: string;
+        let backupInfo: KeyBackupInfo;
+
+        beforeEach(async () => {
+            // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+            await Olm.init();
+            testOlmAccount = new Olm.Account();
+            testOlmAccount.create();
+
+            backupInfo = {
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+                version: "1",
+                auth_data: {
+                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                },
+            };
+
+            const bootstrapped = bootstrapCrossSigningTestOlmAccount(
+                testOlmAccount,
+                TEST_USER_ID,
+                olmDeviceId,
+                backupInfo,
+            );
+
+            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
+            e2eKeyResponder.addCrossSigningData(bootstrapped);
+
+            usermasterPubKey = Object.values(bootstrapped.master_keys![TEST_USER_ID].keys)[0];
+
+            aliceClient = await startTestClient();
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([TEST_USER_ID]));
+            await syncPromise(aliceClient);
+            // DeviceList has a sleep(5) which we need to make happen
+            await jest.advanceTimersByTimeAsync(10);
+
+            // The client should now know about the olm device
+            const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+            expect(devices.get(TEST_USER_ID)!.keys()).toContain(olmDeviceId);
+        });
+
+        afterEach(async () => {
+            if (aliceClient !== undefined) {
+                aliceClient.stopClient();
+            }
+
+            if (testOlmAccount) {
+                testOlmAccount.free();
+            }
+            // Allow in-flight things to complete before we tear down the test
+            await jest.runAllTimersAsync();
+
+            fetchMock.mockReset();
+        });
+
+        newBackendOnly("Should request cross signing keys after verification", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            // The secret must have been requested
+            await requestPromises.get("m.cross_signing.master");
+            await requestPromises.get("m.cross_signing.user_signing");
+            await requestPromises.get("m.cross_signing.self_signing");
+        });
+
+        newBackendOnly("Should accept the backup decryption key gossip if valid", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+
+            const toDeviceEvent = encryptSecretSend({
+                sender: aliceClient.getUserId()!,
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
+                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
+                p2pSession: p2pSession,
+                olmAccount: testOlmAccount,
+                requestId: requestId!,
+                secret: BACKUP_DECRYPTION_KEY_BASE64,
+            });
+
+            const expectBackupCheck = new Promise((resolve) => {
+                fetchMock.get(
+                    "express:/_matrix/client/v3/room_keys/version",
+                    (url, request) => {
+                        resolve(undefined);
+                        return backupInfo;
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
+
+            // The dummy device sends the secret
+            returnToDeviceMessageFromSync(toDeviceEvent);
+
+            await expectBackupCheck;
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeTruthy();
+            expect(encodeBase64(cachedKey!)).toEqual(BACKUP_DECRYPTION_KEY_BASE64);
+        });
+
+        newBackendOnly("Should not accept the backup decryption key gossip if version not matching", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+
+            const toDeviceEvent = encryptSecretSend({
+                sender: aliceClient.getUserId()!,
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
+                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
+                p2pSession: p2pSession,
+                olmAccount: testOlmAccount,
+                requestId: requestId!,
+                secret: BACKUP_DECRYPTION_KEY_BASE64,
+            });
+
+            // This is another backup info, with a different version and public key.
+            const otherBackup = {
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+                version: "2",
+                auth_data: {
+                    public_key: "70+eIej1KpOeB803tyjpxvFP57ypLQCnnlHJkT6GZEg",
+                },
+            };
+
+            const expectBackupCheck = new Promise((resolve) => {
+                fetchMock.get(
+                    "express:/_matrix/client/v3/room_keys/version",
+                    (url, request) => {
+                        resolve(undefined);
+                        return otherBackup;
+                    },
+                    {
+                        overwriteRoutes: true,
+                    },
+                );
+            });
+
+            // The dummy device sends the secret
+            returnToDeviceMessageFromSync(toDeviceEvent);
+
+            await expectBackupCheck;
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
+        /**
+         * Do an interactive verification between alice and the dummy device.
+         */
+        async function doInteractiveVerification(): Promise<void> {
+            // Do a QR code verification for simplicity
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, olmDeviceId),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can show a QR code
+            returnToDeviceMessageFromSync(
+                buildReadyMessage(transactionId, ["m.qr_code.show.v1", "m.reciprocate.v1"], olmDeviceId),
+            );
+            await waitForVerificationRequestChanged(request);
+
+            const currentDeviceKey = e2eKeyReceiver.getSigningKey();
+            // the dummy device shows a QR code
+            const sharedSecret = "SUPERSEKRET";
+            const qrCodeBuffer = buildQRCodeMode1(transactionId, usermasterPubKey, currentDeviceKey, sharedSecret);
+
+            // Alice scans the QR code
+            const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
+            const verifier = await request.scanQRCode(qrCodeBuffer);
+
+            await sendToDevicePromise;
+
+            const verificationPromise = verifier.verify();
+            // the dummy device confirms that Alice scanned the QR code, by replying with a done
+            returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
+
+            // Alice also replies with a 'done'
+            await expectSendToDeviceMessage("m.key.verification.done");
+
+            // ... and the whole thing should be done!
+            await verificationPromise;
+
+            // The other device should now be verified.
+            const otherDevice = (await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]))
+                .get(TEST_USER_ID)!
+                .get(olmDeviceId);
+            expect(otherDevice?.verified).toEqual(DeviceVerification.Verified);
+        }
+    });
+
     async function startTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
         const client = createClient({
             baseUrl: TEST_HOMESERVER_URL,
@@ -1167,6 +1409,57 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     });
 }
 
+function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
+    let mskRequested: (requestId: string) => void;
+    const awaitMskRequest: Promise<string> = new Promise((resolve) => {
+        mskRequested = resolve;
+    });
+    let uskRequested: (requestId: string) => void;
+    const awaitUskRequested: Promise<string> = new Promise((resolve) => {
+        uskRequested = resolve;
+    });
+    let sskRequested: (requestId: string) => void;
+    const awaitSskRequested: Promise<string> = new Promise((resolve) => {
+        sskRequested = resolve;
+    });
+    let backupKeyRequested: (requestId: string) => void;
+    const awaitBackupKeyRequested: Promise<string> = new Promise((resolve) => {
+        backupKeyRequested = resolve;
+    });
+
+    fetchMock.put(
+        new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
+        (url: string, opts: RequestInit): MockResponse => {
+            const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
+            // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
+            const content = Object.values(messages)[0] as any; //messages[TEST_DEVICE_ID] ? messages[TEST_DEVICE_ID] : messages['*'];
+            if (content.action == "request") {
+                const name = content.name;
+                const requestId = content.request_id;
+                // console.warn(`Requested secret ${name} with id ${requestId}`);
+                if (name == "m.cross_signing.user_signing") {
+                    uskRequested(requestId);
+                } else if (name == "m.cross_signing.master") {
+                    mskRequested(requestId);
+                } else if (name == "m.cross_signing.self_signing") {
+                    sskRequested(requestId);
+                } else if (name == "m.megolm_backup.v1") {
+                    backupKeyRequested(requestId);
+                }
+            }
+            return {};
+        },
+        { overwriteRoutes: true },
+    );
+
+    const promiseMap = new Map<string, Promise<string>>();
+    promiseMap.set("m.cross_signing.master", awaitMskRequest);
+    promiseMap.set("m.cross_signing.self_signing", awaitSskRequested);
+    promiseMap.set("m.cross_signing.user_signing", awaitUskRequested);
+    promiseMap.set("m.megolm_backup.v1", awaitBackupKeyRequested);
+    return promiseMap;
+}
+
 /** wait for the verification request to emit a 'Change' event */
 function waitForVerificationRequestChanged(request: VerificationRequest): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -1212,11 +1505,15 @@ function buildRequestMessage(transactionId: string): { type: string; content: ob
 }
 
 /** build an m.key.verification.ready to-device message originating from the dummy device */
-function buildReadyMessage(transactionId: string, methods: string[]): { type: string; content: object } {
+function buildReadyMessage(
+    transactionId: string,
+    methods: string[],
+    fromDevice?: string,
+): { type: string; content: object } {
     return {
         type: "m.key.verification.ready",
         content: {
-            from_device: TEST_DEVICE_ID,
+            from_device: fromDevice || TEST_DEVICE_ID,
             methods: methods,
             transaction_id: transactionId,
         },
@@ -1322,6 +1619,30 @@ function buildQRCode(transactionId: string, key1Base64: string, key2Base64: stri
     idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
     idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
     idx = qrCodeBuffer.writeUInt8(0x02, idx); // mode
+    idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
+    idx += qrCodeBuffer.write(transactionId, idx, "ascii");
+
+    idx += Buffer.from(key1Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += Buffer.from(key2Base64, "base64").copy(qrCodeBuffer, idx);
+    idx += qrCodeBuffer.write(sharedSecret, idx);
+
+    // truncate to the right length
+    return qrCodeBuffer.subarray(0, idx);
+}
+
+function buildQRCodeMode1(
+    transactionId: string,
+    key1Base64: string,
+    key2Base64: string,
+    sharedSecret: string,
+): Uint8Array {
+    // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
+
+    const qrCodeBuffer = Buffer.alloc(150); // oversize
+    let idx = 0;
+    idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
+    idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
+    idx = qrCodeBuffer.writeUInt8(0x01, idx); // mode
     idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
     idx += qrCodeBuffer.write(transactionId, idx, "ascii");
 

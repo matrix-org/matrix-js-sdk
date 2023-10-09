@@ -17,10 +17,11 @@ limitations under the License.
 import Olm from "@matrix-org/olm";
 import anotherjson from "another-json";
 
-import { IContent, IDeviceKeys, IEvent, MatrixClient } from "../../../src";
+import { IContent, IDeviceKeys, IDownloadKeyResult, IEvent, Keys, MatrixClient, SigningKeys } from "../../../src";
 import { IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { ISyncResponder } from "../../test-utils/SyncResponder";
 import { syncPromise } from "../../test-utils/test-utils";
+import { KeyBackupInfo } from "../../../src/crypto-api";
 
 /**
  * @module
@@ -58,6 +59,96 @@ export function getTestOlmAccountKeys(olmAccount: Olm.Account, userId: string, d
     const sig = olmAccount.sign(j);
     testDeviceKeys.signatures = { [userId]: { [`ed25519:${deviceId}`]: sig } };
     return testDeviceKeys;
+}
+
+export type BootstrapTestAccountData = {
+    /** A full key query response with cross-signing and device keys and all signatures */
+    downloadKeys: Partial<IDownloadKeyResult>;
+    masterKeyOlmSigning: Olm.PkSigning;
+    masterKeyPublicKeyBase64: string;
+};
+
+export function bootstrapCrossSigningTestOlmAccount(
+    olmAccount: Olm.Account,
+    userId: string,
+    deviceId: string,
+    keyBackupInfo?: KeyBackupInfo,
+): Partial<IDownloadKeyResult> {
+    const olmAliceMSK = new global.Olm.PkSigning();
+    const masterPrivkey = olmAliceMSK.generate_seed();
+    const masterPubkey = olmAliceMSK.init_with_seed(masterPrivkey);
+
+    const olmAliceUSK = new global.Olm.PkSigning();
+    const userPrivkey = olmAliceUSK.generate_seed();
+    const userPubkey = olmAliceUSK.init_with_seed(userPrivkey);
+
+    const olmAliceSSK = new global.Olm.PkSigning();
+    const sskPrivkey = olmAliceSSK.generate_seed();
+    const sskPubkey = olmAliceSSK.init_with_seed(sskPrivkey);
+
+    const mskInfo: Keys = {
+        user_id: userId,
+        usage: ["master"],
+        keys: {
+            ["ed25519:" + masterPubkey]: masterPubkey,
+        },
+    };
+
+    const sskInfo: Partial<SigningKeys> = {
+        user_id: userId,
+        usage: ["self_signing"],
+        keys: {
+            ["ed25519:" + sskPubkey]: sskPubkey,
+        },
+    };
+    const sskSig = olmAliceMSK.sign(anotherjson.stringify(sskInfo));
+    sskInfo.signatures = {
+        [userId]: {
+            ["ed25519:" + masterPubkey]: sskSig,
+        },
+    };
+
+    const uskInfo: Partial<SigningKeys> = {
+        user_id: userId,
+        usage: ["user_signing"],
+        keys: {
+            ["ed25519:" + userPubkey]: userPubkey,
+        },
+    };
+    const uskSig = olmAliceMSK.sign(anotherjson.stringify(uskInfo));
+    uskInfo.signatures = {
+        [userId]: {
+            ["ed25519:" + masterPubkey]: uskSig,
+        },
+    };
+
+    const deviceKeys = getTestOlmAccountKeys(olmAccount, userId, deviceId);
+
+    const copy = Object.assign({}, deviceKeys);
+    delete copy.signatures;
+    const crossSignature = olmAliceSSK.sign(anotherjson.stringify(copy));
+
+    // add the signature
+    deviceKeys.signatures![userId]["ed25519:" + sskPubkey] = crossSignature;
+
+    if (keyBackupInfo?.auth_data) {
+        const unsignedAuthData = Object.assign({}, keyBackupInfo?.auth_data);
+        delete unsignedAuthData.signatures;
+        const backupSignature = olmAliceMSK.sign(anotherjson.stringify(unsignedAuthData));
+
+        keyBackupInfo.auth_data.signatures = {
+            [userId]: {
+                ["ed25519:" + masterPubkey]: backupSignature,
+            },
+        };
+    }
+
+    return {
+        master_keys: { [userId]: mskInfo },
+        user_signing_keys: { [userId]: uskInfo as SigningKeys },
+        self_signing_keys: { [userId]: sskInfo as SigningKeys },
+        device_keys: { [userId]: { [deviceId]: deviceKeys } },
+    };
 }
 
 /** start an Olm session with a given recipient */
@@ -215,6 +306,38 @@ export function encryptGroupSessionKey(opts: {
             session_key: opts.groupSession.session_key(),
         },
         plaintype: "m.room_key",
+    });
+}
+
+export function encryptSecretSend(opts: {
+    sender: string;
+    /** recipient's user id */
+    recipient: string;
+    /** the recipient's curve25519 key */
+    recipientCurve25519Key: string;
+    /** the recipient's ed25519 key */
+    recipientEd25519Key: string;
+    /** sender's olm account */
+    olmAccount: Olm.Account;
+    /** sender's olm session with the recipient */
+    p2pSession: Olm.Session;
+    requestId: string;
+    secret: string;
+}): ToDeviceEvent {
+    const senderKeys = JSON.parse(opts.olmAccount.identity_keys());
+    return encryptOlmEvent({
+        sender: opts.sender,
+        senderKey: senderKeys.curve25519,
+        senderSigningKey: senderKeys.ed25519,
+        recipient: opts.recipient,
+        recipientCurve25519Key: opts.recipientCurve25519Key,
+        recipientEd25519Key: opts.recipientEd25519Key,
+        p2pSession: opts.p2pSession,
+        plaincontent: {
+            request_id: opts.requestId,
+            secret: opts.secret,
+        },
+        plaintype: "m.secret.send",
     });
 }
 
