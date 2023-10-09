@@ -51,9 +51,9 @@ export type AuthorizationParams = {
  * Generate the scope used in authorization request with OIDC OP
  * @returns scope
  */
-const generateScope = (): string => {
-    const deviceId = randomString(10);
-    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
+export const generateScope = (deviceId?: string): string => {
+    const safeDeviceId = deviceId ?? randomString(10);
+    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
 // https://www.rfc-editor.org/rfc/rfc7636
