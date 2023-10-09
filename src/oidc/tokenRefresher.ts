@@ -31,9 +31,10 @@ import { logger } from "../logger";
  */
 export class OidcTokenRefresher {
     /**
-     * Used to determine the OidcClient has been initialised
-     * and is ready to start refreshing tokens
-     * throws when client initialisation fails
+     * Promise which will complete once the OidcClient has been initialised
+     * and is ready to start refreshing tokens.
+     *
+     * Will reject if the client initialisation fails.
      */
     public readonly oidcClientReady!: Promise<void>;
     private oidcClient!: OidcClient;
@@ -109,9 +110,10 @@ export class OidcTokenRefresher {
     }
 
     /**
-     * Persist the new tokens
-     * Called after tokens are successfully refreshed
-     * This function is intended to be overriden by the consumer when persistence is necessary
+     * Persist the new tokens, called after tokens are successfully refreshed.
+     *
+     * This function is intended to be overriden by the consumer when persistence is necessary.
+     *
      * @param accessToken - new access token
      * @param refreshToken - OPTIONAL new refresh token
      */
