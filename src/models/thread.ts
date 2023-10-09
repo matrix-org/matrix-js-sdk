@@ -95,8 +95,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      *
      * When we run processRootEvent (which I think happens during the setting-up
      * of the thread), we set this to the event pointed to by the server in
-     * latest_event https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/3440-threading-via-relations.md#event-format
-     * that came through with the thread root.
+     * `latest_event` [1] that came through with the thread root.
+     *
+     * [1]: https://spec.matrix.org/v1.8/client-server-api/#server-side-aggregation-of-mthread-relationships
      *
      * Later, when we have populated the timeline, this is set to undefined, so
      * that methods like replyToEvent fall through to use lastReply, which looks
