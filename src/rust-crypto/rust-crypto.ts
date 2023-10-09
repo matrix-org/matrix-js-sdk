@@ -1386,6 +1386,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 // or at least retry for the current decryption failures?
                 // Maybe add some signaling when a new secret is received, and let clients handle it?
                 // as it's where the restore from backup APIs are
+
+                // The secret is valid and stored, clear the inbox.
+                await this.olmMachine.deleteSecretsFromInbox("m.megolm_backup.v1");
             }
         }
     }
