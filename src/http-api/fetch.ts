@@ -112,8 +112,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param body - The HTTP JSON body.
      *
-     * @param opts - additional options. If a number is specified,
-     * this is treated as `opts.localTimeoutMs`.
+     * @param opts - additional options.
+     * When `opts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
+     * when an expired token is encountered. Used to only attempt token refresh once.
      *
      * @returns Promise which resolves to
      * ```
@@ -136,6 +137,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
 
+        // avoid mutating paramOpts so they can be used on retry
         const opts = { ...paramOpts };
 
         if (this.opts.accessToken) {
@@ -181,6 +183,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
     }
 
+    /**
+     * Attempt to refresh access tokens.
+     * On success, sets new access and refresh tokens in opts.
+     * @returns Promise that resolves to a boolean - true when token was refreshed successfully
+     */
     private async tryRefreshToken(): Promise<boolean> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
             return false;
@@ -232,7 +239,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts?: IRequestOpts,
     ): Promise<ResponseType<T, O>> {
         const fullUri = this.getUrl(path, queryParams, opts?.prefix, opts?.baseUrl);
-
         return this.requestOtherUrl<T>(method, fullUri, body, opts);
     }
 
