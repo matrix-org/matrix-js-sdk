@@ -18,6 +18,21 @@ import { MatrixError } from "./errors";
 
 export type Body = Record<string, any> | BodyInit;
 
+/**
+ * @experimental
+ * Unencrypted access and (optional) refresh token
+ */
+export type AccessTokens = {
+    accessToken: string;
+    refreshToken?: string;
+};
+// @TODO(kerrya) add link to IHttpOpts and CreateClientOpts when token refresh is added there
+/**
+ * @experimental
+ * Function that performs token refresh using the given refreshToken.
+ * Returns a promise that resolves to the refreshed access and (optional) refresh tokens.
+ */
+export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
     fetchFn?: typeof global.fetch;
 
