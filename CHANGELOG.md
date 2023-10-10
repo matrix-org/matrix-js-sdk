@@ -1,5 +1,5 @@
-Changes in [29.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.0.0-rc.1) (2023-10-03)
-============================================================================================================
+Changes in [29.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.0.0) (2023-10-10)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Remove browserify builds ([\#3759](https://github.com/matrix-org/matrix-js-sdk/pull/3759)).
