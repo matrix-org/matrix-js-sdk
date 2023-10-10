@@ -29,9 +29,7 @@ const membershipTemplate: CallMembershipData = {
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
-        sender: {
-            userId: "@alice:example.org",
-        },
+        getSender: jest.fn().mockReturnValue("@alice:example.org"),
     } as unknown as MatrixEvent;
 }
 
