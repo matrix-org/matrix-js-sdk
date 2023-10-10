@@ -560,8 +560,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
      * This is abnormally complicated because a rust-side QR Code verifier can span several verification phases.
      */
     public get verificationPhase(): VerificationPhase {
-        const innerState = this.inner.state();
-        switch (innerState) {
+        switch (this.inner.state()) {
             case QrState.Created:
                 // we have created a QR for display; neither side has yet sent an `m.key.verification.start`.
                 return VerificationPhase.Ready;
@@ -585,8 +584,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
             case QrState.Cancelled:
                 return VerificationPhase.Cancelled;
             default:
-                // istanbul ignore next (should be unreachable)
-                throw new Error(`Unknown qr code state ${innerState}`);
+                throw new Error(`Unknown qr code state ${this.inner.state()}`);
         }
     }
 
