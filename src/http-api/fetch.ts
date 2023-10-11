@@ -111,8 +111,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param body - The HTTP JSON body.
      *
-     * @param opts - additional options. If a number is specified,
-     * this is treated as `opts.localTimeoutMs`.
+     * @param opts - additional options.
+     * When `opts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
+     * when an expired token is encountered. Used to only attempt token refresh once.
      *
      * @returns Promise which resolves to
      * ```
@@ -126,14 +127,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
-    public authedRequest<T>(
+    public async authedRequest<T>(
         method: Method,
         path: string,
         queryParams?: QueryDict,
         body?: Body,
-        opts: IRequestOpts = {},
+        paramOpts: IRequestOpts & { doNotAttemptTokenRefresh?: boolean } = {},
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
+
+        // avoid mutating paramOpts so they can be used on retry
+        const opts = { ...paramOpts };
 
         if (this.opts.accessToken) {
             if (this.opts.useAuthorizationHeader) {
@@ -151,19 +155,53 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
         }
 
-        const requestPromise = this.request<T>(method, path, queryParams, body, opts);
+        try {
+            const response = await this.request<T>(method, path, queryParams, body, opts);
+            return response;
+        } catch (error) {
+            const err = error as MatrixError;
 
-        requestPromise.catch((err: MatrixError) => {
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
+                const shouldRetry = await this.tryRefreshToken();
+                // if we got a new token retry the request
+                if (shouldRetry) {
+                    return this.authedRequest(method, path, queryParams, body, {
+                        ...paramOpts,
+                        doNotAttemptTokenRefresh: true,
+                    });
+                }
+            }
+            // otherwise continue with error handling
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
-        });
 
-        // return the original promise, otherwise tests break due to it having to
-        // go around the event loop one more time to process the result of the request
-        return requestPromise;
+            throw err;
+        }
+    }
+
+    /**
+     * Attempt to refresh access tokens.
+     * On success, sets new access and refresh tokens in opts.
+     * @returns Promise that resolves to a boolean - true when token was refreshed successfully
+     */
+    private async tryRefreshToken(): Promise<boolean> {
+        if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
+            return false;
+        }
+
+        try {
+            const { accessToken, refreshToken } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
+            this.opts.accessToken = accessToken;
+            this.opts.refreshToken = refreshToken;
+            // successfully got new tokens
+            return true;
+        } catch (error) {
+            this.opts.logger?.warn("Failed to refresh token", error);
+            return false;
+        }
     }
 
     /**

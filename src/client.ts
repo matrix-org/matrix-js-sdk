@@ -64,6 +64,7 @@ import {
     IdentityPrefix,
     IHttpOpts,
     IRequestOpts,
+    TokenRefreshFunction,
     MatrixError,
     MatrixHttpApi,
     MediaPrefix,
@@ -294,6 +295,14 @@ export interface ICreateClientOpts {
     deviceId?: string;
 
     accessToken?: string;
+    refreshToken?: string;
+
+    /**
+     * Function used to attempt refreshing access and refresh tokens
+     * Called by http-api when a possibly expired token is encountered
+     * and a refreshToken is found
+     */
+    tokenRefreshFunction?: TokenRefreshFunction;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -1344,6 +1353,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
+            refreshToken: opts.refreshToken,
+            tokenRefreshFunction: opts.tokenRefreshFunction,
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
@@ -7714,6 +7725,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getAccessToken(): string | null {
         return this.http.opts.accessToken || null;
+    }
+
+    /**
+     * Get the refresh token associated with this account.
+     * @returns The refresh_token or null
+     */
+    public getRefreshToken(): string | null {
+        return this.http.opts.refreshToken ?? null;
     }
 
     /**
