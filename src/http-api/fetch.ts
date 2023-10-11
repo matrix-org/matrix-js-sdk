@@ -25,7 +25,6 @@ import { ConnectionError, MatrixError } from "./errors";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
-import { logger } from "../logger";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
@@ -225,7 +224,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
-        logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
+        this.opts.logger?.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -279,9 +278,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 priority: opts.priority,
             });
 
-            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
+            this.opts.logger?.debug(
+                `FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`,
+            );
         } catch (e) {
-            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
+            this.opts.logger?.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
