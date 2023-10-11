@@ -199,7 +199,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             // successfully got new tokens
             return true;
         } catch (error) {
-            logger.warn("Failed to refresh token", error);
+            this.opts.logger?.warn("Failed to refresh token", error);
             return false;
         }
     }
