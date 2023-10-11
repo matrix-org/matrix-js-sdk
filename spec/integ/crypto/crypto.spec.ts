@@ -924,7 +924,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             ]);
         });
 
-        it("should send a m.unverified code in toDevices messages for an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
+        it("should send a m.unverified code in toDevices messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
             aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -938,7 +938,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // force alice to download bob keys
             expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
-            // wait to receive the toDevice message and get the unverified bob devices from the payload
+            // wait to receive the toDevice message and get the unverified bob device from the payload
             const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
                 fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
                     const content = JSON.parse(request.body as string);
@@ -947,12 +947,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             });
 
-            // mock text message endpoint
+            // mock endpoint of message sending
             fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
 
             await aliceClient.sendTextMessage(ROOM_ID, "test");
 
-            // Finally, check that toDevice messages has the m.unverified code
+            // Finally, check that the toDevice message has the m.unverified code
             const toDeviceContent = await toDevicePromise;
             expect(toDeviceContent.code).toBe("m.unverified");
         });
