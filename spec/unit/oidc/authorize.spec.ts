@@ -134,6 +134,25 @@ describe("oidc authorization", () => {
 
             expect(authUrl.searchParams.get("code_challenge")).toBeTruthy();
         });
+
+        it("should generate url with create prompt", async () => {
+            const nonce = "abc123";
+
+            const metadata = delegatedAuthConfig.metadata;
+
+            const authUrl = new URL(
+                await generateOidcAuthorizationUrl({
+                    metadata,
+                    homeserverUrl: baseUrl,
+                    clientId,
+                    redirectUri: baseUrl,
+                    nonce,
+                    prompt: "create",
+                }),
+            );
+
+            expect(authUrl.searchParams.get("prompt")).toEqual("create");
+        });
     });
 
     describe("completeAuthorizationCodeGrant", () => {

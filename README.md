@@ -351,7 +351,7 @@ First, you need to pull in the right build tools:
 
 ## Building
 
-To build a browser version from scratch when developing::
+To build a browser version from scratch when developing:
 
 ```
  $ yarn build
