@@ -1321,6 +1321,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
+        this.store.setUserCreator((userId) => User.withReEmitterOnClient(userId, this));
         this.deviceId = opts.deviceId || null;
         this.sessionId = randomString(10);
 
