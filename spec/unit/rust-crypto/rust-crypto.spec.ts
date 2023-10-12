@@ -44,10 +44,12 @@ import {
     EventShieldColour,
     EventShieldReason,
     ImportRoomKeysOpts,
+    KeyBackupCheck,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
+import { logger } from "../../../src/logger";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -71,6 +73,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -93,6 +96,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -315,6 +319,7 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixHttpApi<any>,
                 TEST_USER,
@@ -444,6 +449,7 @@ describe("RustCrypto", () => {
                 getRoomEventEncryptionInfo: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -618,6 +624,7 @@ describe("RustCrypto", () => {
                 getDevice: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -836,6 +843,7 @@ describe("RustCrypto", () => {
                 getIdentity: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -864,8 +872,23 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("onUserIdentityUpdated", () => {
+    describe("key backup", () => {
+        it("is started when rust crypto is created", async () => {
+            // `RustCrypto.checkKeyBackupAndEnable` async call is made in background in the RustCrypto constructor.
+            // We don't have an instance of the rust crypto yet, we spy directly in the prototype.
+            const spyCheckKeyBackupAndEnable = jest
+                .spyOn(RustCrypto.prototype, "checkKeyBackupAndEnable")
+                .mockResolvedValue({} as KeyBackupCheck);
+
+            await makeTestRustCrypto();
+
+            expect(spyCheckKeyBackupAndEnable).toHaveBeenCalled();
+        });
+
         it("raises KeyBackupStatus event when identify change", async () => {
+            // Return the key backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
             const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
                 baseUrl: "http://server/",
                 prefix: "",
@@ -882,6 +905,7 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             const rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 mockHttpApi,
                 testData.TEST_USER_ID,
@@ -889,9 +913,6 @@ describe("RustCrypto", () => {
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
             );
-
-            // Return the key backup
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             // Wait for the key backup to be available
             const keyBackupStatusPromise = new Promise<boolean>((resolve) =>
@@ -914,5 +935,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+    return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
 }

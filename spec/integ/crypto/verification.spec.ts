@@ -160,6 +160,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             // pretend that we have another device, which we will verify
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
+
+            fetchMock.put(
+                new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`),
+                { ok: false, status: 404 },
+                { overwriteRoutes: true },
+            );
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
@@ -431,6 +437,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         it("can verify another via QR code with an untrusted cross-signing key", async () => {
+            // This is a slightly weird thing to test; if we don't trust the cross-signing key, normally we would
+            // spam out a verification request to all devices rather than targeting a single device. Still, it's
+            // a thing both the Matrix protocol and the js-sdk API support, so we may as well test it.
+            //
+            // Since we don't yet trust the master key, this is a type 0x02 QR code:
+            //   "self-verifying in which the current device does not yet trust the master key"
+            //
+            // By the end of it, we should trust the master key.
+
             aliceClient = await startTestClient();
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
@@ -502,12 +517,51 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             reciprocateQRCodeCallbacks.confirm();
             await sendToDevicePromise;
 
+            // at this point, on legacy crypto, the master key is already marked as trusted, and the request is "Done".
+            // Rust crypto, on the other hand, waits for the 'done' to arrive from the other side.
+            if (request.phase === VerificationPhase.Done) {
+                // legacy crypto: we're all done
+                const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+                await verificationPromise;
+            } else {
+                // rust crypto: still in flight
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(request.phase).toEqual(VerificationPhase.Started);
+            }
+
             // the dummy device replies with its own 'done'
             returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
 
-            // ... and the whole thing should be done!
+            // ... and now we're really done.
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
+            const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+        });
+
+        it("can try to generate a QR code when QR code is not supported", async () => {
+            aliceClient = await startTestClient();
+            // we need cross-signing keys for a QR code verification
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can only use SaS
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice tries to generate a QR Code but it's unavailable
+            const qrCodeBuffer = await request.generateQRCode();
+            expect(qrCodeBuffer).toBeUndefined();
         });
 
         newBackendOnly("can verify another by scanning their QR code", async () => {
