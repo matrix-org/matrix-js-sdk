@@ -14,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { Mocked } from "jest-mock";
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { ClientPrefix, HttpApiEvent, HttpApiEventHandlerMap, IdentityPrefix, IHttpOpts, Method } from "../../../src";
+import {
+    ClientPrefix,
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    IdentityPrefix,
+    IHttpOpts,
+    MatrixError,
+    Method,
+} from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { defer, QueryDict } from "../../../src/utils";
-import { logger } from "../../../src/logger";
+import { Logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -231,12 +239,144 @@ describe("FetchHttpApi", () => {
     });
 
     describe("authedRequest", () => {
-        it("should not include token if unset", () => {
-            const fetchFn = jest.fn();
+        it("should not include token if unset", async () => {
+            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
-            api.authedRequest(Method.Post, "/account/password");
+            await api.authedRequest(Method.Post, "/account/password");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
+        });
+
+        describe("with refresh token", () => {
+            const accessToken = "test-access-token";
+            const refreshToken = "test-refresh-token";
+
+            describe("when an unknown token error is encountered", () => {
+                const unknownTokenErrBody = {
+                    errcode: "M_UNKNOWN_TOKEN",
+                    error: "Token is not active",
+                    soft_logout: false,
+                };
+                const unknownTokenErr = new MatrixError(unknownTokenErrBody, 401);
+                const unknownTokenResponse = {
+                    ok: false,
+                    status: 401,
+                    headers: {
+                        get(name: string): string | null {
+                            return name === "Content-Type" ? "application/json" : null;
+                        },
+                    },
+                    text: jest.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
+                };
+                const okayResponse = {
+                    ok: true,
+                    status: 200,
+                };
+
+                describe("without a tokenRefreshFunction", () => {
+                    it("should emit logout and throw", async () => {
+                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, accessToken, refreshToken });
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            unknownTokenErr,
+                        );
+                        expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+                });
+
+                describe("with a tokenRefreshFunction", () => {
+                    it("should emit logout and throw when token refresh fails", async () => {
+                        const error = new Error("uh oh");
+                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
+                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            tokenRefreshFunction,
+                            accessToken,
+                            refreshToken,
+                        });
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            unknownTokenErr,
+                        );
+                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should refresh token and retry request", async () => {
+                        const newAccessToken = "new-access-token";
+                        const newRefreshToken = "new-refresh-token";
+                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                            accessToken: newAccessToken,
+                            refreshToken: newRefreshToken,
+                        });
+                        const fetchFn = jest
+                            .fn()
+                            .mockResolvedValueOnce(unknownTokenResponse)
+                            .mockResolvedValueOnce(okayResponse);
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            tokenRefreshFunction,
+                            accessToken,
+                            refreshToken,
+                        });
+                        const result = await api.authedRequest(Method.Post, "/account/password");
+                        expect(result).toEqual(okayResponse);
+                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+
+                        expect(fetchFn).toHaveBeenCalledTimes(2);
+                        // uses new access token
+                        expect(fetchFn.mock.calls[1][1].headers.Authorization).toEqual("Bearer new-access-token");
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should only try to refresh the token once", async () => {
+                        const newAccessToken = "new-access-token";
+                        const newRefreshToken = "new-refresh-token";
+                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                            accessToken: newAccessToken,
+                            refreshToken: newRefreshToken,
+                        });
+
+                        // fetch doesn't like our new or old tokens
+                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            tokenRefreshFunction,
+                            accessToken,
+                            refreshToken,
+                        });
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            unknownTokenErr,
+                        );
+
+                        // tried to refresh the token once
+                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+
+                        expect(fetchFn).toHaveBeenCalledTimes(2);
+                        // uses new access token on retry
+                        expect(fetchFn.mock.calls[1][1].headers.Authorization).toEqual("Bearer new-access-token");
+
+                        // logged out after refreshed access token is rejected
+                        expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+                });
+            });
         });
     });
 
@@ -300,22 +440,29 @@ describe("FetchHttpApi", () => {
         jest.useFakeTimers();
         const deferred = defer<Response>();
         const fetchFn = jest.fn().mockReturnValue(deferred.promise);
-        jest.spyOn(logger, "debug").mockImplementation(() => {});
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const mockLogger = {
+            debug: jest.fn(),
+        } as unknown as Mocked<Logger>;
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            fetchFn,
+            logger: mockLogger,
+        });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
         jest.advanceTimersByTime(1234);
         deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
-        expect(logger.debug).not.toHaveBeenCalledWith("fragment");
-        expect(logger.debug).not.toHaveBeenCalledWith("query");
-        expect(logger.debug).not.toHaveBeenCalledWith("param");
-        expect(logger.debug).toHaveBeenCalledTimes(2);
-        expect(mocked(logger.debug).mock.calls[0]).toMatchInlineSnapshot(`
+        expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
+        expect(mockLogger.debug).not.toHaveBeenCalledWith("query");
+        expect(mockLogger.debug).not.toHaveBeenCalledWith("param");
+        expect(mockLogger.debug).toHaveBeenCalledTimes(2);
+        expect(mockLogger.debug.mock.calls[0]).toMatchInlineSnapshot(`
             [
               "FetchHttpApi: --> GET https://server:8448/some/path?query=xxx",
             ]
         `);
-        expect(mocked(logger.debug).mock.calls[1]).toMatchInlineSnapshot(`
+        expect(mockLogger.debug.mock.calls[1]).toMatchInlineSnapshot(`
             [
               "FetchHttpApi: <-- GET https://server:8448/some/path?query=xxx [1234ms 200]",
             ]

@@ -51,9 +51,9 @@ export type AuthorizationParams = {
  * Generate the scope used in authorization request with OIDC OP
  * @returns scope
  */
-const generateScope = (): string => {
-    const deviceId = randomString(10);
-    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
+export const generateScope = (deviceId?: string): string => {
+    const safeDeviceId = deviceId ?? randomString(10);
+    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
 // https://www.rfc-editor.org/rfc/rfc7636
@@ -122,8 +122,13 @@ export const generateAuthorizationUrl = async (
  * @experimental
  * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
- * @param oidcClientSettings - oidc configuration
- * @param homeserverName - used as state
+ * @param metadata - validated metadata from OP discovery
+ * @param clientId - this client's id as registered with the OP
+ * @param homeserverUrl - used to establish the session on return from the OP
+ * @param identityServerUrl - used to establish the session on return from the OP
+ * @param nonce - state
+ * @param prompt - indicates to the OP which flow the user should see - eg login or registration
+ *          See https://openid.net/specs/openid-connect-prompt-create-1_0.html#name-prompt-parameter
  * @returns a Promise with the url as a string
  */
 export const generateOidcAuthorizationUrl = async ({
@@ -133,6 +138,7 @@ export const generateOidcAuthorizationUrl = async ({
     homeserverUrl,
     identityServerUrl,
     nonce,
+    prompt,
 }: {
     clientId: string;
     metadata: ValidatedIssuerMetadata;
@@ -140,6 +146,7 @@ export const generateOidcAuthorizationUrl = async ({
     identityServerUrl?: string;
     redirectUri: string;
     nonce: string;
+    prompt?: string;
 }): Promise<string> => {
     const scope = await generateScope();
     const oidcClient = new OidcClient({
@@ -156,6 +163,7 @@ export const generateOidcAuthorizationUrl = async ({
     const request = await oidcClient.createSigninRequest({
         state: userState,
         nonce,
+        prompt,
     });
 
     return request.url;
