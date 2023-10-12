@@ -61,13 +61,22 @@ export function getTestOlmAccountKeys(olmAccount: Olm.Account, userId: string, d
     return testDeviceKeys;
 }
 
-export type BootstrapTestAccountData = {
-    /** A full key query response with cross-signing and device keys and all signatures */
-    downloadKeys: Partial<IDownloadKeyResult>;
-    masterKeyOlmSigning: Olm.PkSigning;
-    masterKeyPublicKeyBase64: string;
-};
-
+/**
+ * Bootstrap cross signing for the given Olm account.
+ * Will generate the cross signing keys and sign them with the master key, and returns the `IDownloadKeyResult`
+ * that can be directly fed into a test e2eKeyResponder.
+ *
+ * The cross-signing keys are randomly generated, similar to how the olm account keys are generated. There may not
+ * be any value in using static vectors, as the device keys change at every test run.
+ *
+ * If a `KeyBackupInfo` is provided, the `auth_data` will be signed with the master key,
+ * the backup will be then trusted after verification.
+ *
+ * @param olmAccount The Olm account object to use for signing the device keys.
+ * @param userId The user ID to associate with the device keys.
+ * @param deviceId The device ID to associate with the device keys.
+ * @returns A valid keys/query response that can be fed into a test e2eKeyResponder.
+ */
 export function bootstrapCrossSigningTestOlmAccount(
     olmAccount: Olm.Account,
     userId: string,
@@ -101,6 +110,7 @@ export function bootstrapCrossSigningTestOlmAccount(
             ["ed25519:" + sskPubkey]: sskPubkey,
         },
     };
+    // sign the ssk with the msk
     const sskSig = olmAliceMSK.sign(anotherjson.stringify(sskInfo));
     sskInfo.signatures = {
         [userId]: {
@@ -115,6 +125,8 @@ export function bootstrapCrossSigningTestOlmAccount(
             ["ed25519:" + userPubkey]: userPubkey,
         },
     };
+
+    // sign the usk with the msk
     const uskSig = olmAliceMSK.sign(anotherjson.stringify(uskInfo));
     uskInfo.signatures = {
         [userId]: {
@@ -122,6 +134,7 @@ export function bootstrapCrossSigningTestOlmAccount(
         },
     };
 
+    // get the device keys and sign them with the ssk (the device is then cross signed)
     const deviceKeys = getTestOlmAccountKeys(olmAccount, userId, deviceId);
 
     const copy = Object.assign({}, deviceKeys);
@@ -131,6 +144,7 @@ export function bootstrapCrossSigningTestOlmAccount(
     // add the signature
     deviceKeys.signatures![userId]["ed25519:" + sskPubkey] = crossSignature;
 
+    // if we have a key backup info, sign it with the msk
     if (keyBackupInfo?.auth_data) {
         const unsignedAuthData = Object.assign({}, keyBackupInfo?.auth_data);
         delete unsignedAuthData.signatures;
@@ -309,6 +323,12 @@ export function encryptGroupSessionKey(opts: {
     });
 }
 
+/**
+ * Test utility to correctly encrypt a secret send event to a test device using the provided p2p session.
+ *
+ * @param opts - the options for the secret send event
+ * @returns the to-device event, ready to be returned in a sync response for the test device.
+ */
 export function encryptSecretSend(opts: {
     sender: string;
     /** recipient's user id */

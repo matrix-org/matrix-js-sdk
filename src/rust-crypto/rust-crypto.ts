@@ -1373,12 +1373,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async onReceiveSecret(name: string, value: string): Promise<void> {
         this.logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
-            // We need the current version, and it's a good time to check if trusted
-            const info = (await this.backupManager.checkKeyBackupAndEnable(true))?.backupInfo;
-            if (info?.version) {
+            // Currently we only receive the decryption key without any key backup version, it is important to
+            // check that the secret is valid and matches the current version before storing it.
+            // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
+            // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later fron an untrusted backup.
+            const backupCheck = await this.backupManager.checkKeyBackupAndEnable(true);
+            if (backupCheck?.backupInfo?.version && backupCheck.trustInfo.trusted) {
                 const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(value);
 
-                const authPublickey = (info.auth_data as Curve25519AuthData)?.public_key;
+                const authPublickey = (backupCheck.backupInfo.auth_data as Curve25519AuthData)?.public_key;
+                if (!authPublickey) {
+                    this.logger.debug(`onReceiveSecret: malformed or unsupported backup auth data`);
+                    return;
+                }
+
                 const backupMatchesSavedPrivateKey =
                     authPublickey === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
 
@@ -1388,13 +1396,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     return;
                 }
 
-                await this.storeSessionBackupPrivateKey(decodeBase64(value), info.version);
+                await this.storeSessionBackupPrivateKey(decodeBase64(value), backupCheck.backupInfo.version);
                 // XXXX at this point we should probably try to download the backup and import the keys,
                 // or at least retry for the current decryption failures?
                 // Maybe add some signaling when a new secret is received, and let clients handle it?
                 // as it's where the restore from backup APIs are
 
                 // The secret is valid and stored, clear the inbox.
+                // Important to call this after storing the secret as good hygiene.
                 await this.olmMachine.deleteSecretsFromInbox("m.megolm_backup.v1");
             }
         }

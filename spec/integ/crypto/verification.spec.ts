@@ -1376,7 +1376,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const currentDeviceKey = e2eKeyReceiver.getSigningKey();
             // the dummy device shows a QR code
             const sharedSecret = "SUPERSEKRET";
-            const qrCodeBuffer = buildQRCodeMode1(transactionId, usermasterPubKey, currentDeviceKey, sharedSecret);
+            // use mode 0x01, self-verifying in which the current device does trust the master key
+            const mode = 0x01;
+            const qrCodeBuffer = buildQRCode(transactionId, usermasterPubKey, currentDeviceKey, sharedSecret, mode);
 
             // Alice scans the QR code
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
@@ -1463,6 +1465,14 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     });
 }
 
+/**
+ * Utility to add all needed mocks for secret requesting (to device of type `m.secret.request`).
+ *
+ * The following secrets are mocked: `m.cross_signing.master`, `m.cross_signing.self_signing`,
+ * `m.cross_signing.user_signing`, `m.megolm_backup.v1`.
+ *
+ * @returns a map of secret name to promise that will resolve when the secret is requested.
+ */
 function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
     let mskRequested: (requestId: string) => void;
     const awaitMskRequest: Promise<string> = new Promise((resolve) => {
@@ -1490,7 +1500,6 @@ function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
             if (content.action == "request") {
                 const name = content.name;
                 const requestId = content.request_id;
-                // console.warn(`Requested secret ${name} with id ${requestId}`);
                 if (name == "m.cross_signing.user_signing") {
                     uskRequested(requestId);
                 } else if (name == "m.cross_signing.master") {
@@ -1665,30 +1674,12 @@ function buildDoneMessage(transactionId: string) {
     };
 }
 
-function buildQRCode(transactionId: string, key1Base64: string, key2Base64: string, sharedSecret: string): Uint8Array {
-    // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
-
-    const qrCodeBuffer = Buffer.alloc(150); // oversize
-    let idx = 0;
-    idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
-    idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
-    idx = qrCodeBuffer.writeUInt8(0x02, idx); // mode
-    idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
-    idx += qrCodeBuffer.write(transactionId, idx, "ascii");
-
-    idx += Buffer.from(key1Base64, "base64").copy(qrCodeBuffer, idx);
-    idx += Buffer.from(key2Base64, "base64").copy(qrCodeBuffer, idx);
-    idx += qrCodeBuffer.write(sharedSecret, idx);
-
-    // truncate to the right length
-    return qrCodeBuffer.subarray(0, idx);
-}
-
-function buildQRCodeMode1(
+function buildQRCode(
     transactionId: string,
     key1Base64: string,
     key2Base64: string,
     sharedSecret: string,
+    mode = 0x02,
 ): Uint8Array {
     // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
 
@@ -1696,7 +1687,7 @@ function buildQRCodeMode1(
     let idx = 0;
     idx += qrCodeBuffer.write("MATRIX", idx, "ascii");
     idx = qrCodeBuffer.writeUInt8(0x02, idx); // version
-    idx = qrCodeBuffer.writeUInt8(0x01, idx); // mode
+    idx = qrCodeBuffer.writeUInt8(mode, idx); // mode
     idx = qrCodeBuffer.writeInt16BE(transactionId.length, idx);
     idx += qrCodeBuffer.write(transactionId, idx, "ascii");
 

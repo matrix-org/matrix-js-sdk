@@ -75,13 +75,14 @@ export async function initRustCrypto(
         rustCrypto.onUserIdentityUpdated(userId),
     );
 
-    // check first if some secrets are pending for process. The registerReceiveSecretCallback will be
-    // triggered only for new secrets.
+    // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
+    // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.
     const pendingValues: string[] = await olmMachine.getSecretsFromInbox("m.megolm_backup.v1");
     pendingValues.forEach((value) => {
         rustCrypto.onReceiveSecret("m.megolm_backup.v1", value);
     });
 
+    // Register a callback to be notified when a new secret is received, as for now only the key backup secret is supported (the cross signing secrets are handled automatically by the OlmMachine)
     await olmMachine.registerReceiveSecretCallback((name: string, value: string) =>
         rustCrypto.onReceiveSecret(name, value),
     );
