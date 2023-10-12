@@ -157,6 +157,11 @@ export function bootstrapCrossSigningTestOlmAccount(
         };
     }
 
+    // clean the olm resources as we don't need them anymore
+    olmAliceMSK.free();
+    olmAliceSSK.free();
+    olmAliceUSK.free();
+
     return {
         master_keys: { [userId]: mskInfo },
         user_signing_keys: { [userId]: uskInfo as SigningKeys },
