@@ -1374,9 +1374,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
             // Currently we only receive the decryption key without any key backup version, it is important to
-            // check that the secret is valid and matches the current version before storing it.
+            // check that the secret is valid for the current version before storing it.
             // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
-            // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later fron an untrusted backup.
+            // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
             const backupCheck = await this.backupManager.checkKeyBackupAndEnable(true);
             if (backupCheck?.backupInfo?.version && backupCheck.trustInfo.trusted) {
                 const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(value);
