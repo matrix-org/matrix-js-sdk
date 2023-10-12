@@ -1371,7 +1371,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param base64 - the secret value base 64 encoded
      */
     public async onReceiveSecret(name: string, value: string): Promise<void> {
-        logger.debug(`onReceiveSecret: Received secret ${name}`);
+        this.logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
             // We need the current version, and it's a good time to check if trusted
             const info = (await this.backupManager.checkKeyBackupAndEnable(true))?.backupInfo;
@@ -1383,7 +1383,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     authPublickey === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
 
                 if (!backupMatchesSavedPrivateKey) {
-                    logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
+                    this.logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
                     // just ignore the secret
                     return;
                 }
