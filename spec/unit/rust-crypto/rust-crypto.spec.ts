@@ -64,7 +64,7 @@ describe("initRustCrypto", () => {
         return {
             registerRoomKeyUpdatedCallback: jest.fn(),
             registerUserIdentityUpdatedCallback: jest.fn(),
-            getSecretsFromInbox: jest.fn().mockResolvedValue([]),
+            getSecretsFromInbox: jest.fn().mockResolvedValue(["dGhpc2lzYWZha2VzZWNyZXQ="]),
             registerReceiveSecretCallback: jest.fn(),
             outgoingRequests: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
@@ -109,6 +109,24 @@ describe("initRustCrypto", () => {
         );
 
         expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
+    });
+
+    it("Should get secrets from inbox on start", async () => {
+        const testOlmMachine = makeTestOlmMachine() as OlmMachine;
+        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+
+        await initRustCrypto(
+            logger,
+            {} as MatrixClient["http"],
+            TEST_USER,
+            TEST_DEVICE_ID,
+            {} as ServerSideSecretStorage,
+            {} as CryptoCallbacks,
+            "storePrefix",
+            "storePassphrase",
+        );
+
+        expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
 });
 
