@@ -1387,10 +1387,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     return;
                 }
 
-                const backupMatchesSavedPrivateKey =
+                const publicKeyMatchesGossipedPrivateKey =
                     authPublickey === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
 
-                if (!backupMatchesSavedPrivateKey) {
+                if (!publicKeyMatchesGossipedPrivateKey) {
                     this.logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
                     // just ignore the secret
                     return;
