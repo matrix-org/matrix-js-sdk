@@ -1179,7 +1179,30 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         let testOlmAccount: Olm.Account;
         const olmDeviceId = "OLM_DEVICE";
         let usermasterPubKey: string;
-        let backupInfo: KeyBackupInfo;
+
+        const matchingBackupInfo: KeyBackupInfo = {
+            algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            version: "1",
+            auth_data: {
+                public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+            },
+        };
+
+        const nonMatchingBackupInfo: KeyBackupInfo = {
+            algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            version: "1",
+            auth_data: {
+                public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
+            },
+        };
+
+        const unknownAlgorithmBackupInfo: KeyBackupInfo = {
+            algorithm: "m.megolm_backup.foo_bar",
+            version: "1",
+            auth_data: {
+                public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
+            },
+        };
 
         beforeEach(async () => {
             // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
@@ -1187,20 +1210,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             testOlmAccount = new Olm.Account();
             testOlmAccount.create();
 
-            backupInfo = {
-                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-                version: "1",
-                auth_data: {
-                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-                },
-            };
-
-            const bootstrapped = bootstrapCrossSigningTestOlmAccount(
-                testOlmAccount,
-                TEST_USER_ID,
-                olmDeviceId,
-                backupInfo,
-            );
+            const bootstrapped = bootstrapCrossSigningTestOlmAccount(testOlmAccount, TEST_USER_ID, olmDeviceId, [
+                matchingBackupInfo,
+                nonMatchingBackupInfo,
+            ]);
 
             e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
             e2eKeyResponder.addCrossSigningData(bootstrapped);
@@ -1250,37 +1263,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
-
-            const toDeviceEvent = encryptSecretSend({
-                sender: aliceClient.getUserId()!,
-                recipient: aliceClient.getUserId()!,
-                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
-                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
-                p2pSession: p2pSession,
-                olmAccount: testOlmAccount,
-                requestId: requestId!,
-                secret: BACKUP_DECRYPTION_KEY_BASE64,
-            });
-
-            const expectBackupCheck = new Promise((resolve) => {
-                fetchMock.get(
-                    "express:/_matrix/client/v3/room_keys/version",
-                    (url, request) => {
-                        resolve(undefined);
-                        return backupInfo;
-                    },
-                    {
-                        overwriteRoutes: true,
-                    },
-                );
-            });
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
-
-            // The dummy device sends the secret
-            returnToDeviceMessageFromSync(toDeviceEvent);
-
-            await expectBackupCheck;
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
             jest.useRealTimers();
@@ -1295,13 +1278,106 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(encodeBase64(cachedKey!)).toEqual(BACKUP_DECRYPTION_KEY_BASE64);
         });
 
-        newBackendOnly("Should not accept the backup decryption key gossip if version not matching", async () => {
+        newBackendOnly("Should not accept the backup decryption key gossip if private key do not match", async () => {
             const requestPromises = mockUpSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should not be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
+        newBackendOnly("Should not accept the backup decryption key gossip if backup not trusted", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            const infoCopy = Object.assign({}, matchingBackupInfo);
+            delete infoCopy.auth_data.signatures;
+
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should not be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
+        newBackendOnly("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                unknownAlgorithmBackupInfo,
+            );
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should not be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
+        newBackendOnly("Should not accept an invalid backup decryption key", async () => {
+            const requestPromises = mockUpSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers();
+
+            // the backup secret should not be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
+        /**
+         * Common test setup for gossiping secrets.
+         * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
+         */
+        async function sendBackupGossipAndExpectVersion(
+            requestId: string,
+            secret: string,
+            expectBackup: KeyBackupInfo,
+        ) {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
 
             const toDeviceEvent = encryptSecretSend({
@@ -1312,24 +1388,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 p2pSession: p2pSession,
                 olmAccount: testOlmAccount,
                 requestId: requestId!,
-                secret: BACKUP_DECRYPTION_KEY_BASE64,
+                secret: secret,
             });
-
-            // This is another backup info, with a different version and public key.
-            const otherBackup = {
-                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-                version: "2",
-                auth_data: {
-                    public_key: "70+eIej1KpOeB803tyjpxvFP57ypLQCnnlHJkT6GZEg",
-                },
-            };
 
             const expectBackupCheck = new Promise((resolve) => {
                 fetchMock.get(
                     "express:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
                         resolve(undefined);
-                        return otherBackup;
+                        return expectBackup;
                     },
                     {
                         overwriteRoutes: true,
@@ -1337,22 +1404,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 );
             });
 
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
+
             // The dummy device sends the secret
             returnToDeviceMessageFromSync(toDeviceEvent);
 
             await expectBackupCheck;
-
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
-
-            // the backup secret should be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
-        });
+        }
 
         /**
          * Do an interactive verification between alice and the dummy device.

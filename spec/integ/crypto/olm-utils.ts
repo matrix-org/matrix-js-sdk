@@ -69,19 +69,20 @@ export function getTestOlmAccountKeys(olmAccount: Olm.Account, userId: string, d
  * The cross-signing keys are randomly generated, similar to how the olm account keys are generated. There may not
  * be any value in using static vectors, as the device keys change at every test run.
  *
- * If a `KeyBackupInfo` is provided, the `auth_data` will be signed with the master key,
- * the backup will be then trusted after verification.
+ * If some`KeyBackupInfo` are provided, the `auth_data` will be signed with the master key,
+ * the backup will be then trusted after verification. For testing purpose several backups can be provided.
  *
- * @param olmAccount The Olm account object to use for signing the device keys.
- * @param userId The user ID to associate with the device keys.
- * @param deviceId The device ID to associate with the device keys.
+ * @param olmAccount - The Olm account object to use for signing the device keys.
+ * @param userId - The user ID to associate with the device keys.
+ * @param deviceId - The device ID to associate with the device keys.
+ * @param keyBackupInfo - The key backup info to sign with the master key.
  * @returns A valid keys/query response that can be fed into a test e2eKeyResponder.
  */
 export function bootstrapCrossSigningTestOlmAccount(
     olmAccount: Olm.Account,
     userId: string,
     deviceId: string,
-    keyBackupInfo?: KeyBackupInfo,
+    keyBackupInfo: KeyBackupInfo[] = [],
 ): Partial<IDownloadKeyResult> {
     const olmAliceMSK = new global.Olm.PkSigning();
     const masterPrivkey = olmAliceMSK.generate_seed();
@@ -144,18 +145,19 @@ export function bootstrapCrossSigningTestOlmAccount(
     // add the signature
     deviceKeys.signatures![userId]["ed25519:" + sskPubkey] = crossSignature;
 
-    // if we have a key backup info, sign it with the msk
-    if (keyBackupInfo?.auth_data) {
-        const unsignedAuthData = Object.assign({}, keyBackupInfo?.auth_data);
+    // if we have some key backup info, sign them with the msk
+
+    keyBackupInfo.forEach((info) => {
+        const unsignedAuthData = Object.assign({}, info.auth_data);
         delete unsignedAuthData.signatures;
         const backupSignature = olmAliceMSK.sign(anotherjson.stringify(unsignedAuthData));
 
-        keyBackupInfo.auth_data.signatures = {
+        info.auth_data.signatures = {
             [userId]: {
                 ["ed25519:" + masterPubkey]: backupSignature,
             },
         };
-    }
+    });
 
     // clean the olm resources as we don't need them anymore
     olmAliceMSK.free();

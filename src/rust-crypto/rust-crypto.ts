@@ -1386,6 +1386,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     // just ignore the secret
                     return;
                 }
+                this.logger.info(`onReceiveSecret: Received matching secret ${name}, store it.`);
 
                 await this.storeSessionBackupPrivateKey(decodeBase64(value), backupCheck.backupInfo.version);
                 // XXXX at this point we should probably try to download the backup and import the keys,

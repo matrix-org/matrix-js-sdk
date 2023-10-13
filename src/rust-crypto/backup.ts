@@ -112,7 +112,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param privateKeyBase64 - The base64-encoded private key to check against.
      * @returns `true` if the private key can decrypt the backup, `false` otherwise.
      */
-    public async backupMatchesPrivateKey(info: KeyBackupInfo, privateKeyBase64: string): Promise<boolean> {
+    public backupMatchesPrivateKey(info: KeyBackupInfo, privateKeyBase64: string): boolean {
         if (info.algorithm !== "m.megolm_backup.v1.curve25519-aes-sha2") {
             logger.warn("backupMatchesPrivateKey: Unsupported backup algorithm", info.algorithm);
             return false;
