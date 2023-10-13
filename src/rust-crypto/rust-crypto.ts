@@ -1379,18 +1379,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
             const backupCheck = await this.backupManager.checkKeyBackupAndEnable(true);
             if (backupCheck?.backupInfo?.version && backupCheck.trustInfo.trusted) {
-                const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(value);
+                const privateKeyMatcehs = this.backupManager.backupMatchesPrivateKey(backupCheck.backupInfo, value);
 
-                const authPublickey = (backupCheck.backupInfo.auth_data as Curve25519AuthData)?.public_key;
-                if (!authPublickey) {
-                    this.logger.debug(`onReceiveSecret: malformed or unsupported backup auth data`);
-                    return;
-                }
-
-                const publicKeyMatchesGossipedPrivateKey =
-                    authPublickey === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
-
-                if (!publicKeyMatchesGossipedPrivateKey) {
+                if (!privateKeyMatcehs) {
                     this.logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
                     // just ignore the secret
                     return;
