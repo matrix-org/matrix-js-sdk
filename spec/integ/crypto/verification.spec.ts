@@ -1232,7 +1232,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         afterEach(async () => {
-
             aliceClient?.stopClient();
             testOlmAccount?.free();
 
@@ -1529,12 +1528,11 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
  *  @returns a map of secret name to promise that will resolve (with the id of the secret request) when the secret is requested.
  */
 function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
+    const mskRequestDefer = defer<string>();
+    const sskRequestDefer = defer<string>();
+    const uskRequestDefer = defer<string>();
+    const backupKeyRequestDefer = defer<string>();
 
-    let mskRequestDefer = defer<string>();
-    let sskRequestDefer = defer<string>();
-    let uskRequestDefer = defer<string>();
-    let backupKeyRequestDefer = defer<string>();
-    
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
         (url: string, opts: RequestInit): MockResponse => {

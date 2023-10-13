@@ -63,14 +63,14 @@ export function getTestOlmAccountKeys(olmAccount: Olm.Account, userId: string, d
 
 /**
  * Bootstrap cross signing for the given Olm account.
- * 
+ *
  * Will generate the cross signing keys and sign them with the master key, and returns the `IDownloadKeyResult`
  * that can be directly fed into a test e2eKeyResponder.
  *
  * The cross-signing keys are randomly generated, similar to how the olm account keys are generated. There may not
  * be any value in using static vectors, as the device keys change at every test run.
  *
- * If some `KeyBackupInfo` are provided, the `auth_data` of each backup info will be signed with the 
+ * If some `KeyBackupInfo` are provided, the `auth_data` of each backup info will be signed with the
  * master key, meaning the backups will be then trusted after verification.
  *
  * @param olmAccount - The Olm account object to use for signing the device keys.
