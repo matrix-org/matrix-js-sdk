@@ -5157,24 +5157,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (!unthreaded && this.supportsThreads()) {
-            // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
-            // but in practice this isn't possible and the spec needs updating.
-            const isThread =
-                !!event.threadRootId &&
-                // A thread cannot be just a thread root and a thread root can only be read in the main timeline
-                !event.isThreadRoot &&
-                // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
-                event.isRelation() &&
-                (event.isRelation(THREAD_RELATION_TYPE.name) || event.relationEventId !== event.threadRootId);
-            body = {
-                ...body,
-                // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
-                thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
-            };
-        }
+        // Unless we're explicitly making an unthreaded receipt or we don't
+        // support threads, include the `thread_id` property in the body.
+        const shouldAddThreadId = !unthreaded && this.supportsThreads();
+        const fullBody = shouldAddThreadId ? { ...body, thread_id: threadIdForReceipt(event) } : body;
 
-        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});
+        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, fullBody || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
@@ -9924,4 +9912,28 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
         }
     }
+}
+
+/**
+ * Given an event, figure out the thread ID we should use for it in a receipt.
+ *
+ * This will either be "main", or event.threadRootId. For the thread root, or
+ * e.g. reactions to the thread root, this will be main. For events inside the
+ * thread, or e.g. reactions to them, this will be event.threadRootId.
+ *
+ * (Exported for test.)
+ */
+export function threadIdForReceipt(event: MatrixEvent): string {
+    // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
+    // but in practice this isn't possible and the spec needs updating.
+    const isThread =
+        !!event.threadRootId &&
+        // A thread cannot be just a thread root and a thread root can only be read in the main timeline
+        !event.isThreadRoot &&
+        // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
+        event.isRelation() &&
+        (event.isRelation(THREAD_RELATION_TYPE.name) || event.relationEventId !== event.threadRootId);
+
+    // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
+    return isThread ? event.threadRootId : MAIN_ROOM_TIMELINE;
 }
