@@ -355,8 +355,7 @@ describe("Read receipt", () => {
             expect(threadIdForReceipt(event)).toEqual("$thread1");
         });
 
-        // Fails because we misclassify redactions within threads
-        it.skip("provides the thread ID for a redaction of a threaded message", () => {
+        it("(suprisingly?) provides 'main' for a redaction of a threaded message", () => {
             const event = utils.mkEvent({
                 event: true,
                 type: EventType.RoomRedaction,
@@ -371,9 +370,16 @@ describe("Read receipt", () => {
             // Set thread Id, to say this message is in the thread.
             event.setThreadId("$thread1");
 
-            // It's in the thread, because it redacts something inside the
-            // thread (not the thread root)
-            expect(threadIdForReceipt(event)).toEqual("$thread1");
+            // Because redacting a message removes all its m.relations, the
+            // message is no longer in the thread, so we must send a receipt for
+            // it in the main timeline.
+            //
+            // This is surprising, but it follows the spec (at least up to
+            // current latest room version, 11). In fact, the event should no
+            // longer have a thread ID set on it, so this testcase should not
+            // come up. (At time of writing, this is not the case though - it
+            // does still have threadId set.)
+            expect(threadIdForReceipt(event)).toEqual("main");
         });
 
         it("provides the thread ID for an edit of a threaded message", () => {
