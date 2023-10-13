@@ -65,34 +65,42 @@ export class CrossSigningIdentity {
             privateKeysInSecretStorage,
         });
 
-        if (!olmDeviceHasKeys && !privateKeysInSecretStorage) {
-            logger.log(
-                "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
-            );
-            await this.resetCrossSigning(opts.authUploadDeviceSigningKeys);
-        } else if (olmDeviceHasKeys) {
-            logger.log("bootStrapCrossSigning: Olm device has private keys: exporting to secret storage");
-            await this.exportCrossSigningKeysToStorage();
-        } else if (privateKeysInSecretStorage) {
-            logger.log(
-                "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
-                    "in secret storage, reading storage and caching locally",
-            );
-            await this.olmMachine.importCrossSigningKeys(
-                masterKeyFromSecretStorage,
-                selfSigningKeyFromSecretStorage,
-                userSigningKeyFromSecretStorage,
-            );
+        if (olmDeviceHasKeys) {
+            if (!privateKeysInSecretStorage) {
+                // the device has the keys but they are not in 4S, so update it
+                logger.log("bootStrapCrossSigning: Olm device has private keys: exporting to secret storage");
+                await this.exportCrossSigningKeysToStorage();
+            } else {
+                logger.log("bootStrapCrossSigning: Olm device has private keys and they are saved in 4S, do nothing");
+            }
+        } /* (!olmDeviceHasKeys) */ else {
+            if (privateKeysInSecretStorage) {
+                // they are in 4S, so import from there
+                logger.log(
+                    "bootStrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
+                        "in secret storage, reading storage and caching locally",
+                );
+                await this.olmMachine.importCrossSigningKeys(
+                    masterKeyFromSecretStorage,
+                    selfSigningKeyFromSecretStorage,
+                    userSigningKeyFromSecretStorage,
+                );
 
-            // Get the current device
-            const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-                this.olmMachine.userId,
-                this.olmMachine.deviceId,
-            );
+                // Get the current device
+                const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+                    this.olmMachine.userId,
+                    this.olmMachine.deviceId,
+                );
 
-            // Sign the device with our cross-signing key and upload the signature
-            const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
-            await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                // Sign the device with our cross-signing key and upload the signature
+                const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+            } else {
+                logger.log(
+                    "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
+                );
+                await this.resetCrossSigning(opts.authUploadDeviceSigningKeys);
+            }
         }
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the
@@ -108,13 +116,21 @@ export class CrossSigningIdentity {
      *   * Upload the private keys to SSSS, if it is set up
      */
     private async resetCrossSigning(authUploadDeviceSigningKeys?: UIAuthCallback<void>): Promise<void> {
+        // XXX: We must find a way to make this atomic, currently if the user does not remember his account password
+        // or 4S passphrase/key the process will fail in a bad state, with keys rotated but not uploaded or saved in 4S.
         const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
 
+        // If 4S is configured we need to udpate it.
+        if (await this.secretStorage.hasKey()) {
+            // Update 4S before uploading cross-signing keys, to stay consistent with legacy that asks
+            // 4S passphrase before asking for account password.
+            // Ultimately should be made atomic and resistent to forgotten password/passphrase.
+            await this.exportCrossSigningKeysToStorage();
+        }
         logger.log("bootStrapCrossSigning: publishing keys to server");
         for (const req of outgoingRequests) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
         }
-        await this.exportCrossSigningKeysToStorage();
     }
 
     /**
@@ -123,6 +139,22 @@ export class CrossSigningIdentity {
      * (If secret storage is *not* configured, we assume that the export will happen when it is set up)
      */
     private async exportCrossSigningKeysToStorage(): Promise<void> {
-        // TODO
+        const exported: RustSdkCryptoJs.CrossSigningKeyExport | null = await this.olmMachine.exportCrossSigningKeys();
+        /* istanbul ignore else (this function is only called when we know the olm machine has keys) */
+        if (exported?.masterKey) {
+            this.secretStorage.store("m.cross_signing.master", exported.masterKey);
+        } else {
+            logger.error(`Cannot export MSK to secret storage, private key unknown`);
+        }
+        if (exported?.self_signing_key) {
+            this.secretStorage.store("m.cross_signing.self_signing", exported.self_signing_key);
+        } else {
+            logger.error(`Cannot export SSK to secret storage, private key unknown`);
+        }
+        if (exported?.userSigningKey) {
+            this.secretStorage.store("m.cross_signing.user_signing", exported.userSigningKey);
+        } else {
+            logger.error(`Cannot export USK to secret storage, private key unknown`);
+        }
     }
 }

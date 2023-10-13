@@ -521,10 +521,19 @@ export async function awaitDecryption(
     }
 
     return new Promise((resolve) => {
-        event.once(MatrixEventEvent.Decrypted, (ev, err) => {
-            logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
-            resolve(ev);
-        });
+        if (waitOnDecryptionFailure) {
+            event.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                if (!err) {
+                    resolve(ev);
+                }
+            });
+        } else {
+            event.once(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                resolve(ev);
+            });
+        }
     });
 }
 

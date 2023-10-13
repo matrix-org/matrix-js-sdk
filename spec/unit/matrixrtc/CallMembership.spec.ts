@@ -23,14 +23,13 @@ const membershipTemplate: CallMembershipData = {
     application: "m.call",
     device_id: "AAAAAAA",
     expires: 5000,
+    membershipID: "bloop",
 };
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
-        sender: {
-            userId: "@alice:example.org",
-        },
+        getSender: jest.fn().mockReturnValue("@alice:example.org"),
     } as unknown as MatrixEvent;
 }
 

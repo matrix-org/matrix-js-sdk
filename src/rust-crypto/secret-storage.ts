@@ -17,7 +17,7 @@ limitations under the License.
 import { ServerSideSecretStorage } from "../secret-storage";
 
 /**
- * Check that the private cross signing keys (master, self signing, user signing) are stored in the secret storage and encrypted with the same secret storage key.
+ * Check that the private cross signing keys (master, self signing, user signing) are stored in the secret storage and encrypted with the default secret storage key.
  *
  * @param secretStorage - The secret store using account data
  * @returns True if the cross-signing keys are all stored and encrypted with the same secret storage key.
@@ -25,20 +25,36 @@ import { ServerSideSecretStorage } from "../secret-storage";
  * @internal
  */
 export async function secretStorageContainsCrossSigningKeys(secretStorage: ServerSideSecretStorage): Promise<boolean> {
-    // Check if the master cross-signing key is stored in secret storage
-    const secretStorageMasterKeys = await secretStorage.isStored("m.cross_signing.master");
+    return secretStorageCanAccessSecrets(secretStorage, [
+        "m.cross_signing.master",
+        "m.cross_signing.user_signing",
+        "m.cross_signing.self_signing",
+    ]);
+}
 
-    // Master key not stored
-    if (!secretStorageMasterKeys) return false;
+/**
+ *
+ * Check that the secret storage can access the given secrets using the default key.
+ *
+ * @param secretStorage - The secret store using account data
+ * @param secretNames - The secret names to check
+ * @returns True if all the given secrets are accessible and encrypted with the given key.
+ *
+ * @internal
+ */
+export async function secretStorageCanAccessSecrets(
+    secretStorage: ServerSideSecretStorage,
+    secretNames: string[],
+): Promise<boolean> {
+    const defaultKeyId = await secretStorage.getDefaultKeyId();
+    if (!defaultKeyId) return false;
 
-    // Get the user signing keys stored into the secret storage
-    const secretStorageUserSigningKeys = (await secretStorage.isStored(`m.cross_signing.user_signing`)) || {};
-    // Get the self signing keys stored into the secret storage
-    const secretStorageSelfSigningKeys = (await secretStorage.isStored(`m.cross_signing.self_signing`)) || {};
+    for (const secretName of secretNames) {
+        // check which keys this particular secret is encrypted with
+        const record = (await secretStorage.isStored(secretName)) || {};
+        // if it's not encrypted with the right key, there is no point continuing
+        if (!(defaultKeyId in record)) return false;
+    }
 
-    // Check that one of the secret storage keys used to encrypt the master key was also used to encrypt the user-signing and self-signing keys
-    return Object.keys(secretStorageMasterKeys).some(
-        (secretStorageKey) =>
-            secretStorageUserSigningKeys[secretStorageKey] && secretStorageSelfSigningKeys[secretStorageKey],
-    );
+    return true;
 }

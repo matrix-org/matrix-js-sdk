@@ -23,19 +23,7 @@ endpoints from before Matrix 1.1, for example.
 
 ## In a browser
 
-### Note, the browserify build has been deprecated. Please use a bundler like webpack or vite instead.
-
-Download the browser version from
-https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
-`<script>` to your page. There will be a global variable `matrixcs`
-attached to `window` through which you can access the SDK. See below for how to
-include libolm to enable end-to-end-encryption.
-
-The browser bundle supports recent versions of browsers. Typically this is ES2015
-or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using
-[browserlists](https://github.com/browserslist/browserslist).
-
-Please check [the working browser example](examples/browser) for more information.
+### Note, the browserify build has been removed. Please use a bundler like webpack or vite instead.
 
 ## In Node.js
 
@@ -363,7 +351,7 @@ First, you need to pull in the right build tools:
 
 ## Building
 
-To build a browser version from scratch when developing::
+To build a browser version from scratch when developing:
 
 ```
  $ yarn build
@@ -374,9 +362,6 @@ To run tests (Jest):
 ```
  $ yarn test
 ```
-
-> **Note**
-> The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
 To run linting:
 

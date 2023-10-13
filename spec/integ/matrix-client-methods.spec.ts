@@ -150,7 +150,7 @@ describe("MatrixClient", function () {
     });
 
     describe("joinRoom", function () {
-        it("should no-op if you've already joined a room", function () {
+        it("should no-op given the ID of a room you've already joined", async () => {
             const roomId = "!foo:bar";
             const room = new Room(roomId, client, userId);
             client.fetchRoomEvent = () =>
@@ -168,8 +168,32 @@ describe("MatrixClient", function () {
             ]);
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
-            client.joinRoom(roomId);
+
+            const joinPromise = client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
+            expect(await joinPromise).toBe(room);
+        });
+
+        it("should no-op given the alias of a room you've already joined", async () => {
+            const roomId = "!roomId:server";
+            const roomAlias = "#my-fancy-room:server";
+            const room = new Room(roomId, client, userId);
+            room.addLiveEvents([
+                utils.mkMembership({
+                    user: userId,
+                    room: roomId,
+                    mship: "join",
+                    event: true,
+                }),
+            ]);
+            store.storeRoom(room);
+
+            // The method makes a request to resolve the alias
+            httpBackend.when("POST", "/join/" + encodeURIComponent(roomAlias)).respond(200, { room_id: roomId });
+
+            const joinPromise = client.joinRoom(roomAlias);
+            await httpBackend.flushAllExpected();
+            expect(await joinPromise).toBe(room);
         });
 
         it("should send request to inviteSignUrl if specified", async () => {
@@ -1180,44 +1204,61 @@ describe("MatrixClient", function () {
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
+            jest.spyOn(client.http, "getUrl");
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
-            httpBackend
-                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
-                .respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
+            expect(client.http.getUrl).toHaveLastReturnedWith(
+                expect.objectContaining({
+                    href: "http://alice.localhost.test.server/_matrix/client/v1/login/get_token",
+                }),
+            );
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
+            jest.spyOn(client.http, "getUrl");
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
+            expect(client.http.getUrl).toHaveLastReturnedWith(
+                expect.objectContaining({
+                    href: "http://alice.localhost.test.server/_matrix/client/v1/login/get_token",
+                }),
+            );
         });
 
-        it("should hit the r1 endpoint when capability is disabled", async () => {
+        it("should still hit the stable endpoint when capability is disabled (but present)", async () => {
+            jest.spyOn(client.http, "getUrl");
             httpBackend
                 .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
+                .respond(200, { capabilities: { "m.get_login_token": { enabled: false } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r0
             expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
+            expect(client.http.getUrl).toHaveLastReturnedWith(
+                expect.objectContaining({
+                    href: "http://alice.localhost.test.server/_matrix/client/v1/login/get_token",
+                }),
+            );
         });
 
         it("should hit the r0 endpoint for fallback", async () => {
+            jest.spyOn(client.http, "getUrl");
             httpBackend.when("GET", "/capabilities").respond(200, {});
             const response = { login_token: "xyz", expires_in: 5 };
             const prom = client.requestLoginToken();
@@ -1225,6 +1266,11 @@ describe("MatrixClient", function () {
             await httpBackend.flush("");
             // check that expires_in has been populated for compatibility with r1
             expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
+            expect(client.http.getUrl).toHaveLastReturnedWith(
+                expect.objectContaining({
+                    href: "http://alice.localhost.test.server/_matrix/client/unstable/org.matrix.msc3882/login/token",
+                }),
+            );
         });
     });
 

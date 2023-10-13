@@ -24,6 +24,7 @@ import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixEvent } from "../matrix";
 import { EncryptionKeyEventContent } from "./types";
+import { randomString } from "../randomstring";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -37,7 +38,7 @@ const getNewEncryptionKey = (): string => {
 };
 
 const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
-const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.member.userId, m.deviceId);
+const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -71,6 +72,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // How many ms after we joined the call, that our membership should expire, or undefined
     // if we're not yet joined
     private relativeExpiry: number | undefined;
+
+    // An identifier for our membership of the call. This will allow us to easily recognise
+    // whether a membership was sent by this session or is stale from some other time.
+    // It also forces our membership events to be unique, because otherwise we could try
+    // to overwrite a membership from a previous session but it would do nothing because the
+    // event content would be identical. We need the origin_server_ts to update though, so
+    // forcing unique content fixes this.
+    private membershipId: string | undefined;
 
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
     private expiryTimeout?: ReturnType<typeof setTimeout>;
@@ -171,7 +180,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
         logger.debug(
             "Call memberships, in order: ",
-            callMemberships.map((m) => [m.createdTs(), m.member.userId]),
+            callMemberships.map((m) => [m.createdTs(), m.sender]),
         );
 
         return callMemberships;
@@ -205,8 +214,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Performs cleanup & removes timers for client shutdown
      */
-    public stop(): void {
-        this.leaveRoomSession();
+    public async stop(): Promise<void> {
+        await this.leaveRoomSession(1000);
         if (this.expiryTimeout) {
             clearTimeout(this.expiryTimeout);
             this.expiryTimeout = undefined;
@@ -235,6 +244,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.encryptMedia = encryptMedia ?? false;
+        this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         this.updateEncryptionKeyEvent();
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
@@ -247,19 +257,36 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * and stops scheduled updates.
      * This will not unsubscribe from updates: remember to call unsubscribe() separately if
      * desired.
+     * The membership update required to leave the session will retry if it fails.
+     * Without network connection the promise will never resolve.
+     * A timeout can be provided so that there is a guarantee for the promise to resolve.
      */
-    public leaveRoomSession(): void {
+    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
         if (!this.isJoined()) {
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
-            return;
+            return new Promise((resolve) => resolve(false));
         }
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
         this.encryptMedia = false;
+        this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
-        this.triggerCallMembershipEventUpdate();
+
+        const timeoutPromise = new Promise((r) => {
+            if (timeout) {
+                // will never resolve if timeout is not set
+                setTimeout(r, timeout, "timeout");
+            }
+        });
+        return new Promise((resolve) => {
+            Promise.race([this.triggerCallMembershipEventUpdate(), timeoutPromise]).then((value) => {
+                // The timeoutPromise returns the string 'timeout' and the membership update void
+                // A success implies that the membership update was quicker then the timeout.
+                resolve(value != "timeout");
+            });
+        });
     }
 
     /**
@@ -301,7 +328,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.error("Failed to send m.call.encryption_key", error);
         }
 
-        console.log(
+        logger.debug(
             `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} encryptionKey=${encryptionKey}`,
             this.encryptionKeys,
         );
@@ -368,7 +395,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        console.log(
+        logger.debug(
             `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey} encryptionKeyIndex=${encryptionKeyIndex}`,
             this.encryptionKeys,
         );
@@ -389,7 +416,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         const isMyMembership = (m: CallMembership): boolean =>
-            m.member.userId === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
         const callMembersChanged =
             oldMemberships
                 .filter((m) => !isMyMembership(m))
@@ -417,6 +444,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (this.relativeExpiry === undefined) {
             throw new Error("Tried to create our own membership event when we're not joined!");
         }
+        if (this.membershipId === undefined) {
+            throw new Error("Tried to create our own membership event when we have no membership ID!");
+        }
 
         const m: CallMembershipData = {
             call_id: "",
@@ -425,6 +455,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
             foci_active: this.activeFoci,
+            membershipID: this.membershipId,
         };
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
@@ -541,7 +572,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
         let myPrevMembership;
         try {
-            if (myCallMemberEvent && myPrevMembershipData) {
+            if (myCallMemberEvent && myPrevMembershipData && myPrevMembershipData.membershipID === this.membershipId) {
                 myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
             }
         } catch (e) {
@@ -564,7 +595,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
         };
 
-        let resendDelay;
+        let resendDelay = 0;
         try {
             await this.client.sendStateEvent(
                 this.room.roomId,
@@ -581,6 +612,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
         }
 
-        if (resendDelay) this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, resendDelay);
+        if (resendDelay) {
+            await new Promise((resolve) => setTimeout(resolve, resendDelay));
+            await this.triggerCallMembershipEventUpdate();
+        }
     }
 }
