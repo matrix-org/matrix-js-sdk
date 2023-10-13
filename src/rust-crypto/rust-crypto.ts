@@ -1370,22 +1370,39 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param name - the secret name
      * @param base64 - the secret value base 64 encoded
      */
-    public async onReceiveSecret(name: string, value: string): Promise<void> {
+    private async handleSecretReceived(name: string, value: string): Promise<boolean> {
         this.logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
             const isHandled = await this.backupManager.handleBackupSecretReceived(value);
 
-            if (isHandled) {
-                // The secret is valid and stored, clear the inbox.
-                // Important to call this after storing the secret as good hygiene.
-                await this.olmMachine.deleteSecretsFromInbox("m.megolm_backup.v1");
+            // XXXX at this point we should probably try to download the backup and import the keys,
+            // or at least retry for the current decryption failures?
+            // Maybe add some signaling when a new secret is received, and let clients handle it?
+            // as it's where the restore from backup APIs are exposed.
 
-                // XXXX at this point we should probably try to download the backup and import the keys,
-                // or at least retry for the current decryption failures?
-                // Maybe add some signaling when a new secret is received, and let clients handle it?
-                // as it's where the restore from backup APIs are
+            return isHandled;
+        }
+        return false;
+    }
+
+    /**
+     * Called when a new secret is received in the rust secret inbox.
+     *
+     * Will poll the secret inbox and handle the secrets received.
+     *
+     * @param name - The name of the secret received.
+     * @returns `true` if the secret has been handled and saved, `false` otherwise.
+     */
+    public async checkSecrets(name: string): Promise<void> {
+        const pendingValues: string[] = await this.olmMachine.getSecretsFromInbox("m.megolm_backup.v1");
+        for (const value of pendingValues) {
+            if (await this.handleSecretReceived(name, value)) {
+                break;
             }
         }
+
+        // Important to call this after handling the secrets as good hygiene.
+        await this.olmMachine.deleteSecretsFromInbox(name);
     }
 
     /**
