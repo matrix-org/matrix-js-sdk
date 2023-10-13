@@ -63,19 +63,20 @@ export function getTestOlmAccountKeys(olmAccount: Olm.Account, userId: string, d
 
 /**
  * Bootstrap cross signing for the given Olm account.
+ * 
  * Will generate the cross signing keys and sign them with the master key, and returns the `IDownloadKeyResult`
  * that can be directly fed into a test e2eKeyResponder.
  *
  * The cross-signing keys are randomly generated, similar to how the olm account keys are generated. There may not
  * be any value in using static vectors, as the device keys change at every test run.
  *
- * If some`KeyBackupInfo` are provided, the `auth_data` will be signed with the master key,
- * the backup will be then trusted after verification. For testing purpose several backups can be provided.
+ * If some `KeyBackupInfo` are provided, the `auth_data` of each backup info will be signed with the 
+ * master key, meaning the backups will be then trusted after verification.
  *
  * @param olmAccount - The Olm account object to use for signing the device keys.
  * @param userId - The user ID to associate with the device keys.
  * @param deviceId - The device ID to associate with the device keys.
- * @param keyBackupInfo - The key backup info to sign with the master key.
+ * @param keyBackupInfo - Optional key backup infos to sign with the master key.
  * @returns A valid keys/query response that can be fed into a test e2eKeyResponder.
  */
 export function bootstrapCrossSigningTestOlmAccount(
@@ -146,7 +147,6 @@ export function bootstrapCrossSigningTestOlmAccount(
     deviceKeys.signatures![userId]["ed25519:" + sskPubkey] = crossSignature;
 
     // if we have some key backup info, sign them with the msk
-
     keyBackupInfo.forEach((info) => {
         const unsignedAuthData = Object.assign({}, info.auth_data);
         delete unsignedAuthData.signatures;
@@ -337,6 +337,7 @@ export function encryptGroupSessionKey(opts: {
  * @returns the to-device event, ready to be returned in a sync response for the test device.
  */
 export function encryptSecretSend(opts: {
+    /** the sender's user id */
     sender: string;
     /** recipient's user id */
     recipient: string;
@@ -348,7 +349,9 @@ export function encryptSecretSend(opts: {
     olmAccount: Olm.Account;
     /** sender's olm session with the recipient */
     p2pSession: Olm.Session;
+    /** The requestId of the secret request that this secret send is replying. */
     requestId: string;
+    /** The secret value */
     secret: string;
 }): ToDeviceEvent {
     const senderKeys = JSON.parse(opts.olmAccount.identity_keys());

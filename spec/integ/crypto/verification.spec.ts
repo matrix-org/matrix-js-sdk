@@ -44,7 +44,7 @@ import {
     Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
-import { escapeRegExp } from "../../../src/utils";
+import { defer, escapeRegExp } from "../../../src/utils";
 import {
     awaitDecryption,
     CRYPTO_BACKENDS,
@@ -1173,8 +1173,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     });
 
     describe("Secrets are gossiped after verification", () => {
-        // we use a legacy olm session as the existing session,
-        // this will give us access to low level olm functions in order to
+        // We use a legacy olm session as the existing session.
+        // This will give us access to low level olm functions in order to
         // simulate a backup key request with proper olm encryption.
         let testOlmAccount: Olm.Account;
         const olmDeviceId = "OLM_DEVICE";
@@ -1232,13 +1232,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         afterEach(async () => {
-            if (aliceClient !== undefined) {
-                aliceClient.stopClient();
-            }
 
-            if (testOlmAccount) {
-                testOlmAccount.free();
-            }
+            aliceClient?.stopClient();
+            testOlmAccount?.free();
+
             // Allow in-flight things to complete before we tear down the test
             await jest.runAllTimersAsync();
 
@@ -1246,7 +1243,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should request cross signing keys after verification", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1257,7 +1254,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should accept the backup decryption key gossip if valid", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1279,7 +1276,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should not accept the backup decryption key gossip if private key do not match", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1300,7 +1297,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should not accept the backup decryption key gossip if backup not trusted", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1324,7 +1321,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1349,7 +1346,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         newBackendOnly("Should not accept an invalid backup decryption key", async () => {
-            const requestPromises = mockUpSecretRequestAndGetPromises();
+            const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
 
@@ -1524,31 +1521,20 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
 }
 
 /**
- * Utility to add all needed mocks for secret requesting (to device of type `m.secret.request`).
+ * Utility to add all needed mocks for secret requesting (to-device of type `m.secret.request`).
  *
  * The following secrets are mocked: `m.cross_signing.master`, `m.cross_signing.self_signing`,
  * `m.cross_signing.user_signing`, `m.megolm_backup.v1`.
  *
- * @returns a map of secret name to promise that will resolve when the secret is requested.
+ *  @returns a map of secret name to promise that will resolve (with the id of the secret request) when the secret is requested.
  */
-function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
-    let mskRequested: (requestId: string) => void;
-    const awaitMskRequest: Promise<string> = new Promise((resolve) => {
-        mskRequested = resolve;
-    });
-    let uskRequested: (requestId: string) => void;
-    const awaitUskRequested: Promise<string> = new Promise((resolve) => {
-        uskRequested = resolve;
-    });
-    let sskRequested: (requestId: string) => void;
-    const awaitSskRequested: Promise<string> = new Promise((resolve) => {
-        sskRequested = resolve;
-    });
-    let backupKeyRequested: (requestId: string) => void;
-    const awaitBackupKeyRequested: Promise<string> = new Promise((resolve) => {
-        backupKeyRequested = resolve;
-    });
+function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
 
+    let mskRequestDefer = defer<string>();
+    let sskRequestDefer = defer<string>();
+    let uskRequestDefer = defer<string>();
+    let backupKeyRequestDefer = defer<string>();
+    
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
         (url: string, opts: RequestInit): MockResponse => {
@@ -1559,13 +1545,13 @@ function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
                 const name = content.name;
                 const requestId = content.request_id;
                 if (name == "m.cross_signing.user_signing") {
-                    uskRequested(requestId);
+                    uskRequestDefer.resolve(requestId);
                 } else if (name == "m.cross_signing.master") {
-                    mskRequested(requestId);
+                    mskRequestDefer.resolve(requestId);
                 } else if (name == "m.cross_signing.self_signing") {
-                    sskRequested(requestId);
+                    sskRequestDefer.resolve(requestId);
                 } else if (name == "m.megolm_backup.v1") {
-                    backupKeyRequested(requestId);
+                    backupKeyRequestDefer.resolve(requestId);
                 }
             }
             return {};
@@ -1574,10 +1560,10 @@ function mockUpSecretRequestAndGetPromises(): Map<string, Promise<string>> {
     );
 
     const promiseMap = new Map<string, Promise<string>>();
-    promiseMap.set("m.cross_signing.master", awaitMskRequest);
-    promiseMap.set("m.cross_signing.self_signing", awaitSskRequested);
-    promiseMap.set("m.cross_signing.user_signing", awaitUskRequested);
-    promiseMap.set("m.megolm_backup.v1", awaitBackupKeyRequested);
+    promiseMap.set("m.cross_signing.master", mskRequestDefer.promise);
+    promiseMap.set("m.cross_signing.self_signing", sskRequestDefer.promise);
+    promiseMap.set("m.cross_signing.user_signing", uskRequestDefer.promise);
+    promiseMap.set("m.megolm_backup.v1", backupKeyRequestDefer.promise);
     return promiseMap;
 }
 

@@ -118,17 +118,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             return false;
         }
 
-        let backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
         try {
-            backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(privateKeyBase64);
+            const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(privateKeyBase64);
+            return (
+                (info.auth_data as Curve25519AuthData)?.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64
+            );
         } catch (e) {
             logger.warn("backupMatchesPrivateKey: Invalid backup decryption key", e);
             return false;
         }
 
-        return (
-            (info.auth_data as Curve25519AuthData)?.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64
-        );
+        
     }
 
     /**
