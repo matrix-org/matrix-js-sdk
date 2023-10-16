@@ -18,7 +18,7 @@ import MockHttpBackend from "matrix-mock-request";
 
 import { MAIN_ROOM_TIMELINE, ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { EventType, MatrixEvent, Room } from "../../src/matrix";
+import { EventType, MatrixEvent, RelationType, Room, threadIdForReceipt } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
@@ -256,6 +256,202 @@ describe("Read receipt", () => {
                 false,
             );
             expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
+        });
+    });
+
+    describe("Determining the right thread ID for a receipt", () => {
+        it("provides the thread root ID for a normal threaded message", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                user: "@bob:matrix.org",
+                room: "!roomx",
+                content: {
+                    "body": "Hello from a thread",
+                    "m.relates_to": {
+                        "event_id": "$thread1",
+                        "m.in_reply_to": {
+                            event_id: "$thread1",
+                        },
+                        "rel_type": "m.thread",
+                    },
+                },
+            });
+
+            expect(threadIdForReceipt(event)).toEqual("$thread1");
+        });
+
+        it("provides 'main' for a non-thread message", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                user: "@bob:matrix.org",
+                room: "!roomx",
+                content: { body: "Hello" },
+            });
+
+            expect(threadIdForReceipt(event)).toEqual("main");
+        });
+
+        it("provides 'main' for a thread root", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                user: "@bob:matrix.org",
+                room: "!roomx",
+                content: { body: "Hello" },
+            });
+            // Set thread ID to this event's ID, meaning this is the thread root
+            event.setThreadId(event.getId());
+
+            expect(threadIdForReceipt(event)).toEqual("main");
+        });
+
+        it("provides 'main' for a reaction to a thread root", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.Reaction,
+                user: "@bob:matrix.org",
+                room: "!roomx",
+                content: {
+                    "m.relates_to": {
+                        rel_type: RelationType.Annotation,
+                        event_id: "$thread1",
+                        key: Math.random().toString(),
+                    },
+                },
+            });
+
+            // Set thread Id, meaning this looks like it's in the thread (this
+            // happens for relations like this, so that they appear in the
+            // thread's timeline).
+            event.setThreadId("$thread1");
+
+            // But because it's a reaction to the thread root, it's in main
+            expect(threadIdForReceipt(event)).toEqual("main");
+        });
+
+        it("provides the thread ID for a reaction to a threaded message", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.Reaction,
+                user: "@bob:matrix.org",
+                room: "!roomx",
+                content: {
+                    "m.relates_to": {
+                        rel_type: RelationType.Annotation,
+                        event_id: "$withinthread2",
+                        key: Math.random().toString(),
+                    },
+                },
+            });
+
+            // Set thread Id, to say this message is in the thread. This happens
+            // when the message arrived and is classified.
+            event.setThreadId("$thread1");
+
+            // It's in the thread because it refers to something else, not the
+            // thread root
+            expect(threadIdForReceipt(event)).toEqual("$thread1");
+        });
+
+        it("(suprisingly?) provides 'main' for a redaction of a threaded message", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomRedaction,
+                content: {
+                    reason: "Spamming",
+                },
+                redacts: "$withinthread2",
+                room: "!roomx",
+                user: "@bob:matrix.org",
+            });
+
+            // Set thread Id, to say this message is in the thread.
+            event.setThreadId("$thread1");
+
+            // Because redacting a message removes all its m.relations, the
+            // message is no longer in the thread, so we must send a receipt for
+            // it in the main timeline.
+            //
+            // This is surprising, but it follows the spec (at least up to
+            // current latest room version, 11). In fact, the event should no
+            // longer have a thread ID set on it, so this testcase should not
+            // come up. (At time of writing, this is not the case though - it
+            // does still have threadId set.)
+            expect(threadIdForReceipt(event)).toEqual("main");
+        });
+
+        it("provides the thread ID for an edit of a threaded message", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomRedaction,
+                content: {
+                    "body": "Edited!",
+                    "m.new_content": {
+                        body: "Edited!",
+                    },
+                    "m.relates_to": {
+                        rel_type: RelationType.Replace,
+                        event_id: "$withinthread2",
+                    },
+                },
+                room: "!roomx",
+                user: "@bob:matrix.org",
+            });
+
+            // Set thread Id, to say this message is in the thread.
+            event.setThreadId("$thread1");
+
+            // It's in the thread, because it redacts something inside the
+            // thread (not the thread root)
+            expect(threadIdForReceipt(event)).toEqual("$thread1");
+        });
+
+        it("provides 'main' for an edit of a thread root", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomRedaction,
+                content: {
+                    "body": "Edited!",
+                    "m.new_content": {
+                        body: "Edited!",
+                    },
+                    "m.relates_to": {
+                        rel_type: RelationType.Replace,
+                        event_id: "$thread1",
+                    },
+                },
+                room: "!roomx",
+                user: "@bob:matrix.org",
+            });
+
+            // Set thread Id, to say this message is in the thread.
+            event.setThreadId("$thread1");
+
+            // It's in the thread, because it redacts something inside the
+            // thread (not the thread root)
+            expect(threadIdForReceipt(event)).toEqual("main");
+        });
+
+        it("provides 'main' for a redaction of the thread root", () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: EventType.RoomRedaction,
+                content: {
+                    reason: "Spamming",
+                },
+                redacts: "$thread1",
+                room: "!roomx",
+                user: "@bob:matrix.org",
+            });
+
+            // Set thread Id, to say this message is in the thread.
+            event.setThreadId("$thread1");
+
+            // It's in the thread, because it redacts something inside the
+            // thread (not the thread root)
+            expect(threadIdForReceipt(event)).toEqual("main");
         });
     });
 });
