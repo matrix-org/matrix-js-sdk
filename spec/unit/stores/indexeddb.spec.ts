@@ -123,7 +123,9 @@ describe("IndexedDBStore", () => {
         store.setUserCreator((id: string) => {
             userCreated = true;
             const user = new User(id);
-            user.on(UserEvent.Presence, () => { presenceEventEmitted = true; });
+            user.on(UserEvent.Presence, () => {
+                presenceEventEmitted = true;
+            });
             return user;
         });
         await store.startup();
