@@ -16,7 +16,7 @@ limitations under the License.
 
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
 
-import { logger, PrefixedLogger } from "../logger";
+import { logger, Logger } from "../logger";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
@@ -531,7 +531,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[createOutboundSession]"),
+            logger.getChild("[createOutboundSession]"),
         );
         return newSessionId!;
     }
@@ -588,7 +588,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[createInboundSession]"),
+            logger.getChild("[createInboundSession]"),
         );
 
         return result!;
@@ -602,7 +602,7 @@ export class OlmDevice {
      * @returns  a list of known session ids for the device
      */
     public async getSessionIdsForDevice(theirDeviceIdentityKey: string): Promise<string[]> {
-        const log = logger.withPrefix("[getSessionIdsForDevice]");
+        const log = logger.getChild("[getSessionIdsForDevice]");
 
         if (theirDeviceIdentityKey in this.sessionsInProgress) {
             log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
@@ -642,7 +642,7 @@ export class OlmDevice {
     public async getSessionIdForDevice(
         theirDeviceIdentityKey: string,
         nowait = false,
-        log?: PrefixedLogger,
+        log?: Logger,
     ): Promise<string | null> {
         const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey, nowait, log);
 
@@ -686,9 +686,9 @@ export class OlmDevice {
     public async getSessionInfoForDevice(
         deviceIdentityKey: string,
         nowait = false,
-        log = logger,
+        log: Logger = logger,
     ): Promise<{ sessionId: string; lastReceivedMessageTs: number; hasReceivedMessage: boolean }[]> {
-        log = log.withPrefix("[getSessionInfoForDevice]");
+        log = log.getChild("[getSessionInfoForDevice]");
 
         if (deviceIdentityKey in this.sessionsInProgress && !nowait) {
             log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
@@ -764,7 +764,7 @@ export class OlmDevice {
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
-            logger.withPrefix("[encryptMessage]"),
+            logger.getChild("[encryptMessage]"),
         );
         return res!;
     }
@@ -806,7 +806,7 @@ export class OlmDevice {
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
-            logger.withPrefix("[decryptMessage]"),
+            logger.getChild("[decryptMessage]"),
         );
         return payloadString!;
     }
@@ -842,7 +842,7 @@ export class OlmDevice {
                     matches = sessionInfo.session.matches_inbound(ciphertext);
                 });
             },
-            logger.withPrefix("[matchesSession]"),
+            logger.getChild("[matchesSession]"),
         );
         return matches!;
     }
@@ -1142,7 +1142,7 @@ export class OlmDevice {
                     },
                 );
             },
-            logger.withPrefix("[addInboundGroupSession]"),
+            logger.getChild("[addInboundGroupSession]"),
         );
     }
 
@@ -1282,7 +1282,7 @@ export class OlmDevice {
                     };
                 });
             },
-            logger.withPrefix("[decryptGroupMessage]"),
+            logger.getChild("[decryptGroupMessage]"),
         );
 
         if (error!) {
@@ -1328,7 +1328,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[hasInboundSessionKeys]"),
+            logger.getChild("[hasInboundSessionKeys]"),
         );
 
         return result!;
@@ -1398,7 +1398,7 @@ export class OlmDevice {
                     };
                 });
             },
-            logger.withPrefix("[getInboundGroupSessionKey]"),
+            logger.getChild("[getInboundGroupSessionKey]"),
         );
 
         return result;
@@ -1443,7 +1443,7 @@ export class OlmDevice {
             (txn) => {
                 result = this.cryptoStore.getSharedHistoryInboundGroupSessions(roomId, txn);
             },
-            logger.withPrefix("[getSharedHistoryInboundGroupSessionsForRoom]"),
+            logger.getChild("[getSharedHistoryInboundGroupSessionsForRoom]"),
         );
         return result!;
     }

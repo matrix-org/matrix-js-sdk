@@ -24,7 +24,7 @@ import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { logger } from "../logger";
+import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
@@ -62,7 +62,7 @@ import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
 import { crypto } from "../crypto/crypto";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType } from "../@types/event";
+import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
@@ -118,6 +118,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
     public constructor(
+        private readonly logger: Logger,
+
         /** The `OlmMachine` from the underlying rust crypto sdk. */
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
 
@@ -143,7 +145,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
-        this.eventDecryptor = new EventDecryptor(olmMachine, this);
+        this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
         this.reemitter.reEmit(this.backupManager, [
@@ -153,6 +155,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
+
+        // Check and start in background the key backup connection
+        this.checkKeyBackupAndEnable();
     }
 
     /**
@@ -1005,12 +1010,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
      *
      * @param key - the backup decryption key
+     * @param version - the backup version for this key.
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: Uint8Array, version?: string): Promise<void> {
         const base64Key = encodeBase64(key);
 
-        // TODO get version from backupManager
-        await this.olmMachine.saveBackupDecryptionKey(RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key), "");
+        if (!version) {
+            throw new Error("storeSessionBackupPrivateKey: version is required");
+        }
+
+        await this.olmMachine.saveBackupDecryptionKey(
+            RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
+            version,
+        );
     }
 
     /**
@@ -1223,10 +1235,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // start tracking devices for any users already known to be in this room.
         const members = await room.getEncryptionTargetMembers();
-        logger.debug(
-            `[${room.roomId} encryption] starting to track devices for: `,
-            members.map((u) => `${u.userId} (${u.membership})`),
-        );
         await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
     }
 
@@ -1306,11 +1314,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
         if (this.stopped) return;
-        logger.debug(`Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`);
+        this.logger.debug(
+            `Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`,
+        );
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
         if (pendingList.length === 0) return;
 
-        logger.debug(
+        this.logger.debug(
             "Retrying decryption on events:",
             pendingList.map((e) => `${e.getId()}`),
         );
@@ -1323,7 +1333,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // and deduplicates repeated attempts for the same event.
         for (const ev of pendingList) {
             ev.attemptDecryption(this, { isRetry: true }).catch((_e) => {
-                logger.info(`Still unable to decrypt event ${ev.getId()} after receiving key`);
+                this.logger.info(`Still unable to decrypt event ${ev.getId()} after receiving key`);
             });
         }
     }
@@ -1339,6 +1349,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async onUserIdentityUpdated(userId: RustSdkCryptoJs.UserId): Promise<void> {
         const newVerification = await this.getUserVerificationStatus(userId.toString());
         this.emit(CryptoEvent.UserTrustStatusChanged, userId.toString(), newVerification);
+
+        // If our own user identity has changed, we may now trust the key backup where we did not before.
+        // So, re-check the key backup status and enable it if available.
+        if (userId.toString() === this.userId) {
+            await this.checkKeyBackupAndEnable();
+        }
     }
 
     /**
@@ -1393,7 +1409,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("missing roomId in the event");
         }
 
-        logger.debug(`Incoming verification event ${event.getId()} type ${event.getType()} from ${event.getSender()}`);
+        this.logger.debug(
+            `Incoming verification event ${event.getId()} type ${event.getType()} from ${event.getSender()}`,
+        );
 
         await this.olmMachine.receiveVerificationEvent(
             JSON.stringify({
@@ -1406,6 +1424,32 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }),
             new RustSdkCryptoJs.RoomId(roomId),
         );
+
+        if (
+            event.getType() === EventType.RoomMessage &&
+            event.getContent().msgtype === MsgType.KeyVerificationRequest
+        ) {
+            const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
+                new RustSdkCryptoJs.UserId(event.getSender()!),
+                event.getId()!,
+            );
+
+            if (!request) {
+                // There are multiple reasons this can happen; probably the most likely is that the event is too old.
+                this.logger.info(
+                    `Ignoring just-received verification request ${event.getId()} which did not start a rust-side verification`,
+                );
+            } else {
+                this.emit(
+                    CryptoEvent.VerificationRequestReceived,
+                    new RustVerificationRequest(
+                        request,
+                        this.outgoingRequestProcessor,
+                        this._supportedVerificationMethods,
+                    ),
+                );
+            }
+        }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
         this.outgoingRequestLoop();
@@ -1432,7 +1476,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
         // fire off the loop in the background
         this.outgoingRequestLoopInner().catch((e) => {
-            logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
+            this.logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
         });
     }
 
@@ -1448,7 +1492,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
                 this.outgoingRequestLoopOneMoreLoop = false;
 
-                logger.debug("Calling OlmMachine.outgoingRequests()");
+                this.logger.debug("Calling OlmMachine.outgoingRequests()");
                 const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
 
                 if (this.stopped) {
@@ -1483,10 +1527,17 @@ class EventDecryptor {
         () => new MapWithDefault<string, Set<MatrixEvent>>(() => new Set()),
     );
 
-    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine, private readonly crypto: RustCrypto) {}
+    public constructor(
+        private readonly logger: Logger,
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
+        private readonly crypto: RustCrypto,
+    ) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        logger.info("Attempting decryption of event", event);
+        this.logger.info(
+            `Attempting decryption of event ${event.getId()} in ${event.getRoomId()} from ${event.getSender()}`,
+        );
+
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
@@ -1564,7 +1615,7 @@ class EventDecryptor {
             new RustSdkCryptoJs.RoomId(event.getRoomId()!),
         );
 
-        return rustEncryptionInfoToJsEncryptionInfo(encryptionInfo);
+        return rustEncryptionInfoToJsEncryptionInfo(this.logger, encryptionInfo);
     }
 
     /**
@@ -1636,6 +1687,7 @@ function stringifyEvent(event: MatrixEvent): string {
 }
 
 function rustEncryptionInfoToJsEncryptionInfo(
+    logger: Logger,
     encryptionInfo: RustSdkCryptoJs.EncryptionInfo | undefined,
 ): EventEncryptionInfo | null {
     if (encryptionInfo === undefined) {
@@ -1659,7 +1711,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
     }
 
     let shieldReason: EventShieldReason | null;
-    if (shieldState.message === null) {
+    if (shieldState.message === undefined) {
         shieldReason = null;
     } else if (shieldState.message === "Encrypted by an unverified user.") {
         // this case isn't actually used with lax shield semantics.

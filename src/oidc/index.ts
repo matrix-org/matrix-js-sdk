@@ -14,18 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/* This file replaces rust-crypto/index.ts when the js-sdk is being built for browserify.
- *
- * It is a stub, so that we do not import the whole of the base64'ed wasm artifact into the browserify bundle.
- * It deliberately does nothing except raise an exception.
- */
-
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
-
-export async function initRustCrypto(
-    _http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    _userId: string,
-    _deviceId: string,
-): Promise<Crypto> {
-    throw new Error("Rust crypto is not supported under browserify.");
-}
+export * from "./tokenRefresher";
