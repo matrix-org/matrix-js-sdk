@@ -569,7 +569,11 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
                 return VerificationPhase.Started;
             case QrState.Confirmed:
                 // we have confirmed the other side's scan and sent an `m.key.verification.done`.
-                return VerificationPhase.Done;
+                //
+                // However, the verification is not yet "Done", because we have to wait until we have received the
+                // `m.key.verification.done` from the other side (in particular, we don't mark the device/identity as
+                // verified until that happens). If we return "Done" too soon, we risk the user cancelling the flow.
+                return VerificationPhase.Started;
             case QrState.Reciprocated:
                 // although the rust SDK doesn't immediately send the `m.key.verification.start` on transition into this
                 // state, `RustVerificationRequest.scanQrCode` immediately calls `reciprocate()` and does so, so in practice
