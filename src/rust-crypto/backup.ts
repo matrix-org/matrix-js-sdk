@@ -174,9 +174,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
                 await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
 
-                 // Emit an event that we have a new backup decryption key, so that client can automatically
+                // Emit an event that we have a new backup decryption key, so that client can automatically
                 // start importing all keys from the backup.
-                this.emit(CryptoEvent.BackupPrivateKeyCached, backupCheck.backupInfo);
+                this.emit(CryptoEvent.KeyBackupPrivateKeyCached, backupCheck.backupInfo);
                 return true;
             } catch (e) {
                 logger.warn("backupMatchesPrivateKey: Invalid backup decryption key", e);
@@ -224,6 +224,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 await this.disableKeyBackup();
             } else {
                 logger.log("Key backup present on server but not trusted: not enabling key backup");
+                // No backup was actually enabled, but still emit the KeyBackupStatus event.
+                this.emit(CryptoEvent.KeyBackupStatus, false);
             }
         } else {
             if (activeVersion === null) {
@@ -490,7 +492,7 @@ export type RustBackupCryptoEvents =
     | CryptoEvent.KeyBackupStatus
     | CryptoEvent.KeyBackupSessionsRemaining
     | CryptoEvent.KeyBackupFailed
-    | CryptoEvent.BackupPrivateKeyCached;
+    | CryptoEvent.KeyBackupPrivateKeyCached;
 
 export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
@@ -499,5 +501,5 @@ export type RustBackupCryptoEventMap = {
     /**
      * Fired when the backup decryption key is received via secret sharing and stored in cache.
      */
-    [CryptoEvent.BackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
+    [CryptoEvent.KeyBackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
 };

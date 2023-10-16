@@ -230,6 +230,34 @@ export enum CryptoEvent {
     KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    /**
+     * Fires when a new valid backup decryption key is in cache.
+     *
+     * The payload is the `KeyBackupInfo`.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupPrivateKeyCached = "crypto.KeyBackupPrivateKeyCached",
+
+    /**
+     * Fires when an automatic key import is started.
+     *
+     * This will happen after a sucessful verification when the private backup key
+     * is stored in cache.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupAutoImportStarted = "crypto.KeyBackupAutoImportStarted",
+
+    /**
+     * Fires when an automatic key import is finished.
+     *
+     * This will happen after a sucessful verification when the private backup key
+     * is stored in cache.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupAutoImportFinished = "crypto.KeyBackupAutoImportFinished",
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -245,15 +273,6 @@ export enum CryptoEvent {
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
-
-    /**
-     * Fires when a new valid backup decryption key is in cache.
-     * 
-     * The payload is the `KeyBackupInfo`.
-     * 
-     * This event is only fired by the rust crypto backend.
-     */
-    BackupPrivateKeyCached = "crypto.BackupPrivateKeyCached",
 }
 
 export type CryptoEventHandlerMap = {
@@ -356,6 +375,9 @@ export type CryptoEventHandlerMap = {
      */
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+    [CryptoEvent.KeyBackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
+    [CryptoEvent.KeyBackupAutoImportStarted]: () => void;
+    [CryptoEvent.KeyBackupAutoImportFinished]: (totalKeys: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
