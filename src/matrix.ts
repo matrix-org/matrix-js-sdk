@@ -42,6 +42,7 @@ export * from "./models/typed-event-emitter";
 export * from "./models/user";
 export * from "./models/device";
 export * from "./models/search-result";
+export * from "./oidc";
 export * from "./scheduler";
 export * from "./filter";
 export * from "./timeline-window";

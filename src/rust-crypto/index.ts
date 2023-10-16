@@ -17,14 +17,15 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto";
-import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
+import { Logger } from "../logger";
 
 /**
  * Create a new `RustCrypto` implementation
  *
+ * @param logger - A `Logger` instance that will be used for debug output.
  * @param http - Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
  *     We expect it to set the access token, etc.
  * @param userId - The local user's User ID.
@@ -40,6 +41,7 @@ import { ICryptoCallbacks } from "../crypto";
  * @internal
  */
 export async function initRustCrypto(
+    logger: Logger,
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
     deviceId: string,
@@ -65,7 +67,7 @@ export async function initRustCrypto(
         storePrefix ?? undefined,
         (storePrefix && storePassphrase) ?? undefined,
     );
-    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
+    const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );
@@ -73,15 +75,15 @@ export async function initRustCrypto(
         rustCrypto.onUserIdentityUpdated(userId),
     );
 
-    // check first if some secrets are pending for process. The registerReceiveSecretCallback will be
-    // triggered only for new secrets.
-    const pendingValues: string[] = await olmMachine.getSecretsFromInbox("m.megolm_backup.v1");
-    pendingValues.forEach((value) => {
-        rustCrypto.onReceiveSecret("m.megolm_backup.v1", value);
-    });
+    // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
+    // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.
+    rustCrypto.checkSecrets("m.megolm_backup.v1");
 
-    await olmMachine.registerReceiveSecretCallback((name: string, value: string) =>
-        rustCrypto.onReceiveSecret(name, value),
+    // Register a callback to be notified when a new secret is received, as for now only the key backup secret is supported (the cross signing secrets are handled automatically by the OlmMachine)
+    await olmMachine.registerReceiveSecretCallback((name: string, _value: string) =>
+        // Instead of directly checking the secret value, we poll the inbox to get all values for that secret type.
+        // Once we have all the values, we can safely clear the secret inbox.
+        rustCrypto.checkSecrets(name),
     );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
