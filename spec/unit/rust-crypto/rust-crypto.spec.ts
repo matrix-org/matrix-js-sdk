@@ -65,6 +65,7 @@ describe("initRustCrypto", () => {
             registerRoomKeyUpdatedCallback: jest.fn(),
             registerUserIdentityUpdatedCallback: jest.fn(),
             getSecretsFromInbox: jest.fn().mockResolvedValue(["dGhpc2lzYWZha2VzZWNyZXQ="]),
+            deleteSecretsFromInbox: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
             outgoingRequests: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
