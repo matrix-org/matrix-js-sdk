@@ -103,7 +103,18 @@ export class RoomEncryptor {
         this.prefixedLogger.debug("Sessions for users are ready; now sharing room key");
 
         const rustEncryptionSettings = new EncryptionSettings();
-        /* FIXME historyVisibility, rotation, etc */
+        /* FIXME historyVisibility, etc */
+
+        // We need to convert the rotation period from milliseconds to microseconds
+        // See https://spec.matrix.org/v1.8/client-server-api/#mroomencryption and
+        // https://matrix-org.github.io/matrix-rust-sdk-crypto-wasm/classes/EncryptionSettings.html#rotationPeriod
+        if (typeof this.encryptionSettings.rotation_period_ms === "number") {
+            rustEncryptionSettings.rotationPeriod = BigInt(this.encryptionSettings.rotation_period_ms * 1000);
+        }
+
+        if (typeof this.encryptionSettings.rotation_period_msgs === "number") {
+            rustEncryptionSettings.rotationPeriodMessages = BigInt(this.encryptionSettings.rotation_period_msgs);
+        }
 
         const shareMessages = await this.olmMachine.shareRoomKey(
             new RoomId(this.room.roomId),
