@@ -1375,7 +1375,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (name === "m.megolm_backup.v1") {
             const isHandled = await this.backupManager.handleBackupSecretReceived(value);
 
-            // XXXX at this point we should probably try to download the backup and import the keys,
+            // XXX at this point we should probably try to download the backup and import the keys,
             // or at least retry for the current decryption failures?
             // Maybe add some signaling when a new secret is received, and let clients handle it?
             // as it's where the restore from backup APIs are exposed.
