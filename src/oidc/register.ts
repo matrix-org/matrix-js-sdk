@@ -34,7 +34,7 @@ export type OidcRegistrationClientMetadata = {
  * @param registrationEndpoint - URL as returned from issuer ./well-known/openid-configuration
  * @param clientMetadata - registration metadata
  * @returns resolves to the registered client id when registration is successful
- * @throws when registration request fails, or response is invalid
+ * @throws when registration request fails, or response is invalid. Will throw an errow with an {@link OidcError} message
  */
 const doRegistration = async (
     registrationEndpoint: string,

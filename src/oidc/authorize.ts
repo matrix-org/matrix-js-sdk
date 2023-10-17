@@ -198,7 +198,8 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
  * @param code - authorization code as returned by OP during authorization
  * @param storedAuthorizationParams - stored params from start of oidc login flow
  * @returns valid bearer token response
- * @throws when request fails, or returned token response is invalid
+ * @throws when request fails, or returned token response is invalid.
+ *      Will throw Error with an {@link OidcError} message.
  */
 export const completeAuthorizationCodeGrant = async (
     code: string,
