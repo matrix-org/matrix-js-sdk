@@ -1373,7 +1373,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private async handleSecretReceived(name: string, value: string): Promise<boolean> {
         this.logger.debug(`onReceiveSecret: Received secret ${name}`);
         if (name === "m.megolm_backup.v1") {
-            const isHandled = await this.backupManager.handleBackupSecretReceived(value);
+            return await this.backupManager.handleBackupSecretReceived(value);
 
             // XXX at this point we should probably try to download the backup and import the keys,
             // or at least retry for the current decryption failures?
