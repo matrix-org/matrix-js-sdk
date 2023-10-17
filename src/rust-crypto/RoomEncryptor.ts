@@ -112,7 +112,7 @@ export class RoomEncryptor {
         const rustEncryptionSettings = new EncryptionSettings();
         /* FIXME rotation, etc */
 
-        rustEncryptionSettings.historyVisibility = this.toRustHistoryVisibility(this.room.getHistoryVisibility());
+        rustEncryptionSettings.historyVisibility = toRustHistoryVisibility(this.room.getHistoryVisibility());
 
         const shareMessages = await this.olmMachine.shareRoomKey(
             new RoomId(this.room.roomId),
@@ -123,24 +123,6 @@ export class RoomEncryptor {
             for (const m of shareMessages) {
                 await this.outgoingRequestProcessor.makeOutgoingRequest(m);
             }
-        }
-    }
-
-    /**
-     * Convert a HistoryVisibility to a RustHistoryVisibility
-     * @param visibility - HistoryVisibility enum
-     $ @returns a RustHistoryVisibility enum
-     */
-    private toRustHistoryVisibility(visibility: HistoryVisibility): RustHistoryVisibility {
-        switch (visibility) {
-            case HistoryVisibility.Invited:
-                return RustHistoryVisibility.Invited;
-            case HistoryVisibility.Joined:
-                return RustHistoryVisibility.Joined;
-            case HistoryVisibility.Shared:
-                return RustHistoryVisibility.Shared;
-            case HistoryVisibility.WorldReadable:
-                return RustHistoryVisibility.WorldReadable;
         }
     }
 
@@ -177,5 +159,23 @@ export class RoomEncryptor {
             this.olmMachine.identityKeys.curve25519.toBase64(),
             this.olmMachine.identityKeys.ed25519.toBase64(),
         );
+    }
+}
+
+/**
+ * Convert a HistoryVisibility to a RustHistoryVisibility
+ * @param visibility - HistoryVisibility enum
+ $ @returns a RustHistoryVisibility enum
+ */
+export function toRustHistoryVisibility(visibility: HistoryVisibility): RustHistoryVisibility {
+    switch (visibility) {
+        case HistoryVisibility.Invited:
+            return RustHistoryVisibility.Invited;
+        case HistoryVisibility.Joined:
+            return RustHistoryVisibility.Joined;
+        case HistoryVisibility.Shared:
+            return RustHistoryVisibility.Shared;
+        case HistoryVisibility.WorldReadable:
+            return RustHistoryVisibility.WorldReadable;
     }
 }
