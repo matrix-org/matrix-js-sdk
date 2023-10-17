@@ -23,7 +23,7 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, mkEventCustom, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
@@ -31,12 +31,14 @@ import {
     BOB_TEST_USER_ID,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
+    TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
+    Category,
     ClientEvent,
     createClient,
     CryptoEvent,
@@ -71,8 +73,8 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
-    createOlmSession,
     createOlmAccount,
+    createOlmSession,
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptMegolmEventRawPlainText,
@@ -80,6 +82,7 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
+import { HistoryVisibility } from "../../../src/@types/partials";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -922,6 +925,80 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
         });
+    });
+
+    newBackendOnly("should rotate the session when the history visibility changes", async () => {
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+        const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+        // Tell alice we share a room with bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Force alice to download bob keys
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        /**
+         * Return the event received on rooms/{roomId}/send/ endpoint.
+         * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+         * @returns the content of event (no decryption)
+         */
+        function expectSendMessage() {
+            return new Promise<IContent>((resolve) => {
+                fetchMock.putOnce(
+                    new RegExp("/send/"),
+                    (url, request) => {
+                        const content = JSON.parse(request.body as string);
+                        resolve(content);
+                        return { event_id: "$event_id" };
+                    },
+                    { overwriteRoutes: true },
+                );
+            });
+        }
+
+        // Send a message to bob and get the current session id
+        let [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectSendMessage(),
+        ]);
+
+        // Check that the session id exists
+        const sessionId = encryptedMessage.session_id;
+        expect(sessionId).toBeDefined();
+
+        // Change history visibility in sync response
+        const syncResponse = getSyncResponse([]);
+        syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                sender: TEST_USER_ID,
+                type: "m.room.history_visibility",
+                state_key: "",
+                content: {
+                    history_visibility: HistoryVisibility.Invited,
+                },
+            }),
+        );
+
+        // send the new visibility
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // Resend a message to bob and get the new session id
+        [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectSendMessage(),
+        ]);
+
+        // Check that the new session id exists
+        const newSessionId = encryptedMessage.session_id;
+        expect(newSessionId).toBeDefined();
+
+        // Check that the session id has changed
+        expect(sessionId).not.toEqual(newSessionId);
     });
 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
