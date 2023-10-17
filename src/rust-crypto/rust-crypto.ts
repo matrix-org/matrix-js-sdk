@@ -1365,7 +1365,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * and are guaranteed to have been received over a 1-to-1 Olm
      * Session from a verified device.
      *
-     * The only secret this is currently broadcasted is the `m.megolm_backup.v1`.
+     * The only secret currently broadcasted in this way is `m.megolm_backup.v1`.
      *
      * @param name - the secret name
      * @param base64 - the secret value base 64 encoded
