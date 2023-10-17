@@ -419,7 +419,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * If the event is encrypted, we attempt to mock up an event as it would have looked had the sender not encrypted it.
      * If the event is not encrypted, a copy of it is simply returned as-is.
      *
-     * @returns A copy of the event, in wire format, as it would have been had it not been encrypted.
+     * @returns A shallow copy of the event, in wire format, as it would have been had it not been encrypted.
      */
     public getEffectiveEvent(): IEvent {
         const content = Object.assign({}, this.getContent()); // clone for mutation
