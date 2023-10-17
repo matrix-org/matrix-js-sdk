@@ -414,9 +414,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Gets the event as though it would appear unencrypted. If the event is already not
-     * encrypted, it is simply returned as-is.
-     * @returns The event in wire format.
+     * Gets the event as it would appear if it had been sent unencrypted.
+     *
+     * If the event is encrypted, we attempt to mock up an event as it would have looked had the sender not encrypted it.
+     * If the event is not encrypted, a copy of it is simply returned as-is.
+     *
+     * @returns A copy of the event, in wire format, as it would have been had it not been encrypted.
      */
     public getEffectiveEvent(): IEvent {
         const content = Object.assign({}, this.getContent()); // clone for mutation
@@ -1593,15 +1596,21 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Summarise the event as JSON. This is currently used by React SDK's view
-     * event source feature and Seshat's event indexing, so take care when
-     * adjusting the output here.
+     * Summarise the event as JSON.
      *
      * If encrypted, include both the decrypted and encrypted view of the event.
      *
      * This is named `toJSON` for use with `JSON.stringify` which checks objects
      * for functions named `toJSON` and will call them to customise the output
      * if they are defined.
+     *
+     * **WARNING** Do not log the result of this method; otherwise, it will end up
+     * in rageshakes, leading to a privacy violation.
+     *
+     * @deprecated Prefer to use {@link MatrixEvent#getEffectiveEvent} or similar.
+     * This method will be removed soon; it is too easy to use it accidentally
+     * and cause a privacy violation (cf https://github.com/vector-im/element-web/issues/26380).
+     * In any case, the value it returns is not a faithful serialization of the object.
      */
     public toJSON(): object {
         const event = this.getEffectiveEvent();
