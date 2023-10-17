@@ -17,14 +17,15 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto";
-import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
+import { Logger } from "../logger";
 
 /**
  * Create a new `RustCrypto` implementation
  *
+ * @param logger - A `Logger` instance that will be used for debug output.
  * @param http - Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
  *     We expect it to set the access token, etc.
  * @param userId - The local user's User ID.
@@ -40,6 +41,7 @@ import { ICryptoCallbacks } from "../crypto";
  * @internal
  */
 export async function initRustCrypto(
+    logger: Logger,
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
     deviceId: string,
@@ -65,7 +67,7 @@ export async function initRustCrypto(
         storePrefix ?? undefined,
         (storePrefix && storePassphrase) ?? undefined,
     );
-    const rustCrypto = new RustCrypto(olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
+    const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );

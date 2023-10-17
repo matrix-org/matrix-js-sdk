@@ -24,15 +24,15 @@ declare global {
     /* eslint-enable no-var */
 }
 
-if (global.__js_sdk_entrypoint) {
+if (globalThis.__js_sdk_entrypoint) {
     throw new Error("Multiple matrix-js-sdk entrypoints detected!");
 }
-global.__js_sdk_entrypoint = true;
+globalThis.__js_sdk_entrypoint = true;
 
 // just *accessing* indexedDB throws an exception in firefox with indexeddb disabled.
 let indexedDB: IDBFactory | undefined;
 try {
-    indexedDB = global.indexedDB;
+    indexedDB = globalThis.indexedDB;
 } catch (e) {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
@@ -40,8 +40,5 @@ if (indexedDB) {
     matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
 }
 
-// We export 3 things to make browserify happy as well as downstream projects.
-// It's awkward, but required.
 export * from "./matrix";
-export default matrixcs; // keep export for browserify package deps
-global.matrixcs = matrixcs;
+globalThis.matrixcs = matrixcs;

@@ -72,36 +72,6 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         actions: [PushRuleActionName.DontNotify],
     },
     {
-        rule_id: RuleId.IsUserMention,
-        default: true,
-        enabled: true,
-        conditions: [
-            {
-                kind: ConditionKind.EventPropertyContains,
-                key: "content.m\\.mentions.user_ids",
-                value: "", // The user ID is dynamically added in rewriteDefaultRules.
-            },
-        ],
-        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
-    },
-    {
-        rule_id: RuleId.IsRoomMention,
-        default: true,
-        enabled: true,
-        conditions: [
-            {
-                kind: ConditionKind.EventPropertyIs,
-                key: "content.m\\.mentions.room",
-                value: true,
-            },
-            {
-                kind: ConditionKind.SenderNotificationPermission,
-                key: "room",
-            },
-        ],
-        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Highlight }],
-    },
-    {
         // For homeservers which don't support MSC3786 yet
         rule_id: ".org.matrix.msc3786.rule.room.server_acl",
         default: true,

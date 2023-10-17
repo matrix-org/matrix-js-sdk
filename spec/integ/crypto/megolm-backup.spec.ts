@@ -163,15 +163,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             },
         };
 
-        fetchMock.get(
-            "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
-            testData.CURVE25519_KEY_BACKUP_DATA,
-        );
+        fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
+            // check that the version is correct
+            const version = new URLSearchParams(new URL(url).search).get("version");
+            if (version == "1") {
+                return testData.CURVE25519_KEY_BACKUP_DATA;
+            } else {
+                return {
+                    status: 403,
+                    body: {
+                        current_version: "1",
+                        errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                        error: "Wrong backup version.",
+                    },
+                };
+            }
+        });
+
         fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
         aliceClient = await initTestClient();
         const aliceCrypto = aliceClient.getCrypto()!;
-        await aliceCrypto.storeSessionBackupPrivateKey(Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"));
+        await aliceCrypto.storeSessionBackupPrivateKey(
+            Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+            testData.SIGNED_BACKUP_DATA.version!,
+        );
 
         // start after saving the private key
         await aliceClient.startClient();
@@ -237,6 +253,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(1);
 
             await awaitKeyCached;
+
+            // The key should be now cached
+            const afterCache = await aliceClient.restoreKeyBackupWithCache(undefined, undefined, check!.backupInfo!);
+
+            expect(afterCache.imported).toStrictEqual(1);
         });
 
         it("recover specific session from backup", async function () {
@@ -640,6 +661,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                testData.SIGNED_BACKUP_DATA.version!,
             );
 
             const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
@@ -653,6 +675,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                testData.SIGNED_BACKUP_DATA.version!,
             );
 
             const backup: KeyBackupInfo = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));

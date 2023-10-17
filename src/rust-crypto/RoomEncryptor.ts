@@ -19,7 +19,7 @@ import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matr
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
-import { logger, PrefixedLogger } from "../logger";
+import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
@@ -30,7 +30,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
  * @internal
  */
 export class RoomEncryptor {
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
@@ -45,7 +45,7 @@ export class RoomEncryptor {
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
-        this.prefixedLogger = logger.withPrefix(`[${room.roomId} encryption]`);
+        this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
     }
 
     /**
@@ -65,15 +65,14 @@ export class RoomEncryptor {
      * @param member - new membership state
      */
     public onRoomMembership(member: RoomMember): void {
-        this.prefixedLogger.debug(`${member.membership} event for ${member.userId}`);
-
         if (
             member.membership == "join" ||
             (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
-            this.prefixedLogger.debug(`starting to track devices for: ${member.userId}`);
-            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]);
+            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
+                this.prefixedLogger.error("Unable to update tracked users", e);
+            });
         }
 
         // TODO: handle leaves (including our own)

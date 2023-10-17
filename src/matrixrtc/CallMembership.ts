@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, RoomMember } from "../matrix";
+import { MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -42,11 +42,11 @@ export class CallMembership {
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");
         if (typeof data.scope !== "string") throw new Error("Malformed membership event: scope must be string");
-        if (!parentEvent.sender) throw new Error("Invalid parent event: sender is null");
+        if (!parentEvent.getSender()) throw new Error("Invalid parent event: sender is null");
     }
 
-    public get member(): RoomMember {
-        return this.parentEvent.sender!;
+    public get sender(): string | undefined {
+        return this.parentEvent.getSender();
     }
 
     public get callId(): string {

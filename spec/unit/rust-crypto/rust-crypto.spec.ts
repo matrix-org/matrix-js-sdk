@@ -44,10 +44,12 @@ import {
     EventShieldColour,
     EventShieldReason,
     ImportRoomKeysOpts,
+    KeyBackupCheck,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
+import { logger } from "../../../src/logger";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -71,6 +73,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -93,6 +96,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto(
+            logger,
             {} as MatrixClient["http"],
             TEST_USER,
             TEST_DEVICE_ID,
@@ -315,6 +319,7 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixHttpApi<any>,
                 TEST_USER,
@@ -444,6 +449,7 @@ describe("RustCrypto", () => {
                 getRoomEventEncryptionInfo: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -498,7 +504,7 @@ describe("RustCrypto", () => {
             [RustSdkCryptoJs.ShieldColor.Red, EventShieldColour.RED],
         ])("gets the right shield color (%i)", async (rustShield, expectedShield) => {
             const mockEncryptionInfo = {
-                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: null }),
+                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: undefined }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
@@ -509,7 +515,7 @@ describe("RustCrypto", () => {
         });
 
         it.each([
-            [null, null],
+            [undefined, null],
             ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
             ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
             [
@@ -618,6 +624,7 @@ describe("RustCrypto", () => {
                 getDevice: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -783,9 +790,22 @@ describe("RustCrypto", () => {
         it("can save and restore a key", async () => {
             const key = "testtesttesttesttesttesttesttest";
             const rustCrypto = await makeTestRustCrypto();
-            await rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key));
+            await rustCrypto.storeSessionBackupPrivateKey(
+                new TextEncoder().encode(key),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
+        });
+
+        it("fails to save a key if version not provided", async () => {
+            const key = "testtesttesttesttesttesttesttest";
+            const rustCrypto = await makeTestRustCrypto();
+            await expect(() => rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key))).rejects.toThrow(
+                "storeSessionBackupPrivateKey: version is required",
+            );
+            const fetched = await rustCrypto.getSessionBackupPrivateKey();
+            expect(fetched).toBeNull();
         });
     });
 
@@ -823,6 +843,7 @@ describe("RustCrypto", () => {
                 getIdentity: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
+                logger,
                 olmMachine,
                 {} as MatrixClient["http"],
                 TEST_USER,
@@ -850,6 +871,57 @@ describe("RustCrypto", () => {
             expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
         });
     });
+
+    describe("key backup", () => {
+        it("is started when rust crypto is created", async () => {
+            // `RustCrypto.checkKeyBackupAndEnable` async call is made in background in the RustCrypto constructor.
+            // We don't have an instance of the rust crypto yet, we spy directly in the prototype.
+            const spyCheckKeyBackupAndEnable = jest
+                .spyOn(RustCrypto.prototype, "checkKeyBackupAndEnable")
+                .mockResolvedValue({} as KeyBackupCheck);
+
+            await makeTestRustCrypto();
+
+            expect(spyCheckKeyBackupAndEnable).toHaveBeenCalled();
+        });
+
+        it("raises KeyBackupStatus event when identify change", async () => {
+            // Return the key backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+
+            const olmMachine = {
+                getIdentity: jest.fn(),
+                // Force the backup to be trusted by the olmMachine
+                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(true) }),
+                isBackupEnabled: jest.fn().mockReturnValue(true),
+                getBackupKeys: jest.fn(),
+                enableBackupV1: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+
+            const rustCrypto = new RustCrypto(
+                logger,
+                olmMachine,
+                mockHttpApi,
+                testData.TEST_USER_ID,
+                testData.TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+
+            // Wait for the key backup to be available
+            const keyBackupStatusPromise = new Promise<boolean>((resolve) =>
+                rustCrypto.once(CryptoEvent.KeyBackupStatus, resolve),
+            );
+            await rustCrypto.onUserIdentityUpdated(new RustSdkCryptoJs.UserId(testData.TEST_USER_ID));
+            expect(await keyBackupStatusPromise).toBe(true);
+        });
+    });
 });
 
 /** build a basic RustCrypto instance for testing
@@ -863,5 +935,5 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+    return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
 }

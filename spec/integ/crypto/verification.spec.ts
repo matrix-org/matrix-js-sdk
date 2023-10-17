@@ -21,12 +21,14 @@ import { MockResponse } from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
+import Olm from "@matrix-org/olm";
 
 import {
     createClient,
     CryptoEvent,
     IContent,
     ICreateClientOpts,
+    IEvent,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -42,9 +44,17 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { escapeRegExp } from "../../../src/utils";
-import { CRYPTO_BACKENDS, emitPromise, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import {
+    awaitDecryption,
+    CRYPTO_BACKENDS,
+    emitPromise,
+    getSyncResponse,
+    InitCrypto,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
+    BOB_ONE_TIME_KEYS,
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
     BOB_SIGNED_TEST_DEVICE_DATA,
     BOB_TEST_USER_ID,
@@ -55,11 +65,11 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
-    BOB_ONE_TIME_KEYS,
 } from "../../test-utils/test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { createOlmSession, encryptGroupSessionKey, encryptMegolmEvent, ToDeviceEvent } from "./olm-utils";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -138,6 +148,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         beforeEach(async () => {
             // pretend that we have another device, which we will verify
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
+
+            fetchMock.put(
+                new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`),
+                { ok: false, status: 404 },
+                { overwriteRoutes: true },
+            );
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
@@ -409,6 +425,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         it("can verify another via QR code with an untrusted cross-signing key", async () => {
+            // This is a slightly weird thing to test; if we don't trust the cross-signing key, normally we would
+            // spam out a verification request to all devices rather than targeting a single device. Still, it's
+            // a thing both the Matrix protocol and the js-sdk API support, so we may as well test it.
+            //
+            // Since we don't yet trust the master key, this is a type 0x02 QR code:
+            //   "self-verifying in which the current device does not yet trust the master key"
+            //
+            // By the end of it, we should trust the master key.
+
             aliceClient = await startTestClient();
             // QRCode fails if we don't yet have the cross-signing keys, so make sure we have them now.
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
@@ -480,12 +505,51 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             reciprocateQRCodeCallbacks.confirm();
             await sendToDevicePromise;
 
+            // at this point, on legacy crypto, the master key is already marked as trusted, and the request is "Done".
+            // Rust crypto, on the other hand, waits for the 'done' to arrive from the other side.
+            if (request.phase === VerificationPhase.Done) {
+                // legacy crypto: we're all done
+                const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+                await verificationPromise;
+            } else {
+                // rust crypto: still in flight
+                // eslint-disable-next-line jest/no-conditional-expect
+                expect(request.phase).toEqual(VerificationPhase.Started);
+            }
+
             // the dummy device replies with its own 'done'
             returnToDeviceMessageFromSync(buildDoneMessage(transactionId));
 
-            // ... and the whole thing should be done!
+            // ... and now we're really done.
             await verificationPromise;
             expect(request.phase).toEqual(VerificationPhase.Done);
+            const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
+            expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
+        });
+
+        it("can try to generate a QR code when QR code is not supported", async () => {
+            aliceClient = await startTestClient();
+            // we need cross-signing keys for a QR code verification
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+            await waitForDeviceList();
+
+            // Alice sends a m.key.verification.request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            // The dummy device replies with an m.key.verification.ready, indicating it can only use SaS
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+            expect(request.phase).toEqual(VerificationPhase.Ready);
+
+            // Alice tries to generate a QR Code but it's unavailable
+            const qrCodeBuffer = await request.generateQRCode();
+            expect(qrCodeBuffer).toBeUndefined();
         });
 
         newBackendOnly("can verify another by scanning their QR code", async () => {
@@ -897,6 +961,205 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
     });
 
+    describe("Incoming verification in a DM", () => {
+        let testOlmAccount: Olm.Account;
+
+        beforeEach(async () => {
+            // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+            await Olm.init();
+            testOlmAccount = new Olm.Account();
+            testOlmAccount.create();
+
+            aliceClient = await startTestClient();
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
+            await syncPromise(aliceClient);
+        });
+
+        /**
+         * Return a plaintext verification request event from Bob to Alice
+         * @see https://spec.matrix.org/v1.7/client-server-api/#mkeyverificationrequest
+         */
+        function createVerificationRequestEvent(): IEvent {
+            return {
+                content: {
+                    body: "Verification request from Bob to Alice",
+                    from_device: "BobDevice",
+                    methods: ["m.sas.v1"],
+                    msgtype: "m.key.verification.request",
+                    to: aliceClient.getUserId()!,
+                },
+                event_id: "$143273582443PhrSn:example.org",
+                origin_server_ts: Date.now(),
+                room_id: TEST_ROOM_ID,
+                sender: "@bob:xyz",
+                type: "m.room.message",
+                unsigned: {
+                    age: 1234,
+                },
+            };
+        }
+
+        /**
+         * Create a to-device event from Bob to Alice, sharing the group session key
+         * @param groupSession - group session key to share
+         * @param p2pSession - test Olm session to encrypt the key with
+         */
+        function encryptGroupSessionKeyForAlice(
+            groupSession: Olm.OutboundGroupSession,
+            p2pSession: Olm.Session,
+        ): ToDeviceEvent {
+            return encryptGroupSessionKey({
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
+                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
+                olmAccount: testOlmAccount,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: TEST_ROOM_ID,
+            });
+        }
+
+        /**
+         * Create and encrypt a verification request event
+         * @param groupSession
+         */
+        function createEncryptedVerificationRequest(groupSession: Olm.OutboundGroupSession): IEvent {
+            const testOlmAccountKeys = JSON.parse(testOlmAccount.identity_keys());
+            return encryptMegolmEvent({
+                senderKey: testOlmAccountKeys.curve25519,
+                groupSession: groupSession,
+                room_id: TEST_ROOM_ID,
+                plaintext: createVerificationRequestEvent(),
+            });
+        }
+
+        it("Verification request not found", async () => {
+            // Expect to not find any verification request
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            expect(request).toBeUndefined();
+        });
+
+        it("ignores old verification requests", async () => {
+            const eventHandler = jest.fn();
+            aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
+
+            const verificationRequestEvent = createVerificationRequestEvent();
+            verificationRequestEvent.origin_server_ts -= 1000000;
+            returnRoomMessageFromSync(TEST_ROOM_ID, verificationRequestEvent);
+
+            await syncPromise(aliceClient);
+
+            // make sure the event has arrived
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
+            expect(matrixEvent.getId()).toEqual(verificationRequestEvent.event_id);
+
+            // check that an event has not been raised, and that the request is not found
+            expect(eventHandler).not.toHaveBeenCalled();
+            expect(
+                aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
+            ).not.toBeDefined();
+        });
+
+        it("Plaintext verification request from Bob to Alice", async () => {
+            // Add verification request from Bob to Alice in the DM between them
+            returnRoomMessageFromSync(TEST_ROOM_ID, createVerificationRequestEvent());
+
+            // Wait for the request to be received
+            const request1 = await emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+            expect(request1.roomId).toBe(TEST_ROOM_ID);
+            expect(request1.isSelfVerification).toBe(false);
+            expect(request1.otherUserId).toBe("@bob:xyz");
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+        });
+
+        it("Encrypted verification request from Bob to Alice", async () => {
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+
+            // make the room_key event, but don't send it yet
+            const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
+
+            // Add verification request from Bob to Alice in the DM between them
+            returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
+
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
+
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
+
+            // wait for a first attempt at decryption: should fail
+            await awaitDecryption(matrixEvent);
+            expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
+
+            const requestEventPromise = emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+
+            // Send Bob the room keys
+            returnToDeviceMessageFromSync(toDeviceEvent);
+
+            // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
+            await jest.advanceTimersByTimeAsync(10);
+
+            // Wait for the request to be decrypted
+            const request1 = await requestEventPromise;
+            expect(request1.roomId).toBe(TEST_ROOM_ID);
+            expect(request1.isSelfVerification).toBe(false);
+            expect(request1.otherUserId).toBe("@bob:xyz");
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // Expect to find the verification request received during the sync
+            expect(request?.roomId).toBe(TEST_ROOM_ID);
+            expect(request?.isSelfVerification).toBe(false);
+            expect(request?.otherUserId).toBe("@bob:xyz");
+        });
+
+        newBackendOnly(
+            "If the verification request is not decrypted within 5 minutes, the request is ignored",
+            async () => {
+                const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+                const groupSession = new Olm.OutboundGroupSession();
+                groupSession.create();
+
+                // make the room_key event, but don't send it yet
+                const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
+
+                // Add verification request from Bob to Alice in the DM between them
+                returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
+
+                // Wait for the sync response to be processed
+                await syncPromise(aliceClient);
+
+                const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+                const matrixEvent = room.getLiveTimeline().getEvents()[0];
+
+                // wait for a first attempt at decryption: should fail
+                await awaitDecryption(matrixEvent);
+                expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
+
+                // Advance time by 5mins, the verification request should be ignored after that
+                jest.advanceTimersByTime(5 * 60 * 1000);
+
+                // Send Bob the room keys
+                returnToDeviceMessageFromSync(toDeviceEvent);
+
+                // Wait for the message to be decrypted
+                await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
+
+                const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+                // the request should not be present
+                expect(request).not.toBeDefined();
+            },
+        );
+    });
+
     async function startTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
         const client = createClient({
             baseUrl: TEST_HOMESERVER_URL,
@@ -926,6 +1189,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     function returnToDeviceMessageFromSync(ev: { type: string; content: object; sender?: string }): void {
         ev.sender ??= TEST_USER_ID;
         syncResponder.sendOrQueueSyncResponse({ to_device: { events: [ev] } });
+    }
+
+    function returnRoomMessageFromSync(roomId: string, ev: IEvent): void {
+        syncResponder.sendOrQueueSyncResponse({
+            next_batch: 1,
+            rooms: {
+                join: {
+                    [roomId]: { timeline: { events: [ev] } },
+                },
+            },
+        });
     }
 });
 

@@ -215,6 +215,36 @@ describe("MegolmBackup", function () {
             jest.spyOn(global, "setTimeout").mockRestore();
         });
 
+        test("fail if crypto not enabled", async () => {
+            const client = makeTestClient(cryptoStore);
+            const data = {
+                algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+                version: "1",
+                auth_data: {
+                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                },
+            };
+            await expect(client.restoreKeyBackupWithSecretStorage(data)).rejects.toThrow(
+                "End-to-end encryption disabled",
+            );
+        });
+
+        test("fail if given backup has no version", async () => {
+            const client = makeTestClient(cryptoStore);
+            await client.initCrypto();
+            const data = {
+                algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+                auth_data: {
+                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                },
+            };
+            const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
+            await client.getCrypto()!.storeSessionBackupPrivateKey(key, "1");
+            await expect(client.restoreKeyBackupWithCache(undefined, undefined, data)).rejects.toThrow(
+                "Backup version must be defined",
+            );
+        });
+
         it("automatically calls the key back up", function () {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();

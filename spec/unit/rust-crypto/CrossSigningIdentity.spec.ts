@@ -41,6 +41,7 @@ describe("CrossSigningIdentity", () => {
             olmMachine = {
                 crossSigningStatus: jest.fn(),
                 bootstrapCrossSigning: jest.fn(),
+                exportCrossSigningKeys: jest.fn(),
                 close: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
@@ -50,6 +51,8 @@ describe("CrossSigningIdentity", () => {
 
             secretStorage = {
                 get: jest.fn(),
+                hasKey: jest.fn(),
+                store: jest.fn(),
             } as unknown as Mocked<ServerSideSecretStorage>;
 
             crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage);
@@ -61,7 +64,8 @@ describe("CrossSigningIdentity", () => {
                 hasSelfSigning: true,
                 hasUserSigning: true,
             });
-            // TODO: secret storage
+            // in secret storage
+            secretStorage.get.mockResolvedValue("base64-saved-in-storage");
             await crossSigning.bootstrapCrossSigning({});
             expect(olmMachine.bootstrapCrossSigning).not.toHaveBeenCalled();
             expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
@@ -71,6 +75,19 @@ describe("CrossSigningIdentity", () => {
             olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
             await crossSigning.bootstrapCrossSigning({ setupNewCrossSigning: true });
             expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
+        });
+
+        it("Shoud update 4S on reset if 4S is set up", async () => {
+            olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
+            secretStorage.hasKey.mockResolvedValue(true);
+            olmMachine.exportCrossSigningKeys.mockResolvedValue({
+                masterKey: "base64_aaaaaaaaaa",
+                self_signing_key: "base64_bbbbbbbbbbb",
+                userSigningKey: "base64_cccccccc",
+            });
+            await crossSigning.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
+            expect(secretStorage.store).toHaveBeenCalledTimes(3);
         });
 
         it("should call bootstrapCrossSigning if we need new keys", async () => {
