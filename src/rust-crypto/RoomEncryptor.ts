@@ -14,7 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import {
+    EncryptionAlgorithm,
+    EncryptionSettings,
+    OlmMachine,
+    RoomId,
+    UserId,
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
@@ -104,6 +110,9 @@ export class RoomEncryptor {
 
         const rustEncryptionSettings = new EncryptionSettings();
         /* FIXME historyVisibility, etc */
+
+        // We only support megolm
+        rustEncryptionSettings.algorithm = EncryptionAlgorithm.MegolmV1AesSha2;
 
         // We need to convert the rotation period from milliseconds to microseconds
         // See https://spec.matrix.org/v1.8/client-server-api/#mroomencryption and
