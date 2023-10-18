@@ -5157,24 +5157,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (!unthreaded && this.supportsThreads()) {
-            // XXX: the spec currently says a threaded read receipt can be sent for the root of a thread,
-            // but in practice this isn't possible and the spec needs updating.
-            const isThread =
-                !!event.threadRootId &&
-                // A thread cannot be just a thread root and a thread root can only be read in the main timeline
-                !event.isThreadRoot &&
-                // Similarly non-thread relations upon the thread root (reactions, edits) should also be for the main timeline.
-                event.isRelation() &&
-                (event.isRelation(THREAD_RELATION_TYPE.name) || event.relationEventId !== event.threadRootId);
-            body = {
-                ...body,
-                // Only thread replies should define a specific thread. Thread roots can only be read in the main timeline.
-                thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
-            };
-        }
+        // Unless we're explicitly making an unthreaded receipt or we don't
+        // support threads, include the `thread_id` property in the body.
+        const shouldAddThreadId = !unthreaded && this.supportsThreads();
+        const fullBody = shouldAddThreadId ? { ...body, thread_id: threadIdForReceipt(event) } : body;
 
-        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});
+        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, fullBody || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
@@ -9924,4 +9912,67 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
         }
     }
+}
+
+/**
+ * Given an event, figure out the thread ID we should use for it in a receipt.
+ *
+ * This will either be "main", or event.threadRootId. For the thread root, or
+ * e.g. reactions to the thread root, this will be main. For events inside the
+ * thread, or e.g. reactions to them, this will be event.threadRootId.
+ *
+ * (Exported for test.)
+ */
+export function threadIdForReceipt(event: MatrixEvent): string {
+    return inMainTimelineForReceipt(event) ? MAIN_ROOM_TIMELINE : event.threadRootId!;
+}
+
+/**
+ * a) True for non-threaded messages, thread roots and non-thread relations to thread roots.
+ * b) False for messages with thread relations to the thread root.
+ * c) False for messages with any kind of relation to a message from case b.
+ *
+ * Note: true for redactions of messages that are in threads. Redacted messages
+ * are not really in threads (because their relations are gone), so if they look
+ * like they are in threads, that is a sign of a bug elsewhere. (At time of
+ * writing, this bug definitely exists - messages are not moved to another
+ * thread when they are redacted.)
+ *
+ * @returns true if this event is considered to be in the main timeline as far
+ *               as receipts are concerned.
+ */
+function inMainTimelineForReceipt(event: MatrixEvent): boolean {
+    if (!event.threadRootId) {
+        // Not in a thread: then it is in the main timeline
+        return true;
+    }
+
+    if (event.isThreadRoot) {
+        // Thread roots are in the main timeline. Note: the spec is ambiguous (or
+        // wrong) on this - see
+        // https://github.com/matrix-org/matrix-spec-proposals/pull/4037
+        return true;
+    }
+
+    if (!event.isRelation()) {
+        // If it's not related to anything, it can't be related via a chain of
+        // relations to a thread root.
+        //
+        // Note: this is a bug, because how does it have a threadRootId if it is
+        // neither a thread root, nor related to one?
+        logger.warn(`Event is not a relation or a thread root, but still has a threadRootId! id=${event.getId()}`);
+        return true;
+    }
+
+    if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+        // It's a message in a thread - definitely not in the main timeline.
+        return false;
+    }
+
+    const isRelatedToRoot = event.relationEventId === event.threadRootId;
+
+    // If it's related to the thread root (and we already know it's not a thread
+    // relation) then it's in the main timeline. If it's related to something
+    // else, then it's in the thread (because it has a thread ID).
+    return isRelatedToRoot;
 }
