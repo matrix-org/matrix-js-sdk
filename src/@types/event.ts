@@ -55,7 +55,7 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
-    CallEncryptionPrefix = "io.element.call.encryption_key",
+    CallEncryptionKeysPrefix = "io.element.call.encryption_keys",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",

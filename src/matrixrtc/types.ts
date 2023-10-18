@@ -14,9 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export interface EncryptionKeyEventContent {
-    "m.encryption_key": string;
-    "m.encryption_key_index": number;
+export interface EncryptionKeyEntry {
+    index: number;
+    key: string;
+}
+
+export interface EncryptionKeysEventContent {
+    "keys": EncryptionKeyEntry[];
     "m.device_id": string;
     "m.call_id": string;
 }

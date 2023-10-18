@@ -23,8 +23,8 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixEvent } from "../matrix";
-import { EncryptionKeyEventContent } from "./types";
 import { randomString } from "../randomstring";
+import { EncryptionKeysEventContent } from "./types";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -100,7 +100,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId!");
         if (!deviceId) throw new Error("No deviceId!");
 
-        return (this.getKeyForParticipant(userId, deviceId)?.length ?? 0) % 16;
+        return (this.getKeysForParticipant(userId, deviceId)?.length ?? 0) % 16;
     }
 
     private setEncryptionKey(
@@ -119,7 +119,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, encryptionKeyIndex, participantId);
     }
 
-    public getKeyForParticipant(userId: string, deviceId: string): Array<string> | undefined {
+    public getKeysForParticipant(userId: string, deviceId: string): Array<string> | undefined {
         return this.encryptionKeys.get(getParticipantId(userId, deviceId));
     }
 
@@ -246,6 +246,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.encryptMedia = encryptMedia ?? false;
         this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
+        this.makeNewSenderKey();
         this.updateEncryptionKeyEvent();
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
@@ -289,6 +290,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         });
     }
 
+    private makeNewSenderKey(): void {
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
+
+        if (!userId) throw new Error("No userId");
+        if (!deviceId) throw new Error("No deviceId");
+
+        const encryptionKey = getNewEncryptionKey();
+        const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
+        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
+    }
+
     /**
      * Re-sends the encryption key room event with a new key
      */
@@ -297,6 +310,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.lastEncryptionKeyUpdateRequest &&
             this.lastEncryptionKeyUpdateRequest + UPDATE_ENCRYPTION_KEY_THROTTLE > Date.now()
         ) {
+            logger.info("Last encryption key event sent too recently: postponing");
             this.lastEncryptionKeyUpdateRequest = Date.now();
             setTimeout(() => {
                 this.updateEncryptionKeyEvent();
@@ -315,24 +329,32 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
 
-        const encryptionKey = getNewEncryptionKey();
-        const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
+        const myKeys = this.getKeysForParticipant(userId, deviceId);
+
+        if (!myKeys) {
+            logger.warn("Tried to send encryption keys event but no keys found!");
+            return;
+        }
+
         try {
-            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionPrefix, {
-                "m.encryption_key": encryptionKey,
-                "m.encryption_key_index": encryptionKeyIndex,
+            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, {
+                "keys": myKeys.map((key, index) => {
+                    return {
+                        index,
+                        key,
+                    };
+                }),
                 "m.device_id": deviceId,
                 "m.call_id": "",
-            } as EncryptionKeyEventContent);
+            } as EncryptionKeysEventContent);
         } catch (error) {
             logger.error("Failed to send m.call.encryption_key", error);
         }
 
         logger.debug(
-            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} encryptionKey=${encryptionKey}`,
+            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
             this.encryptionKeys,
         );
-        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
     }
 
     /**
@@ -363,43 +385,50 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     public onCallEncryption = (event: MatrixEvent): void => {
         const userId = event.getSender();
-        const content = event.getContent<EncryptionKeyEventContent>();
-        const encryptionKey = content["m.encryption_key"];
-        const encryptionKeyIndex = content["m.encryption_key_index"];
+        const content = event.getContent<EncryptionKeysEventContent>();
+
         const deviceId = content["m.device_id"];
         const callId = content["m.call_id"];
 
-        if (
-            !userId ||
-            !deviceId ||
-            !encryptionKey ||
-            encryptionKeyIndex === undefined ||
-            encryptionKeyIndex === null ||
-            callId === undefined ||
-            callId === null ||
-            typeof deviceId !== "string" ||
-            typeof callId !== "string" ||
-            typeof encryptionKey !== "string" ||
-            typeof encryptionKeyIndex !== "number"
-        ) {
-            throw new Error(
-                `Malformed m.call.encryption_key: userId=${userId}, deviceId=${deviceId}, encryptionKeyIndex=${encryptionKeyIndex} callId=${callId}`,
-            );
+        if (!userId) {
+            logger.warn(`Received m.call.encryption_keys with no userId: callId=${callId}`);
+            return;
         }
 
         // We currently only handle callId = ""
         if (callId !== "") {
             logger.warn(
-                `Received m.call.encryption_key with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
+                `Received m.call.encryption_keys with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
             );
             return;
         }
 
-        logger.debug(
-            `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey} encryptionKeyIndex=${encryptionKeyIndex}`,
-            this.encryptionKeys,
-        );
-        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
+        for (const key of content.keys) {
+            const encryptionKey = key.key;
+            const encryptionKeyIndex = key.index;
+
+            if (
+                !encryptionKey ||
+                encryptionKeyIndex === undefined ||
+                encryptionKeyIndex === null ||
+                callId === undefined ||
+                callId === null ||
+                typeof deviceId !== "string" ||
+                typeof callId !== "string" ||
+                typeof encryptionKey !== "string" ||
+                typeof encryptionKeyIndex !== "number"
+            ) {
+                logger.warn(
+                    `Malformed call encryption_key: userId=${userId}, deviceId=${deviceId}, encryptionKeyIndex=${encryptionKeyIndex} callId=${callId}`,
+                );
+            } else {
+                logger.debug(
+                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey} encryptionKeyIndex=${encryptionKeyIndex}`,
+                    this.encryptionKeys,
+                );
+                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
+            }
+        }
     };
 
     public onMembershipUpdate = (): void => {
