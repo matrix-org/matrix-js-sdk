@@ -37,6 +37,7 @@ import {
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
+    Category,
     ClientEvent,
     createClient,
     CryptoEvent,
@@ -147,6 +148,27 @@ async function expectSendRoomKey(
 }
 
 /**
+ * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+ * @returns the content of event (no decryption)
+ */
+function expectEncryptedSendMessage() {
+    return new Promise<IContent>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url, request) => {
+                const content = JSON.parse(request.body as string);
+                resolve(content);
+                return { event_id: "$event_id" };
+            },
+            // append to the list of intercepts on this path (since we have some tests that call
+            // this function multiple times)
+            { overwriteRoutes: false },
+        );
+    });
+}
+
+/**
  * Expect that the client sends an encrypted event
  *
  * Waits for an HTTP request to send an encrypted message in the test room.
@@ -159,22 +181,7 @@ async function expectSendRoomKey(
 async function expectSendMegolmMessage(
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
-    const encryptedMessageContent = await new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/send/m.room.encrypted/"),
-            (url: string, opts: RequestInit): MockResponse => {
-                resolve(JSON.parse(opts.body as string));
-                return {
-                    event_id: "$event_id",
-                };
-            },
-            {
-                // append to the list of intercepts on this path (since we have some tests that call
-                // this function multiple times)
-                overwriteRoutes: false,
-            },
-        );
-    });
+    const encryptedMessageContent = await expectEncryptedSendMessage();
 
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
     const inboundGroupSession = await inboundGroupSessionPromise;
@@ -921,6 +928,122 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 }),
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
+        });
+    });
+
+    describe("Session should rotate according to encryption settings", () => {
+        /**
+         * Send a message to bob and get the encrypted message
+         * @returns {Promise<IContent>} The encrypted message
+         */
+        async function sendEncryptedMessage(): Promise<IContent> {
+            const [encryptedMessage] = await Promise.all([
+                expectEncryptedSendMessage(),
+                aliceClient.sendTextMessage(ROOM_ID, "test"),
+            ]);
+            return encryptedMessage;
+        }
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        newBackendOnly("should rotate the session after 2 messages", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+            // Every 2 messages in the room, the session should be rotated
+            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 2,
+            };
+
+            // tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Send a message to bob and get the encrypted message
+            const [encryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // Check that the session id exists
+            const sessionId = encryptedMessage.session_id;
+            expect(sessionId).toBeDefined();
+
+            // Send a message to bob and get the current message
+            const secondEncryptedMessage = await sendEncryptedMessage();
+
+            // Check that the same session id is shared between the two messages
+            const secondSessionId = secondEncryptedMessage.session_id;
+            expect(secondSessionId).toBe(sessionId);
+
+            // The session should be rotated, we are expecting the room key to be sent
+            const [thirdEncryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // The session is rotated every 2 messages, we should have a new session id
+            const thirdSessionId = thirdEncryptedMessage.session_id;
+            expect(thirdSessionId).not.toBe(sessionId);
+        });
+
+        newBackendOnly("should rotate the session after 1h", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            // We need to fake the timers to make the session rotate
+            jest.useFakeTimers();
+
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+
+            // The minimum rotation period is 1h
+            // https://github.com/matrix-org/matrix-rust-sdk/blob/f75b2cd1d0981db42751dadb08c826740af1018e/crates/matrix-sdk-crypto/src/olm/group_sessions/outbound.rs#L410-L415
+            const oneHourInMs = 60 * 60 * 1000;
+
+            // Every 1h the session should be rotated
+            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_ms: oneHourInMs,
+            };
+
+            // tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Send a message to bob and get the encrypted message
+            const [encryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // Check that the session id exists
+            const sessionId = encryptedMessage.session_id;
+            expect(sessionId).toBeDefined();
+
+            // Advance the time by 1h
+            jest.advanceTimersByTime(oneHourInMs);
+
+            // Send a second message to bob and get the encrypted message
+            const [secondEncryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // The session should be rotated
+            const secondSessionId = secondEncryptedMessage.session_id;
+            expect(secondSessionId).not.toBe(sessionId);
         });
     });
 
