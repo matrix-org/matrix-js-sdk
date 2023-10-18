@@ -150,6 +150,27 @@ async function expectSendRoomKey(
 }
 
 /**
+ * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+ * @returns the content of event (no decryption)
+ */
+function expectEncryptedSendMessage() {
+    return new Promise<IContent>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url, request) => {
+                const content = JSON.parse(request.body as string);
+                resolve(content);
+                return { event_id: "$event_id" };
+            },
+            // append to the list of intercepts on this path (since we have some tests that call
+            // this function multiple times)
+            { overwriteRoutes: true },
+        );
+    });
+}
+
+/**
  * Expect that the client sends an encrypted event
  *
  * Waits for an HTTP request to send an encrypted message in the test room.
@@ -162,22 +183,7 @@ async function expectSendRoomKey(
 async function expectSendMegolmMessage(
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
-    const encryptedMessageContent = await new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/send/m.room.encrypted/"),
-            (url: string, opts: RequestInit): MockResponse => {
-                resolve(JSON.parse(opts.body as string));
-                return {
-                    event_id: "$event_id",
-                };
-            },
-            {
-                // append to the list of intercepts on this path (since we have some tests that call
-                // this function multiple times)
-                overwriteRoutes: false,
-            },
-        );
-    });
+    const encryptedMessageContent = await expectEncryptedSendMessage();
 
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
     const inboundGroupSession = await inboundGroupSessionPromise;
@@ -939,30 +945,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // Force alice to download bob keys
         expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
-        /**
-         * Return the event received on rooms/{roomId}/send/ endpoint.
-         * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
-         * @returns the content of event (no decryption)
-         */
-        function expectSendMessage() {
-            return new Promise<IContent>((resolve) => {
-                fetchMock.putOnce(
-                    new RegExp("/send/"),
-                    (url, request) => {
-                        const content = JSON.parse(request.body as string);
-                        resolve(content);
-                        return { event_id: "$event_id" };
-                    },
-                    { overwriteRoutes: true },
-                );
-            });
-        }
-
         // Send a message to bob and get the current session id
         let [, , encryptedMessage] = await Promise.all([
             aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
-            expectSendMessage(),
+            expectEncryptedSendMessage(),
         ]);
 
         // Check that the session id exists
@@ -990,7 +977,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         [, , encryptedMessage] = await Promise.all([
             aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
-            expectSendMessage(),
+            expectEncryptedSendMessage(),
         ]);
 
         // Check that the new session id exists
