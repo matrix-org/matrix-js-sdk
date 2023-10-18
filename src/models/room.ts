@@ -2342,7 +2342,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
-                redactedEvent.makeRedacted(event);
+                redactedEvent.makeRedacted(event, this);
 
                 // If this is in the current state, replace it with the redacted version
                 if (redactedEvent.isState()) {
