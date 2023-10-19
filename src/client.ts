@@ -4506,8 +4506,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const breakoutContentRooms: BreakoutEventContentRooms = {};
         for (const room of rooms) {
             const roomId = room.roomId;
+            const domain = this.getDomain();
             breakoutContentRooms[roomId] = {
-                via: [],
+                via: domain ? [domain] : [],
                 users: room.users,
             };
         }
