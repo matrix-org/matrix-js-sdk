@@ -121,7 +121,7 @@ describe("OutgoingRequestProcessor", () => {
 
     it("should handle ToDeviceRequests", async () => {
         // first, mock up the ToDeviceRequest as we might expect to receive it from the Rust layer ...
-        const testBody = '{ "foo": "bar" }';
+        const testBody = '{ "messages": { "user": {"device": "bar" }}}';
         const outgoingRequest = new ToDeviceRequest("1234", "test/type", "test/txnid", testBody);
 
         // ... then poke it into the OutgoingRequestProcessor under test.
