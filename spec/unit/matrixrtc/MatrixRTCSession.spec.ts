@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import crypto from "crypto";
+
 import { EventTimeline, EventType, MatrixClient, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
@@ -28,6 +30,8 @@ const membershipTemplate: CallMembershipData = {
     expires: 60 * 60 * 1000,
     membershipID: "bloop",
 };
+
+global.crypto.getRandomValues = crypto.randomBytes;
 
 const mockFocus = { type: "mock" };
 
