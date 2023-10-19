@@ -123,7 +123,7 @@ export class OutgoingRequestProcessor {
     /**
      * Send the HTTP request for a `ToDeviceRequest`
      *
-     * @param request request to send
+     * @param request - request to send
      * @returns JSON-serialized body of the response, if successful
      */
     private async sendToDeviceRequest(request: ToDeviceRequest): Promise<string> {
