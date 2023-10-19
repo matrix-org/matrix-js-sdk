@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BreakoutEventContent, ExistingBreakoutRoomWithSummary } from "../@types/breakout";
+import { BreakoutEventContent, BreakoutRoomWithSummary } from "../@types/breakout";
 import { EventType } from "../@types/event";
 import { logger } from "../logger";
 import { deepCompare } from "../utils";
@@ -28,11 +28,11 @@ export enum BreakoutRoomsEvent {
 }
 
 export type BreakoutRoomsEventHandlerMap = {
-    [BreakoutRoomsEvent.RoomsChanged]: (room: ExistingBreakoutRoomWithSummary[]) => void;
+    [BreakoutRoomsEvent.RoomsChanged]: (room: BreakoutRoomWithSummary[]) => void;
 };
 
 export class BreakoutRooms extends TypedEventEmitter<BreakoutRoomsEvent, BreakoutRoomsEventHandlerMap> {
-    private currentBreakoutRooms?: ExistingBreakoutRoomWithSummary[];
+    private currentBreakoutRooms?: BreakoutRoomWithSummary[];
 
     public constructor(private room: Room) {
         super();
@@ -46,7 +46,7 @@ export class BreakoutRooms extends TypedEventEmitter<BreakoutRoomsEvent, Breakou
         });
     }
 
-    public getCurrentBreakoutRooms(): ExistingBreakoutRoomWithSummary[] | null {
+    public getCurrentBreakoutRooms(): BreakoutRoomWithSummary[] | null {
         return this.currentBreakoutRooms ? [...this.currentBreakoutRooms] : null;
     }
 
@@ -57,12 +57,12 @@ export class BreakoutRooms extends TypedEventEmitter<BreakoutRoomsEvent, Breakou
         return state.getStateEvents(EventType.Breakout, "") ?? state?.getStateEvents(EventType.PrefixedBreakout, "");
     }
 
-    private async parseBreakoutEvent(event: MatrixEvent): Promise<ExistingBreakoutRoomWithSummary[]> {
+    private async parseBreakoutEvent(event: MatrixEvent): Promise<BreakoutRoomWithSummary[]> {
         const content = event.getContent() as BreakoutEventContent;
         if (!content["m.breakout"]) throw new Error("m.breakout is null or undefined");
         if (Array.isArray(content["m.breakout"])) throw new Error("m.breakout is an array");
 
-        const breakoutRooms: ExistingBreakoutRoomWithSummary[] = [];
+        const breakoutRooms: BreakoutRoomWithSummary[] = [];
         for (const [roomId, room] of Object.entries(content["m.breakout"])) {
             if (!Array.isArray(room.users)) throw new Error("users is not an array");
 

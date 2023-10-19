@@ -221,12 +221,7 @@ import {
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
-import {
-    BreakoutEventContent,
-    BreakoutEventContentRooms,
-    ExistingBreakoutRoom,
-    NewBreakoutRoom,
-} from "./@types/breakout";
+import { BreakoutEventContentRooms, BreakoutRoom } from "./@types/breakout";
 
 export type Store = IStore;
 
@@ -4503,43 +4498,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
     }
 
-    public async createBreakoutRooms(
-        parentRoomId: string,
-        rooms: (NewBreakoutRoom | ExistingBreakoutRoom)[],
-    ): Promise<{ newRooms: ExistingBreakoutRoom[]; response: ISendEventResponse }> {
+    public async createBreakoutRooms(parentRoomId: string, rooms: BreakoutRoom[]): Promise<ISendEventResponse> {
         if (rooms.length === 0) {
             throw new Error("Called with an empty array of rooms");
         }
 
         const breakoutContentRooms: BreakoutEventContentRooms = {};
-        const newRooms: ExistingBreakoutRoom[] = [];
-
         for (const room of rooms) {
-            if (room.hasOwnProperty("roomId")) {
-                const roomId = (room as ExistingBreakoutRoom).roomId;
-                breakoutContentRooms[roomId] = {
-                    via: [],
-                    users: room.users,
-                };
-                newRooms.push({ roomId, users: room.users } as ExistingBreakoutRoom);
-            } else if (room.hasOwnProperty("roomName")) {
-                const { room_id: roomId } = await this.createRoom({ name: (room as NewBreakoutRoom).roomName });
-                breakoutContentRooms[roomId] = {
-                    via: [],
-                    users: room.users,
-                };
-                newRooms.push({ roomId, users: room.users } as ExistingBreakoutRoom);
-            } else {
-                throw new Error("Bad room passed");
-            }
+            const roomId = room.roomId;
+            breakoutContentRooms[roomId] = {
+                via: [],
+                users: room.users,
+            };
         }
 
-        return {
-            newRooms,
-            response: await this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
-                "m.breakout": breakoutContentRooms,
-            } as BreakoutEventContent),
-        };
+        return await this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
+            "m.breakout": breakoutContentRooms,
+        });
     }
 
     public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;

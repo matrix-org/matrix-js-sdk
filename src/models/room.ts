@@ -67,7 +67,7 @@ import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { BreakoutRooms, BreakoutRoomsEvent, BreakoutRoomsEventHandlerMap } from "./breakoutRooms";
-import { ExistingBreakoutRoomWithSummary } from "../@types/breakout";
+import { BreakoutRoomWithSummary } from "../@types/breakout";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -511,7 +511,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.reEmitter.reEmit(this.breakoutRooms, [BreakoutRoomsEvent.RoomsChanged]);
     }
 
-    public getBreakoutRooms(): ExistingBreakoutRoomWithSummary[] | null {
+    public getBreakoutRooms(): BreakoutRoomWithSummary[] | null {
         return this.breakoutRooms.getCurrentBreakoutRooms();
     }
 

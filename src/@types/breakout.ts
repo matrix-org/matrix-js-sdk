@@ -29,18 +29,11 @@ export interface BreakoutEventContent {
     "m.breakout": BreakoutEventContentRooms;
 }
 
-export interface BreakoutRoomBase {
+export interface BreakoutRoom {
     users: string[];
-}
-
-export interface NewBreakoutRoom extends BreakoutRoomBase {
-    roomName: string;
-}
-
-export interface ExistingBreakoutRoom extends BreakoutRoomBase {
     roomId: string;
 }
 
-export interface ExistingBreakoutRoomWithSummary extends ExistingBreakoutRoom {
+export interface BreakoutRoomWithSummary extends BreakoutRoom {
     roomSummary: IRoomSummaryAPIResponse;
 }
