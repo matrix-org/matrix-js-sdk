@@ -14,4 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+export * from "./authorize";
+export * from "./discovery";
+export * from "./error";
+export * from "./register";
 export * from "./tokenRefresher";
+export * from "./validate";
