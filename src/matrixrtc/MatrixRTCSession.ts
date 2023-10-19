@@ -22,7 +22,7 @@ import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
-import { MatrixEvent } from "../matrix";
+import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 
@@ -248,7 +248,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         this.makeNewSenderKey();
-        this.updateEncryptionKeyEvent();
+        this.requestKeyEventSend();
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
         this.triggerCallMembershipEventUpdate();
@@ -268,6 +268,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
             return new Promise((resolve) => resolve(false));
         }
+
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
+
+        if (!userId) throw new Error("No userId");
+        if (!deviceId) throw new Error("No deviceId");
+
+        // clear our encryption keys as we're done with them now (we'll
+        // make new keys if we rejoin). We leave keys for other participants
+        // as they may still be using the same ones.
+        this.encryptionKeys.set(getParticipantId(userId, deviceId), []);
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
@@ -304,25 +315,35 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Re-sends the encryption key room event with a new key
+     * Requests that we resend our keys to the room. May send a keys event immediately
+     * or queue for alter if one has already been sent recently.
      */
-    private updateEncryptionKeyEvent = async (): Promise<void> => {
+    private requestKeyEventSend(): void {
         if (
             this.lastEncryptionKeyUpdateRequest &&
             this.lastEncryptionKeyUpdateRequest + UPDATE_ENCRYPTION_KEY_THROTTLE > Date.now()
         ) {
             logger.info("Last encryption key event sent too recently: postponing");
             if (this.keysEventUpdateTimeout === undefined) {
-                this.keysEventUpdateTimeout = setTimeout(this.updateEncryptionKeyEvent, UPDATE_ENCRYPTION_KEY_THROTTLE);
+                this.keysEventUpdateTimeout = setTimeout(this.sendEncryptionKeysEvent, UPDATE_ENCRYPTION_KEY_THROTTLE);
             }
             return;
         }
 
+        this.sendEncryptionKeysEvent();
+    }
+
+    /**
+     * Re-sends the encryption keys room event
+     */
+    private sendEncryptionKeysEvent = async (): Promise<void> => {
         if (this.keysEventUpdateTimeout !== undefined) {
             clearTimeout(this.keysEventUpdateTimeout);
             this.keysEventUpdateTimeout = undefined;
         }
         this.lastEncryptionKeyUpdateRequest = Date.now();
+
+        logger.info("Sending encryption keys event");
 
         if (!this.isJoined()) return;
         if (!this.encryptMedia) return;
@@ -351,14 +372,26 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 "m.device_id": deviceId,
                 "m.call_id": "",
             } as EncryptionKeysEventContent);
-        } catch (error) {
-            logger.error("Failed to send m.call.encryption_key", error);
-        }
 
-        logger.debug(
-            `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
-            this.encryptionKeys,
-        );
+            logger.debug(
+                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
+                this.encryptionKeys,
+            );
+        } catch (error) {
+            const matrixError = error as MatrixError;
+            if (matrixError.event) {
+                // cancel the pending event: we'll just generate a new one with our latest
+                // keys when we resend
+                this.client.cancelPendingEvent(matrixError.event);
+            }
+            if (this.keysEventUpdateTimeout === undefined) {
+                const resendDelay = matrixError.data.retry_after_ms ?? 5000;
+                logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
+                this.keysEventUpdateTimeout = setTimeout(this.sendEncryptionKeysEvent, resendDelay);
+            } else {
+                logger.info("Not scheduling key resend as another re-send is already pending");
+            }
+        }
     };
 
     /**
@@ -463,7 +496,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 .join();
 
         if (callMembersChanged && this.isJoined()) {
-            this.updateEncryptionKeyEvent();
+            this.requestKeyEventSend();
         }
 
         this.setExpiryTimer();
