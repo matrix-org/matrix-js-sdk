@@ -33,7 +33,7 @@ const membershipTemplate: CallMembershipData = {
 
 if (!global.crypto) {
     // @ts-ignore
-    global.crypto = { getRandomValues: crypto.randomBytes };
+    global.crypto = { getRandomValues: (array) => crypto.randomBytes(array.length) };
 }
 
 const mockFocus = { type: "mock" };
