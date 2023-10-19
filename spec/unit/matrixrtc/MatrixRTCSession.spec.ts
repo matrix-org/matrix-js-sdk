@@ -31,7 +31,10 @@ const membershipTemplate: CallMembershipData = {
     membershipID: "bloop",
 };
 
-global.crypto.getRandomValues = crypto.randomBytes;
+if (!global.crypto) {
+    // @ts-ignore
+    global.crypto = { getRandomValues: crypto.randomBytes };
+}
 
 const mockFocus = { type: "mock" };
 
