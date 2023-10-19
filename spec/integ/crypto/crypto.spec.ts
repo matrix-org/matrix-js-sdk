@@ -31,7 +31,6 @@ import {
     BOB_TEST_USER_ID,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
-    TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
@@ -55,6 +54,7 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
+    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -82,7 +82,6 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
-import { HistoryVisibility } from "../../../src/@types/partials";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -947,7 +946,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // Send a message to bob and get the current session id
         let [, , encryptedMessage] = await Promise.all([
-            aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
             expectEncryptedSendMessage(),
         ]);
@@ -958,7 +957,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // Change history visibility in sync response
         const syncResponse = getSyncResponse([]);
-        syncResponse.rooms[Category.Join][TEST_ROOM_ID].timeline.events.push(
+        syncResponse.rooms[Category.Join][ROOM_ID].timeline.events.push(
             mkEventCustom({
                 sender: TEST_USER_ID,
                 type: "m.room.history_visibility",
@@ -975,7 +974,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // Resend a message to bob and get the new session id
         [, , encryptedMessage] = await Promise.all([
-            aliceClient.sendTextMessage(TEST_ROOM_ID, "test"),
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
             expectEncryptedSendMessage(),
         ]);
