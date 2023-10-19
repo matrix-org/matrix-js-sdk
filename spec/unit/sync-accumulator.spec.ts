@@ -29,7 +29,7 @@ import {
     SyncAccumulator,
     IInviteState,
 } from "../../src/sync-accumulator";
-import { IRoomSummary } from "../../src";
+import { IRoomSummary } from "../../src/models/room-summary";
 import * as utils from "../test-utils/test-utils";
 
 // The event body & unsigned object get frozen to assert that they don't get altered

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomSummary } from "../client";
+import { IRoomSummaryAPIResponse } from "../client";
 
 export interface BreakoutEventContentRoom {
     via: string[];
@@ -42,5 +42,5 @@ export interface ExistingBreakoutRoom extends BreakoutRoomBase {
 }
 
 export interface ExistingBreakoutRoomWithSummary extends ExistingBreakoutRoom {
-    roomSummary: IRoomSummary;
+    roomSummary: IRoomSummaryAPIResponse;
 }

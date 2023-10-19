@@ -890,7 +890,7 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-export interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+export interface IRoomSummaryAPIResponse extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
     room_type?: RoomType;
     membership?: string;
     is_encrypted: boolean;
@@ -9787,7 +9787,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
      * @param via - The list of servers which know about the room if only an ID was provided.
      */
-    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
+    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummaryAPIResponse> {
         const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
         return this.http.authedRequest(Method.Get, path, { via }, undefined, {
             prefix: "/_matrix/client/unstable/im.nheko.summary",
