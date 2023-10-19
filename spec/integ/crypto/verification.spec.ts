@@ -1538,7 +1538,7 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
         (url: string, opts: RequestInit): MockResponse => {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
-            const content = Object.values(messages)[0] as any; //messages[TEST_DEVICE_ID] ? messages[TEST_DEVICE_ID] : messages['*'];
+            const content = Object.values(messages)[0] as any;
             if (content.action == "request") {
                 const name = content.name;
                 const requestId = content.request_id;
