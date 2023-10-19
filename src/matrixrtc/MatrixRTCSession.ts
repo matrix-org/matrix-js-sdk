@@ -83,6 +83,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
     private expiryTimeout?: ReturnType<typeof setTimeout>;
+    private keysEventUpdateTimeout?: ReturnType<typeof setTimeout>;
 
     private activeFoci: Focus[] | undefined;
 
@@ -305,19 +306,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Re-sends the encryption key room event with a new key
      */
-    private async updateEncryptionKeyEvent(): Promise<void> {
+    private updateEncryptionKeyEvent = async (): Promise<void> => {
         if (
             this.lastEncryptionKeyUpdateRequest &&
             this.lastEncryptionKeyUpdateRequest + UPDATE_ENCRYPTION_KEY_THROTTLE > Date.now()
         ) {
             logger.info("Last encryption key event sent too recently: postponing");
-            this.lastEncryptionKeyUpdateRequest = Date.now();
-            setTimeout(() => {
-                this.updateEncryptionKeyEvent();
-            }, UPDATE_ENCRYPTION_KEY_THROTTLE);
+            if (this.keysEventUpdateTimeout === undefined) {
+                this.keysEventUpdateTimeout = setTimeout(this.updateEncryptionKeyEvent, UPDATE_ENCRYPTION_KEY_THROTTLE);
+            }
             return;
         }
 
+        if (this.keysEventUpdateTimeout !== undefined) {
+            clearTimeout(this.keysEventUpdateTimeout);
+            this.keysEventUpdateTimeout = undefined;
+        }
         this.lastEncryptionKeyUpdateRequest = Date.now();
 
         if (!this.isJoined()) return;
@@ -355,7 +359,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
             this.encryptionKeys,
         );
-    }
+    };
 
     /**
      * Sets a timer for the soonest membership expiry
