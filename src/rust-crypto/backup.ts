@@ -95,11 +95,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const signatureVerification: SignatureVerification = await this.olmMachine.verifyBackup(info);
 
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-        const pubKeyForSavedPrivateKey = backupKeys?.decryptionKey?.megolmV1PublicKey;
+        const decryptionKey = backupKeys?.decryptionKey;
         const backupMatchesSavedPrivateKey =
-            info.algorithm === pubKeyForSavedPrivateKey?.algorithm &&
-            (info.auth_data as Curve25519AuthData)?.public_key === pubKeyForSavedPrivateKey.publicKeyBase64;
-
+            !!decryptionKey && backupInfoMatchesBackupDecryptionKey(info, decryptionKey);
         return {
             matchesDecryptionKey: backupMatchesSavedPrivateKey,
             trusted: signatureVerification.trusted(),
