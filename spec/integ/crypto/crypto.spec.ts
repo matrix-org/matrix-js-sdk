@@ -164,7 +164,7 @@ function expectEncryptedSendMessage() {
             },
             // append to the list of intercepts on this path (since we have some tests that call
             // this function multiple times)
-            { overwriteRoutes: true },
+            { overwriteRoutes: false },
         );
     });
 }
