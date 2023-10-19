@@ -1609,7 +1609,7 @@ function buildRequestMessage(transactionId: string): { type: string; content: ob
     };
 }
 
-/** build an m.key.verification.ready to-device message originating from the dummy device */
+/** build an m.key.verification.ready to-device message originating from the given `fromDevice` (default to `TEST_DEVICE_ID` if not provided) */
 function buildReadyMessage(
     transactionId: string,
     methods: string[],
