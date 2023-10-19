@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * Errors expected to be encountered during OIDC discovery, client registration, and authentication.
+ * Not intended to be displayed directly to the user.
+ */
 export enum OidcError {
     NotSupported = "OIDC authentication not supported",
     Misconfigured = "OIDC is misconfigured",
