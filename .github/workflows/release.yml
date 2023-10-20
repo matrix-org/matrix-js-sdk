@@ -51,10 +51,17 @@ jobs:
             - name: Install Deps
               run: "yarn install --frozen-lockfile"
 
-            - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "$VERSION"
+            - name: Load version
+              run: echo "VERSION=$VERSION" >> $GITHUB_ENV
               env:
                   VERSION: ${{ steps.release.outputs.tag_name }}
+
+            - name: Finalise version
+              if: inputs.final
+              run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
+
+            - name: Bump package.json version
+              run: yarn version --no-git-tag-version --new-version "$VERSION"
 
             - name: Add to CHANGELOG.md
               run: |
@@ -70,7 +77,6 @@ jobs:
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
               env:
-                  VERSION: ${{ steps.release.outputs.tag_name }}
                   BODY: ${{ steps.release.outputs.body }}
 
             # For the published and dist versions of the package,
@@ -94,34 +100,30 @@ jobs:
                   git add package.json CHANGELOG.md
                   git commit -m "$VERSION"
                   git push
-              env:
-                  VERSION: ${{ steps.release.outputs.tag_name }}
 
             - name: Publish release
               uses: actions/github-script@v6
               id: my-script
               env:
                   RELEASE_ID: ${{ steps.release.outputs.id }}
-                  TAG_NAME: ${{ steps.release.outputs.tag_name }}
                   MODE: ${{ inputs.mode }}
               with:
                   result-encoding: string
                   retries: 3
                   script: |
-                      let { RELEASE_ID: release_id, TAG_NAME, MODE } = process.env;
+                      let { RELEASE_ID: release_id, VERSION, MODE } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
                           owner,
                           repo,
                           release_id,
-                          tag_name: TAG_NAME,
-                          name: TAG_NAME,
+                          tag_name: VERSION,
+                          name: VERSION,
                           draft: false,
                       };
 
                       if (MODE === "final") {
-                          opts.tag_name = opts.name = TAG_NAME.split("-")[0];
                           opts.prerelease = false;
                           opts.make_latest = true;
                       }
