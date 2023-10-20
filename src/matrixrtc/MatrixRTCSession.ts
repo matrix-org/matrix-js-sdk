@@ -179,10 +179,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
-        logger.debug(
-            "Call memberships, in order: ",
-            callMemberships.map((m) => [m.createdTs(), m.sender]),
-        );
+        if (callMemberships.length > 1) {
+            logger.debug(
+                `Call memberships in room ${room.roomId}, in order: `,
+                callMemberships.map((m) => [m.createdTs(), m.sender]),
+            );
+        }
 
         return callMemberships;
     }
