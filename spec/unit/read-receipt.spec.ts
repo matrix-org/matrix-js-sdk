@@ -225,6 +225,7 @@ describe("Read receipt", () => {
         it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
             const userId = client.getSafeUserId();
             const room = new Room(ROOM_ID, client, userId);
+            room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
 
             const unthreadedReceipt: WrappedReceipt = {
                 eventId: "$olderEvent",

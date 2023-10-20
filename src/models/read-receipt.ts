@@ -26,6 +26,7 @@ import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
+import { logger } from "../logger";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -95,14 +96,74 @@ export abstract class ReadReceipt<
 
     /**
      * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them.
+     * have received no read receipts from them, or if the receipt we have
+     * points at an event we don't have, or if the thread ID in the receipt does
+     * not match the thread root of the referenced event.
+     *
      * @param userId - The user ID to get read receipt event ID for
      * @param ignoreSynthesized - If true, return only receipts that have been
      *                                    sent by the server, not implicit ones generated
      *                                    by the JS SDK.
-     * @returns ID of the latest event that the given user has read, or null.
+     * @returns ID of the latest existing event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+        // Find what the latest receipt says is the latest event we have read
+        const latestReceipt = this.getLatestReceipt(userId, ignoreSynthesized);
+
+        if (!latestReceipt) {
+            return null;
+        }
+
+        return this.receiptPointsAtConsistentEvent(latestReceipt) ? latestReceipt.eventId : null;
+    }
+
+    /**
+     * Returns true if the event pointed at by this receipt exists, and its
+     * threadRootId is consistent with the thread information in the receipt.
+     */
+    private receiptPointsAtConsistentEvent(receipt: WrappedReceipt): boolean {
+        // If the receipt points at a non-existent event, it's not consistent
+        const event = this.findEventById(receipt.eventId);
+        if (!event) {
+            logger.warn(`Ignoring receipt for missing event with id ${receipt.eventId}`);
+            return false;
+        }
+
+        // If this is an unthreaded receipt, we're good
+        if (!receipt.data?.thread_id) {
+            return true;
+        }
+
+        // If the receipt is for the main timeline
+        if (receipt.data.thread_id === MAIN_ROOM_TIMELINE) {
+            // If the event is not in a thread, this checks out
+            if (!event.threadRootId) {
+                return true;
+            }
+
+            // If the event is a thread root, we need a special case because
+            // event.threadRootId won't match, but thread root events are
+            // actually on the main timeline, so we return successfully.
+            if (event.isThreadRoot) {
+                return true;
+            }
+        }
+
+        // If the receipt is for the correct thread, we are good.
+        if (event.threadRootId === receipt.data.thread_id) {
+            return true;
+        }
+
+        // The thread ID doesn't match up
+        logger.warn(
+            `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees \
+                with the thread root (${event.threadRootId}) of the referenced event \
+                (event ID = ${receipt.eventId})`,
+        );
+        return false;
+    }
+
+    private getLatestReceipt(userId: string, ignoreSynthesized = false): WrappedReceipt | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
@@ -118,10 +179,10 @@ export abstract class ReadReceipt<
 
         // The public receipt is more likely to drift out of date so the private
         // one has precedence
-        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
+        if (!comparison) return privateReadReceipt ?? publicReadReceipt ?? null;
 
         // If public read receipt is older, return the private one
-        return (comparison < 0 ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
+        return (comparison < 0 ? privateReadReceipt : publicReadReceipt) ?? null;
     }
 
     public addReceiptToStructure(
@@ -228,6 +289,8 @@ export abstract class ReadReceipt<
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;
 
     public abstract setUnread(type: NotificationCountType, count: number): void;
+
+    public abstract findEventById(eventId: string): MatrixEvent | undefined;
 
     /**
      * This issue should also be addressed on synapse's side and is tracked as part

@@ -1746,6 +1746,7 @@ describe("Room", function () {
             it("should acknowledge if an event has been read", function () {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
+                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
             it("return false for an unknown event", function () {
@@ -3151,7 +3152,7 @@ describe("Room", function () {
             room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                 return receiptType === ReceiptType.ReadPrivate ? ({ eventId: "eventId" } as WrappedReceipt) : null;
             };
-
+            room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
             expect(room.getEventReadUpTo(userA)).toEqual("eventId");
         });
 
@@ -3170,10 +3171,11 @@ describe("Room", function () {
                 for (let i = 1; i <= 2; i++) {
                     room.getUnfilteredTimelineSet = () =>
                         ({
-                            compareEventOrdering: (event1, event2) => {
+                            compareEventOrdering: (event1: string) => {
                                 return event1 === `eventId${i}` ? 1 : -1;
                             },
-                        } as EventTimelineSet);
+                            findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                        } as unknown as EventTimelineSet);
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
                 }
@@ -3184,8 +3186,9 @@ describe("Room", function () {
                     for (let i = 1; i <= 2; i++) {
                         room.getUnfilteredTimelineSet = () =>
                             ({
-                                compareEventOrdering: (_1, _2) => null,
-                            } as EventTimelineSet);
+                                compareEventOrdering: () => null,
+                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                            } as unknown as EventTimelineSet);
                         room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                             if (receiptType === ReceiptType.ReadPrivate) {
                                 return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as WrappedReceipt;
@@ -3203,8 +3206,9 @@ describe("Room", function () {
                 it("should correctly compare, if private read receipt is missing", () => {
                     room.getUnfilteredTimelineSet = () =>
                         ({
-                            compareEventOrdering: (_1, _2) => null,
-                        } as EventTimelineSet);
+                            compareEventOrdering: () => null,
+                            findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                        } as unknown as EventTimelineSet);
                     room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId2", data: { ts: 1 } } as WrappedReceipt;
@@ -3220,8 +3224,9 @@ describe("Room", function () {
                 beforeAll(() => {
                     room.getUnfilteredTimelineSet = () =>
                         ({
-                            compareEventOrdering: (_1, _2) => null,
-                        } as EventTimelineSet);
+                            compareEventOrdering: () => null,
+                            findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                        } as unknown as EventTimelineSet);
                 });
 
                 it("should give precedence to m.read.private", () => {
