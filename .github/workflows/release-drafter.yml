@@ -1,4 +1,4 @@
-name: Prepare Draft release
+name: Release Drafter
 on:
     push:
         branches: [staging]
