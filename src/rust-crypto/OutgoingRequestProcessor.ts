@@ -61,7 +61,10 @@ export class OutgoingRequestProcessor {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     ) {}
 
-    public async makeOutgoingRequest<T>(msg: OutgoingRequest, uiaCallback?: UIAuthCallback<T>): Promise<void> {
+    public async makeOutgoingRequest<T>(
+        msg: OutgoingRequest | SigningKeysUploadRequest,
+        uiaCallback?: UIAuthCallback<T>,
+    ): Promise<void> {
         let resp: string;
 
         /* refer https://docs.rs/matrix-sdk-crypto/0.6.0/matrix_sdk_crypto/requests/enum.OutgoingRequests.html
@@ -90,13 +93,15 @@ export class OutgoingRequestProcessor {
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof SigningKeysUploadRequest) {
-            resp = await this.makeRequestWithUIA(
+            await this.makeRequestWithUIA(
                 Method.Post,
                 "/_matrix/client/v3/keys/device_signing/upload",
                 {},
                 msg.body,
                 uiaCallback,
             );
+            // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+            return;
         } else {
             logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
             resp = "";
