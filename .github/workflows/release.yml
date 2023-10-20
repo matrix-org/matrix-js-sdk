@@ -106,7 +106,7 @@ jobs:
                   result-encoding: string
                   retries: 3
                   script: |
-                      let { RELEASE_ID, TAG_NAME, MODE } = process.env;
+                      let { RELEASE_ID: release_id, TAG_NAME, MODE } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
