@@ -72,6 +72,7 @@ import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../common-crypto/base64";
 import { DecryptionError } from "../crypto/algorithms";
+import { RequestSender } from "./RequestSender";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -143,7 +144,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
         super();
-        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, new RequestSender(http));
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this);
 
@@ -380,7 +381,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                  * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
                  */
                 const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
-                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                await this.outgoingRequestProcessor.sendOutgoingRequest(request);
             }
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
             return userIdentity !== undefined;
@@ -957,7 +958,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await userIdentity.requestVerification(
                 this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        await this.outgoingRequestProcessor.sendOutgoingRequest(outgoingRequest);
         return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
     }
 
@@ -987,7 +988,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await device.requestVerification(
                 this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        await this.outgoingRequestProcessor.sendOutgoingRequest(outgoingRequest);
         return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
     }
 
@@ -1538,7 +1539,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this.outgoingRequestLoopOneMoreLoop = false;
 
                 this.logger.debug("Calling OlmMachine.outgoingRequests()");
-                const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
+                const outgoingRequests: OutgoingRequest[] = await this.olmMachine.outgoingRequests();
 
                 if (this.stopped) {
                     // we've been told to stop while `outgoingRequests` was running: exit the loop without processing
@@ -1552,9 +1553,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     return;
                 }
 
-                for (const msg of outgoingRequests) {
-                    await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
-                }
+                await this.outgoingRequestProcessor.processOutgoingRequests(outgoingRequests);
             }
         } finally {
             this.outgoingRequestLoopRunning = false;

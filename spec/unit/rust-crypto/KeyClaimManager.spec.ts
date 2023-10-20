@@ -23,6 +23,7 @@ import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingReque
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
+import { RequestSender } from "../../../lib/rust-crypto/RequestSender";
 
 afterEach(() => {
     fetchMock.mockReset();
@@ -52,7 +53,8 @@ describe("KeyClaimManager", () => {
             markRequestAsSent: jest.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
-        const outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, httpApi);
+        const requestSender = new RequestSender(httpApi);
+        const outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, requestSender);
 
         keyClaimManager = new KeyClaimManager(olmMachine, outgoingRequestProcessor);
     });

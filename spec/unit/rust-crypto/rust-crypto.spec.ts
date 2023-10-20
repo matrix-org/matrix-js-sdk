@@ -313,12 +313,13 @@ describe("RustCrypto", () => {
          */
         function awaitCallToMakeOutgoingRequest(): Promise<() => void> {
             return new Promise<() => void>((resolveCalledPromise, _reject) => {
-                outgoingRequestProcessor.makeOutgoingRequest.mockImplementationOnce(async () => {
+                outgoingRequestProcessor.processOutgoingRequests.mockImplementationOnce(async () => {
                     const completePromise = new Promise<void>((resolveCompletePromise, _reject) => {
                         resolveCalledPromise(resolveCompletePromise);
                     });
                     return completePromise;
                 });
+                outgoingRequestProcessor.sendOutgoingRequest.mockImplementationOnce(async () => "{}");
             });
         }
 
@@ -336,7 +337,8 @@ describe("RustCrypto", () => {
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             outgoingRequestProcessor = {
-                makeOutgoingRequest: jest.fn(),
+                processOutgoingRequests: jest.fn(),
+                sendOutgoingRequest: jest.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             rustCrypto = new RustCrypto(
@@ -360,7 +362,7 @@ describe("RustCrypto", () => {
 
             await makeRequestPromise;
             expect(olmMachine.outgoingRequests).toHaveBeenCalled();
-            expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledWith(testReq);
+            expect(outgoingRequestProcessor.processOutgoingRequests).toHaveBeenCalledWith([testReq]);
         });
 
         it("should go round the loop again if another sync completes while the first `outgoingRequests` is running", async () => {
@@ -412,7 +414,7 @@ describe("RustCrypto", () => {
             rustCrypto.onSyncCompleted({});
 
             resolveMakeRequest = await makeRequestPromise;
-            outgoingRequestProcessor.makeOutgoingRequest.mockReset();
+            outgoingRequestProcessor.processOutgoingRequests.mockReset();
             resolveMakeRequest();
 
             // now stop...
@@ -425,7 +427,7 @@ describe("RustCrypto", () => {
                 setTimeout(resolve, 100);
             });
             expect(rustCrypto["outgoingRequestLoopRunning"]).toBeFalsy();
-            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+            expect(outgoingRequestProcessor.processOutgoingRequests).not.toHaveBeenCalled();
             expect(olmMachine.outgoingRequests).not.toHaveBeenCalled();
 
             // we sent three, so there should be 2 left

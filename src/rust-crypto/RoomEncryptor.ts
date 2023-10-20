@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { EncryptionSettings, OlmMachine, RoomId, ToDeviceRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
@@ -105,16 +105,17 @@ export class RoomEncryptor {
         const rustEncryptionSettings = new EncryptionSettings();
         /* FIXME historyVisibility, rotation, etc */
 
-        const shareMessages = await this.olmMachine.shareRoomKey(
+        const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
             new RoomId(this.room.roomId),
             userList,
             rustEncryptionSettings,
         );
-        if (shareMessages) {
-            for (const m of shareMessages) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(m);
-            }
-        }
+
+        await Promise.all(
+            shareMessages.map((m) => {
+                this.outgoingRequestProcessor.sendOutgoingRequest(m);
+            }),
+        );
     }
 
     /**

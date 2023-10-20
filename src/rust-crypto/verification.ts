@@ -252,11 +252,17 @@ export class RustVerificationRequest
 
         this._accepting = true;
         try {
-            const req: undefined | OutgoingRequest = this.inner.acceptWithMethods(
-                this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
-            );
+            const req: undefined | RustSdkCryptoJs.ToDeviceRequest | RustSdkCryptoJs.RoomMessageRequest =
+                this.inner.acceptWithMethods(
+                    this.supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                );
             if (req) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+                try {
+                    await this.outgoingRequestProcessor.sendOutgoingRequest(req);
+                } catch (e) {
+                    // XXX should we cancel the request here?
+                    throw e;
+                }
             }
         } finally {
             this._accepting = false;
@@ -284,7 +290,7 @@ export class RustVerificationRequest
         try {
             const req: undefined | OutgoingRequest = this.inner.cancel();
             if (req) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+                await this.outgoingRequestProcessor.sendOutgoingRequest(req);
             }
         } finally {
             this._cancelling = false;
@@ -328,7 +334,7 @@ export class RustVerificationRequest
 
         if (res) {
             const [, req] = res;
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            await this.outgoingRequestProcessor.sendOutgoingRequest(req);
         }
 
         // this should have triggered the onChange callback, and we should now have a verifier
@@ -359,7 +365,7 @@ export class RustVerificationRequest
         // we can immediately trigger the reciprocate request
         const req: undefined | OutgoingRequest = verifier.reciprocate();
         if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            await this.outgoingRequestProcessor.sendOutgoingRequest(req);
         }
 
         return this._verifier;
@@ -494,7 +500,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
         // TODO: something with `e`
         const req: undefined | OutgoingRequest = this.inner.cancel();
         if (req) {
-            this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            this.outgoingRequestProcessor.sendOutgoingRequest(req);
         }
     }
 
@@ -601,7 +607,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
     private async confirmScanning(): Promise<void> {
         const req: undefined | OutgoingRequest = this.inner.confirmScanning();
         if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            await this.outgoingRequestProcessor.sendOutgoingRequest(req);
         }
     }
 }
@@ -630,7 +636,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public async verify(): Promise<void> {
         const req: undefined | OutgoingRequest = this.inner.accept();
         if (req) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            await this.outgoingRequestProcessor.sendOutgoingRequest(req);
         }
         await this.completionPromise;
     }
@@ -653,7 +659,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
                 confirm: async (): Promise<void> => {
                     const requests: Array<OutgoingRequest> = await this.inner.confirm();
                     for (const m of requests) {
-                        await this.outgoingRequestProcessor.makeOutgoingRequest(m);
+                        await this.outgoingRequestProcessor.sendOutgoingRequest(m);
                     }
                 },
                 mismatch: (): void => {

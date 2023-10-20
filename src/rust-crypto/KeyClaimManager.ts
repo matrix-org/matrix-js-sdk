@@ -73,7 +73,7 @@ export class KeyClaimManager {
         }
         const claimRequest = await this.olmMachine.getMissingSessions(userList);
         if (claimRequest) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(claimRequest);
+            await this.outgoingRequestProcessor.sendOutgoingRequest(claimRequest);
         }
     }
 }

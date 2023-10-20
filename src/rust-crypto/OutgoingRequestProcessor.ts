@@ -23,25 +23,24 @@ import {
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
-    SigningKeysUploadRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { QueryDict } from "../utils";
-import { IAuthDict, UIAuthCallback } from "../interactive-auth";
-import { UIAResponse } from "../@types/uia";
-import { ToDeviceMessageId } from "../@types/event";
+import { RequestSender } from "./RequestSender";
 
 /**
- * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
+ * Union type for all the request types returned by `OlmMachine.outgoingRequests`.
  *
  * @internal
  */
-export interface OutgoingRequest {
-    readonly id: string | undefined;
-    readonly type: number;
-}
+export type OutgoingRequest =
+    | KeysUploadRequest
+    | KeysQueryRequest
+    | KeysClaimRequest
+    | KeysBackupRequest
+    | RoomMessageRequest
+    | SignatureUploadRequest
+    | ToDeviceRequest;
 
 /**
  * OutgoingRequestManager: turns `OutgoingRequest`s from the rust sdk into HTTP requests
@@ -56,140 +55,47 @@ export interface OutgoingRequest {
  * @internal
  */
 export class OutgoingRequestProcessor {
-    public constructor(
-        private readonly olmMachine: OlmMachine,
-        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    ) {}
+    public constructor(private readonly olmMachine: OlmMachine, public readonly requestSender: RequestSender) {}
 
-    public async makeOutgoingRequest<T>(msg: OutgoingRequest, uiaCallback?: UIAuthCallback<T>): Promise<void> {
-        let resp: string;
-
-        /* refer https://docs.rs/matrix-sdk-crypto/0.6.0/matrix_sdk_crypto/requests/enum.OutgoingRequests.html
-         * for the complete list of request types
-         */
-        if (msg instanceof KeysUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
-        } else if (msg instanceof KeysQueryRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
-        } else if (msg instanceof KeysClaimRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
-        } else if (msg instanceof SignatureUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
-        } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(
-                Method.Put,
-                "/_matrix/client/v3/room_keys/keys",
-                { version: msg.version },
-                msg.body,
-            );
-        } else if (msg instanceof ToDeviceRequest) {
-            resp = await this.sendToDeviceRequest(msg);
-        } else if (msg instanceof RoomMessageRequest) {
-            const path =
-                `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
-                `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
-            resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
-        } else if (msg instanceof SigningKeysUploadRequest) {
-            resp = await this.makeRequestWithUIA(
-                Method.Post,
-                "/_matrix/client/v3/keys/device_signing/upload",
-                {},
-                msg.body,
-                uiaCallback,
-            );
-        } else {
-            logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
-            resp = "";
-        }
-
-        if (msg.id) {
-            try {
-                await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
-            } catch (e) {
-                // Ignore errors which are caused by the olmMachine having been freed. The exact error message depends
-                // on whether we are using a release or develop build of rust-sdk-crypto-wasm.
-                if (
-                    e instanceof Error &&
-                    (e.message === "Attempt to use a moved value" || e.message === "null pointer passed to rust")
-                ) {
-                    logger.log(`Ignoring error '${e.message}': client is likely shutting down`);
-                } else {
-                    throw e;
+    /**
+     * Should be called at the end of each sync to process all the outgoing requests (`olmMachine.outgoingRequests()`).
+     * This will send them all off, and mark them as sent in the olm machine.
+     * If some requests fail, they will be retried on the next sync, and a log will describe the failure.
+     *
+     * @param requests
+     */
+    public async processOutgoingRequests(requests: OutgoingRequest[]): Promise<void> {
+        await Promise.all(
+            requests.map(async (request) => {
+                const { id, type } = request;
+                try {
+                    const resp = await this.requestSender.createHttpRequest(request);
+                    if (id) {
+                        await this.olmMachine.markRequestAsSent(id, type, resp);
+                    }
+                } catch (e) {
+                    logger.error(`processOutgoingRequests: Failed to send outgoing request ${type}`, e);
                 }
-            }
-        }
+            }),
+        );
     }
 
     /**
-     * Send the HTTP request for a `ToDeviceRequest`
+     * Use when you need to send a request directly and out of band of a sync.
+     * If the request has an `id`, it will be marked as sent in the olm machine.
      *
-     * @param request - request to send
-     * @returns JSON-serialized body of the response, if successful
+     * In case of error it will be bubbled up, it's the caller responability to handle it.
+     *
+     * @param request - The request to send.
+     * @returns the response body as a string.
+     * @throws {Error} if the request fails.
      */
-    private async sendToDeviceRequest(request: ToDeviceRequest): Promise<string> {
-        // a bit of extra logging, to help trace to-device messages through the system
-        const parsedBody: { messages: Record<string, Record<string, Record<string, any>>> } = JSON.parse(request.body);
-
-        const messageList = [];
-        for (const [userId, perUserMessages] of Object.entries(parsedBody.messages)) {
-            for (const [deviceId, message] of Object.entries(perUserMessages)) {
-                messageList.push(`${userId}/${deviceId} (msgid ${message[ToDeviceMessageId]})`);
-            }
+    public async sendOutgoingRequest(request: OutgoingRequest): Promise<string> {
+        const { id, type } = request;
+        const resp = await this.requestSender.createHttpRequest(request);
+        if (id) {
+            await this.olmMachine.markRequestAsSent(id, type, resp);
         }
-
-        logger.info(
-            `Sending batch of to-device messages. type=${request.event_type} txnid=${request.txn_id}`,
-            messageList,
-        );
-
-        const path =
-            `/_matrix/client/v3/sendToDevice/${encodeURIComponent(request.event_type)}/` +
-            encodeURIComponent(request.txn_id);
-        return await this.rawJsonRequest(Method.Put, path, {}, request.body);
-    }
-
-    private async makeRequestWithUIA<T>(
-        method: Method,
-        path: string,
-        queryParams: QueryDict,
-        body: string,
-        uiaCallback: UIAuthCallback<T> | undefined,
-    ): Promise<string> {
-        if (!uiaCallback) {
-            return await this.rawJsonRequest(method, path, queryParams, body);
-        }
-
-        const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: IAuthDict | null): Promise<UIAResponse<T>> => {
-            const newBody: Record<string, any> = {
-                ...parsedBody,
-            };
-            if (auth !== null) {
-                newBody.auth = auth;
-            }
-            const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
-            return JSON.parse(resp) as T;
-        };
-
-        const resp = await uiaCallback(makeRequest);
-        return JSON.stringify(resp);
-    }
-
-    private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {
-        const opts = {
-            // inhibit the JSON stringification and parsing within HttpApi.
-            json: false,
-
-            // nevertheless, we are sending, and accept, JSON.
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-
-            // we use the full prefix
-            prefix: "",
-        };
-
-        return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
+        return resp;
     }
 }

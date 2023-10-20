@@ -94,7 +94,7 @@ export class CrossSigningIdentity {
 
                 // Sign the device with our cross-signing key and upload the signature
                 const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
-                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                await this.outgoingRequestProcessor.sendOutgoingRequest(request);
             } else {
                 logger.log(
                     "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
@@ -128,9 +128,15 @@ export class CrossSigningIdentity {
             await this.exportCrossSigningKeysToStorage();
         }
         logger.log("bootStrapCrossSigning: publishing keys to server");
-        for (const req of outgoingRequests) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
-        }
+
+        // TODO this do not need to be marked as sent as stated by the API doc
+        // https://github.com/matrix-org/matrix-rust-sdk/issues/2749
+        // Just send and bubble in case of error
+        await Promise.all(
+            outgoingRequests.map((req) => {
+                this.outgoingRequestProcessor.requestSender.createHttpRequest(req, authUploadDeviceSigningKeys);
+            }),
+        );
     }
 
     /**
