@@ -12,4 +12,3 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   disable-autolabeler: true
-                  include-pre-releases: false
