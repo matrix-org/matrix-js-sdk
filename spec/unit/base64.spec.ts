@@ -19,7 +19,7 @@ import NodeBuffer from "node:buffer";
 
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64 } from "../../src/base64";
 
-describe.each(["browser", "node"])("Crypto Base64 encoding (%s)", (env) => {
+describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
     let origBuffer = Buffer;
 
     beforeAll(() => {
