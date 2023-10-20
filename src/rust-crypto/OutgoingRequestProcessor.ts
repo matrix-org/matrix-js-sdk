@@ -62,7 +62,7 @@ export class OutgoingRequestProcessor {
      * This will send them all off, and mark them as sent in the olm machine.
      * If some requests fail, they will be retried on the next sync, and a log will describe the failure.
      *
-     * @param requests
+     * @param requests - The outgoing requests to process.
      */
     public async processOutgoingRequests(requests: OutgoingRequest[]): Promise<void> {
         await Promise.all(
@@ -88,7 +88,7 @@ export class OutgoingRequestProcessor {
      *
      * @param request - The request to send.
      * @returns the response body as a string.
-     * @throws {Error} if the request fails.
+     * @throws if the request fails.
      */
     public async sendOutgoingRequest(request: OutgoingRequest): Promise<string> {
         const { id, type } = request;

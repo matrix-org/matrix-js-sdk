@@ -33,8 +33,8 @@ export class RequestSender {
      * Creates an HTTP request for the given SDK request object and optional UIA callback.
      * The method and path of the HTTP request is determined based on the type of the SDK request object.
      *
-     * @param request The SDK request object to create an HTTP request for.
-     * @param uiaCallback An optional UIA callback to use for interactive authentication.
+     * @param request - The SDK request object to create an HTTP request for.
+     * @param uiaCallback - An optional UIA callback to use for interactive authentication.
      * @returns A promise that resolves with the HTTP response body as a string.
      */
     public async createHttpRequest<T>(request: SdkRequest, uiaCallback?: UIAuthCallback<T>): Promise<string> {
@@ -76,7 +76,7 @@ export class RequestSender {
                 uiaCallback,
             );
         } else {
-            respPromise = Promise.reject("Invalid request type");
+            respPromise = Promise.reject(new Error("Invalid request type"));
         }
 
         return respPromise;
