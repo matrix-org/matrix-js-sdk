@@ -28,6 +28,7 @@ import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { decodeBase64 } from "../../../src/base64";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -275,13 +276,13 @@ describe("Secrets", function () {
 
     describe("bootstrap", function () {
         // keys used in some of the tests
-        const XSK = new Uint8Array(olmlib.decodeBase64("3lo2YdJugHjfE+Or7KJ47NuKbhE7AAGLgQ/dc19913Q="));
+        const XSK = new Uint8Array(decodeBase64("3lo2YdJugHjfE+Or7KJ47NuKbhE7AAGLgQ/dc19913Q="));
         const XSPubKey = "DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0";
-        const USK = new Uint8Array(olmlib.decodeBase64("lKWi3hJGUie5xxHgySoz8PHFnZv6wvNaud/p2shN9VU="));
+        const USK = new Uint8Array(decodeBase64("lKWi3hJGUie5xxHgySoz8PHFnZv6wvNaud/p2shN9VU="));
         const USPubKey = "CUpoiTtHiyXpUmd+3ohb7JVxAlUaOG1NYs9Jlx8soQU";
-        const SSK = new Uint8Array(olmlib.decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="));
+        const SSK = new Uint8Array(decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="));
         const SSPubKey = "0DfNsRDzEvkCLA0gD3m7VAGJ5VClhjEsewI35xq873Q";
-        const SSSSKey = new Uint8Array(olmlib.decodeBase64("XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0="));
+        const SSSSKey = new Uint8Array(decodeBase64("XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0="));
 
         it("bootstraps when no storage or cross-signing keys locally", async function () {
             const key = new Uint8Array(16);
