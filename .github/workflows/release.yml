@@ -61,7 +61,9 @@ jobs:
 
                   echo "$HEADER" >> CHANGELOG.md
                   printf '=%.0s' $(seq ${#HEADER}) >> CHANGELOG.md
-                  echo "\n$BODY\n" >> CHANGELOG.md
+                  echo "" >> CHANGELOG.md
+                  echo "$BODY" >> CHANGELOG.md
+                  echo "" >> CHANGELOG.md
 
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
