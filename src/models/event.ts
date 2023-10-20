@@ -1197,6 +1197,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // to the main timeline. This will change if MSC3389 is merged.
         if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
             this.moveAllRelatedToMainTimeline(room);
+            redactionEvent.moveToMainTimeline(room);
         }
 
         this.invalidateExtensibleEvent();
