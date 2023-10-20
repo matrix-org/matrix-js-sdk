@@ -121,6 +121,7 @@ jobs:
                       if (MODE === "final") {
                           opts.tag_name = opts.name = TAG_NAME.split("-")[0];
                           opts.prerelease = false;
+                          opts.make_latest = true;
                       }
 
                       github.rest.repos.updateRelease(opts);
