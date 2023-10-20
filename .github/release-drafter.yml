@@ -1,5 +1,6 @@
 name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
+change-template: "* $TITLE ([#$NUMBER]($URL)). Contributed by @$AUTHOR."
 categories:
     - title: "🚨 BREAKING CHANGES"
       label: "X-Breaking-Change"

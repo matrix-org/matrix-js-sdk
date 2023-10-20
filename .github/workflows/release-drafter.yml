@@ -2,6 +2,7 @@ name: Release Drafter
 on:
     push:
         branches: [staging]
+concurrency: ${{ github.workflow }}
 jobs:
     draft:
         runs-on: ubuntu-latest

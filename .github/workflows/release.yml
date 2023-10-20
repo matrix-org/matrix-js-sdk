@@ -1,11 +1,95 @@
 name: Release Process
 on:
-    release:
-        types: [published]
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+    workflow_dispatch:
+        inputs:
+            mode:
+                description: What type of release
+                required: true
+                default: rc
+                type: choice
+                options:
+                    - rc
+                    - final
+            docs:
+                description: Publish docs
+                required: true
+                type: boolean
+                default: true
+            npm:
+                description: Publish to npm
+                required: true
+                type: boolean
+                default: true
+concurrency: ${{ github.workflow }}
 jobs:
-    jsdoc:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Assert on staging branch
+              if: github.ref_name != 'staging'
+              run: |
+                  echo "Action must run on staging branch"
+                  exit 1
+
+            - name: Get draft release
+              id: release
+              uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+              with:
+                  draft: true
+                  commitSha: ${{ github.sha }}
+
+            - uses: actions/checkout@v4
+
+            - name: Bump package.json version
+              run: yarn version --no-git-tag-version --new-version "$VERSION"
+              env:
+                  VERSION: ${{ steps.release.outputs.tag_name }}
+
+            - name: Add to CHANGELOG.md
+              run: |
+                  mv CHANGELOG.md CHANGELOG.md.old
+                  HEADER="Changes in [${VERSION#v}](https://github.com/${{ github.repository }}/releases/tag/$VERSION) ($(date '+%Y-%m-%d'))"
+
+                  echo "$HEADER" >> CHANGELOG.md
+                  printf '=%.0s' $(seq ${#HEADER}) >> CHANGELOG.md
+                  echo "\n$BODY\n" >> CHANGELOG.md
+
+                  cat CHANGELOG.md.old >> CHANGELOG.md
+                  rm CHANGELOG.md.old
+              env:
+                  VERSION: ${{ steps.release.outputs.tag_name }}
+                  BODY: ${{ steps.release.outputs.body }}
+
+            # For the published and dist versions of the package,
+            # we copy the `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if they exist).
+            # This small bit of gymnastics allows us to use the TypeScript source directly for development without
+            # needing to build before linting or testing.
+            - name: Update package.json fields
+              run: |
+                  for i in main typings browser
+                  do
+                      lib_value=$(jq -r ".matrix_lib_$i" package.json)
+                      if [ "$lib_value" != "null" ]; then
+                          jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
+                      fi
+                  done
+
+            - name: Commit and push changes
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  git add package.json CHANGELOG.md
+                  git commit -m "$VERSION"
+                  git push
+              env:
+                  VERSION: ${{ steps.release.outputs.tag_name }}
+
+    docs:
         name: Publish Documentation
+        needs: release
+        if: inputs.docs
         runs-on: ubuntu-latest
         steps:
             - name: 🧮 Checkout code
@@ -47,6 +131,8 @@ jobs:
 
     npm:
         name: Publish
+        needs: release
+        if: inputs.npm
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
