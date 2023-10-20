@@ -81,7 +81,7 @@ import {
     ToDeviceEvent,
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
-import { encodeBase64 } from "../../../src/crypto/olmlib";
+import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
