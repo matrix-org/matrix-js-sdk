@@ -38,9 +38,16 @@ jobs:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
                   draft: true
-                  commitSha: ${{ github.sha }}
+                  latest: true
 
             - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v3
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
 
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "$VERSION"
