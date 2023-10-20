@@ -23,19 +23,14 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixError, MatrixEvent } from "../matrix";
-import { randomString } from "../randomstring";
+import { randomString, secureRandomBase64 } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
+import { decodeBase64, encodeUnpaddedBase64Url } from "../base64";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
-
-const getNewEncryptionKey = (): string => {
-    const key = new Uint8Array(32);
-    crypto.getRandomValues(key);
-    return key.toString();
-};
 
 const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
@@ -58,7 +53,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
     [MatrixRTCSessionEvent.EncryptionKeyChanged]: (
-        key: string,
+        key: Uint8Array,
         encryptionKeyIndex: number,
         participantId: string,
     ) => void;
@@ -91,7 +86,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private needCallMembershipUpdate = false;
 
     private encryptMedia = false;
-    private encryptionKeys = new Map<string, Array<string>>();
+    // userId:deviceId => array of keys
+    private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
     private getNewEncryptionKeyIndex(): number {
@@ -108,19 +104,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         userId: string,
         deviceId: string,
         encryptionKeyIndex: number,
-        encryptionKey: string,
+        encryptionKeyString: string,
     ): void {
+        const keyBin = decodeBase64(encryptionKeyString);
+
         const participantId = getParticipantId(userId, deviceId);
         const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
 
-        if (encryptionKeys[encryptionKeyIndex] === encryptionKey) return;
+        if (encryptionKeys[encryptionKeyIndex] === keyBin) return;
 
-        encryptionKeys[encryptionKeyIndex] = encryptionKey;
+        encryptionKeys[encryptionKeyIndex] = keyBin;
         this.encryptionKeys.set(participantId, encryptionKeys);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKey, encryptionKeyIndex, participantId);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
     }
 
-    public getKeysForParticipant(userId: string, deviceId: string): Array<string> | undefined {
+    public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
         return this.encryptionKeys.get(getParticipantId(userId, deviceId));
     }
 
@@ -128,7 +126,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
      */
-    public getEncryptionKeys(): IterableIterator<[string, Array<string>]> {
+    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         return this.encryptionKeys.entries();
     }
 
@@ -311,7 +309,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
 
-        const encryptionKey = getNewEncryptionKey();
+        const encryptionKey = secureRandomBase64(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
     }
@@ -368,7 +366,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 "keys": myKeys.map((key, index) => {
                     return {
                         index,
-                        key,
+                        key: encodeUnpaddedBase64Url(key),
                     };
                 }),
                 "m.device_id": deviceId,

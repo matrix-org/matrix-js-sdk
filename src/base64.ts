@@ -54,7 +54,16 @@ export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): stri
 }
 
 /**
- * Decode a base64 string to a typed array of uint8.
+ * Encode a typed array of uint8 as unpadded base64 using the URL-safe encoding.
+ * @param uint8Array - The data to encode.
+ * @returns The unpadded base64.
+ */
+export function encodeUnpaddedBase64Url(uint8Array: ArrayBuffer | Uint8Array): string {
+    return encodeUnpaddedBase64(uint8Array).replace("+", "-").replace("/", "_");
+}
+
+/**
+ * Decode a base64 (or base64url) string to a typed array of uint8.
  * @param base64 - The base64 to decode.
  * @returns The decoded data.
  */
