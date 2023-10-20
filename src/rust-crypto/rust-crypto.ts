@@ -70,7 +70,7 @@ import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
-import { encodeBase64 } from "../common-crypto/base64";
+import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
