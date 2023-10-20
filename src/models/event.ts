@@ -1193,8 +1193,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             }
         }
 
-        // If the redacted event was in a thread
-        if (room && this.threadRootId && this.threadRootId !== this.getId()) {
+        // If the redacted event was in a thread (but not thread root), move it
+        // to the main timeline. This will change if MSC3389 is merged.
+        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
             this.moveAllRelatedToMainTimeline(room);
         }
 
