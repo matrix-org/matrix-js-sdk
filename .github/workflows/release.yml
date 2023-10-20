@@ -95,6 +95,36 @@ jobs:
               env:
                   VERSION: ${{ steps.release.outputs.tag_name }}
 
+            - name: Publish release
+              uses: actions/github-script@v6
+              id: my-script
+              env:
+                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  TAG_NAME: ${{ steps.release.outputs.tag_name }}
+                  MODE: ${{ inputs.mode }}
+              with:
+                  result-encoding: string
+                  retries: 3
+                  script: |
+                      let { RELEASE_ID, TAG_NAME, MODE } = process.env;
+                      const { owner, repo } = context.repo;
+
+                      const opts = {
+                          owner,
+                          repo,
+                          release_id,
+                          tag_name: TAG_NAME,
+                          name: TAG_NAME,
+                          draft: false,
+                      };
+
+                      if (MODE === "final") {
+                          opts.tag_name = opts.name = TAG_NAME.split("-")[0];
+                          opts.prerelease = false;
+                      }
+
+                      github.rest.repos.updateRelease(opts);
+
     docs:
         name: Publish Documentation
         needs: release
