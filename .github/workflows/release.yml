@@ -64,15 +64,18 @@ jobs:
               run: yarn version --no-git-tag-version --new-version "$VERSION"
 
             - name: Add to CHANGELOG.md
+              if: inputs.final
               run: |
                   mv CHANGELOG.md CHANGELOG.md.old
                   HEADER="Changes in [${VERSION#v}](https://github.com/${{ github.repository }}/releases/tag/$VERSION) ($(date '+%Y-%m-%d'))"
 
-                  echo "$HEADER" >> CHANGELOG.md
-                  printf '=%.0s' $(seq ${#HEADER}) >> CHANGELOG.md
-                  echo "" >> CHANGELOG.md
-                  echo "$BODY" >> CHANGELOG.md
-                  echo "" >> CHANGELOG.md
+                  {
+                      echo "$HEADER"
+                      printf '=%.0s' $(seq ${#HEADER})
+                      echo ""
+                      echo "$BODY"
+                      echo ""
+                  } > CHANGELOG.md
 
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
