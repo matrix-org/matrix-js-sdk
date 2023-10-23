@@ -150,7 +150,7 @@ async function expectSendRoomKey(
 /**
  * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
  * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
- * @returns the content of event (no decryption)
+ * @returns the content of the encrypted event
  */
 function expectEncryptedSendMessage() {
     return new Promise<IContent>((resolve) => {
@@ -960,7 +960,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 rotation_period_msgs: 2,
             };
 
-            // tell alice we share a room with bob
+            // Tell alice we share a room with bob
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
@@ -977,7 +977,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const sessionId = encryptedMessage.session_id;
             expect(sessionId).toBeDefined();
 
-            // Send a message to bob and get the current message
+            // Send a second message to bob and get the current message
             const secondEncryptedMessage = await sendEncryptedMessage();
 
             // Check that the same session id is shared between the two messages
@@ -1000,7 +1000,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // We need to fake the timers to make the session rotate
+            // We need to fake the timers to advance the time
             jest.useFakeTimers();
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
@@ -1015,7 +1015,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 rotation_period_ms: oneHourInMs,
             };
 
-            // tell alice we share a room with bob
+            // Tell alice we share a room with bob
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
