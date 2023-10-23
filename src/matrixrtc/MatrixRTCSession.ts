@@ -302,6 +302,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         });
     }
 
+    /**
+     * Generate a new sender key and add it at the next available index
+     */
     private makeNewSenderKey(): void {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
