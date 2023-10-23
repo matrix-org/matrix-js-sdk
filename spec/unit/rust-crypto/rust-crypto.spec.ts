@@ -505,6 +505,26 @@ describe("RustCrypto", () => {
             expect(olmMachine.getRoomEventEncryptionInfo).not.toHaveBeenCalled();
         });
 
+        it("should handle decryption failures", async () => {
+            const event = mkEvent({
+                event: true,
+                type: "m.room.encrypted",
+                content: { algorithm: "fake_alg" },
+                room: "!room:id",
+            });
+            event.event.event_id = "$event:id";
+            const mockCryptoBackend = {
+                decryptEvent: () => {
+                    throw new Error("UISI");
+                },
+            };
+            await event.attemptDecryption(mockCryptoBackend as unknown as CryptoBackend);
+
+            const res = await rustCrypto.getEncryptionInfoForEvent(event);
+            expect(res).toBe(null);
+            expect(olmMachine.getRoomEventEncryptionInfo).not.toHaveBeenCalled();
+        });
+
         it("passes the event into the OlmMachine", async () => {
             const encryptedEvent = await makeEncryptedEvent();
             const res = await rustCrypto.getEncryptionInfoForEvent(encryptedEvent);
