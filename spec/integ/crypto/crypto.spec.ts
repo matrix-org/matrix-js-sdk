@@ -931,14 +931,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // tell alice we share a room with bob
+            // Tell alice we share a room with bob
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             await syncPromise(aliceClient);
 
-            // force alice to download bob keys
+            // Force alice to download bob keys
             expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
-            // wait to receive the toDevice message and get the unverified bob device from the payload
+            // Wait to receive the toDevice message and return bob device content
             const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
                 fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
                     const content = JSON.parse(request.body as string);
@@ -947,7 +947,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             });
 
-            // mock endpoint of message sending
+            // Mock endpoint of message sending
             fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
 
             await aliceClient.sendTextMessage(ROOM_ID, "test");
