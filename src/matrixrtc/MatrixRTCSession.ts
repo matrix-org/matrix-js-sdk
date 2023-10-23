@@ -90,46 +90,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
-    private getNewEncryptionKeyIndex(): number {
-        const userId = this.client.getUserId();
-        const deviceId = this.client.getDeviceId();
-
-        if (!userId) throw new Error("No userId!");
-        if (!deviceId) throw new Error("No deviceId!");
-
-        return (this.getKeysForParticipant(userId, deviceId)?.length ?? 0) % 16;
-    }
-
-    private setEncryptionKey(
-        userId: string,
-        deviceId: string,
-        encryptionKeyIndex: number,
-        encryptionKeyString: string,
-    ): void {
-        const keyBin = decodeBase64(encryptionKeyString);
-
-        const participantId = getParticipantId(userId, deviceId);
-        const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
-
-        if (encryptionKeys[encryptionKeyIndex] === keyBin) return;
-
-        encryptionKeys[encryptionKeyIndex] = keyBin;
-        this.encryptionKeys.set(participantId, encryptionKeys);
-        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-    }
-
-    public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId));
-    }
-
-    /**
-     * A map of keys used to encrypt and decrypt (we are using a symmetric
-     * cipher) given participant's media. This also includes our own key
-     */
-    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        return this.encryptionKeys.entries();
-    }
-
     /**
      * Returns all the call memberships for a room, oldest first
      */
@@ -300,6 +260,46 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 resolve(value != "timeout");
             });
         });
+    }
+
+    public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId));
+    }
+
+    /**
+     * A map of keys used to encrypt and decrypt (we are using a symmetric
+     * cipher) given participant's media. This also includes our own key
+     */
+    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
+        return this.encryptionKeys.entries();
+    }
+
+    private getNewEncryptionKeyIndex(): number {
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
+
+        if (!userId) throw new Error("No userId!");
+        if (!deviceId) throw new Error("No deviceId!");
+
+        return (this.getKeysForParticipant(userId, deviceId)?.length ?? 0) % 16;
+    }
+
+    private setEncryptionKey(
+        userId: string,
+        deviceId: string,
+        encryptionKeyIndex: number,
+        encryptionKeyString: string,
+    ): void {
+        const keyBin = decodeBase64(encryptionKeyString);
+
+        const participantId = getParticipantId(userId, deviceId);
+        const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
+
+        if (encryptionKeys[encryptionKeyIndex] === keyBin) return;
+
+        encryptionKeys[encryptionKeyIndex] = keyBin;
+        this.encryptionKeys.set(participantId, encryptionKeys);
+        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
     }
 
     /**
