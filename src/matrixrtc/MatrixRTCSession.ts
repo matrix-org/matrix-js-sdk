@@ -85,7 +85,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private updateCallMembershipRunning = false;
     private needCallMembershipUpdate = false;
 
-    private encryptMedia = false;
+    private manageMediaKeys = false;
     // userId:deviceId => array of keys
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
@@ -194,21 +194,28 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
      * This method will return immediately and the session will be joined in the background.
+     *
+     * @param activeFoci - The list of foci to set as currently active in the call member event
+     * @param manageMediaKeys - If true, generate and share a a media key for this participant,
+     *                          and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
+     *                          media keys for other participants become available.
      */
-    public joinRoomSession(activeFoci: Focus[], encryptMedia?: boolean): void {
+    public joinRoomSession(activeFoci: Focus[], manageMediaKeys?: boolean): void {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         }
 
-        logger.info(`Joining call session in room ${this.room.roomId} with encryptMedia=${encryptMedia}`);
+        logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${manageMediaKeys}`);
         this.activeFoci = activeFoci;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
-        this.encryptMedia = encryptMedia ?? false;
+        this.manageMediaKeys = manageMediaKeys ?? false;
         this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
-        this.makeNewSenderKey();
-        this.requestKeyEventSend();
+        if (manageMediaKeys) {
+            this.makeNewSenderKey();
+            this.requestKeyEventSend();
+        }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
         this.triggerCallMembershipEventUpdate();
@@ -243,7 +250,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
         this.activeFoci = undefined;
-        this.encryptMedia = false;
+        this.manageMediaKeys = false;
         this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
@@ -322,6 +329,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * or queue for alter if one has already been sent recently.
      */
     private requestKeyEventSend(): void {
+        if (!this.manageMediaKeys) return;
+
         if (
             this.lastEncryptionKeyUpdateRequest &&
             this.lastEncryptionKeyUpdateRequest + UPDATE_ENCRYPTION_KEY_THROTTLE > Date.now()
@@ -349,7 +358,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info("Sending encryption keys event");
 
         if (!this.isJoined()) return;
-        if (!this.encryptMedia) return;
 
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
