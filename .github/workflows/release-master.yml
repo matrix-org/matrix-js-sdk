@@ -13,6 +13,13 @@ jobs:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
+            - uses: actions/setup-node@v3
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
             - name: Set up git
               run: |
                   git config --global user.email "releases@riot.im"
