@@ -1537,7 +1537,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
                 this.outgoingRequestLoopOneMoreLoop = false;
 
-                this.logger.debug("Calling OlmMachine.outgoingRequests()");
                 const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
 
                 if (this.stopped) {
@@ -1650,7 +1649,7 @@ class EventDecryptor {
     }
 
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
-        if (!event.getClearContent()) {
+        if (!event.getClearContent() || event.isDecryptionFailure()) {
             // not successfully decrypted
             return null;
         }
