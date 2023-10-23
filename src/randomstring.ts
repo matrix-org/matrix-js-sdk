@@ -15,19 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import nodeCrypto from "node:crypto";
-
 import { encodeUnpaddedBase64Url } from "./base64";
+import { crypto } from "./crypto/crypto";
 
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS = "0123456789";
 
-const webCrypto = typeof crypto === "object" ? crypto : (nodeCrypto.webcrypto as typeof crypto);
-
 export function secureRandomBase64(len: number): string {
     const key = new Uint8Array(len);
-    webCrypto.getRandomValues(key);
+    crypto.getRandomValues(key);
 
     // encode to base64url as this value goes into URLs
     return encodeUnpaddedBase64Url(key);
