@@ -82,12 +82,6 @@ describe("OutgoingRequestProcessor", () => {
             "https://example.com/_matrix/client/v3/keys/signatures/upload",
         ],
         ["KeysBackupRequest", KeysBackupRequest, "PUT", "https://example.com/_matrix/client/v3/room_keys/keys"],
-        [
-            "SigningKeysUploadRequest",
-            SigningKeysUploadRequest,
-            "POST",
-            "https://example.com/_matrix/client/v3/keys/device_signing/upload",
-        ],
     ];
 
     test.each(tests)(`should handle %ss`, async (_, RequestClass, expectedMethod, expectedPath) => {
@@ -121,7 +115,7 @@ describe("OutgoingRequestProcessor", () => {
 
     it("should handle ToDeviceRequests", async () => {
         // first, mock up the ToDeviceRequest as we might expect to receive it from the Rust layer ...
-        const testBody = '{ "foo": "bar" }';
+        const testBody = '{ "messages": { "user": {"device": "bar" }}}';
         const outgoingRequest = new ToDeviceRequest("1234", "test/type", "test/txnid", testBody);
 
         // ... then poke it into the OutgoingRequestProcessor under test.
@@ -179,10 +173,37 @@ describe("OutgoingRequestProcessor", () => {
         httpBackend.verifyNoOutstandingRequests();
     });
 
+    it("should handle SigningKeysUploadRequests without UIA", async () => {
+        // first, mock up a request as we might expect to receive it from the Rust layer ...
+        const testReq = { foo: "bar" };
+        const outgoingRequest = new SigningKeysUploadRequest(JSON.stringify(testReq));
+
+        // ... then poke the request into the OutgoingRequestProcessor under test
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest);
+
+        // Now: check that it makes a matching HTTP request.
+        const testResponse = '{"result":1}';
+        httpBackend
+            .when("POST", "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual("https://example.com/_matrix/client/v3/keys/device_signing/upload");
+                expect(JSON.parse(req.rawData)).toEqual(testReq);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
+
+        // SigningKeysUploadRequest does not need to be marked as sent, so no call to OlmMachine.markAsSent is expected.
+
+        await httpBackend.flushAllExpected();
+        await reqProm;
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
     it("should handle SigningKeysUploadRequests with UIA", async () => {
         // first, mock up a request as we might expect to receive it from the Rust layer ...
         const testReq = { foo: "bar" };
-        const outgoingRequest = new SigningKeysUploadRequest("1234", JSON.stringify(testReq));
+        const outgoingRequest = new SigningKeysUploadRequest(JSON.stringify(testReq));
 
         // also create a UIA callback
         const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
@@ -192,7 +213,7 @@ describe("OutgoingRequestProcessor", () => {
         // ... then poke the request into the OutgoingRequestProcessor under test
         const reqProm = processor.makeOutgoingRequest(outgoingRequest, authCallback);
 
-        // Now: check that it makes a matching HTTP request ...
+        // Now: check that it makes a matching HTTP request.
         const testResponse = '{"result":1}';
         httpBackend
             .when("POST", "/_matrix")
@@ -204,12 +225,10 @@ describe("OutgoingRequestProcessor", () => {
             })
             .respond(200, testResponse, true);
 
-        // ... and that it calls OlmMachine.markAsSent.
-        const markSentCallPromise = awaitCallToMarkAsSent();
-        await httpBackend.flushAllExpected();
+        // SigningKeysUploadRequest does not need to be marked as sent, so no call to OlmMachine.markAsSent is expected.
 
-        await Promise.all([reqProm, markSentCallPromise]);
-        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
+        await httpBackend.flushAllExpected();
+        await reqProm;
         httpBackend.verifyNoOutstandingRequests();
     });
 

@@ -82,7 +82,8 @@ import {
     ToDeviceEvent,
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
-import { encodeBase64 } from "../../../src/crypto/olmlib";
+
+import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -1294,6 +1295,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // An auto import should have been triggered
             await autoImportFinished;
+
         });
 
         newBackendOnly("Should not accept the backup decryption key gossip if private key do not match", async () => {
@@ -1340,7 +1342,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const backupStatus = await keyBackupStatusUpdate;
             expect(backupStatus).toBe(false);
-            jest.runAllTimersAsync();
+            await jest.runAllTimersAsync();
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1354,17 +1356,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+
             const keyBackupStatusUpdate = new Promise<boolean>((resolve) => {
                 aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
                     resolve(enabled);
                 });
             });
 
+
             await sendBackupGossipAndExpectVersion(
                 requestId!,
                 BACKUP_DECRYPTION_KEY_BASE64,
                 unknownAlgorithmBackupInfo,
             );
+
 
             await keyBackupStatusUpdate;
             await jest.runAllTimersAsync();
@@ -1444,6 +1449,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             };
 
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
 
             // The dummy device sends the secret
             returnToDeviceMessageFromSync(toDeviceEvent);
@@ -1581,7 +1587,8 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
         (url: string, opts: RequestInit): MockResponse => {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
-            const content = Object.values(messages)[0] as any; //messages[TEST_DEVICE_ID] ? messages[TEST_DEVICE_ID] : messages['*'];
+            const content = Object.values(messages)[0] as any;
+
             if (content.action == "request") {
                 const name = content.name;
                 const requestId = content.request_id;
@@ -1652,7 +1659,7 @@ function buildRequestMessage(transactionId: string): { type: string; content: ob
     };
 }
 
-/** build an m.key.verification.ready to-device message originating from the dummy device */
+/** build an m.key.verification.ready to-device message originating from the given `fromDevice` (default to `TEST_DEVICE_ID` if not provided) */
 function buildReadyMessage(
     transactionId: string,
     methods: string[],
