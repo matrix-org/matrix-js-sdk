@@ -38,6 +38,7 @@ jobs:
               with:
                   ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  fetch-depth: 0
 
             - uses: actions/setup-node@v3
               with:
