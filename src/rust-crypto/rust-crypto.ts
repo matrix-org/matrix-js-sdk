@@ -1647,7 +1647,7 @@ class EventDecryptor {
     }
 
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
-        if (!event.getClearContent()) {
+        if (!event.getClearContent() || event.isDecryptionFailure()) {
             // not successfully decrypted
             return null;
         }
