@@ -25,7 +25,7 @@ import { Focus } from "./focus";
 import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64 } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
-import { decodeBase64, encodeUnpaddedBase64Url } from "../base64";
+import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -377,7 +377,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 "keys": myKeys.map((key, index) => {
                     return {
                         index,
-                        key: encodeUnpaddedBase64Url(key),
+                        key: encodeUnpaddedBase64(key),
                     };
                 }),
                 "m.device_id": deviceId,
