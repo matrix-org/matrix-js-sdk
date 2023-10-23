@@ -924,7 +924,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             ]);
         });
 
-        it("should send a m.unverified code in toDevices messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
+        it("should send a m.unverified code in toDevice messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
             aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });

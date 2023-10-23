@@ -85,7 +85,7 @@ export class RoomEncryptor {
      * This ensures that we have a megolm session ready to use and that we have shared its key with all the devices
      * in the room.
      *
-     * @param globalBlacklistUnverifiedDevices - True, it will not send encrypted messages to unverified devices
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
     public async ensureEncryptionSession(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
@@ -108,13 +108,10 @@ export class RoomEncryptor {
         const rustEncryptionSettings = new EncryptionSettings();
         /* FIXME historyVisibility, rotation, etc */
 
-        const isRoomBlacklistUnverifiedDevices = this.room.getBlacklistUnverifiedDevices();
+        // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
+        // See Room#getBlacklistUnverifiedDevices
         rustEncryptionSettings.onlyAllowTrustedDevices =
-            // When isRoomBlacklistUnverifiedDevices === null, the global settings should be used
-            // See Room#getBlacklistUnverifiedDevices
-            isRoomBlacklistUnverifiedDevices === null
-                ? globalBlacklistUnverifiedDevices
-                : isRoomBlacklistUnverifiedDevices;
+            this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
 
         const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
             new RoomId(this.room.roomId),
@@ -145,7 +142,7 @@ export class RoomEncryptor {
      * then encrypt the event using the session.
      *
      * @param event - Event to be encrypted.
-     * @param globalBlacklistUnverifiedDevices - True, it will not send encrypted messages to unverified devices
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
     public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         await this.ensureEncryptionSession(globalBlacklistUnverifiedDevices);
