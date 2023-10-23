@@ -102,7 +102,14 @@ jobs:
                   git config --global user.name "RiotRobot"
                   git add package.json CHANGELOG.md
                   git commit -m "$VERSION"
-                  git push
+                  git push origin staging
+
+            - name: Merge to master
+              if: input.final
+              run: |
+                  git checkout master
+                  git merge -X theirs staging
+                  git push origin master
 
             - name: Publish release
               uses: actions/github-script@v6
