@@ -13,6 +13,11 @@ jobs:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
+            - name: Set up git
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+
             - name: Merge to develop
               run: |
                   git checkout develop
@@ -39,8 +44,6 @@ jobs:
 
             - name: Commit and push changes
               run: |
-                  git config --global user.email "releases@riot.im"
-                  git config --global user.name "RiotRobot"
                   git add package.json
                   git commit -m "Resetting package fields for development"
                   git push origin develop

@@ -92,10 +92,13 @@ jobs:
                       fi
                   done
 
-            - name: Commit and push changes
+            - name: Set up git
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
+
+            - name: Commit and push changes
+              run: |
                   git add package.json CHANGELOG.md
                   git commit -m "$VERSION"
                   git push origin staging
@@ -170,10 +173,13 @@ jobs:
                   yarn gendoc
                   symlinks -rc _docs
 
-            - name: 🚀 Deploy
+            - name: 🔨 Set up git
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
+
+            - name: 🚀 Deploy
+              run: |
                   git add . --all
                   git commit -m "Update docs"
                   git push
