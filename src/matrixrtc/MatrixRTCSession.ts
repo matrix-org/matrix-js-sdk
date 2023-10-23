@@ -471,7 +471,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 );
             } else {
                 logger.debug(
-                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKey=${encryptionKey} encryptionKeyIndex=${encryptionKeyIndex}`,
+                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
                     this.encryptionKeys,
                 );
                 this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
