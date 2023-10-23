@@ -302,7 +302,7 @@ describe("MatrixRTCSession", () => {
             }
         });
 
-        it("creates & sends a key when joining", () => {
+        it("creates a key when joining", () => {
             sess!.joinRoomSession([mockFocus], true);
             const keys = sess?.getKeysForParticipant("@alice:example.org", "AAAAAAA");
             expect(keys).toHaveLength(1);
@@ -310,6 +310,27 @@ describe("MatrixRTCSession", () => {
             const allKeys = sess!.getEncryptionKeys();
             expect(allKeys).toBeTruthy();
             expect(Array.from(allKeys)).toHaveLength(1);
+        });
+
+        it("sends keys when joining", async () => {
+            const eventSentPromise = new Promise((resolve) => {
+                sendEventMock.mockImplementation(resolve);
+            });
+
+            sess!.joinRoomSession([mockFocus], true);
+
+            await eventSentPromise;
+
+            expect(sendEventMock).toHaveBeenCalledWith(expect.stringMatching(".*"), "io.element.call.encryption_keys", {
+                "m.call_id": "",
+                "m.device_id": "AAAAAAA",
+                "keys": [
+                    {
+                        index: 0,
+                        key: expect.stringMatching(".*"),
+                    },
+                ],
+            });
         });
     });
 
