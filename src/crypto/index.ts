@@ -102,6 +102,7 @@ import {
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 import { ClientPrefix, MatrixError, Method } from "../http-api";
+import { decodeBase64, encodeBase64 } from "../base64";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -500,7 +501,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     await this.secretStorage.store("m.megolm_backup.v1", fixedKey, [keys![0]]);
                 }
 
-                return olmlib.decodeBase64(fixedKey || storedKey);
+                return decodeBase64(fixedKey || storedKey);
             }
 
             // try to get key from app
@@ -1050,7 +1051,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             newKeyId = await createSSSS(opts, backupKey);
 
             // store the backup key in secret storage
-            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey!), [newKeyId]);
+            await secretStorage.store("m.megolm_backup.v1", encodeBase64(backupKey!), [newKeyId]);
 
             // The backup is trusted because the user provided the private key.
             // Sign the backup with the cross-signing key so the key backup can
@@ -1094,7 +1095,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             );
             // write the key to 4S
             const privateKey = decodeRecoveryKey(info.recovery_key);
-            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+            await secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
 
             // create keyBackupInfo object to add to builder
             const data: IKeyBackupInfo = {
@@ -1122,7 +1123,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 const keyId = newKeyId || oldKeyId;
                 await secretStorage.store("m.megolm_backup.v1", fixedBackupKey, keyId ? [keyId] : null);
             }
-            const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(fixedBackupKey || sessionBackupKey));
+            const decodedBackupKey = new Uint8Array(decodeBase64(fixedBackupKey || sessionBackupKey));
             builder.addSessionBackupPrivateKeyToCache(decodedBackupKey);
         } else if (this.backupManager.getKeyBackupEnabled()) {
             // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
@@ -1137,7 +1138,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return;
             }
             logger.info("Got session backup key from cache/user that wasn't in SSSS: saving to SSSS");
-            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey));
+            await secretStorage.store("m.megolm_backup.v1", encodeBase64(backupKey));
         }
 
         const operation = builder.buildOperation();
@@ -1178,7 +1179,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // write the key to 4S
         const privateKey = info.privateKey;
-        await this.secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(privateKey));
+        await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(privateKey));
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
@@ -1301,13 +1302,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // make sure we have a Uint8Array, rather than a string
         if (typeof encodedKey === "string") {
-            key = new Uint8Array(olmlib.decodeBase64(fixBackupKey(encodedKey) || encodedKey));
+            key = new Uint8Array(decodeBase64(fixBackupKey(encodedKey) || encodedKey));
             await this.storeSessionBackupPrivateKey(key);
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
             const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
-            key = olmlib.decodeBase64(decrypted);
+            key = decodeBase64(decrypted);
         }
         return key;
     }
@@ -1323,7 +1324,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-        const encryptedKey = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });
@@ -4196,7 +4197,7 @@ export function fixBackupKey(key?: string): string | null {
         return null;
     }
     const fixedKey = Uint8Array.from(key.split(","), (x) => parseInt(x));
-    return olmlib.encodeBase64(fixedKey);
+    return encodeBase64(fixedKey);
 }
 
 /**

@@ -21,7 +21,7 @@ limitations under the License.
 import { crypto } from "../crypto";
 import { VerificationBase as Base } from "./Base";
 import { newKeyMismatchError, newUserCancelledError } from "./Error";
-import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
+import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
 import { logger } from "../../logger";
 import { VerificationRequest } from "./request/VerificationRequest";
 import { MatrixClient } from "../../client";

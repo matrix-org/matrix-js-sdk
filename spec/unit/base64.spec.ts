@@ -15,16 +15,44 @@ limitations under the License.
 */
 
 import { TextEncoder, TextDecoder } from "util";
+import NodeBuffer from "node:buffer";
 
-import { decodeBase64, encodeBase64, encodeUnpaddedBase64 } from "../../../src/common-crypto/base64";
+import { decodeBase64, encodeBase64, encodeUnpaddedBase64 } from "../../src/base64";
 
-describe("Crypto Base64 encoding", () => {
+describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
+    let origBuffer = Buffer;
+
+    beforeAll(() => {
+        if (env === "browser") {
+            origBuffer = Buffer;
+            // @ts-ignore
+            // eslint-disable-next-line no-global-assign
+            Buffer = undefined;
+
+            global.atob = NodeBuffer.atob;
+            global.btoa = NodeBuffer.btoa;
+        }
+    });
+
+    afterAll(() => {
+        // eslint-disable-next-line no-global-assign
+        Buffer = origBuffer;
+        // @ts-ignore
+        global.atob = undefined;
+        // @ts-ignore
+        global.btoa = undefined;
+    });
+
     it("Should decode properly encoded data", async () => {
-        const toEncode = "encoding hello world";
-        const encoded = encodeBase64(new TextEncoder().encode(toEncode));
-        const decoded = new TextDecoder().decode(decodeBase64(encoded));
+        const decoded = new TextDecoder().decode(decodeBase64("ZW5jb2RpbmcgaGVsbG8gd29ybGQ="));
 
-        expect(decoded).toStrictEqual(toEncode);
+        expect(decoded).toStrictEqual("encoding hello world");
+    });
+
+    it("Should decode URL-safe base64", async () => {
+        const decoded = new TextDecoder().decode(decodeBase64("Pz8_Pz8="));
+
+        expect(decoded).toStrictEqual("?????");
     });
 
     it("Encode unpadded should not have padding", async () => {
