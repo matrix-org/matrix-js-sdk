@@ -1709,7 +1709,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     describe("getEncryptionInfoForEvent", () => {
         it("handles outgoing events", async () => {
             aliceClient.setGlobalErrorOnUnknownDevices(false);
-            //aliceClient.getCrypto()!.globalErrorOnUnknownDevices = false;
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
