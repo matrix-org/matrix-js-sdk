@@ -184,8 +184,15 @@ describe("MatrixRTCSession", () => {
 
     describe("joining", () => {
         let mockRoom: Room;
+        let sendStateEventMock: jest.Mock;
+        let sendEventMock: jest.Mock;
 
         beforeEach(() => {
+            sendStateEventMock = jest.fn();
+            sendEventMock = jest.fn();
+            client.sendStateEvent = sendStateEventMock;
+            client.sendEvent = sendEventMock;
+
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         });
@@ -205,8 +212,6 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends a membership event when joining a call", () => {
-            client.sendStateEvent = jest.fn();
-
             sess!.joinRoomSession([mockFocus]);
 
             expect(client.sendStateEvent).toHaveBeenCalledWith(
@@ -230,9 +235,6 @@ describe("MatrixRTCSession", () => {
         });
 
         it("does nothing if join called when already joined", () => {
-            const sendStateEventMock = jest.fn();
-            client.sendStateEvent = sendStateEventMock;
-
             sess!.joinRoomSession([mockFocus]);
 
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
@@ -298,6 +300,16 @@ describe("MatrixRTCSession", () => {
             } finally {
                 jest.useRealTimers();
             }
+        });
+
+        it("creates & sends a key when joining", () => {
+            sess!.joinRoomSession([mockFocus], true);
+            const keys = sess?.getKeysForParticipant("@alice:example.org", "AAAAAAA");
+            expect(keys).toHaveLength(1);
+
+            const allKeys = sess!.getEncryptionKeys();
+            expect(allKeys).toBeTruthy();
+            expect(Array.from(allKeys)).toHaveLength(1);
         });
     });
 
