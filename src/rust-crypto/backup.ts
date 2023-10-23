@@ -460,7 +460,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {
             try {
                 const decrypted = JSON.parse(
-                    await this.decryptionKey.decryptV1(
+                    this.decryptionKey.decryptV1(
                         sessionData.session_data.ephemeral,
                         sessionData.session_data.mac,
                         sessionData.session_data.ciphertext,
