@@ -165,7 +165,7 @@ export class RoomEncryptor {
 /**
  * Convert a HistoryVisibility to a RustHistoryVisibility
  * @param visibility - HistoryVisibility enum
- $ @returns a RustHistoryVisibility enum
+ * @returns a RustHistoryVisibility enum
  */
 export function toRustHistoryVisibility(visibility: HistoryVisibility): RustHistoryVisibility {
     switch (visibility) {

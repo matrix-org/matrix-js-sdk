@@ -968,7 +968,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             }),
         );
 
-        // send the new visibility
+        // Update the new visibility
         syncResponder.sendOrQueueSyncResponse(syncResponse);
         await syncPromise(aliceClient);
 
