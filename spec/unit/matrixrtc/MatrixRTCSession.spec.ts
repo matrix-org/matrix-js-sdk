@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, EventType, MatrixClient, MatrixError, Room } from "../../../src";
+import { EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { randomString } from "../../../src/randomstring";
@@ -472,5 +472,55 @@ describe("MatrixRTCSession", () => {
             },
             "@alice:example.org",
         );
+    });
+
+    it("collects keys from encryption events", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.onCallEncryption({
+            getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+            getContent: jest.fn().mockReturnValue({
+                device_id: "bobsphone",
+                call_id: "",
+                keys: [
+                    {
+                        index: 0,
+                        key: "dGhpcyBpcyB0aGUga2V5",
+                    },
+                ],
+            }),
+            getSender: jest.fn().mockReturnValue("@bob:example.org"),
+        } as unknown as MatrixEvent);
+
+        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
+        expect(bobKeys).toHaveLength(1);
+        expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+    });
+
+    it("collects keys at non-zero indices", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.onCallEncryption({
+            getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+            getContent: jest.fn().mockReturnValue({
+                device_id: "bobsphone",
+                call_id: "",
+                keys: [
+                    {
+                        index: 4,
+                        key: "dGhpcyBpcyB0aGUga2V5",
+                    },
+                ],
+            }),
+            getSender: jest.fn().mockReturnValue("@bob:example.org"),
+        } as unknown as MatrixEvent);
+
+        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
+        expect(bobKeys).toHaveLength(5);
+        expect(bobKeys[0]).toBeFalsy();
+        expect(bobKeys[1]).toBeFalsy();
+        expect(bobKeys[2]).toBeFalsy();
+        expect(bobKeys[3]).toBeFalsy();
+        expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
     });
 });
