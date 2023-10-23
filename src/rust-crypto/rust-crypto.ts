@@ -329,6 +329,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public globalBlacklistUnverifiedDevices = false;
 
+    /**
+     * Implementation of {@link CryptoApi#getVersion}.
+     */
+    public getVersion(): string {
+        const versions = RustSdkCryptoJs.getVersions();
+        return `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`;
+    }
+
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 

@@ -143,6 +143,13 @@ describe("RustCrypto", () => {
             10000,
         );
 
+        it("should return the current version of the rust sdk and vodozemac", async () => {
+            const versions = RustSdkCryptoJs.getVersions();
+            expect(rustCrypto.getVersion()).toBe(
+                `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`,
+            );
+        });
+
         it("should import and export keys", async () => {
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             let importTotal = 0;

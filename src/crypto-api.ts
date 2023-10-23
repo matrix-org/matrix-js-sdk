@@ -40,6 +40,13 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
+     * Return the current version of the Rust SDK and the Vodozemac library
+     * @returns the version in the format `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`
+     * XXXX: Remove `null` when the old crypto is removed
+     */
+    getVersion(): string | null;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
