@@ -100,7 +100,7 @@ jobs:
                   git push origin staging
 
             - name: Merge to master
-              if: input.final
+              if: inputs.final
               run: |
                   git checkout master
                   git merge -X theirs staging
