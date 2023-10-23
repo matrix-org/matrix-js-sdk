@@ -31,6 +31,7 @@ import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
+import { ToDeviceMessageId } from "../@types/event";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -60,7 +61,10 @@ export class OutgoingRequestProcessor {
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     ) {}
 
-    public async makeOutgoingRequest<T>(msg: OutgoingRequest, uiaCallback?: UIAuthCallback<T>): Promise<void> {
+    public async makeOutgoingRequest<T>(
+        msg: OutgoingRequest | SigningKeysUploadRequest,
+        uiaCallback?: UIAuthCallback<T>,
+    ): Promise<void> {
         let resp: string;
 
         /* refer https://docs.rs/matrix-sdk-crypto/0.6.0/matrix_sdk_crypto/requests/enum.OutgoingRequests.html
@@ -82,23 +86,22 @@ export class OutgoingRequestProcessor {
                 msg.body,
             );
         } else if (msg instanceof ToDeviceRequest) {
-            const path =
-                `/_matrix/client/v3/sendToDevice/${encodeURIComponent(msg.event_type)}/` +
-                encodeURIComponent(msg.txn_id);
-            resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
+            resp = await this.sendToDeviceRequest(msg);
         } else if (msg instanceof RoomMessageRequest) {
             const path =
                 `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
         } else if (msg instanceof SigningKeysUploadRequest) {
-            resp = await this.makeRequestWithUIA(
+            await this.makeRequestWithUIA(
                 Method.Post,
                 "/_matrix/client/v3/keys/device_signing/upload",
                 {},
                 msg.body,
                 uiaCallback,
             );
+            // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+            return;
         } else {
             logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
             resp = "";
@@ -120,6 +123,34 @@ export class OutgoingRequestProcessor {
                 }
             }
         }
+    }
+
+    /**
+     * Send the HTTP request for a `ToDeviceRequest`
+     *
+     * @param request - request to send
+     * @returns JSON-serialized body of the response, if successful
+     */
+    private async sendToDeviceRequest(request: ToDeviceRequest): Promise<string> {
+        // a bit of extra logging, to help trace to-device messages through the system
+        const parsedBody: { messages: Record<string, Record<string, Record<string, any>>> } = JSON.parse(request.body);
+
+        const messageList = [];
+        for (const [userId, perUserMessages] of Object.entries(parsedBody.messages)) {
+            for (const [deviceId, message] of Object.entries(perUserMessages)) {
+                messageList.push(`${userId}/${deviceId} (msgid ${message[ToDeviceMessageId]})`);
+            }
+        }
+
+        logger.info(
+            `Sending batch of to-device messages. type=${request.event_type} txnid=${request.txn_id}`,
+            messageList,
+        );
+
+        const path =
+            `/_matrix/client/v3/sendToDevice/${encodeURIComponent(request.event_type)}/` +
+            encodeURIComponent(request.txn_id);
+        return await this.rawJsonRequest(Method.Put, path, {}, request.body);
     }
 
     private async makeRequestWithUIA<T>(

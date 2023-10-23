@@ -70,7 +70,7 @@ import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
-import { encodeBase64 } from "../common-crypto/base64";
+import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
@@ -1358,6 +1358,51 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Handles secret received from the rust secret inbox.
+     *
+     * The gossipped secrets are received using the `m.secret.send` event type
+     * and are guaranteed to have been received over a 1-to-1 Olm
+     * Session from a verified device.
+     *
+     * The only secret currently handled in this way is `m.megolm_backup.v1`.
+     *
+     * @param name - the secret name
+     * @param value - the secret value
+     */
+    private async handleSecretReceived(name: string, value: string): Promise<boolean> {
+        this.logger.debug(`onReceiveSecret: Received secret ${name}`);
+        if (name === "m.megolm_backup.v1") {
+            return await this.backupManager.handleBackupSecretReceived(value);
+            // XXX at this point we should probably try to download the backup and import the keys,
+            // or at least retry for the current decryption failures?
+            // Maybe add some signaling when a new secret is received, and let clients handle it?
+            // as it's where the restore from backup APIs are exposed.
+        }
+        return false;
+    }
+
+    /**
+     * Called when a new secret is received in the rust secret inbox.
+     *
+     * Will poll the secret inbox and handle the secrets received.
+     *
+     * @param name - The name of the secret received.
+     */
+    public async checkSecrets(name: string): Promise<void> {
+        const pendingValues: string[] = await this.olmMachine.getSecretsFromInbox(name);
+        for (const value of pendingValues) {
+            if (await this.handleSecretReceived(name, value)) {
+                // If we have a valid secret for that name there is no point of processing the other secrets values.
+                // It's probably the same secret shared by another device.
+                break;
+            }
+        }
+
+        // Important to call this after handling the secrets as good hygiene.
+        await this.olmMachine.deleteSecretsFromInbox(name);
+    }
+
+    /**
      * Handle a live event received via /sync.
      * See {@link ClientEventHandlerMap#event}
      *
@@ -1492,7 +1537,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
                 this.outgoingRequestLoopOneMoreLoop = false;
 
-                this.logger.debug("Calling OlmMachine.outgoingRequests()");
                 const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
 
                 if (this.stopped) {

@@ -537,30 +537,3 @@ export function isOlmEncrypted(event: MatrixEvent): boolean {
     }
     return true;
 }
-
-/**
- * Encode a typed array of uint8 as base64.
- * @param uint8Array - The data to encode.
- * @returns The base64.
- */
-export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return Buffer.from(uint8Array).toString("base64");
-}
-
-/**
- * Encode a typed array of uint8 as unpadded base64.
- * @param uint8Array - The data to encode.
- * @returns The unpadded base64.
- */
-export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeBase64(uint8Array).replace(/=+$/g, "");
-}
-
-/**
- * Decode a base64 string to a typed array of uint8.
- * @param base64 - The base64 to decode.
- * @returns The decoded data.
- */
-export function decodeBase64(base64: string): Uint8Array {
-    return Buffer.from(base64, "base64");
-}

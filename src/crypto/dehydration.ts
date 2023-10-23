@@ -17,7 +17,7 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto";
-import { decodeBase64, encodeBase64 } from "./olmlib";
+import { decodeBase64, encodeBase64 } from "../base64";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
 import { logger } from "../logger";

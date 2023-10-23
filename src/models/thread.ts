@@ -228,8 +228,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     };
 
-    private onRedaction = async (event: MatrixEvent): Promise<void> => {
-        if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
+    private onRedaction = async (event: MatrixEvent, room: Room, threadRootId?: string): Promise<void> => {
+        if (threadRootId !== this.id) return; // ignore redactions for other timelines
         if (this.replyCount <= 0) {
             for (const threadEvent of this.timeline) {
                 this.clearEventMetadata(threadEvent);
@@ -430,22 +430,19 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             // If initial events have not been fetched, we are OK to throw away
             // this event, because we are about to fetch all the events for this
             // thread from the server.
-            //
-            // If not, this looks like a bug - we should always add the event to
-            // the thread. See https://github.com/vector-im/element-web/issues/26254
-            logger.warn(
-                `Not adding event ${event.getId()} to thread timeline!
-                isNewestReply=${isNewestReply}
-                event.localTimestamp=${event.localTimestamp}
-                !!lastReply=${!!lastReply}
-                lastReply?.getId()=${lastReply?.getId()}
-                lastReply?.localTimestamp=${lastReply?.localTimestamp}
-                toStartOfTimeline=${toStartOfTimeline}
-                Thread.hasServerSideSupport=${Thread.hasServerSideSupport}
-                event.isRelation(RelationType.Annotation)=${event.isRelation(RelationType.Annotation)}
-                event.isRelation(RelationType.Replace)=${event.isRelation(RelationType.Replace)}
-                `,
-            );
+
+            // Otherwise, we should add it, but we suspect it is out of order.
+            if (toStartOfTimeline) {
+                // If we're adding at the start of the timeline, it doesn't
+                // matter that it's out of order.
+                this.addEventToTimeline(event, toStartOfTimeline);
+            } else {
+                // We think this event might be out of order, because isNewestReply
+                // is false (otherwise we would have gone into the earlier if
+                // clause), so try to insert it in the right place based on
+                // timestamp.
+                this.insertEventIntoTimeline(event);
+            }
         }
 
         if (

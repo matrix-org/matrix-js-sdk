@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import type { PkSigning } from "@matrix-org/olm";
-import { decodeBase64, encodeBase64, IObject, pkSign, pkVerify } from "./olmlib";
+import { IObject, pkSign, pkVerify } from "./olmlib";
 import { logger } from "../logger";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
@@ -31,6 +31,7 @@ import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
 import { DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
+import { decodeBase64, encodeBase64 } from "../base64";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };

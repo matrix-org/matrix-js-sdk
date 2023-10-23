@@ -118,10 +118,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
-        logger.debug(
-            "Call memberships, in order: ",
-            callMemberships.map((m) => [m.createdTs(), m.sender]),
-        );
+        if (callMemberships.length > 1) {
+            logger.debug(
+                `Call memberships in room ${room.roomId}, in order: `,
+                callMemberships.map((m) => [m.createdTs(), m.sender]),
+            );
+        }
 
         return callMemberships;
     }
@@ -427,7 +429,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
         };
 
-        let resendDelay = 0;
         try {
             await this.client.sendStateEvent(
                 this.room.roomId,
@@ -438,13 +439,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Sent updated call member event.`);
 
             // check periodically to see if we need to refresh our member event
-            if (this.isJoined()) resendDelay = MEMBER_EVENT_CHECK_PERIOD;
+            if (this.isJoined()) {
+                this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
+            }
         } catch (e) {
-            resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
+            const resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
             logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
-        }
-
-        if (resendDelay) {
             await new Promise((resolve) => setTimeout(resolve, resendDelay));
             await this.triggerCallMembershipEventUpdate();
         }
