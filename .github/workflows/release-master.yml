@@ -28,7 +28,7 @@ jobs:
             - name: Merge to develop
               run: |
                   git checkout develop
-                  git merge -X theirs master
+                  git merge -X ours master
 
             - name: Update package.json fields
               run: |
