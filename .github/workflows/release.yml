@@ -25,12 +25,6 @@ jobs:
     release:
         runs-on: ubuntu-latest
         steps:
-            - name: Assert on staging branch
-              if: github.ref_name != 'staging'
-              run: |
-                  echo "Action must run on staging branch"
-                  exit 1
-
             - name: Get draft release
               id: release
               uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
@@ -42,6 +36,7 @@ jobs:
 
             - uses: actions/checkout@v4
               with:
+                  ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
             - uses: actions/setup-node@v3
