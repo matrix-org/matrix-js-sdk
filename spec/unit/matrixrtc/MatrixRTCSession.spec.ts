@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, EventType, MatrixClient, Room } from "../../../src";
+import { EventTimeline, EventType, MatrixClient, MatrixError, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { randomString } from "../../../src/randomstring";
@@ -331,6 +331,37 @@ describe("MatrixRTCSession", () => {
                     },
                 ],
             });
+        });
+
+        it("retries key sends", async () => {
+            jest.useFakeTimers();
+            let firstEventSent = false;
+
+            try {
+                const eventSentPromise = new Promise<void>((resolve) => {
+                    sendEventMock.mockImplementation(() => {
+                        if (!firstEventSent) {
+                            jest.advanceTimersByTime(10000);
+
+                            firstEventSent = true;
+                            const e = new Error() as MatrixError;
+                            e.data = {};
+                            throw e;
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                sess!.joinRoomSession([mockFocus], true);
+                jest.advanceTimersByTime(10000);
+
+                await eventSentPromise;
+
+                expect(sendEventMock).toHaveBeenCalledTimes(2);
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 
