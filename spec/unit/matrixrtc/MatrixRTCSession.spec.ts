@@ -322,9 +322,9 @@ describe("MatrixRTCSession", () => {
             await eventSentPromise;
 
             expect(sendEventMock).toHaveBeenCalledWith(expect.stringMatching(".*"), "io.element.call.encryption_keys", {
-                "m.call_id": "",
-                "m.device_id": "AAAAAAA",
-                "keys": [
+                call_id: "",
+                device_id: "AAAAAAA",
+                keys: [
                     {
                         index: 0,
                         key: expect.stringMatching(".*"),

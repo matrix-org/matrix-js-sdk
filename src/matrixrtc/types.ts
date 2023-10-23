@@ -20,7 +20,7 @@ export interface EncryptionKeyEntry {
 }
 
 export interface EncryptionKeysEventContent {
-    "keys": EncryptionKeyEntry[];
-    "m.device_id": string;
-    "m.call_id": string;
+    keys: EncryptionKeyEntry[];
+    device_id: string;
+    call_id: string;
 }

@@ -374,14 +374,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         try {
             await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, {
-                "keys": myKeys.map((key, index) => {
+                keys: myKeys.map((key, index) => {
                     return {
                         index,
                         key: encodeUnpaddedBase64(key),
                     };
                 }),
-                "m.device_id": deviceId,
-                "m.call_id": "",
+                device_id: deviceId,
+                call_id: "",
             } as EncryptionKeysEventContent);
 
             logger.debug(
@@ -435,8 +435,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
 
-        const deviceId = content["m.device_id"];
-        const callId = content["m.call_id"];
+        const deviceId = content["device_id"];
+        const callId = content["call_id"];
 
         if (!userId) {
             logger.warn(`Received m.call.encryption_keys with no userId: callId=${callId}`);
