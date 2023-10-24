@@ -1232,10 +1232,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 config,
             );
         }
-
-        // start tracking devices for any users already known to be in this room.
-        const members = await room.getEncryptionTargetMembers();
-        await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
     }
 
     /** called by the sync loop after processing each sync.

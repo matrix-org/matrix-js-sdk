@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { EncryptionSettings, OlmMachine, RequestType, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
@@ -22,7 +23,7 @@ import { Room } from "../models/room";
 import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -35,6 +36,7 @@ export class RoomEncryptor {
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
+     * @param outgoingRequestProcessor - The OutgoingRequestProcessor, which sends outgoing requests to the homeserver.
      * @param room - The room we want to encrypt for
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
@@ -46,6 +48,16 @@ export class RoomEncryptor {
         private encryptionSettings: IContent,
     ) {
         this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
+
+        // start tracking devices for any users already known to be in this room.
+        // Do not load members here, would defeat lazy loading.
+        const members = room.getJoinedMembers();
+        // At this point just mark the known members as tracked, it might not be the full list of members
+        // because of lazy loading. This is fine, because we will get a member list update when sending a message for
+        // the first time, see `RoomEncryptor#ensureEncryptionSession`
+        this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId))).then(() => {
+            this.prefixedLogger.debug(`Updated tracked users for room ${room.roomId}`);
+        });
     }
 
     /**
@@ -91,7 +103,33 @@ export class RoomEncryptor {
             );
         }
 
+        // Manually call `loadMembersIfNeeded` here, because we want to know if it's the first
+        // time the room is loaded (due to lazy loading), so we can update the tracked users.
+        const fromServer = await this.room.loadMembersIfNeeded();
         const members = await this.room.getEncryptionTargetMembers();
+
+        if (fromServer) {
+            // It's the first time the room is loaded, so we need to update the tracked users
+            await this.olmMachine
+                .updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)))
+                .then(() => {
+                    this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);
+                });
+        }
+
+        // Query keys in case we don't have them for newly tracked members.
+        // This must be done before ensuring sessions. If not the devices of these users are not
+        // known yet and will not get the room key.
+        // We don't have API to only get the queries related to this member list, so we just
+        // process the pending `KeysQuery` requests from the olmMachine. (usually these are processed
+        // at the end of the sync, but we can't wait for that).
+        const request: OutgoingRequest[] = (await this.olmMachine.outgoingRequests()).filter(
+            (r: OutgoingRequest) => r.type === RequestType.KeysQuery,
+        );
+        for (let i = 0; i < request.length; i++) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(request[i]);
+        }
+
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,
             members.map((u) => `${u.userId} (${u.membership})`),

@@ -1727,7 +1727,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
-        oldBackendOnly("Sending an event initiates a member list sync", async () => {
+        it("Sending an event initiates a member list sync", async () => {
             // we expect a call to the /members list...
             const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
 
@@ -1746,7 +1746,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await Promise.all([sendPromise, megolmMessagePromise, memberListPromise]);
         });
 
-        oldBackendOnly("loading the membership list inhibits a later load", async () => {
+        it("loading the membership list inhibits a later load", async () => {
             const room = aliceClient.getRoom(ROOM_ID)!;
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
 
