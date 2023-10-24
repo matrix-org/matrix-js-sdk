@@ -1,5 +1,5 @@
-Changes in [29.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.1.0-rc.1) (2023-10-17)
-============================================================================================================
+Changes in [29.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.1.0) (2023-10-24)
+==================================================================================================
 
 ## ✨ Features
  * OIDC: refresh tokens ([\#3764](https://github.com/matrix-org/matrix-js-sdk/pull/3764)). Contributed by @kerryarchibald.
