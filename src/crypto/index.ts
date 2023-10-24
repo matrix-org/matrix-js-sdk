@@ -613,10 +613,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Implementation of {@link CryptoApi#getVersion}.
      */
-    public getVersion(): null {
-        // `Crypto.getOlmVersion()` is used for the old crypto
-        // This API is for the new crypto
-        return null;
+    public getVersion(): string {
+        const olmVersionTuple = Crypto.getOlmVersion();
+        return `${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`;
     }
 
     /**

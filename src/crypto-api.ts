@@ -41,10 +41,12 @@ export interface CryptoApi {
 
     /**
      * Return the current version of the Rust SDK and the Vodozemac library
-     * @returns the version in the format `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`
-     * XXXX: Remove `null` when the old crypto is removed
+     * Rust crypto: the format is `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`
+     * Old Crypto: the format is `x.x.x`
+     * XXXX: remove old crypto when we remove support for it
+     * @returns the formatted version
      */
-    getVersion(): string | null;
+    getVersion(): string;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
