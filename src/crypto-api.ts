@@ -40,7 +40,7 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * Return the current version of the Rust SDK and the Vodozemac library
+     * Return the current version of the crypto module.
      * Rust crypto: the format is `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`
      * Old Crypto: the format is `Olm x.x.x`
      * XXXX: remove old crypto when we remove support for it
