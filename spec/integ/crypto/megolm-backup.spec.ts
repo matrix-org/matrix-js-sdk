@@ -27,6 +27,7 @@ import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../..
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
+import { flushPromises } from "../../test-utils/flushPromises";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 
@@ -110,9 +111,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     /** an object which intercepts `/keys/query` requests on the test homeserver */
     let e2eKeyResponder: E2EKeyResponder;
 
-    jest.useFakeTimers();
-
     beforeEach(async () => {
+        jest.useFakeTimers();
+
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
         fetchMock.config.warnOnFallback = false;
@@ -134,6 +135,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         await jest.runAllTimersAsync();
 
         fetchMock.mockReset();
+        jest.restoreAllMocks();
     });
 
     async function initTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
@@ -149,64 +151,131 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         return client;
     }
 
-    it("Alice checks key backups when receiving a message she can't decrypt", async function () {
-        const syncResponse = {
+    describe("Key backup check on UTD message", () => {
+        // sync response which contains an encrypted event
+        const SYNC_RESPONSE = {
             next_batch: 1,
-            rooms: {
-                join: {
-                    [ROOM_ID]: {
-                        timeline: {
-                            events: [testData.ENCRYPTED_EVENT],
-                        },
-                    },
-                },
-            },
+            rooms: { join: { [ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } } } },
         };
 
-        fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
-            // check that the version is correct
-            const version = new URLSearchParams(new URL(url).search).get("version");
-            if (version == "1") {
-                return testData.CURVE25519_KEY_BACKUP_DATA;
-            } else {
-                return {
-                    status: 403,
-                    body: {
-                        current_version: "1",
-                        errcode: "M_WRONG_ROOM_KEYS_VERSION",
-                        error: "Wrong backup version.",
-                    },
-                };
+        const EXPECTED_URL =
+            [
+                "https://alice-server.com/_matrix/client/v3/room_keys/keys",
+                encodeURIComponent(testData.TEST_ROOM_ID),
+                encodeURIComponent(testData.MEGOLM_SESSION_DATA.session_id),
+            ].join("/") + "?version=1";
+
+        /** Flush promises enough times to get the crypto stacks to make the backup request */
+        async function flushBackupRequest() {
+            // we have to run flushPromises lots of times. It seems like each time the rust code touches indexeddb,
+            // it needs another round of flushPromises to progress, or something.
+            for (let i = 0; i < 10; i++) {
+                await flushPromises();
             }
+        }
+
+        beforeEach(async () => {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            // ignore requests to send room key requests
+            fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            // start after saving the private key
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+            // XXX: should we automatically re-check after a device becomes verified?
+            await waitForDeviceList();
+            await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
         });
 
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        it("Alice checks key backups when receiving a message she can't decrypt", async () => {
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
+                // check that the version is correct
+                const version = new URLSearchParams(new URL(url).search).get("version");
+                if (version == "1") {
+                    return testData.CURVE25519_KEY_BACKUP_DATA;
+                } else {
+                    return {
+                        status: 403,
+                        body: {
+                            current_version: "1",
+                            errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                            error: "Wrong backup version.",
+                        },
+                    };
+                }
+            });
 
-        aliceClient = await initTestClient();
-        const aliceCrypto = aliceClient.getCrypto()!;
-        await aliceCrypto.storeSessionBackupPrivateKey(
-            Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-            testData.SIGNED_BACKUP_DATA.version!,
-        );
+            // Send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
+            syncResponder.sendOrQueueSyncResponse(SYNC_RESPONSE);
+            await syncPromise(aliceClient);
 
-        // start after saving the private key
-        await aliceClient.startClient();
+            const room = aliceClient.getRoom(ROOM_ID)!;
+            const event = room.getLiveTimeline().getEvents()[0];
+            await awaitDecryption(event, { waitOnDecryptionFailure: true });
 
-        // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
-        // XXX: should we automatically re-check after a device becomes verified?
-        await waitForDeviceList();
-        await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-        await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
+        });
 
-        // Now, send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
-        syncResponder.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceClient);
+        it("handles error on backup query gracefully", async () => {
+            jest.spyOn(console, "error").mockImplementation(() => {});
 
-        const room = aliceClient.getRoom(ROOM_ID)!;
-        const event = room.getLiveTimeline().getEvents()[0];
-        await awaitDecryption(event, { waitOnDecryptionFailure: true });
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                { status: 404, body: { errcode: "M_NOT_FOUND" } },
+                { name: "getKey" },
+            );
 
-        expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
+            // Send Alice a message that she won't be able to decrypt
+            syncResponder.sendOrQueueSyncResponse(SYNC_RESPONSE);
+            await flushBackupRequest();
+
+            const calls = fetchMock.calls("getKey");
+            expect(calls.length).toEqual(1);
+            expect(calls[0][0]).toEqual(EXPECTED_URL);
+
+            await flushBackupRequest();
+
+            // we should not have logged an error.
+            // eslint-disable-next-line no-console
+            expect(console.error).not.toHaveBeenCalled();
+        });
+
+        it("Only queries once", async () => {
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                { status: 404, body: { errcode: "M_NOT_FOUND" } },
+                { name: "getKey" },
+            );
+
+            // Send Alice a message that she won't be able to decrypt
+            syncResponder.sendOrQueueSyncResponse(SYNC_RESPONSE);
+            await flushBackupRequest();
+            const calls = fetchMock.calls("getKey");
+            expect(calls.length).toEqual(1);
+            expect(calls[0][0]).toEqual(EXPECTED_URL);
+
+            fetchMock.resetHistory();
+
+            // another message
+            const event2 = { ...testData.ENCRYPTED_EVENT, event_id: "$event2" };
+            const syncResponse2 = {
+                next_batch: 1,
+                rooms: { join: { [ROOM_ID]: { timeline: { events: [event2] } } } },
+            };
+            syncResponder.sendOrQueueSyncResponse(syncResponse2);
+            await flushBackupRequest();
+            expect(fetchMock.calls("getKey").length).toEqual(0);
+        });
     });
 
     describe("recover from backup", () => {
