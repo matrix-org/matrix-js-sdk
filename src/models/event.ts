@@ -1193,22 +1193,41 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             }
         }
 
-        // If the redacted event was in a thread
-        if (room && this.threadRootId && this.threadRootId !== this.getId()) {
-            // Remove it from its thread
-            this.thread?.timelineSet.removeEvent(this.getId()!);
-            this.setThread(undefined);
-
-            // And insert it into the main timeline
-            const timeline = room.getLiveTimeline();
-            // We use insertEventIntoTimeline to insert it in timestamp order,
-            // because we don't know where it should go (until we have MSC4033).
-            timeline
-                .getTimelineSet()
-                .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
+        // If the redacted event was in a thread (but not thread root), move it
+        // to the main timeline. This will change if MSC3389 is merged.
+        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
+            this.moveAllRelatedToMainTimeline(room);
+            redactionEvent.moveToMainTimeline(room);
         }
 
         this.invalidateExtensibleEvent();
+    }
+
+    private moveAllRelatedToMainTimeline(room: Room): void {
+        const thread = this.thread;
+        this.moveToMainTimeline(room);
+
+        // If we dont have access to the thread, we can only move this
+        // event, not things related to it.
+        if (thread) {
+            for (const event of thread.events) {
+                if (event.getRelation()?.event_id === this.getId()) {
+                    event.moveAllRelatedToMainTimeline(room);
+                }
+            }
+        }
+    }
+
+    private moveToMainTimeline(room: Room): void {
+        // Remove it from its thread
+        this.thread?.timelineSet.removeEvent(this.getId()!);
+        this.setThread(undefined);
+
+        // And insert it into the main timeline
+        const timeline = room.getLiveTimeline();
+        // We use insertEventIntoTimeline to insert it in timestamp order,
+        // because we don't know where it should go (until we have MSC4033).
+        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
     }
 
     /**

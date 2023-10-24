@@ -29,7 +29,7 @@ import {
     MSC3886SimpleHttpRendezvousTransportDetails,
 } from "../../../src/rendezvous/transports";
 import { DummyTransport } from "./DummyTransport";
-import { decodeBase64 } from "../../../src/crypto/olmlib";
+import { decodeBase64 } from "../../../src/base64";
 import { logger } from "../../../src/logger";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 

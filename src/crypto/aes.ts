@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { decodeBase64, encodeBase64 } from "./olmlib";
+import { decodeBase64, encodeBase64 } from "../base64";
 import { subtleCrypto, crypto, TextEncoder } from "./crypto";
 
 // salt for HKDF, with 8 bytes of zeros
