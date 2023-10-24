@@ -31,7 +31,11 @@ export function makeMockRoom(
     } as unknown as Room;
 }
 
-function makeMockRoomState(memberships: CallMembershipData[], roomId: string, getLocalAge: (() => number) | undefined) {
+export function makeMockRoomState(
+    memberships: CallMembershipData[],
+    roomId: string,
+    getLocalAge: (() => number) | undefined,
+) {
     return {
         getStateEvents: (_: string, stateKey: string) => {
             const event = mockRTCEvent(memberships, roomId, getLocalAge);
