@@ -364,6 +364,22 @@ describe("MatrixRTCSession", () => {
             }
         });
 
+        it("cancels key send event that fail", async () => {
+            const eventSentinel = {} as unknown as MatrixEvent;
+
+            client.cancelPendingEvent = jest.fn();
+            sendEventMock.mockImplementation(() => {
+                const e = new Error() as MatrixError;
+                e.data = {};
+                e.event = eventSentinel;
+                throw e;
+            });
+
+            sess!.joinRoomSession([mockFocus], true);
+
+            expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
+        });
+
         it("Re-sends key if a new member joins", async () => {
             jest.useFakeTimers();
             try {
