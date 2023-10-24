@@ -121,7 +121,7 @@ describe("Crypto", function () {
 
         const olmVersionTuple = Crypto.getOlmVersion();
         expect(client.getCrypto()?.getVersion()).toBe(
-            `${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`,
+            `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`,
         );
     });
 

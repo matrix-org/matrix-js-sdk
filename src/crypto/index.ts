@@ -615,7 +615,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getVersion(): string {
         const olmVersionTuple = Crypto.getOlmVersion();
-        return `${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`;
+        return `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`;
     }
 
     /**
