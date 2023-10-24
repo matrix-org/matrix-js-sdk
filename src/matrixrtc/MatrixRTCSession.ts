@@ -494,20 +494,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const isMyMembership = (m: CallMembership): boolean =>
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
-        const callMembersChanged =
-            oldMemberships
-                .filter((m) => !isMyMembership(m))
-                .map(getParticipantIdFromMembership)
-                .sort()
-                .join() !==
-            this.memberships
-                .filter((m) => !isMyMembership(m))
-                .map(getParticipantIdFromMembership)
-                .sort()
-                .join();
 
-        if (callMembersChanged && this.isJoined()) {
-            this.requestKeyEventSend();
+        if (this.isJoined()) {
+            const oldMebershipIds = new Set(
+                oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            );
+            const newMebershipIds = new Set(
+                this.memberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            );
+
+            const anyArrived = Array.from(newMebershipIds).some((x) => !oldMebershipIds.has(x));
+
+            if (anyArrived) {
+                logger.debug(`New member(s) have arrived: re-sending keys`);
+                this.requestKeyEventSend();
+            }
         }
 
         this.setExpiryTimer();
