@@ -24,6 +24,7 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Setup Node
+              id: setupNode
               uses: actions/setup-node@v3
               with:
                   cache: "yarn"
@@ -51,7 +52,7 @@ jobs:
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
-              run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+              run: mv coverage/lcov.info coverage/${{ steps.setupNode.output.node-version }}-${{ matrix.specs }}.lcov.info
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
