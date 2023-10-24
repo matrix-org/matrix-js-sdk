@@ -12,7 +12,7 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 jobs:
     jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})"
+        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-latest
         timeout-minutes: 10
         strategy:
