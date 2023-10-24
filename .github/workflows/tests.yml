@@ -18,7 +18,7 @@ jobs:
         strategy:
             matrix:
                 specs: [integ, unit]
-                node: [18, latest]
+                node: [18, "*"]
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
