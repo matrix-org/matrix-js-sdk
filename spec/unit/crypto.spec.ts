@@ -115,6 +115,16 @@ describe("Crypto", function () {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
+    it("getVersion() should return the current version of the olm library", async () => {
+        const client = new TestClient("@alice:example.com", "deviceid").client;
+        await client.initCrypto();
+
+        const olmVersionTuple = Crypto.getOlmVersion();
+        expect(client.getCrypto()?.getVersion()).toBe(
+            `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`,
+        );
+    });
+
     describe("encrypted events", function () {
         it("provides encryption information for events from unverified senders", async function () {
             const client = new TestClient("@alice:example.com", "deviceid").client;
