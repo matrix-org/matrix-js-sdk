@@ -23,7 +23,13 @@ import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import { awaitDecryption, CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import {
+    advanceTimersUntil,
+    awaitDecryption,
+    CRYPTO_BACKENDS,
+    InitCrypto,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
@@ -221,7 +227,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const room = aliceClient.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
-            await advanceTimerUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
+            await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
             expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
         });
@@ -309,7 +315,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 onKeyCached = resolve;
             });
 
-            const result = await advanceTimerUntil(
+            const result = await advanceTimersUntil(
                 aliceClient.restoreKeyBackupWithRecoveryKey(
                     testData.BACKUP_DECRYPTION_KEY_BASE58,
                     undefined,
@@ -326,7 +332,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await awaitKeyCached;
 
             // The key should be now cached
-            const afterCache = await advanceTimerUntil(
+            const afterCache = await advanceTimersUntil(
                 aliceClient.restoreKeyBackupWithCache(undefined, undefined, check!.backupInfo!),
             );
 
@@ -351,7 +357,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
-            const result = await advanceTimerUntil(
+            const result = await advanceTimersUntil(
                 aliceClient.restoreKeyBackupWithRecoveryKey(
                     testData.BACKUP_DECRYPTION_KEY_BASE58,
                     ROOM_ID,
@@ -895,24 +901,3 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         expect(devices.get(TEST_USER_ID)!.keys()).toContain(TEST_DEVICE_ID);
     }
 });
-
-/**
- * Advance the fake timers in a loop until the given promise resolves or rejects.
- *
- * Returns the result of the promise.
- *
- * We need this because there are a bunch of steps in the backup handling which require an iteration of the event loop
- * (notably, indexeddb transactions; also the backup decryption loop deliberately yields to avoid blocking the loop).
- * */
-async function advanceTimerUntil<T>(awaitPromise: Promise<T>): Promise<T> {
-    let resolved = false;
-    awaitPromise.finally(() => {
-        resolved = true;
-    });
-
-    while (!resolved) {
-        await jest.advanceTimersByTimeAsync(1);
-    }
-
-    return await awaitPromise;
-}
