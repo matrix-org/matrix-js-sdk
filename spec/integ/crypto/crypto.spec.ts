@@ -670,7 +670,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     it("prepareToEncrypt", async () => {
-        const homeserverUrl = "https://alice-server.com";
+        const homeserverUrl = aliceClient.getHomeserverUrl();
         keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
@@ -684,7 +684,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // Alice should claim one of his OTKs
+        // Alice should claim one of Bob's OTKs
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
@@ -701,7 +701,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
-        const homeserverUrl = "https://alice-server.com";
+        const homeserverUrl = aliceClient.getHomeserverUrl();
         keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
@@ -729,7 +729,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("We should start a new megolm session after forceDiscardSession", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
-        const homeserverUrl = "https://alice-server.com";
+        const homeserverUrl = aliceClient.getHomeserverUrl();
         keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
@@ -1735,7 +1735,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         it("Sending an event initiates a member list sync", async () => {
-            const homeserverUrl = "https://alice-server.com";
+            const homeserverUrl = aliceClient.getHomeserverUrl();
             keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
@@ -1758,7 +1758,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         it("loading the membership list inhibits a later load", async () => {
-            const homeserverUrl = "https://alice-server.com";
+            const homeserverUrl = aliceClient.getHomeserverUrl();
             keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 

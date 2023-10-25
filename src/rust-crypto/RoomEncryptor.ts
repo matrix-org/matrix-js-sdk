@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RequestType, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
@@ -23,7 +23,7 @@ import { Room } from "../models/room";
 import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -33,17 +33,20 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 export class RoomEncryptor {
     private readonly prefixedLogger: Logger;
 
+    /** whether the room members have been loaded and tracked for the first time */
+    private lazyLoadedMembersResolved = false;
+
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
-     * @param outgoingRequestProcessor - The OutgoingRequestProcessor, which sends outgoing requests to the homeserver.
+     * @param outgoingRequestManager - The OutgoingRequestManager, which manages the queue of outgoing requests.
      * @param room - The room we want to encrypt for
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly keyClaimManager: KeyClaimManager,
-        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly outgoingRequestManager: OutgoingRequestsManager,
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
@@ -108,27 +111,21 @@ export class RoomEncryptor {
         const fromServer = await this.room.loadMembersIfNeeded();
         const members = await this.room.getEncryptionTargetMembers();
 
-        if (fromServer) {
+        if (fromServer && !this.lazyLoadedMembersResolved) {
             // It's the first time the room is loaded, so we need to update the tracked users
-            await this.olmMachine
-                .updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)))
-                .then(() => {
-                    this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);
-                });
+            await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
+            this.lazyLoadedMembersResolved = true;
+            this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);
         }
 
         // Query keys in case we don't have them for newly tracked members.
         // This must be done before ensuring sessions. If not the devices of these users are not
         // known yet and will not get the room key.
-        // We don't have API to only get the queries related to this member list, so we just
-        // process the pending `KeysQuery` requests from the olmMachine. (usually these are processed
+        // We don't have API to only get the keys queries related to this member list, so we just
+        // process the pending requests from the olmMachine. (usually these are processed
         // at the end of the sync, but we can't wait for that).
-        const request: OutgoingRequest[] = (await this.olmMachine.outgoingRequests()).filter(
-            (r: OutgoingRequest) => r.type === RequestType.KeysQuery,
-        );
-        for (let i = 0; i < request.length; i++) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(request[i]);
-        }
+        // XXX future improvement process only KeysQueryRequests for the tracked users.
+        await this.outgoingRequestManager.requestLoop();
 
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,
@@ -150,7 +147,7 @@ export class RoomEncryptor {
         );
         if (shareMessages) {
             for (const m of shareMessages) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(m);
+                await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
             }
         }
     }
