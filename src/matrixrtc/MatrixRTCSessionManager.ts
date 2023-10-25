@@ -121,7 +121,9 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
             return;
         }
 
-        this.refreshRoom(room);
+        if (event.getType() == EventType.GroupCallMemberPrefix) {
+            this.refreshRoom(room);
+        }
     };
 
     private refreshRoom(room: Room): void {
