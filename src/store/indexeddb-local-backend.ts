@@ -191,7 +191,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 this.db?.close(); // this does not call onclose
                 this.disconnected = true;
                 this.db = undefined;
-                onClose?.();
             };
             this.db.onclose = (): void => {
                 this.disconnected = true;
