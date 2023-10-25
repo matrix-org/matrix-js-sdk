@@ -35,6 +35,10 @@ const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
 const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
 
+function keysEqual(a: Uint8Array, b: Uint8Array): boolean {
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+}
+
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
     MembershipsChanged = "memberships_changed",
@@ -302,7 +306,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const participantId = getParticipantId(userId, deviceId);
         const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
 
-        if (encryptionKeys[encryptionKeyIndex] === keyBin) return;
+        if (keysEqual(encryptionKeys[encryptionKeyIndex], keyBin)) return;
 
         encryptionKeys[encryptionKeyIndex] = keyBin;
         this.encryptionKeys.set(participantId, encryptionKeys);
@@ -321,6 +325,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const encryptionKey = secureRandomBase64(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
+        logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
     }
 
