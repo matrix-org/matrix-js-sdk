@@ -670,7 +670,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     it("prepareToEncrypt", async () => {
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        const homeserverUrl = "https://alice-server.com";
+        keyResponder = new E2EKeyResponder(homeserverUrl);
+        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+        const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+        keyResponder.addDeviceKeys(testDeviceKeys);
+
         await startClientAndAwaitFirstSync();
         aliceClient.setGlobalErrorOnUnknownDevices(false);
 
@@ -678,10 +684,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // we expect alice first to query bob's keys...
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-        // ... and then claim one of his OTKs
+        // Alice should claim one of his OTKs
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
