@@ -45,7 +45,8 @@ const getParticipantId = (userId: string, deviceId: string): string => `${userId
 const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
 
 function keysEqual(a: Uint8Array, b: Uint8Array): boolean {
-    return a.length === b.length && a.every((x, i) => x === b[i]);
+    if (a === b) return true;
+    return a && b && a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 export enum MatrixRTCSessionEvent {
