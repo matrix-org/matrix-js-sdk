@@ -57,7 +57,7 @@ import {
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
-import { escapeRegExp } from "../../../src/utils";
+import { defer, escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -66,13 +66,19 @@ import {
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
-import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
+import {
+    CrossSigningKey,
+    CryptoCallbacks,
+    EventShieldColour,
+    EventShieldReason,
+    KeyBackupInfo,
+} from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
-    createOlmSession,
     createOlmAccount,
+    createOlmSession,
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptMegolmEventRawPlainText,
@@ -1698,6 +1704,105 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         await syncPromise(aliceClient);
         await sendEventPromise;
+    });
+
+    describe("getEncryptionInfoForEvent", () => {
+        it("handles outgoing events", async () => {
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+
+            // Alice shares a room with Bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceClient);
+
+            // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // ... and claim one of his OTKs ...
+            expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+            // ... and send an m.room_key message ...
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+            // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
+            const sendRoomMessageDefer = defer<MockResponse>();
+            const reqProm = new Promise<IContent>((resolve) => {
+                fetchMock.putOnce(
+                    new RegExp("/send/m.room.encrypted/"),
+                    async (url: string, opts: RequestInit): Promise<MockResponse> => {
+                        resolve(JSON.parse(opts.body as string));
+                        return await sendRoomMessageDefer.promise;
+                    },
+                    {
+                        // append to the list of intercepts on this path (since we have some tests that call
+                        // this function multiple times)
+                        overwriteRoutes: false,
+                    },
+                );
+            });
+
+            // Now we start to send the message
+            const sendProm = aliceClient.sendTextMessage(testData.TEST_ROOM_ID, "test");
+
+            // and wait for the outgoing requests
+            const inboundGroupSession = await inboundGroupSessionPromise;
+            const encryptedMessageContent = await reqProm;
+            const msg: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+            logger.log("Decrypted received megolm message", msg);
+
+            // at this point, the request to send the room message has been made, but not completed.
+            // get hold of the pending event, and see what getEncryptionInfoForEvent makes of it
+            const pending = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getPendingEvents();
+            expect(pending.length).toEqual(1);
+            const encInfo = await aliceClient.getCrypto()!.getEncryptionInfoForEvent(pending[0]);
+            expect(encInfo!.shieldColour).toEqual(EventShieldColour.NONE);
+            expect(encInfo!.shieldReason).toBeNull();
+
+            // release the send request
+            const resp = { event_id: "$event_id" };
+            sendRoomMessageDefer.resolve(resp);
+            expect(await sendProm).toEqual(resp);
+
+            // still pending at this point
+            expect(aliceClient.getRoom(testData.TEST_ROOM_ID)!.getPendingEvents().length).toEqual(1);
+
+            // echo the event back
+            const fullEvent = {
+                event_id: "$event_id",
+                type: "m.room.encrypted",
+                sender: aliceClient.getUserId(),
+                origin_server_ts: Date.now(),
+                content: encryptedMessageContent,
+            };
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                rooms: { join: { [testData.TEST_ROOM_ID]: { timeline: { events: [fullEvent] } } } },
+            });
+            await syncPromise(aliceClient);
+
+            const timelineEvents = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getLiveTimeline()!.getEvents();
+            const lastEvent = timelineEvents[timelineEvents.length - 1];
+            expect(lastEvent.getId()).toEqual("$event_id");
+
+            // now check getEncryptionInfoForEvent again
+            const encInfo2 = await aliceClient.getCrypto()!.getEncryptionInfoForEvent(lastEvent);
+            let expectedEncryptionInfo;
+            if (backend === "rust-sdk") {
+                // rust crypto does not trust its own device until it is cross-signed.
+                expectedEncryptionInfo = {
+                    shieldColour: EventShieldColour.RED,
+                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
+                };
+            } else {
+                expectedEncryptionInfo = {
+                    shieldColour: EventShieldColour.NONE,
+                    shieldReason: null,
+                };
+            }
+            expect(encInfo2).toEqual(expectedEncryptionInfo);
+        });
     });
 
     describe("Lazy-loading member lists", () => {
