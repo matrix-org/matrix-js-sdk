@@ -20,6 +20,7 @@ import {
     OlmMachine,
     RoomId,
     UserId,
+    HistoryVisibility as RustHistoryVisibility,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
@@ -29,6 +30,7 @@ import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { HistoryVisibility } from "../@types/partials";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -109,7 +111,7 @@ export class RoomEncryptor {
         this.prefixedLogger.debug("Sessions for users are ready; now sharing room key");
 
         const rustEncryptionSettings = new EncryptionSettings();
-        /* FIXME historyVisibility, etc */
+        rustEncryptionSettings.historyVisibility = toRustHistoryVisibility(this.room.getHistoryVisibility());
 
         // We only support megolm
         rustEncryptionSettings.algorithm = EncryptionAlgorithm.MegolmV1AesSha2;
@@ -170,5 +172,23 @@ export class RoomEncryptor {
             this.olmMachine.identityKeys.curve25519.toBase64(),
             this.olmMachine.identityKeys.ed25519.toBase64(),
         );
+    }
+}
+
+/**
+ * Convert a HistoryVisibility to a RustHistoryVisibility
+ * @param visibility - HistoryVisibility enum
+ * @returns a RustHistoryVisibility enum
+ */
+export function toRustHistoryVisibility(visibility: HistoryVisibility): RustHistoryVisibility {
+    switch (visibility) {
+        case HistoryVisibility.Invited:
+            return RustHistoryVisibility.Invited;
+        case HistoryVisibility.Joined:
+            return RustHistoryVisibility.Joined;
+        case HistoryVisibility.Shared:
+            return RustHistoryVisibility.Shared;
+        case HistoryVisibility.WorldReadable:
+            return RustHistoryVisibility.WorldReadable;
     }
 }

@@ -23,7 +23,7 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, mkEventCustom, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
@@ -54,6 +54,7 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
+    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -1051,6 +1052,61 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const secondSessionId = secondEncryptedMessage.session_id;
             expect(secondSessionId).not.toBe(sessionId);
         });
+    });
+
+    newBackendOnly("should rotate the session when the history visibility changes", async () => {
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+        const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+        // Tell alice we share a room with bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Force alice to download bob keys
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // Send a message to bob and get the current session id
+        let [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectEncryptedSendMessage(),
+        ]);
+
+        // Check that the session id exists
+        const sessionId = encryptedMessage.session_id;
+        expect(sessionId).toBeDefined();
+
+        // Change history visibility in sync response
+        const syncResponse = getSyncResponse([]);
+        syncResponse.rooms[Category.Join][ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                sender: TEST_USER_ID,
+                type: "m.room.history_visibility",
+                state_key: "",
+                content: {
+                    history_visibility: HistoryVisibility.Invited,
+                },
+            }),
+        );
+
+        // Update the new visibility
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // Resend a message to bob and get the new session id
+        [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectEncryptedSendMessage(),
+        ]);
+
+        // Check that the new session id exists
+        const newSessionId = encryptedMessage.session_id;
+        expect(newSessionId).toBeDefined();
+
+        // Check that the session id has changed
+        expect(sessionId).not.toEqual(newSessionId);
     });
 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
