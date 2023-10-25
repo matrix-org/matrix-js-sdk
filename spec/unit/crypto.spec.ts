@@ -115,7 +115,7 @@ describe("Crypto", function () {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
-    it("should return the current version of the olm library", async () => {
+    it("getVersion() should return the current version of the olm library", async () => {
         const client = new TestClient("@alice:example.com", "deviceid").client;
         await client.initCrypto();
 

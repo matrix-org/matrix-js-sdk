@@ -132,6 +132,12 @@ describe("initRustCrypto", () => {
 });
 
 describe("RustCrypto", () => {
+    it("getVersion() should return the current version of the rust sdk and vodozemac", async () => {
+        const rustCrypto = await makeTestRustCrypto();
+        const versions = RustSdkCryptoJs.getVersions();
+        expect(rustCrypto.getVersion()).toBe(`Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`);
+    });
+
     describe(".importRoomKeys and .exportRoomKeys", () => {
         let rustCrypto: RustCrypto;
 
@@ -142,13 +148,6 @@ describe("RustCrypto", () => {
             /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
             10000,
         );
-
-        it("should return the current version of the rust sdk and vodozemac", async () => {
-            const versions = RustSdkCryptoJs.getVersions();
-            expect(rustCrypto.getVersion()).toBe(
-                `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`,
-            );
-        });
 
         it("should import and export keys", async () => {
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
