@@ -714,7 +714,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // ... and claim one of his OTKs ...
+        // ... and claim one of Bob's OTKs ...
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // ... and send an m.room_key message
@@ -742,7 +742,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // ... and claim one of his OTKs ...
+        // ... and claim one of Bob's OTKs ...
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // ... and send an m.room_key message
