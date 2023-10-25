@@ -40,6 +40,13 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
+     * Return the current version of the crypto module.
+     * For example: `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`.
+     * @returns the formatted version
+     */
+    getVersion(): string;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
