@@ -17,11 +17,10 @@ limitations under the License.
 import { Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { logger } from "../../../lib/logger";
 import { defer } from "../../../src/utils";
-import { OutgoingRequest } from "../../../lib/rust-crypto/OutgoingRequestProcessor";
+import { logger } from "../../../src/logger";
 
 describe("OutgoingRequestsManager", () => {
     /** the OutgoingRequestProcessor implementation under test */
