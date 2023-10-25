@@ -396,7 +396,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.client.cancelPendingEvent(matrixError.event);
             }
             if (this.keysEventUpdateTimeout === undefined) {
-                const resendDelay = matrixError.data.retry_after_ms ?? 5000;
+                const resendDelay = matrixError.data?.retry_after_ms ?? 5000;
                 logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
                 this.keysEventUpdateTimeout = setTimeout(this.sendEncryptionKeysEvent, resendDelay);
             } else {
