@@ -88,7 +88,6 @@ const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
  * @internal
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
-    public globalErrorOnUnknownDevices = false;
     private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
@@ -219,6 +218,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     // CryptoBackend implementation
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public set globalErrorOnUnknownDevices(_v: boolean) {
+        // Not implemented for rust crypto.
+    }
+
+    public get globalErrorOnUnknownDevices(): boolean {
+        // Not implemented for rust crypto.
+        return false;
+    }
 
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
