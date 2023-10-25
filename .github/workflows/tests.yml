@@ -12,18 +12,19 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 jobs:
     jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})"
+        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-latest
         timeout-minutes: 10
         strategy:
             matrix:
                 specs: [integ, unit]
-                node: [18, latest]
+                node: [18, "*"]
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
 
             - name: Setup Node
+              id: setupNode
               uses: actions/setup-node@v3
               with:
                   cache: "yarn"
@@ -51,7 +52,7 @@ jobs:
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
-              run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+              run: mv coverage/lcov.info coverage/${{ steps.setupNode.output.node-version }}-${{ matrix.specs }}.lcov.info
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
