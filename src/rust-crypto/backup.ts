@@ -29,7 +29,7 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri } from "../utils";
+import { encodeUri, immediate } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
@@ -468,6 +468,9 @@ export class RustBackupDecryptor implements BackupDecryptor {
                 );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
+
+                // there might be lots of sessions, so don't hog the event loop
+                await immediate();
             } catch (e) {
                 logger.log("Failed to decrypt megolm session from backup", e, sessionData);
             }
