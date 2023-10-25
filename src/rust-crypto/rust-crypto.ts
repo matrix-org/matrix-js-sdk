@@ -29,7 +29,7 @@ import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault, encodeUri } from "../utils";
+import { encodeUri, MapWithDefault } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -296,8 +296,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param event - event to inspect
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
-        // TODO: make this work properly. Or better, replace it.
-
         const ret: Partial<IEncryptedEventInfo> = {};
 
         ret.senderKey = event.getSenderKey() ?? undefined;
@@ -1687,6 +1685,11 @@ class EventDecryptor {
         if (!event.getClearContent() || event.isDecryptionFailure()) {
             // not successfully decrypted
             return null;
+        }
+
+        // special-case outgoing events, which the rust crypto-sdk will barf on
+        if (event.status !== null) {
+            return { shieldColour: EventShieldColour.NONE, shieldReason: null };
         }
 
         const encryptionInfo = await this.olmMachine.getRoomEventEncryptionInfo(

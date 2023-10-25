@@ -1,3 +1,21 @@
+Changes in [29.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.1.0) (2023-10-24)
+==================================================================================================
+
+## ✨ Features
+ * OIDC: refresh tokens ([\#3764](https://github.com/matrix-org/matrix-js-sdk/pull/3764)). Contributed by @kerryarchibald.
+ * OIDC: add `prompt` param to auth url creation ([\#3794](https://github.com/matrix-org/matrix-js-sdk/pull/3794)). Contributed by @kerryarchibald.
+ * Allow applications to specify their own logger instance ([\#3792](https://github.com/matrix-org/matrix-js-sdk/pull/3792)). Fixes #1899.
+ * Export AutoDiscoveryError and fix type of ALL_ERRORS ([\#3768](https://github.com/matrix-org/matrix-js-sdk/pull/3768)).
+
+## 🐛 Bug Fixes
+ * Fix sending call member events on leave ([\#3799](https://github.com/matrix-org/matrix-js-sdk/pull/3799)). Fixes vector-im/element-call#1763.
+ * Don't use event.sender in CallMembership ([\#3793](https://github.com/matrix-org/matrix-js-sdk/pull/3793)).
+ * Element-R: Don't mark QR code verification as done until it's done ([\#3791](https://github.com/matrix-org/matrix-js-sdk/pull/3791)). Fixes vector-im/element-web#26293.
+ * Element-R: Connect device to key backup when crypto is created ([\#3784](https://github.com/matrix-org/matrix-js-sdk/pull/3784)). Fixes vector-im/element-web#26316. Contributed by @florianduros.
+ * Element-R: Avoid errors in `VerificationRequest.generateQRCode` when QR code is unavailable ([\#3779](https://github.com/matrix-org/matrix-js-sdk/pull/3779)). Fixes vector-im/element-web#26300. Contributed by @florianduros.
+ * ElementR: Check key backup when user identity changes ([\#3760](https://github.com/matrix-org/matrix-js-sdk/pull/3760)). Fixes vector-im/element-web#26244. Contributed by @florianduros.
+ * Element-R: emit `VerificationRequestReceived` on incoming request ([\#3762](https://github.com/matrix-org/matrix-js-sdk/pull/3762)). Fixes vector-im/element-web#26245.
+
 Changes in [29.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.0.0) (2023-10-10)
 ==================================================================================================
 
