@@ -21,6 +21,7 @@ import {
     RoomId,
     UserId,
     HistoryVisibility as RustHistoryVisibility,
+    ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
@@ -43,6 +44,7 @@ export class RoomEncryptor {
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
+     * @param outgoingRequestProcessor - The OutgoingRequestProcessor, which sends outgoing requests
      * @param room - The room we want to encrypt for
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
@@ -91,8 +93,10 @@ export class RoomEncryptor {
      *
      * This ensures that we have a megolm session ready to use and that we have shared its key with all the devices
      * in the room.
+     *
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
-    public async ensureEncryptionSession(): Promise<void> {
+    public async ensureEncryptionSession(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
             throw new Error(
                 `Cannot encrypt in ${this.room.roomId} for unsupported algorithm '${this.encryptionSettings.algorithm}'`,
@@ -127,7 +131,12 @@ export class RoomEncryptor {
             rustEncryptionSettings.rotationPeriodMessages = BigInt(this.encryptionSettings.rotation_period_msgs);
         }
 
-        const shareMessages = await this.olmMachine.shareRoomKey(
+        // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
+        // See Room#getBlacklistUnverifiedDevices
+        rustEncryptionSettings.onlyAllowTrustedDevices =
+            this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
+
+        const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
             new RoomId(this.room.roomId),
             userList,
             rustEncryptionSettings,
@@ -156,9 +165,10 @@ export class RoomEncryptor {
      * then encrypt the event using the session.
      *
      * @param event - Event to be encrypted.
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
-    public async encryptEvent(event: MatrixEvent): Promise<void> {
-        await this.ensureEncryptionSession();
+    public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+        await this.ensureEncryptionSession(globalBlacklistUnverifiedDevices);
 
         const encryptedContent = await this.olmMachine.encryptRoomEvent(
             new RoomId(this.room.roomId),

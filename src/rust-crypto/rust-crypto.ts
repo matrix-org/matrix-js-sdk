@@ -282,7 +282,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
         }
 
-        await encryptor.encryptEvent(event);
+        await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices);
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
@@ -376,7 +376,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const encryptor = this.roomEncryptors[room.roomId];
 
         if (encryptor) {
-            encryptor.ensureEncryptionSession();
+            encryptor.ensureEncryptionSession(this.globalBlacklistUnverifiedDevices);
         }
     }
 
