@@ -392,7 +392,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
             logger.debug(
                 `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
-                this.encryptionKeys,
             );
         } catch (error) {
             const matrixError = error as MatrixError;
