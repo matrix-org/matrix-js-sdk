@@ -23,7 +23,14 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, mkEventCustom, syncPromise } from "../../test-utils/test-utils";
+import {
+    advanceTimersUntil,
+    CRYPTO_BACKENDS,
+    getSyncResponse,
+    InitCrypto,
+    mkEventCustom,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
@@ -2767,7 +2774,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.get("express:/_matrix/client/v3/room_keys/keys", keyBackupData);
 
                 // should be able to restore from 4S
-                const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
+                const importResult = await advanceTimersUntil(
+                    aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!),
+                );
                 expect(importResult.imported).toStrictEqual(1);
             });
 
