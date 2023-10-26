@@ -35,8 +35,8 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
      *
-     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
-     * going to support it in the rust crypto implementation.
+     * @remarks This has no effect in Rust Crypto; it exists only for the sake of
+     * the accessors in MatrixClient.
      */
     globalErrorOnUnknownDevices: boolean;
 

@@ -14,8 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EncryptionSettings, OlmMachine, RoomId, UserId, ToDeviceRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
-
+import {
+    EncryptionAlgorithm,
+    EncryptionSettings,
+    OlmMachine,
+    RoomId,
+    UserId,
+    HistoryVisibility as RustHistoryVisibility,
+    ToDeviceRequest,
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
@@ -23,6 +30,7 @@ import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { HistoryVisibility } from "../@types/partials";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -106,7 +114,21 @@ export class RoomEncryptor {
         this.prefixedLogger.debug("Sessions for users are ready; now sharing room key");
 
         const rustEncryptionSettings = new EncryptionSettings();
-        /* FIXME historyVisibility, rotation, etc */
+        rustEncryptionSettings.historyVisibility = toRustHistoryVisibility(this.room.getHistoryVisibility());
+
+        // We only support megolm
+        rustEncryptionSettings.algorithm = EncryptionAlgorithm.MegolmV1AesSha2;
+
+        // We need to convert the rotation period from milliseconds to microseconds
+        // See https://spec.matrix.org/v1.8/client-server-api/#mroomencryption and
+        // https://matrix-org.github.io/matrix-rust-sdk-crypto-wasm/classes/EncryptionSettings.html#rotationPeriod
+        if (typeof this.encryptionSettings.rotation_period_ms === "number") {
+            rustEncryptionSettings.rotationPeriod = BigInt(this.encryptionSettings.rotation_period_ms * 1000);
+        }
+
+        if (typeof this.encryptionSettings.rotation_period_msgs === "number") {
+            rustEncryptionSettings.rotationPeriodMessages = BigInt(this.encryptionSettings.rotation_period_msgs);
+        }
 
         // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
         // See Room#getBlacklistUnverifiedDevices
@@ -159,5 +181,23 @@ export class RoomEncryptor {
             this.olmMachine.identityKeys.curve25519.toBase64(),
             this.olmMachine.identityKeys.ed25519.toBase64(),
         );
+    }
+}
+
+/**
+ * Convert a HistoryVisibility to a RustHistoryVisibility
+ * @param visibility - HistoryVisibility enum
+ * @returns a RustHistoryVisibility enum
+ */
+export function toRustHistoryVisibility(visibility: HistoryVisibility): RustHistoryVisibility {
+    switch (visibility) {
+        case HistoryVisibility.Invited:
+            return RustHistoryVisibility.Invited;
+        case HistoryVisibility.Joined:
+            return RustHistoryVisibility.Joined;
+        case HistoryVisibility.Shared:
+            return RustHistoryVisibility.Shared;
+        case HistoryVisibility.WorldReadable:
+            return RustHistoryVisibility.WorldReadable;
     }
 }

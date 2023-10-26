@@ -29,7 +29,7 @@ import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault, encodeUri } from "../utils";
+import { encodeUri, MapWithDefault } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -88,7 +88,6 @@ const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
  * @internal
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
-    public globalErrorOnUnknownDevices = false;
     private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
@@ -220,6 +219,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    public set globalErrorOnUnknownDevices(_v: boolean) {
+        // Not implemented for rust crypto.
+    }
+
+    public get globalErrorOnUnknownDevices(): boolean {
+        // Not implemented for rust crypto.
+        return false;
+    }
+
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
         // will cause an error.
@@ -267,8 +275,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param event - event to inspect
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
-        // TODO: make this work properly. Or better, replace it.
-
         const ret: Partial<IEncryptedEventInfo> = {};
 
         ret.senderKey = event.getSenderKey() ?? undefined;
@@ -328,6 +334,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     public globalBlacklistUnverifiedDevices = false;
+
+    /**
+     * Implementation of {@link CryptoApi#getVersion}.
+     */
+    public getVersion(): string {
+        const versions = RustSdkCryptoJs.getVersions();
+        return `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`;
+    }
 
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
@@ -1652,6 +1666,11 @@ class EventDecryptor {
         if (!event.getClearContent() || event.isDecryptionFailure()) {
             // not successfully decrypted
             return null;
+        }
+
+        // special-case outgoing events, which the rust crypto-sdk will barf on
+        if (event.status !== null) {
+            return { shieldColour: EventShieldColour.NONE, shieldReason: null };
         }
 
         const encryptionInfo = await this.olmMachine.getRoomEventEncryptionInfo(
