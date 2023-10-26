@@ -23,6 +23,7 @@ import {
     HistoryVisibility as RustHistoryVisibility,
     ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
+
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
