@@ -133,7 +133,7 @@ export class RoomEncryptor {
         // process the pending requests from the olmMachine. (usually these are processed
         // at the end of the sync, but we can't wait for that).
         // XXX future improvement process only KeysQueryRequests for the tracked users.
-        await this.outgoingRequestManager.requestLoop();
+        await this.outgoingRequestManager.doProcessOutgoingRequests();
 
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,

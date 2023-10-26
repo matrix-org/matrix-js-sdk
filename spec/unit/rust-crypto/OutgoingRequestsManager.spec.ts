@@ -56,7 +56,7 @@ describe("OutgoingRequestsManager", () => {
                 return;
             });
 
-            await manager.requestLoop();
+            await manager.doProcessOutgoingRequests();
 
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(2);
@@ -79,11 +79,11 @@ describe("OutgoingRequestsManager", () => {
                     return [request3];
                 });
 
-            const firstRequest = manager.requestLoop();
+            const firstRequest = manager.doProcessOutgoingRequests();
 
             // stack 2 additional requests while the first one is still running
-            const secondRequest = manager.requestLoop();
-            const thirdRequest = manager.requestLoop();
+            const secondRequest = manager.doProcessOutgoingRequests();
+            const thirdRequest = manager.doProcessOutgoingRequests();
 
             // let the first request complete
             firstOutgoingRequestDefer.resolve([request1, request2]);
@@ -112,7 +112,7 @@ describe("OutgoingRequestsManager", () => {
                 throw new Error("Some network error");
             });
 
-            await manager.requestLoop();
+            await manager.doProcessOutgoingRequests();
 
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
         });
@@ -128,7 +128,7 @@ describe("OutgoingRequestsManager", () => {
                 return firstOutgoingRequestDefer.promise;
             });
 
-            const firstRequest = manager.requestLoop();
+            const firstRequest = manager.doProcessOutgoingRequests();
 
             // stop
             manager.stop();
@@ -150,7 +150,7 @@ describe("OutgoingRequestsManager", () => {
                 return firstOutgoingRequestDefer.promise;
             });
 
-            const firstRequest = manager.requestLoop();
+            const firstRequest = manager.doProcessOutgoingRequests();
 
             // stop
             manager.stop();
@@ -182,7 +182,7 @@ describe("OutgoingRequestsManager", () => {
                     return;
                 });
 
-            const firstRequest = manager.requestLoop();
+            const firstRequest = manager.doProcessOutgoingRequests();
 
             firstRequestDefer.resolve();
 

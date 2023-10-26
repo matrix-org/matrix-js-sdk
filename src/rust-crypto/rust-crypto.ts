@@ -1256,7 +1256,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public onSyncCompleted(syncState: OnSyncCompletedData): void {
         // Processing the /sync may have produced new outgoing requests which need sending, so kick off the outgoing
         // request loop, if it's not already running.
-        this.outgoingRequestsManager.requestLoop();
+        this.outgoingRequestsManager.doProcessOutgoingRequests();
     }
 
     /**
@@ -1506,7 +1506,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
-        this.outgoingRequestsManager.requestLoop();
+        this.outgoingRequestsManager.doProcessOutgoingRequests();
     }
 }
 

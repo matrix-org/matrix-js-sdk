@@ -27,8 +27,8 @@ export class OutgoingRequestsManager {
     /** whether {@link stop} has been called */
     private stopped = false;
 
-    /** whether the loop is currently running */
-    private isLoopRunning = false;
+    /** whether a task is currently running */
+    private isTaskRunning = false;
 
     /** queue of requests to be processed once the current loop is finished */
     private requestQueue: (() => void)[] = [];
@@ -48,27 +48,33 @@ export class OutgoingRequestsManager {
 
     /**
      * Process the outgoing requests from the OlmMachine.
+     *
+     * This should be called at the end of each sync, to process any requests that have been queued.
+     * In some cases if outgoing requests need to be sent immediately, this can be called directly.
+     *
      * There is only one request running at once, and the others are queued.
      * If a request is currently running the queued request will only trigger an additional run.
      */
-    public async requestLoop(): Promise<void> {
-        if (this.isLoopRunning) {
+    public async doProcessOutgoingRequests(): Promise<void> {
+        if (this.isTaskRunning) {
             // If the task is running, add the request to the queue and wait for completion.
             // This ensures that the requests are processed only once at a time.
             await new Promise<void>((resolve) => {
                 this.requestQueue.push(resolve);
             });
         } else {
-            await this.executeLoop();
+            await this.executeTask();
         }
     }
 
-    private async executeLoop(): Promise<void> {
-        this.isLoopRunning = true;
+    private async executeTask(): Promise<void> {
+        this.isTaskRunning = true;
 
-        await this.processOutgoingRequests();
-
-        this.isLoopRunning = false;
+        try {
+            await this.processOutgoingRequests();
+        } finally {
+            this.isTaskRunning = false;
+        }
 
         if (this.requestQueue.length > 0) {
             if (this.stopped) {
@@ -81,7 +87,7 @@ export class OutgoingRequestsManager {
             this.requestQueue = [];
 
             // run again and resolve all the pending requests.
-            await this.executeLoop();
+            await this.executeTask();
 
             awaitingRequests.forEach((resolve) => resolve());
         }
