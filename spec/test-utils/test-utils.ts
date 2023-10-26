@@ -537,8 +537,6 @@ export async function awaitDecryption(
     });
 }
 
-export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
-
 export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     app_display_name: "app",
     app_id: "123",
@@ -560,4 +558,26 @@ export type InitCrypto = (_: MatrixClient) => Promise<void>;
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
 if (global.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
+}
+
+export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
+
+/**
+ * Advance the fake timers in a loop until the given promise resolves or rejects.
+ *
+ * Returns the result of the promise.
+ *
+ * This can be useful when there are multiple steps in the code which require an iteration of the event loop.
+ */
+export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
+    let resolved = false;
+    promise.finally(() => {
+        resolved = true;
+    });
+
+    while (!resolved) {
+        await jest.advanceTimersByTimeAsync(1);
+    }
+
+    return await promise;
 }
