@@ -168,7 +168,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * @param client - An instance of MatrixClient object
      * @returns User object with reEmitter setup on client
      */
-    public static withReEmitterOnClient(userId: string, client: MatrixClient): User {
+    public static createUser(userId: string, client: MatrixClient): User {
         const user = new User(userId);
         client.reEmitter.reEmit(user, [
             UserEvent.AvatarUrl,

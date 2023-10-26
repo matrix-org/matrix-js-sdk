@@ -431,7 +431,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = User.withReEmitterOnClient(presenceEvent.getContent().user_id, client);
+                        user = User.createUser(presenceEvent.getContent().user_id, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -530,7 +530,7 @@ export class SyncApi {
                             if (user) {
                                 user.setPresenceEvent(presenceEvent);
                             } else {
-                                user = User.withReEmitterOnClient(presenceEvent.getContent().user_id, this.client);
+                                user = User.createUser(presenceEvent.getContent().user_id, this.client);
                                 user.setPresenceEvent(presenceEvent);
                                 this.client.store.storeUser(user);
                             }
@@ -1150,7 +1150,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = User.withReEmitterOnClient(presenceEvent.getSender()!, client);
+                        user = User.createUser(presenceEvent.getSender()!, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
