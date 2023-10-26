@@ -137,7 +137,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return new MatrixRTCSession(client, room, callMemberships);
     }
 
-    private constructor(
+    public constructor(
         private readonly client: MatrixClient,
         public readonly room: Room,
         public memberships: CallMembership[],
@@ -219,6 +219,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 setTimeout(r, timeout, "timeout");
             }
         });
+
         return new Promise((resolve) => {
             Promise.race([this.triggerCallMembershipEventUpdate(), timeoutPromise]).then((value) => {
                 // The timeoutPromise returns the string 'timeout' and the membership update void
@@ -323,7 +324,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Makes a new membership list given the old list alonng with this user's previous membership event
+     * Makes a new membership list given the old list along with this user's previous membership event
      * (if any) and this device's previous membership (if any)
      */
     private makeNewMemberships(
