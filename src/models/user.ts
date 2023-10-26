@@ -153,6 +153,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Construct a new User. A User must have an ID and can optionally have extra information associated with it.
      * @param userId - Required. The ID of this user.
+     * @deprecated use `User.createUser`
      */
     public constructor(public readonly userId: string) {
         super();
