@@ -44,8 +44,8 @@ describe("OutgoingRequestsManager", () => {
         manager = new OutgoingRequestsManager(logger, olmMachine, processor);
     });
 
-    describe("requestLoop", () => {
-        it("Requests are processed directly when requested", async () => {
+    describe("Call doProcessOutgoingRequests", () => {
+        it("The call triggers handling of the machine outgoing requests", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
             olmMachine.outgoingRequests.mockImplementationOnce(async () => {
@@ -102,7 +102,7 @@ describe("OutgoingRequestsManager", () => {
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
         });
 
-        it("Process 3 consecutive calls to doProcessOutgoingRequests while not blocking first one", async () => {
+        it("Process 3 consecutive calls to doProcessOutgoingRequests while not blocking previous ones", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
             const request3 = new RustSdkCryptoJs.KeysBackupRequest("foo3", "{}", "1");
@@ -181,7 +181,7 @@ describe("OutgoingRequestsManager", () => {
     });
 
     describe("Calling stop on the manager should stop ongoing work", () => {
-        it("Is stopped properly before making requests", async () => {
+        it("When the manager is stopped after outgoingRequests() call, do not make sever requests", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
 
             const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
@@ -203,29 +203,7 @@ describe("OutgoingRequestsManager", () => {
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(0);
         });
 
-        it("Is stopped properly after calling outgoing requests", async () => {
-            const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
-
-            const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
-
-            olmMachine.outgoingRequests.mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
-                return firstOutgoingRequestDefer.promise;
-            });
-
-            const firstRequest = manager.doProcessOutgoingRequests();
-
-            // stop
-            manager.stop();
-
-            // let the first request complete
-            firstOutgoingRequestDefer.resolve([request1]);
-
-            await firstRequest;
-
-            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(0);
-        });
-
-        it("Is stopped properly in between requests", async () => {
+        it("When the manager is stopped while doing server calls, it should stop before the next sever call", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("11", "{}");
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("12", "{}");
 
