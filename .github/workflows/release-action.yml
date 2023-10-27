@@ -112,6 +112,16 @@ jobs:
                   DEPENDENCIES: ${{ inputs.dependencies }}
                   FINAL: ${{ inputs.final }}
 
+            - name: Prevent develop dependencies
+              if: inputs.dependencies
+              run: |
+                  ret=0
+                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+                  if [ "$ret" -eq 0 ]; then
+                      echo "package.json contains develop dependencies. Refusing to release."
+                      exit
+                  fi
+
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "$VERSION"
 
