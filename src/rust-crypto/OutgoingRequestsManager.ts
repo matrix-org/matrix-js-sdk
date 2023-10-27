@@ -18,6 +18,7 @@ import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { Logger } from "../logger";
+import { defer, IDeferred } from "../utils";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.
@@ -30,8 +31,11 @@ export class OutgoingRequestsManager {
     /** whether a task is currently running */
     private isTaskRunning = false;
 
-    /** queue of requests to be processed once the current loop is finished */
-    private requestQueue: (() => void)[] = [];
+    /**
+     * If there are additional calls to doProcessOutgoingRequests() while there is a current call running
+     * we need to remember in order to call process again (as there could be new requests).
+     */
+    private nextLoopDeferred?: IDeferred<void>;
 
     public constructor(
         private readonly logger: Logger,
@@ -47,52 +51,56 @@ export class OutgoingRequestsManager {
     }
 
     /**
-     * Process the outgoing requests from the OlmMachine.
+     * Process the OutgoingRequests from the OlmMachine.
      *
-     * This should be called at the end of each sync, to process any requests that have been queued.
-     * In some cases if outgoing requests need to be sent immediately, this can be called directly.
+     * This should be called at the end of each sync, to process any OlmMachine OutgoingRequests created by the rust sdk.
+     * In some cases if OutgoingRequests need to be sent immediately, this can be called directly.
      *
-     * There is only one request running at once, and the others are queued.
-     * If a request is currently running the queued request will only trigger an additional run.
+     * Calls to doProcessOutgoingRequests() are processed synchronously, one after the other, in order.
+     * If doProcessOutgoingRequests() is called while another call is still being processed, it will be queued.
+     * Multiple calls to doProcessOutgoingRequests() when a call is already processing will be batched together.
      */
     public async doProcessOutgoingRequests(): Promise<void> {
         if (this.isTaskRunning) {
             // If the task is running, add the request to the queue and wait for completion.
             // This ensures that the requests are processed only once at a time.
-            await new Promise<void>((resolve) => {
-                this.requestQueue.push(resolve);
-            });
-        } else {
-            await this.executeTask();
-        }
-    }
-
-    private async executeTask(): Promise<void> {
-        this.isTaskRunning = true;
-
-        try {
-            await this.processOutgoingRequests();
-        } finally {
-            this.isTaskRunning = false;
-        }
-
-        if (this.requestQueue.length > 0) {
-            if (this.stopped) {
-                this.requestQueue.forEach((resolve) => resolve());
-                return;
+            if (!this.nextLoopDeferred) {
+                this.nextLoopDeferred = defer();
             }
-            // there are a pending request that need to be executed
-            const awaitingRequests = this.requestQueue.map((resolve) => resolve);
-            // reset the queue
-            this.requestQueue = [];
+            return this.nextLoopDeferred.promise;
+        } else {
+            this.isTaskRunning = true;
+            try {
+                await this.processOutgoingRequests();
+            } finally {
+                this.isTaskRunning = false;
+            }
 
-            // run again and resolve all the pending requests.
-            await this.executeTask();
+            // If there was some request while this iteration was running, run a second time and resolve the linked promise.
+            if (this.nextLoopDeferred) {
+                if (this.stopped) {
+                    this.nextLoopDeferred.resolve();
+                    return;
+                }
 
-            awaitingRequests.forEach((resolve) => resolve());
+                // keep the current deferred requests to resolve them after the next iteration.
+                const deferred = this.nextLoopDeferred;
+                // reset the nextLoopDeferred so that any future requests are queued for another additional iteration.
+                this.nextLoopDeferred = undefined;
+
+                // Run again and resolve all the pending requests.
+                // Notice that we don't await on it, so that the current promise is resolved now.
+                // The requests that were deferred will be resolved after this new iteration.
+                this.doProcessOutgoingRequests().then(() => {
+                    deferred.resolve();
+                });
+            }
         }
     }
 
+    /**
+     * Make a single request to `olmMachine.outgoingRequests` and do the corresponding requests.
+     */
     private async processOutgoingRequests(): Promise<void> {
         if (this.stopped) return;
 

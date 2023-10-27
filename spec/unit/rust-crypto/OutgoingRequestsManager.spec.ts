@@ -23,13 +23,13 @@ import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 
 describe("OutgoingRequestsManager", () => {
-    /** the OutgoingRequestProcessor implementation under test */
+    /** the OutgoingRequestsManager implementation under test */
     let manager: OutgoingRequestsManager;
 
-    /** a mock  OutgoingRequestProcessor */
+    /** a mock OutgoingRequestProcessor */
     let processor: Mocked<OutgoingRequestProcessor>;
 
-    /** a mocked-up OlmMachine which processor is connected to */
+    /** a mocked-up OlmMachine which manager is connected to */
     let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
 
     beforeEach(async () => {
@@ -64,7 +64,7 @@ describe("OutgoingRequestsManager", () => {
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
         });
 
-        it("Stack requests while one is already running", async () => {
+        it("Stack and batch calls to doProcessOutgoingRequests while one is already running", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
             const request3 = new RustSdkCryptoJs.KeysBackupRequest("foo3", "{}", "1");
@@ -102,7 +102,69 @@ describe("OutgoingRequestsManager", () => {
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
         });
 
-        it("Should not bubble if request is rejected", async () => {
+        it("Process 3 consecutive calls to doProcessOutgoingRequests while not blocking first one", async () => {
+            const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
+            const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
+            const request3 = new RustSdkCryptoJs.KeysBackupRequest("foo3", "{}", "1");
+
+            // create defer to control if there is a loop going on
+            const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
+            const secondOutgoingRequestDefer = defer<OutgoingRequest[]>();
+            const thirdOutgoingRequestDefer = defer<OutgoingRequest[]>();
+
+            olmMachine.outgoingRequests
+                .mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
+                    return firstOutgoingRequestDefer.promise;
+                })
+                .mockImplementationOnce(async () => {
+                    return secondOutgoingRequestDefer.promise;
+                })
+                .mockImplementationOnce(async () => {
+                    return thirdOutgoingRequestDefer.promise;
+                })
+                .mockImplementationOnce(async () => {
+                    // Another one that should not occur
+                    return [];
+                });
+
+            const firstRequest = manager.doProcessOutgoingRequests();
+
+            // First request will start an iteration and for now is awaiting on firstOutgoingRequestDefer
+
+            // Query a new request now, this would request a new iteration
+            const secondRequest = manager.doProcessOutgoingRequests();
+
+            // let the first iteration complete
+            firstOutgoingRequestDefer.resolve([request1]);
+
+            // The first request should be now complete
+            await firstRequest;
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
+
+            // The second request is awaiting on secondOutgoingRequestDefer
+            // stack a new request that should be processed in an additional iteration
+
+            const thirdRequest = manager.doProcessOutgoingRequests();
+
+            secondOutgoingRequestDefer.resolve([request2]);
+            await secondRequest;
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(2);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
+
+            // The third request is awaiting on thirdOutgoingRequestDefer
+
+            thirdOutgoingRequestDefer.resolve([request3]);
+            await thirdRequest;
+
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(3);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
+
+            // ensure that no other iteration is going on
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(3);
+        });
+
+        it("Should not bubble exceptions if server request is rejected", async () => {
             const request = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
             olmMachine.outgoingRequests.mockImplementationOnce(async () => {
                 return [request];
@@ -118,7 +180,7 @@ describe("OutgoingRequestsManager", () => {
         });
     });
 
-    describe("Stop", () => {
+    describe("Calling stop on the manager should stop ongoing work", () => {
         it("Is stopped properly before making requests", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
 
