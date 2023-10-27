@@ -23,7 +23,14 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, mkEventCustom, syncPromise } from "../../test-utils/test-utils";
+import {
+    advanceTimersUntil,
+    CRYPTO_BACKENDS,
+    getSyncResponse,
+    InitCrypto,
+    mkEventCustom,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
@@ -88,6 +95,7 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
+import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -942,6 +950,39 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 }),
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
+        });
+
+        it("should send a m.unverified code in toDevice messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
+            aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            // Tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Wait to receive the toDevice message and return bob device content
+            const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
+                fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
+                    const content = JSON.parse(request.body as string);
+                    resolve(content.messages["@bob:xyz"]["DEVICE_ID"]);
+                    return {};
+                });
+            });
+
+            // Mock endpoint of message sending
+            fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
+
+            await aliceClient.sendTextMessage(ROOM_ID, "test");
+
+            // Finally, check that the toDevice message has the m.unverified code
+            const toDeviceContent = await toDevicePromise;
+            expect(toDeviceContent.code).toBe("m.unverified");
         });
     });
 
@@ -2782,7 +2823,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.get("express:/_matrix/client/v3/room_keys/keys", keyBackupData);
 
                 // should be able to restore from 4S
-                const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
+                const importResult = await advanceTimersUntil(
+                    aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!),
+                );
                 expect(importResult.imported).toStrictEqual(1);
             });
 
