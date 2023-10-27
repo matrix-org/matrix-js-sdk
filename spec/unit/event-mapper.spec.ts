@@ -34,6 +34,7 @@ describe("eventMapperFor", function () {
                 getRoom(roomId: string): Room | null {
                     return rooms.find((r) => r.roomId === roomId) ?? null;
                 },
+                setUserCreator(_) {},
             } as IStore,
             scheduler: {
                 setProcessFunction: jest.fn(),
