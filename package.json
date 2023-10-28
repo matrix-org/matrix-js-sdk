@@ -79,7 +79,7 @@
         "@babel/preset-typescript": "^7.12.7",
         "@babel/register": "^7.12.10",
         "@casualbot/jest-sonar-reporter": "2.2.7",
-        "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz",
+        "@matrix-org/olm": "3.2.15",
         "@types/bs58": "^4.0.1",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
