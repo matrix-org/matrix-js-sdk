@@ -22,11 +22,10 @@ const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS = "0123456789";
 
-export function secureRandomBase64(len: number): string {
+export function secureRandomBase64Url(len: number): string {
     const key = new Uint8Array(len);
     crypto.getRandomValues(key);
 
-    // encode to base64url as this value goes into URLs
     return encodeUnpaddedBase64Url(key);
 }
 

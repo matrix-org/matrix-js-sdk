@@ -23,7 +23,7 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixError, MatrixEvent } from "../matrix";
-import { randomString, secureRandomBase64 } from "../randomstring";
+import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 import { isNumber } from "../utils";
@@ -325,7 +325,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
 
-        const encryptionKey = secureRandomBase64(16);
+        const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
