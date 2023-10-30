@@ -26,6 +26,7 @@ import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64 } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
+import { isNumber } from "../utils";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -462,6 +463,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         for (const key of content.keys) {
+            if (!key.key || !isNumber(key.index)) {
+                logger.warn(`Received m.call.encryption_keys with invalid entry: callId=${callId}`);
+                continue;
+            }
+
             const encryptionKey = key.key;
             const encryptionKeyIndex = key.index;
 
