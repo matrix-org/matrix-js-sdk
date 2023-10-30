@@ -456,6 +456,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        if (!Array.isArray(content.keys)) {
+            logger.warn(`Received m.call.encryption_keys where keys wasn't an array: callId=${callId}`);
+            return;
+        }
+
         for (const key of content.keys) {
             const encryptionKey = key.key;
             const encryptionKeyIndex = key.index;
