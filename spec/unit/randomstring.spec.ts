@@ -15,12 +15,17 @@ limitations under the License.
 */
 
 import { decodeBase64 } from "../../src/base64";
-import { randomLowercaseString, randomString, randomUppercaseString, secureRandomBase64 } from "../../src/randomstring";
+import {
+    randomLowercaseString,
+    randomString,
+    randomUppercaseString,
+    secureRandomBase64Url,
+} from "../../src/randomstring";
 
 describe("Random strings", () => {
     it.each([8, 16, 32])("secureRandomBase64 generates %i valid base64 bytes", (n: number) => {
-        const randb641 = secureRandomBase64(n);
-        const randb642 = secureRandomBase64(n);
+        const randb641 = secureRandomBase64Url(n);
+        const randb642 = secureRandomBase64Url(n);
 
         expect(randb641).not.toEqual(randb642);
 
