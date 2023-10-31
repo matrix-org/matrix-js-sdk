@@ -90,8 +90,12 @@ export class CallMembership {
         return this.getLocalExpiry() - Date.now();
     }
 
+    public getAbsoluteMsUntilExpiry(): number {
+        return this.getAbsoluteExpiry() - Date.now();
+    }
+
     public isExpired(): boolean {
-        return this.getAbsoluteExpiry() < this.parentEvent.getTs() + this.parentEvent.getLocalAge();
+        return this.getAbsoluteMsUntilExpiry() < 0;
     }
 
     public getActiveFoci(): Focus[] {
