@@ -135,7 +135,9 @@ describe("RustCrypto", () => {
     it("getVersion() should return the current version of the rust sdk and vodozemac", async () => {
         const rustCrypto = await makeTestRustCrypto();
         const versions = RustSdkCryptoJs.getVersions();
-        expect(rustCrypto.getVersion()).toBe(`Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`);
+        expect(rustCrypto.getVersion()).toBe(
+            `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`,
+        );
     });
 
     describe(".importRoomKeys and .exportRoomKeys", () => {

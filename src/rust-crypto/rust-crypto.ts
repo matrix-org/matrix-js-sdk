@@ -369,7 +369,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public getVersion(): string {
         const versions = RustSdkCryptoJs.getVersions();
-        return `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`;
+        return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
     }
 
     public prepareToEncrypt(room: Room): void {
