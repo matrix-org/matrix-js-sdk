@@ -156,9 +156,9 @@ export abstract class ReadReceipt<
 
         // The thread ID doesn't match up
         logger.warn(
-            `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees \
-                with the thread root (${event.threadRootId}) of the referenced event \
-                (event ID = ${receipt.eventId})`,
+            `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees ` +
+                `with the thread root (${event.threadRootId}) of the referenced event ` +
+                `(event ID = ${receipt.eventId})`,
         );
         return false;
     }
