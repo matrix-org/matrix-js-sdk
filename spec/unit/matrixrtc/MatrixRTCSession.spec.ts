@@ -65,7 +65,11 @@ describe("MatrixRTCSession", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         expiredMembership.expires = 1000;
         expiredMembership.device_id = "EXPIRED";
-        const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], () => 10000);
+        const mockRoom = makeMockRoom(
+            [membershipTemplate, expiredMembership],
+            () => 10000,
+            () => Date.now() - 10000,
+        );
 
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(1);
@@ -307,7 +311,11 @@ describe("MatrixRTCSession", () => {
             let eventAge = 0;
 
             const membership = Object.assign({}, membershipTemplate);
-            const mockRoom = makeMockRoom([membership], () => eventAge);
+            const mockRoom = makeMockRoom(
+                [membership],
+                () => eventAge,
+                () => Date.now() - eventAge,
+            );
 
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             const membershipObject = sess.memberships[0];
@@ -338,6 +346,7 @@ describe("MatrixRTCSession", () => {
                 }),
             ],
             () => eventAge,
+            () => Date.now() - eventAge,
         );
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { logger } from "../logger";
 import { MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
@@ -91,7 +92,8 @@ export class CallMembership {
     }
 
     public isExpired(): boolean {
-        return this.getMsUntilExpiry() < 0;
+        logger.log("this.getMsUntilExpiry", this.getMsUntilExpiry());
+        return this.getMsUntilExpiry() <= 0;
     }
 
     public getActiveFoci(): Focus[] {
