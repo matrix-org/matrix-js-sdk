@@ -23,7 +23,14 @@ import { MockResponse, MockResponseFunction } from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import {
+    advanceTimersUntil,
+    CRYPTO_BACKENDS,
+    getSyncResponse,
+    InitCrypto,
+    mkEventCustom,
+    syncPromise,
+} from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
@@ -37,6 +44,7 @@ import {
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import {
+    Category,
     ClientEvent,
     createClient,
     CryptoEvent,
@@ -53,11 +61,12 @@ import {
     Room,
     RoomMember,
     RoomStateEvent,
+    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
-import { escapeRegExp } from "../../../src/utils";
+import { defer, escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -66,13 +75,19 @@ import {
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
-import { CrossSigningKey, CryptoCallbacks, KeyBackupInfo } from "../../../src/crypto-api";
+import {
+    CrossSigningKey,
+    CryptoCallbacks,
+    EventShieldColour,
+    EventShieldReason,
+    KeyBackupInfo,
+} from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
-    createOlmSession,
     createOlmAccount,
+    createOlmSession,
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptMegolmEventRawPlainText,
@@ -80,6 +95,7 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
+import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -147,6 +163,27 @@ async function expectSendRoomKey(
 }
 
 /**
+ * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+ * @returns the content of the encrypted event
+ */
+function expectEncryptedSendMessage() {
+    return new Promise<IContent>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url, request) => {
+                const content = JSON.parse(request.body as string);
+                resolve(content);
+                return { event_id: "$event_id" };
+            },
+            // append to the list of intercepts on this path (since we have some tests that call
+            // this function multiple times)
+            { overwriteRoutes: false },
+        );
+    });
+}
+
+/**
  * Expect that the client sends an encrypted event
  *
  * Waits for an HTTP request to send an encrypted message in the test room.
@@ -159,22 +196,7 @@ async function expectSendRoomKey(
 async function expectSendMegolmMessage(
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
-    const encryptedMessageContent = await new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/send/m.room.encrypted/"),
-            (url: string, opts: RequestInit): MockResponse => {
-                resolve(JSON.parse(opts.body as string));
-                return {
-                    event_id: "$event_id",
-                };
-            },
-            {
-                // append to the list of intercepts on this path (since we have some tests that call
-                // this function multiple times)
-                overwriteRoutes: false,
-            },
-        );
-    });
+    const encryptedMessageContent = await expectEncryptedSendMessage();
 
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
     const inboundGroupSession = await inboundGroupSessionPromise;
@@ -922,6 +944,210 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
         });
+
+        it("should send a m.unverified code in toDevice messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
+            aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
+
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            // Tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Wait to receive the toDevice message and return bob device content
+            const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
+                fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
+                    const content = JSON.parse(request.body as string);
+                    resolve(content.messages["@bob:xyz"]["DEVICE_ID"]);
+                    return {};
+                });
+            });
+
+            // Mock endpoint of message sending
+            fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
+
+            await aliceClient.sendTextMessage(ROOM_ID, "test");
+
+            // Finally, check that the toDevice message has the m.unverified code
+            const toDeviceContent = await toDevicePromise;
+            expect(toDeviceContent.code).toBe("m.unverified");
+        });
+    });
+
+    describe("Session should rotate according to encryption settings", () => {
+        /**
+         * Send a message to bob and get the encrypted message
+         * @returns {Promise<IContent>} The encrypted message
+         */
+        async function sendEncryptedMessage(): Promise<IContent> {
+            const [encryptedMessage] = await Promise.all([
+                expectEncryptedSendMessage(),
+                aliceClient.sendTextMessage(ROOM_ID, "test"),
+            ]);
+            return encryptedMessage;
+        }
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        newBackendOnly("should rotate the session after 2 messages", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+            // Every 2 messages in the room, the session should be rotated
+            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 2,
+            };
+
+            // Tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Send a message to bob and get the encrypted message
+            const [encryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // Check that the session id exists
+            const sessionId = encryptedMessage.session_id;
+            expect(sessionId).toBeDefined();
+
+            // Send a second message to bob and get the current message
+            const secondEncryptedMessage = await sendEncryptedMessage();
+
+            // Check that the same session id is shared between the two messages
+            const secondSessionId = secondEncryptedMessage.session_id;
+            expect(secondSessionId).toBe(sessionId);
+
+            // The session should be rotated, we are expecting the room key to be sent
+            const [thirdEncryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // The session is rotated every 2 messages, we should have a new session id
+            const thirdSessionId = thirdEncryptedMessage.session_id;
+            expect(thirdSessionId).not.toBe(sessionId);
+        });
+
+        newBackendOnly("should rotate the session after 1h", async () => {
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+            // We need to fake the timers to advance the time
+            jest.useFakeTimers();
+
+            const syncResponse = getSyncResponse(["@bob:xyz"]);
+
+            // The minimum rotation period is 1h
+            // https://github.com/matrix-org/matrix-rust-sdk/blob/f75b2cd1d0981db42751dadb08c826740af1018e/crates/matrix-sdk-crypto/src/olm/group_sessions/outbound.rs#L410-L415
+            const oneHourInMs = 60 * 60 * 1000;
+
+            // Every 1h the session should be rotated
+            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_ms: oneHourInMs,
+            };
+
+            // Tell alice we share a room with bob
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            // Force alice to download bob keys
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // Send a message to bob and get the encrypted message
+            const [encryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // Check that the session id exists
+            const sessionId = encryptedMessage.session_id;
+            expect(sessionId).toBeDefined();
+
+            // Advance the time by 1h
+            jest.advanceTimersByTime(oneHourInMs);
+
+            // Send a second message to bob and get the encrypted message
+            const [secondEncryptedMessage] = await Promise.all([
+                sendEncryptedMessage(),
+                expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+
+            // The session should be rotated
+            const secondSessionId = secondEncryptedMessage.session_id;
+            expect(secondSessionId).not.toBe(sessionId);
+        });
+    });
+
+    newBackendOnly("should rotate the session when the history visibility changes", async () => {
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await startClientAndAwaitFirstSync();
+        const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
+
+        // Tell alice we share a room with bob
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceClient);
+
+        // Force alice to download bob keys
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+        // Send a message to bob and get the current session id
+        let [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectEncryptedSendMessage(),
+        ]);
+
+        // Check that the session id exists
+        const sessionId = encryptedMessage.session_id;
+        expect(sessionId).toBeDefined();
+
+        // Change history visibility in sync response
+        const syncResponse = getSyncResponse([]);
+        syncResponse.rooms[Category.Join][ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                sender: TEST_USER_ID,
+                type: "m.room.history_visibility",
+                state_key: "",
+                content: {
+                    history_visibility: HistoryVisibility.Invited,
+                },
+            }),
+        );
+
+        // Update the new visibility
+        syncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // Resend a message to bob and get the new session id
+        [, , encryptedMessage] = await Promise.all([
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
+            expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
+            expectEncryptedSendMessage(),
+        ]);
+
+        // Check that the new session id exists
+        const newSessionId = encryptedMessage.session_id;
+        expect(newSessionId).toBeDefined();
+
+        // Check that the session id has changed
+        expect(sessionId).not.toEqual(newSessionId);
     });
 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
@@ -1698,6 +1924,105 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         await syncPromise(aliceClient);
         await sendEventPromise;
+    });
+
+    describe("getEncryptionInfoForEvent", () => {
+        it("handles outgoing events", async () => {
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+
+            // Alice shares a room with Bob
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceClient);
+
+            // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+
+            // ... and claim one of his OTKs ...
+            expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
+
+            // ... and send an m.room_key message ...
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
+
+            // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
+            const sendRoomMessageDefer = defer<MockResponse>();
+            const reqProm = new Promise<IContent>((resolve) => {
+                fetchMock.putOnce(
+                    new RegExp("/send/m.room.encrypted/"),
+                    async (url: string, opts: RequestInit): Promise<MockResponse> => {
+                        resolve(JSON.parse(opts.body as string));
+                        return await sendRoomMessageDefer.promise;
+                    },
+                    {
+                        // append to the list of intercepts on this path (since we have some tests that call
+                        // this function multiple times)
+                        overwriteRoutes: false,
+                    },
+                );
+            });
+
+            // Now we start to send the message
+            const sendProm = aliceClient.sendTextMessage(testData.TEST_ROOM_ID, "test");
+
+            // and wait for the outgoing requests
+            const inboundGroupSession = await inboundGroupSessionPromise;
+            const encryptedMessageContent = await reqProm;
+            const msg: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+            logger.log("Decrypted received megolm message", msg);
+
+            // at this point, the request to send the room message has been made, but not completed.
+            // get hold of the pending event, and see what getEncryptionInfoForEvent makes of it
+            const pending = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getPendingEvents();
+            expect(pending.length).toEqual(1);
+            const encInfo = await aliceClient.getCrypto()!.getEncryptionInfoForEvent(pending[0]);
+            expect(encInfo!.shieldColour).toEqual(EventShieldColour.NONE);
+            expect(encInfo!.shieldReason).toBeNull();
+
+            // release the send request
+            const resp = { event_id: "$event_id" };
+            sendRoomMessageDefer.resolve(resp);
+            expect(await sendProm).toEqual(resp);
+
+            // still pending at this point
+            expect(aliceClient.getRoom(testData.TEST_ROOM_ID)!.getPendingEvents().length).toEqual(1);
+
+            // echo the event back
+            const fullEvent = {
+                event_id: "$event_id",
+                type: "m.room.encrypted",
+                sender: aliceClient.getUserId(),
+                origin_server_ts: Date.now(),
+                content: encryptedMessageContent,
+            };
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                rooms: { join: { [testData.TEST_ROOM_ID]: { timeline: { events: [fullEvent] } } } },
+            });
+            await syncPromise(aliceClient);
+
+            const timelineEvents = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getLiveTimeline()!.getEvents();
+            const lastEvent = timelineEvents[timelineEvents.length - 1];
+            expect(lastEvent.getId()).toEqual("$event_id");
+
+            // now check getEncryptionInfoForEvent again
+            const encInfo2 = await aliceClient.getCrypto()!.getEncryptionInfoForEvent(lastEvent);
+            let expectedEncryptionInfo;
+            if (backend === "rust-sdk") {
+                // rust crypto does not trust its own device until it is cross-signed.
+                expectedEncryptionInfo = {
+                    shieldColour: EventShieldColour.RED,
+                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
+                };
+            } else {
+                expectedEncryptionInfo = {
+                    shieldColour: EventShieldColour.NONE,
+                    shieldReason: null,
+                };
+            }
+            expect(encInfo2).toEqual(expectedEncryptionInfo);
+        });
     });
 
     describe("Lazy-loading member lists", () => {
@@ -2483,7 +2808,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.get("express:/_matrix/client/v3/room_keys/keys", keyBackupData);
 
                 // should be able to restore from 4S
-                const importResult = await aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!);
+                const importResult = await advanceTimersUntil(
+                    aliceClient.restoreKeyBackupWithSecretStorage(check!.backupInfo!),
+                );
                 expect(importResult.imported).toStrictEqual(1);
             });
 

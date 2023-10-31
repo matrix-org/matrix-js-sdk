@@ -1342,6 +1342,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
+        this.store.setUserCreator((userId) => User.createUser(userId, this));
         this.deviceId = opts.deviceId || null;
         this.sessionId = randomString(10);
 
@@ -2679,12 +2680,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This API is currently UNSTABLE and may change or be removed without notice.
      *
+     * It has no effect with the Rust crypto implementation.
+     *
      * @param value - whether error on unknown devices
      *
-     * @deprecated Prefer direct access to {@link CryptoApi.globalBlacklistUnverifiedDevices}:
-     *
      * ```ts
-     * client.getCrypto().globalBlacklistUnverifiedDevices = value;
+     * client.getCrypto().globalErrorOnUnknownDevices = value;
      * ```
      */
     public setGlobalErrorOnUnknownDevices(value: boolean): void {

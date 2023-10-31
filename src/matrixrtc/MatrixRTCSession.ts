@@ -23,7 +23,7 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
 import { MatrixError, MatrixEvent } from "../matrix";
-import { randomString, secureRandomBase64 } from "../randomstring";
+import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 
@@ -368,7 +368,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId");
         if (!deviceId) throw new Error("No deviceId");
 
-        const encryptionKey = secureRandomBase64(16);
+        const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, delayBeforeUse);
@@ -501,12 +501,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        if (!Array.isArray(content.keys)) {
+            logger.warn(`Received m.call.encryption_keys where keys wasn't an array: callId=${callId}`);
+            return;
+        }
+
         if (userId === this.client.getUserId() && deviceId === this.client.getDeviceId()) {
             // We store our own sender key in the same set along with keys from others, so it's
             // important we don't allow our own keys to be set by one of these events (apart from
             // the fact that we don't need it anyway because we already know our own keys).
             logger.info("Ignoring our own keys event");
-            return;
         }
 
         for (const key of content.keys) {

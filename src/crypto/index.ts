@@ -611,6 +611,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoApi#getVersion}.
+     */
+    public getVersion(): string {
+        const olmVersionTuple = Crypto.getOlmVersion();
+        return `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`;
+    }
+
+    /**
      * Whether to trust a others users signatures of their devices.
      * If false, devices will only be considered 'verified' if we have
      * verified that device individually (effectively disabling cross-signing).

@@ -16,8 +16,9 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import "jest-localstorage-mock";
+import { IDBFactory } from "fake-indexeddb";
 
-import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
+import { IndexedDBStore, IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { defer } from "../../../src/utils";
@@ -74,6 +75,62 @@ describe("IndexedDBStore", () => {
             store.setOutOfBandMembers(roomId, [member1, member2]),
         ]);
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(2);
+    });
+
+    it("Should load presence events on startup", async () => {
+        // 1. Create idb database
+        const indexedDB = new IDBFactory();
+        const setupDefer = defer<Event>();
+        const req = indexedDB.open("matrix-js-sdk:db3", 1);
+        let db: IDBDatabase;
+        req.onupgradeneeded = () => {
+            db = req.result;
+            db.createObjectStore("users", { keyPath: ["userId"] });
+            db.createObjectStore("accountData", { keyPath: ["type"] });
+            db.createObjectStore("sync", { keyPath: ["clobber"] });
+        };
+        req.onsuccess = setupDefer.resolve;
+        await setupDefer.promise;
+
+        // 2. Fill in user presence data
+        const writeDefer = defer<Event>();
+        const transaction = db!.transaction(["users"], "readwrite");
+        const objectStore = transaction.objectStore("users");
+        const request = objectStore.put({
+            userId: "@alice:matrix.org",
+            event: {
+                content: {
+                    presence: "online",
+                },
+                sender: "@alice:matrix.org",
+                type: "m.presence",
+            },
+        });
+        request.onsuccess = writeDefer.resolve;
+        await writeDefer.promise;
+
+        // 3. Close database
+        req.result.close();
+
+        // 2. Check if the code loads presence events
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "db3",
+            localStorage,
+        });
+        let userCreated = false;
+        let presenceEventEmitted = false;
+        store.setUserCreator((id: string) => {
+            userCreated = true;
+            const user = new User(id);
+            user.on(UserEvent.Presence, () => {
+                presenceEventEmitted = true;
+            });
+            return user;
+        });
+        await store.startup();
+        expect(userCreated).toBe(true);
+        expect(presenceEventEmitted).toBe(true);
     });
 
     it("should use MemoryStore methods for pending events if no localStorage", async () => {
