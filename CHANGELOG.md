@@ -1,3 +1,29 @@
+Changes in [30.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.0-rc.1) (2023-10-31)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Refactor & make base64 functions browser-safe ([\#3818](https://github.com/matrix-org/matrix-js-sdk/pull/3818)).
+
+## 🦖 Deprecations
+ * Deprecate `MatrixEvent.toJSON` ([\#3801](https://github.com/matrix-org/matrix-js-sdk/pull/3801)).
+
+## ✨ Features
+ * Element-R: Add the git sha of the binding crate to `CryptoApi#getVersion` ([\#3838](https://github.com/matrix-org/matrix-js-sdk/pull/3838)). Contributed by @florianduros.
+ * Element-R: Wire up `globalBlacklistUnverifiedDevices` field to rust crypto encryption settings ([\#3790](https://github.com/matrix-org/matrix-js-sdk/pull/3790)). Fixes vector-im/element-web#26315. Contributed by @florianduros.
+ * Element-R: Wire up room rotation ([\#3807](https://github.com/matrix-org/matrix-js-sdk/pull/3807)). Fixes vector-im/element-web#26318. Contributed by @florianduros.
+ * Element-R: Add current version of the rust-sdk and vodozemac ([\#3825](https://github.com/matrix-org/matrix-js-sdk/pull/3825)). Contributed by @florianduros.
+ * Element-R: Wire up room history visibility ([\#3805](https://github.com/matrix-org/matrix-js-sdk/pull/3805)). Fixes vector-im/element-web#26319. Contributed by @florianduros.
+ * Element-R: log when we send to-device messages ([\#3810](https://github.com/matrix-org/matrix-js-sdk/pull/3810)).
+
+## 🐛 Bug Fixes
+ * Fix reemitter not being correctly wired on user objects created in storage classes ([\#3796](https://github.com/matrix-org/matrix-js-sdk/pull/3796)). Contributed by @MidhunSureshR.
+ * Element-R: silence log errors when viewing a pending event ([\#3824](https://github.com/matrix-org/matrix-js-sdk/pull/3824)).
+ * Don't emit a closed event if the indexeddb is closed by Element ([\#3832](https://github.com/matrix-org/matrix-js-sdk/pull/3832)). Fixes vector-im/element-web#25941. Contributed by @dhenneke.
+ * Element-R: silence log errors when viewing a decryption failure ([\#3821](https://github.com/matrix-org/matrix-js-sdk/pull/3821)).
+ * Don't remove thread info from a thread root when it is redacted ([\#3814](https://github.com/matrix-org/matrix-js-sdk/pull/3814)). Contributed by @andybalaam.
+ * Move events related to a redacted event into the main timeline ([\#3800](https://github.com/matrix-org/matrix-js-sdk/pull/3800)). Fixes vector-im/element-web#26388. Contributed by @andybalaam.
+ * Move redacted messages out of any thread, into main timeline. ([\#3798](https://github.com/matrix-org/matrix-js-sdk/pull/3798)). Fixes vector-im/element-web#26366. Contributed by @andybalaam.
+
 Changes in [29.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.1.0) (2023-10-24)
 ==================================================================================================
 
