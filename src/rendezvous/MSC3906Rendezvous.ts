@@ -116,7 +116,7 @@ export class MSC3906Rendezvous {
 
         await this.send({ type: PayloadType.Progress, protocols: [LOGIN_TOKEN_PROTOCOL.name] });
 
-        logger.info("Waiting for other device to chose protocol");
+        logger.info("Waiting for other device to choose protocol");
         const { type, protocol, outcome } = await this.receive();
 
         if (type === PayloadType.Finish) {
@@ -202,8 +202,8 @@ export class MSC3906Rendezvous {
         }
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
-        // TODO: this function isn't available with rust crypto backend
-        await this.client.crypto!.setDeviceVerification(userId, this.newDeviceId, true, false, true);
+        await crypto.setDeviceVerified(userId, this.newDeviceId, true);
+        // TODO: cross sign the device
 
         const masterPublicKey = (await crypto.getCrossSigningKeyId(CrossSigningKey.Master)) ?? undefined;
 

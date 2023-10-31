@@ -133,10 +133,10 @@ function makeMockClient(opts: {
                     getCrossSigningKeyId(key: CrossSigningKey): string | null {
                         return opts.crossSigningIds?.[key] ?? null;
                     },
+                    setDeviceVerified(userId: string, deviceId: string, verified: boolean): Promise<void> {
+                        return Promise.resolve();
+                    },
                 };
-            },
-            crypto: {
-                setDeviceVerification: opts.verificationFunction,
             },
         } as unknown as MatrixClient,
         deviceMap,
