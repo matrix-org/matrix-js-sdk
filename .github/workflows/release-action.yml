@@ -2,6 +2,8 @@ name: Release Action
 on:
     workflow_call:
         secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
             NPM_TOKEN:
                 required: false
         inputs:
