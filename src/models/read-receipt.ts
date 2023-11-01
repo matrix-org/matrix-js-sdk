@@ -95,15 +95,19 @@ export abstract class ReadReceipt<
     }
 
     /**
-     * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them, or if the receipt we have
-     * points at an event we don't have, or if the thread ID in the receipt does
-     * not match the thread root of the referenced event.
+     * Get the ID of the event that a given user has read up to, or null if:
+     * - we have received no read receipts for them, or
+     * - the receipt we have points at an event we don't have, or
+     * - the thread ID in the receipt does not match the thread root of the
+     *   referenced event.
+     *
+     * (The event might not exist if it is not loaded, and the thread ID might
+     * not match if the event has moved thread because it was redacted.)
      *
      * @param userId - The user ID to get read receipt event ID for
      * @param ignoreSynthesized - If true, return only receipts that have been
-     *                                    sent by the server, not implicit ones generated
-     *                                    by the JS SDK.
+     *                            sent by the server, not implicit ones generated
+     *                            by the JS SDK.
      * @returns ID of the latest existing event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
@@ -122,48 +126,77 @@ export abstract class ReadReceipt<
      * threadRootId is consistent with the thread information in the receipt.
      */
     private receiptPointsAtConsistentEvent(receipt: WrappedReceipt): boolean {
-        // If the receipt points at a non-existent event, it's not consistent
         const event = this.findEventById(receipt.eventId);
         if (!event) {
+            // If the receipt points at a non-existent event, we have 2
+            // possibilities:
+            //
+            // 1. We don't have the event because it's not loaded yet - probably
+            //    it's old and we're best off ignoring the receipt - we can just
+            //    send a new one when we read a new event.
+            //
+            // 2. We have a bug e.g. we misclassified this event into the wrong
+            //    thread.
             logger.warn(`Ignoring receipt for missing event with id ${receipt.eventId}`);
+
+            // This receipt is not "valid" because it doesn't point at an event
+            // we have. We want to pretend it doesn't exist.
             return false;
         }
 
-        // If this is an unthreaded receipt, we're good
         if (!receipt.data?.thread_id) {
+            // If this is an unthreaded receipt, it could point at any event, so
+            // there is no need to validate further - this receipt is valid.
             return true;
         }
+        // Otherwise it is a threaded receipt...
 
-        // If the receipt is for the main timeline
         if (receipt.data.thread_id === MAIN_ROOM_TIMELINE) {
-            // If the event is not in a thread, this checks out
-            if (!event.threadRootId) {
+            // The receipt is for the main timeline: we check that the event is
+            // in the main timeline.
+
+            // There are two ways to know an event is in the main timeline:
+            // either it has no threadRootId, or it is a thread root.
+            // (Note: it's a little odd because the thread root is in the main
+            // timeline, but it still has a threadRootId.)
+            const eventIsInMainTimeline = !event.threadRootId || event.isThreadRoot;
+
+            if (eventIsInMainTimeline) {
+                // The receipt is for the main timeline, and so is the event, so
+                // the receipt is valid.
                 return true;
             }
+        } else {
+            // The receipt is for a different thread (not the main timeline)
 
-            // If the event is a thread root, we need a special case because
-            // event.threadRootId won't match, but thread root events are
-            // actually on the main timeline, so we return successfully.
-            if (event.isThreadRoot) {
+            if (event.threadRootId === receipt.data.thread_id) {
+                // If the receipt and event agree on the thread ID, the receipt
+                // is valid.
                 return true;
             }
         }
 
-        // If the receipt is for the correct thread, we are good.
-        if (event.threadRootId === receipt.data.thread_id) {
-            return true;
-        }
-
-        // The thread ID doesn't match up
+        // The receipt thread ID disagrees with the event thread ID. There are 2
+        // possibilities:
+        //
+        // 1. The event moved to a different thread after the receipt was
+        //    created. This can happen if the event was redacted because that
+        //    moves it to the main timeline.
+        //
+        // 2. There is a bug somewhere - either we put the event into the wrong
+        //    thread, or someone sent an incorrect receipt.
         logger.warn(
             `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees ` +
                 `with the thread root (${event.threadRootId}) of the referenced event ` +
                 `(event ID = ${receipt.eventId})`,
         );
+
+        // This receipt is not "valid" because it disagrees with us about what
+        // thread the event is in. We want to pretend it doesn't exist.
         return false;
     }
 
-    private getLatestReceipt(userId: string, ignoreSynthesized = false): WrappedReceipt | null {
+    private getLatestReceipt(userId: string, ignoreSynthesized: boolean): WrappedReceipt | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
@@ -290,6 +323,11 @@ export abstract class ReadReceipt<
 
     public abstract setUnread(type: NotificationCountType, count: number): void;
 
+    /**
+     * Look in this room/thread's timeline to find an event. If `this` is a
+     * room, we look in all threads, but if `this` is a thread, we look only
+     * inside this thread.
+     */
     public abstract findEventById(eventId: string): MatrixEvent | undefined;
 
     /**
