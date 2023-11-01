@@ -3255,7 +3255,7 @@ describe("Room", function () {
                     for (let i = 1; i <= 2; i++) {
                         room.getUnfilteredTimelineSet = () =>
                             ({
-                                compareEventOrdering: (event1: string) => {
+                                compareEventOrdering: (event1: string, _event2: string) => {
                                     return event1 === `eventId${i}` ? 1 : -1;
                                 },
                                 findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
