@@ -117,13 +117,15 @@ export class RoomEncryptor {
             );
         }
 
-        // Manually call `loadMembersIfNeeded` here, because we want to know if it's the first
-        // time the room is loaded (due to lazy loading), so we can update the tracked users.
-        const fromServer = await this.room.loadMembersIfNeeded();
         const members = await this.room.getEncryptionTargetMembers();
 
-        if (fromServer && !this.lazyLoadedMembersResolved) {
-            // It's the first time the room is loaded, so we need to update the tracked users
+        // If this is the first time we are sending a message to the room, we may not yet have seen all the members
+        // (so the Crypto SDK might not have a device list for them). So, if this is the first time we are encrypting
+        // for this room, give the SDK the full list of members, to be on the safe side.
+        //
+        // This could end up being racy (if two calls to ensureEncryptionSession happen at the same time), but that's
+        // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
+        if (!this.lazyLoadedMembersResolved) {
             await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
             this.lazyLoadedMembersResolved = true;
             this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);

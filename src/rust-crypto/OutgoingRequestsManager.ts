@@ -28,12 +28,16 @@ export class OutgoingRequestsManager {
     /** whether {@link stop} has been called */
     private stopped = false;
 
-    /** whether a task is currently running */
-    private isTaskRunning = false;
+    /** whether {@link outgoingRequestLoop} is currently running */
+    private outgoingRequestLoopRunning = false;
 
     /**
      * If there are additional calls to doProcessOutgoingRequests() while there is a current call running
-     * we need to remember in order to call process again (as there could be new requests).
+     * we need to remember in order to call `doProcessOutgoingRequests` again (as there could be new requests).
+     *
+     * If this is defined, it is an indication that we need to do another iteration; in this case the deferred
+     * will resolve once that next iteration completes. If it is undefined, there have been no new calls
+     * to `doProcessOutgoingRequests` since the current iteration started.
      */
     private nextLoopDeferred?: IDeferred<void>;
 
@@ -60,41 +64,58 @@ export class OutgoingRequestsManager {
      * If doProcessOutgoingRequests() is called while another call is still being processed, it will be queued.
      * Multiple calls to doProcessOutgoingRequests() when a call is already processing will be batched together.
      */
-    public async doProcessOutgoingRequests(): Promise<void> {
-        if (this.isTaskRunning) {
-            // If the task is running, add the request to the queue and wait for completion.
-            // This ensures that the requests are processed only once at a time.
-            if (!this.nextLoopDeferred) {
-                this.nextLoopDeferred = defer();
-            }
-            return this.nextLoopDeferred.promise;
-        } else {
-            this.isTaskRunning = true;
-            try {
-                await this.processOutgoingRequests();
-            } finally {
-                this.isTaskRunning = false;
-            }
+    public doProcessOutgoingRequests(): Promise<void> {
+        // Flag that we need at least one more iteration of the loop.
+        //
+        // It is important that we do this even if the loop is currently running. There is potential for a race whereby
+        // a request is added to the queue *after* `OlmMachine.outgoingRequests` checks the queue, but *before* it
+        // returns. In such a case, the item could sit there unnoticed for some time.
+        //
+        // In order to circumvent the race, we set a flag which tells the loop to go round once again even if the
+        // queue appears to be empty.
+        if (!this.nextLoopDeferred) {
+            this.nextLoopDeferred = defer();
+        }
 
-            // If there was some request while this iteration was running, run a second time and resolve the linked promise.
-            if (this.nextLoopDeferred) {
-                if (this.stopped) {
-                    this.nextLoopDeferred.resolve();
-                    return;
-                }
+        // ... and wait for it to complete.
+        const result = this.nextLoopDeferred.promise;
 
-                // keep the current deferred requests to resolve them after the next iteration.
+        // set the loop going if it is not already.
+        if (!this.outgoingRequestLoopRunning) {
+            this.outgoingRequestLoop().catch((e) => {
+                // this should not happen; outgoingRequestLoop should return any errors via `nextLoopDeferred`.
+                /* istanbul ignore next */
+                this.logger.error("Uncaught error in outgoing request loop", e);
+            });
+        }
+        return result;
+    }
+
+    private async outgoingRequestLoop(): Promise<void> {
+        /* istanbul ignore if */
+        if (this.outgoingRequestLoopRunning) {
+            throw new Error("Cannot run two outgoing request loops");
+        }
+        this.outgoingRequestLoopRunning = true;
+        try {
+            while (!this.stopped && this.nextLoopDeferred) {
                 const deferred = this.nextLoopDeferred;
-                // reset the nextLoopDeferred so that any future requests are queued for another additional iteration.
+
+                // reset `nextLoopDeferred` so that any future calls to `doProcessOutgoingRequests` are queued
+                // for another additional iteration.
                 this.nextLoopDeferred = undefined;
 
-                // Run again and resolve all the pending requests.
-                // Notice that we don't await on it, so that the current promise is resolved now.
-                // The requests that were deferred will be resolved after this new iteration.
-                this.doProcessOutgoingRequests().then(() => {
-                    deferred.resolve();
-                });
+                // make the requests and feed the results back to the `nextLoopDeferred`
+                await this.processOutgoingRequests().then(deferred.resolve, deferred.reject);
             }
+        } finally {
+            this.outgoingRequestLoopRunning = false;
+        }
+
+        if (this.nextLoopDeferred) {
+            // the loop was stopped, but there was a call to `doProcessOutgoingRequests`. Make sure that
+            // we reject the promise in case anything is waiting for it.
+            this.nextLoopDeferred.reject(new Error("OutgoingRequestsManager was stopped"));
         }
     }
 
