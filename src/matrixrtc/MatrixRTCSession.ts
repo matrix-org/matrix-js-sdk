@@ -511,6 +511,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // important we don't allow our own keys to be set by one of these events (apart from
             // the fact that we don't need it anyway because we already know our own keys).
             logger.info("Ignoring our own keys event");
+            return;
         }
 
         for (const key of content.keys) {
