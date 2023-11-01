@@ -128,7 +128,7 @@ export abstract class ReadReceipt<
     private receiptPointsAtConsistentEvent(receipt: WrappedReceipt): boolean {
         const event = this.findEventById(receipt.eventId);
         if (!event) {
-            // If the receipt points at a non-existent event, we have 2
+            // If the receipt points at a non-existent event, we have multiple
             // possibilities:
             //
             // 1. We don't have the event because it's not loaded yet - probably
@@ -137,6 +137,12 @@ export abstract class ReadReceipt<
             //
             // 2. We have a bug e.g. we misclassified this event into the wrong
             //    thread.
+            //
+            // 3. The referenced event moved out of this thread (e.g. because it
+            //    was deleted.)
+            //
+            // 4. The receipt had the incorrect thread ID (due to a bug in a
+            // client, or malicious behaviour).
             logger.warn(`Ignoring receipt for missing event with id ${receipt.eventId}`);
 
             // This receipt is not "valid" because it doesn't point at an event
@@ -185,6 +191,11 @@ export abstract class ReadReceipt<
         //
         // 2. There is a bug somewhere - either we put the event into the wrong
         //    thread, or someone sent an incorrect receipt.
+        //
+        // In many cases, we won't get here because the call to findEventById
+        // would have already returned null. We include this check to cover
+        // cases when `this` is a  room, meaning findEventById will find events
+        // in any thread, and to be defensive against unforeseen code paths.
         logger.warn(
             `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees ` +
                 `with the thread root (${event.threadRootId}) of the referenced event ` +
