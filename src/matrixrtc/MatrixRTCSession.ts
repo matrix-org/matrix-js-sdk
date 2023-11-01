@@ -35,7 +35,7 @@ const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
 // A delay after a member leaves before we create and publish a new key, because people
 // tend to leave calls at the same time
 const MAKE_KEY_DELAY = 3000;
-// The between creating and sending a new key and starting to encrypt with it. This gives others
+// The delay between creating and sending a new key and starting to encrypt with it. This gives others
 // a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
 // The total time between a member leaving and the call switching to new keys is therefore
 // MAKE_KEY_DELAY + SEND_KEY_DELAY
