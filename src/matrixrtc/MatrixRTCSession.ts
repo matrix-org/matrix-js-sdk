@@ -515,6 +515,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         for (const key of content.keys) {
+            if (!key) {
+                logger.info("Ignoring false-y key in keys event");
+                continue;
+            }
+
             const encryptionKey = key.key;
             const encryptionKeyIndex = key.index;
 
