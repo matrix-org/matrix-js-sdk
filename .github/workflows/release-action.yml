@@ -92,7 +92,6 @@ jobs:
                   done <<< "$DEPENDENCIES"
               env:
                   DEPENDENCIES: ${{ inputs.dependencies }}
-                  FINAL: ${{ inputs.final }}
 
             - name: Prevent develop dependencies
               if: inputs.dependencies
