@@ -3,6 +3,10 @@ name: Merge master -> develop
 on:
     push:
         branches: [master]
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
 concurrency: ${{ github.workflow }}
 jobs:
     merge:
