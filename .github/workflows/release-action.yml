@@ -22,6 +22,10 @@ on:
                     `version` can be `"current"` to leave it at the current version.
                 type: string
                 required: false
+            include-changes:
+                description: Project to include changelog entries from in this release.
+                type: string
+                required: false
 jobs:
     release:
         name: Release
@@ -64,8 +68,10 @@ jobs:
               run: "yarn install --frozen-lockfile"
 
             - name: Update dependencies
+              id: update-dependencies
               if: inputs.dependencies
               run: |
+                  UPDATED=()
                   while IFS= read -r DEPENDENCY; do
                       [ -z "$DEPENDENCY" ] && continue
                       IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
@@ -89,7 +95,11 @@ jobs:
                       yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
                       git add -u
                       git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
+                      UPDATED+=("$PACKAGE")
                   done <<< "$DEPENDENCIES"
+
+                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
+                  echo "updated=$JSON" >> $GITHUB_OUTPUT
               env:
                   DEPENDENCIES: ${{ inputs.dependencies }}
                   FINAL: ${{ inputs.final }}
@@ -106,6 +116,15 @@ jobs:
 
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "$VERSION"
+
+            - name: Ingest upstream changes
+              if: |
+                  inputs.dependencies &&
+                  inputs.include-changes &&
+                  includes(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
+              uses: ./.github/actions/combine-changes
+              with:
+                  project: ${{ inputs.include-changes }}
 
             - name: Add to CHANGELOG.md
               if: inputs.mode == 'final'

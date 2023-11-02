@@ -1,0 +1,67 @@
+name: Ingest upstream changes
+description: Merges changelog from target project release into the input body
+inputs:
+    project:
+        description: Project from which to include changes.
+        required: true
+runs:
+    using: composite
+    steps:
+        - name: Find upstream version
+          id: upstream
+          shell: bash
+          run: |
+              echo "version=$(cat node_modules/$DEPENDENCY/package.json | jq -r .version)" >> $GITHUB_OUTPUT
+              URL=$(node_modules/$DEPENDENCY/package.json | jq -r .repository.url)
+              OWNER=$(basename $(dirname "$URL"))
+              PROJECT=$(basename "$URL")
+              echo "repo=${OWNER}/${PROJECT}" >> $GITHUB_OUTPUT
+          env:
+              DEPENDENCY: ${{ inputs.project }}
+
+        - name: Get upstream release
+          id: upstream-release
+          uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
+          env:
+              GITHUB_TOKEN: ${{ github.token }}
+          with:
+              tag: v${{ steps.upstream.outputs.version }}
+              repo: ${{ steps.upstream.outputs.repo }}
+
+        - name: Merge changes
+          uses: actions/github-script@v6
+          env:
+              SOURCE: ${{ steps.upstream-release.outputs.body }}
+          with:
+              retries: 3
+              script: |
+                  const { RELEASE_NOTES, SOURCE } = process.env;
+
+                  let heading = null;
+                  const sections = new Map();
+                  for (const line of SOURCE.split("\n")) {
+                      if (line.startsWith("#")) {
+                          heading = line;
+                          sections.set(heading, []);
+                          continue;
+                      }
+                      if (heading && line) {
+                          sections.get(heading).push(line);
+                      }
+                  }
+
+                  const output = [];
+                  for (const line of [...RELEASE_NOTES.split("\n"), null]) {
+                      if (line.startsWith("#") || line === null) {
+                          if (heading) {
+                              const lastIsBlank = !output.at(-1)?.trim();
+                              if (lastIsBlank) output.pop();
+                              output.push(...sections.get(heading));
+                              if (lastIsBlank) output.push("");
+                          }
+                          heading = line;
+                      }
+                      output.push(line);
+                  }
+
+                  core.exportVariable("RELEASE_NOTES", output.join("\n"));
