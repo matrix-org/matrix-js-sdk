@@ -19,7 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { defer } from "../../../src/utils";
+import { defer, IDeferred } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 
 describe("OutgoingRequestsManager", () => {
@@ -107,55 +107,57 @@ describe("OutgoingRequestsManager", () => {
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
             const request3 = new RustSdkCryptoJs.KeysBackupRequest("foo3", "{}", "1");
 
-            // create defer to control if there is a loop going on
-            const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
-            const secondOutgoingRequestDefer = defer<OutgoingRequest[]>();
-            const thirdOutgoingRequestDefer = defer<OutgoingRequest[]>();
+            // promises which will resolve when OlmMachine.outgoingRequests is called
+            const outgoingRequestCalledPromises: Promise<void>[] = [];
 
-            olmMachine.outgoingRequests
-                .mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
-                    return firstOutgoingRequestDefer.promise;
-                })
-                .mockImplementationOnce(async () => {
-                    return secondOutgoingRequestDefer.promise;
-                })
-                .mockImplementationOnce(async () => {
-                    return thirdOutgoingRequestDefer.promise;
-                })
-                .mockImplementationOnce(async () => {
-                    // Another one that should not occur
-                    return [];
+            // deferreds which will provide the results of OlmMachine.outgoingRequests
+            const outgoingRequestResultDeferreds: IDeferred<OutgoingRequest[]>[] = [];
+
+            for (let i = 0; i < 3; i++) {
+                const resultDeferred = defer<OutgoingRequest[]>();
+                const calledPromise = new Promise<void>((resolve) => {
+                    olmMachine.outgoingRequests.mockImplementationOnce(() => {
+                        resolve();
+                        return resultDeferred.promise;
+                    });
                 });
+                outgoingRequestCalledPromises.push(calledPromise);
+                outgoingRequestResultDeferreds.push(resultDeferred);
+            }
 
-            const firstRequest = manager.doProcessOutgoingRequests();
+            const call1 = manager.doProcessOutgoingRequests();
 
-            // First request will start an iteration and for now is awaiting on firstOutgoingRequestDefer
+            // First call will start an iteration and for now is awaiting on outgoingRequests
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
 
-            // Query a new request now, this would request a new iteration
-            const secondRequest = manager.doProcessOutgoingRequests();
+            // Make a new call now: this will request a new iteration
+            const call2 = manager.doProcessOutgoingRequests();
 
             // let the first iteration complete
-            firstOutgoingRequestDefer.resolve([request1]);
+            outgoingRequestResultDeferreds[0].resolve([request1]);
 
-            // The first request should be now complete
-            await firstRequest;
+            // The first call should now complete
+            await call1;
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
 
-            // The second request is awaiting on secondOutgoingRequestDefer
-            // stack a new request that should be processed in an additional iteration
+            // Wait for the second iteration to fire and be waiting on `outgoingRequests`
+            await outgoingRequestCalledPromises[1];
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
 
-            const thirdRequest = manager.doProcessOutgoingRequests();
+            // Stack a new call that should be processed in an additional iteration.
+            const call3 = manager.doProcessOutgoingRequests();
 
-            secondOutgoingRequestDefer.resolve([request2]);
-            await secondRequest;
+            outgoingRequestResultDeferreds[1].resolve([request2]);
+            await call2;
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(2);
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
 
-            // The third request is awaiting on thirdOutgoingRequestDefer
-
-            thirdOutgoingRequestDefer.resolve([request3]);
-            await thirdRequest;
+            // Wait for the third iteration to fire and be waiting on `outgoingRequests`
+            await outgoingRequestCalledPromises[2];
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(3);
+            outgoingRequestResultDeferreds[2].resolve([request3]);
+            await call3;
 
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(3);
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
