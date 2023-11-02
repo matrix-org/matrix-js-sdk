@@ -664,14 +664,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * The fallbackAge is computed by using the origin_server_ts. So it is not adjusted 
+     * The fallbackAge is computed by using the origin_server_ts. So it is not adjusted
      * to the local device clock. It should never be used.
      * If there is no unsigned field in the event this is a better fallback then 0.
      * It is supposed to only be used like this: `ev.getAge() ?? ev.fallbackAge()`
      */
-    private fallbackAge(): number{
-        if(!this.getAge()) {
-            logger.warn("Age for event was not available, using `now - origin_server_ts` as a fallback. If the device clock is not correct issues might occur.");
+    private fallbackAge(): number {
+        if (!this.getAge()) {
+            logger.warn(
+                "Age for event was not available, using `now - origin_server_ts` as a fallback. If the device clock is not correct issues might occur.",
+            );
         }
         return Math.max(Date.now() - this.getTs(), 0);
     }
