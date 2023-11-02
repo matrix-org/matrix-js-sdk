@@ -6,6 +6,10 @@ on:
                 required: true
             NPM_TOKEN:
                 required: false
+            GPG_PASSPHRASE:
+                required: false
+            GPG_PRIVATE_KEY:
+                required: false
         inputs:
             final:
                 description: Make final release
@@ -26,11 +30,29 @@ on:
                 description: Project to include changelog entries from in this release.
                 type: string
                 required: false
+            gpg-fingerprint:
+                description: Fingerprint of the GPG key to use for signing the git tag and assets, if any.
+                type: string
+                required: false
+            asset-path:
+                description: |
+                    The path to the asset you want to upload, if any. You can use glob patterns here.
+                    Will be GPG signed and an `.asc` file included in the release artifacts if `gpg-fingerprint` is set.
+                type: string
+                required: false
 jobs:
     release:
         name: Release
         runs-on: ubuntu-latest
         steps:
+            - name: Load GPG key
+              if: inputs.gpg-fingerprint
+              uses: crazy-max/ghaction-import-gpg@111c56156bcc6918c056dbef52164cfa583dc549 # v5
+              with:
+                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.GPG_PASSPHRASE }}
+                  fingerprint: ${{ inputs.gpg-fingerprint }}
+
             - name: Get draft release
               id: release
               uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
@@ -40,20 +62,37 @@ jobs:
                   draft: true
                   latest: true
 
-            - name: Load version
-              run: echo "VERSION=$VERSION" >> $GITHUB_ENV
-              env:
-                  VERSION: ${{ steps.release.outputs.tag_name }}
-
-            - name: Finalise version
-              if: inputs.mode == 'final'
-              run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
-
             - uses: actions/checkout@v4
               with:
                   ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
+
+            - name: Prepare variables
+              id: prepare
+              run: |
+                  echo "VERSION=$VERSION" >> $GITHUB_ENV
+                  echo "RELEASE_NOTES<<EOF${BODY}EOF" >> $GITHUB_ENV
+
+                  HAS_DIST=0
+                  jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
+                  echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
+
+                  if [ -n "$GPG_FINGERPRINT" ]
+                  then
+                      UID=$(gpg --with-colons --fingerprint "$GPG_FINGERPRINT" | awk -F: '$1=="uid" {print $10; exit}')
+                      EMAIL=$(echo "$UID" | awk -F[<>] '{print $2}')
+                      echo "gpg-uid=$UID" >> $GITHUB_OUTPUT
+                      echo "gpg-email=$EMAIL" >> $GITHUB_OUTPUT
+                  fi
+              env:
+                  BODY: ${{ steps.release.outputs.body }}
+                  VERSION: ${{ steps.release.outputs.tag_name }}
+                  GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
+
+            - name: Finalise version
+              if: inputs.mode == 'final'
+              run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
             - name: Set up git
               run: |
@@ -136,14 +175,12 @@ jobs:
                       echo "$HEADER"
                       printf '=%.0s' $(seq ${#HEADER})
                       echo ""
-                      echo "$BODY"
+                      echo "$RELEASE_NOTES"
                       echo ""
                   } > CHANGELOG.md
 
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
-              env:
-                  BODY: ${{ steps.release.outputs.body }}
 
             # For the published and dist versions of the package,
             # we copy the `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if they exist).
@@ -159,11 +196,53 @@ jobs:
                       fi
                   done
 
-            - name: Commit and push changes
+            - name: Commit changes
               run: |
                   git add package.json CHANGELOG.md
                   git commit -m "$VERSION"
+
+            - name: Build assets
+              if: steps.prepare.outputs.has-dist-script
+              run: DIST_VERSION="$VERSION" yarn dist
+
+            - name: Upload release assets & signatures
+              if: inputs.asset_path
+              uses: ./.github/actions/upload-release-assets
+              with:
+                  gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
+                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  asset-path: ${{ inputs.asset-path }}
+
+            - name: Generate & upload tarball signature
+              if: inputs.gpg-fingerprint
+              uses: ./.github/actions/sign-release-tarball
+              with:
+                  gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
+                  upload-url: ${{ steps.release.outputs.upload_url }}
+
+            - name: Create signed tag
+              if: inputs.gpg-fingerprint
+              run: |
+                  GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
+                  git push origin staging "$VERSION"
+              env:
+                  GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
+                  SIGNING_ID: ${{ steps.prepare.outputs.email }}
+
+            # We defer pushing changes until after the release assets are built,
+            # signed & uploaded to improve the atomicity of this action.
+            - name: Push changes to staging
+              run: |
                   git push origin staging
+                  git reset --hard
+
+            # TODO validate release tarball signature
+            - name: Validate gpg signature
+              if: inputs.gpg-fingerprint
+              run: |
+                  echo "::error title=Failed to validate tarball GPG signature::{message}"
+
+            # TODO validate release has expected assets
 
             - name: Merge to master
               if: inputs.final
