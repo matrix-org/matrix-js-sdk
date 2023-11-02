@@ -161,7 +161,7 @@ jobs:
                   inputs.dependencies &&
                   inputs.include-changes &&
                   includes(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
-              uses: ./.github/actions/combine-changes
+              uses: matrix-org/matrix-js-sdk/.github/actions/combine-changes@develop
               with:
                   project: ${{ inputs.include-changes }}
 
@@ -207,7 +207,7 @@ jobs:
 
             - name: Upload release assets & signatures
               if: inputs.asset_path
-              uses: ./.github/actions/upload-release-assets
+              uses: matrix-org/matrix-js-sdk/.github/actions/upload-release-assets@develop
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
@@ -215,7 +215,7 @@ jobs:
 
             - name: Generate & upload tarball signature
               if: inputs.gpg-fingerprint
-              uses: ./.github/actions/sign-release-tarball
+              uses: matrix-org/matrix-js-sdk/.github/actions/sign-release-tarball@develop
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
