@@ -155,12 +155,10 @@ jobs:
 
             - name: Publish release
               uses: actions/github-script@v6
-              id: my-script
               env:
                   RELEASE_ID: ${{ steps.release.outputs.id }}
                   MODE: ${{ inputs.final }}
               with:
-                  result-encoding: string
                   retries: 3
                   script: |
                       let { RELEASE_ID: release_id, VERSION, MODE } = process.env;
