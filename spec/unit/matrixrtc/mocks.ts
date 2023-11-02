@@ -36,7 +36,7 @@ export function makeMockRoomState(
     memberships: CallMembershipData[],
     roomId: string,
     getLocalAge: (() => number) | undefined,
-    localTimestamp: (() => number) |undefined = undefined,
+    localTimestamp: (() => number) | undefined = undefined,
 ) {
     return {
         getStateEvents: (_: string, stateKey: string) => {
