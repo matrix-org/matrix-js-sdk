@@ -19,7 +19,7 @@ import { mocked } from "jest-mock";
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
-import { makeThreadEvent, mkThread } from "../../test-utils/thread";
+import { makeThreadEvent, mkThread, populateThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
@@ -148,8 +148,8 @@ describe("Thread", () => {
             expect(thread.hasUserReadEvent(myUserId, events.at(-1)!.getId() ?? "")).toBeTruthy();
         });
 
-        it("considers other events with no RR as unread", () => {
-            const { thread, events } = mkThread({
+        it("considers other events with no RR as unread", async () => {
+            const { thread, events, threadRoot } = await populateThread({
                 room,
                 client,
                 authorId: myUserId,
@@ -157,6 +157,20 @@ describe("Thread", () => {
                 length: 25,
                 ts: 190,
             });
+
+            const receipt = new MatrixEvent({
+                type: "m.receipt",
+                room_id: room.roomId,
+                content: {
+                    // unthreaded receipt for the thread root
+                    [threadRoot.getId()]: {
+                        [ReceiptType.Read]: {
+                            [myUserId]: { ts: 200 },
+                        },
+                    },
+                },
+            });
+            room.addReceipt(receipt);
 
             // Before alice's last unthreaded receipt
             expect(thread.hasUserReadEvent("@alice:example.org", events.at(1)!.getId() ?? "")).toBeTruthy();

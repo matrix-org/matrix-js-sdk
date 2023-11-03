@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
-import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
+import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
 
 export enum ThreadEvent {
@@ -813,22 +813,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
-        return super.hasUserReadEvent(userId, eventId);
+        return this.room.hasUserReadEvent(userId, eventId);
     }
 
     public setUnread(type: NotificationCountType, count: number): void {
         return this.room.setThreadUnreadNotificationCount(this.id, type, count);
-    }
-
-    /**
-     * Returns the most recent unthreaded receipt for a given user
-     * @param userId - the MxID of the User
-     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
-     * or a user chooses to use private read receipts (or we have simply not received
-     * a receipt from this user yet).
-     */
-    public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
-        return this.room.getLastUnthreadedReceiptFor(userId);
     }
 }
 

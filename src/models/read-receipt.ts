@@ -387,49 +387,4 @@ export abstract class ReadReceipt<
                 return receipt.userId;
             });
     }
-
-    /**
-     * Determines if the given user has read a particular event ID with the known
-     * history of the room. This is not a definitive check as it relies only on
-     * what is available to the room at the time of execution.
-     * @param userId - The user ID to check the read state of.
-     * @param eventId - The event ID to check if the user read.
-     * @returns True if the user has read the event, false otherwise.
-     */
-    public hasUserReadEvent(userId: string, eventId: string): boolean {
-        const readUpToId = this.getEventReadUpTo(userId, false);
-        if (readUpToId === eventId) return true;
-
-        if (
-            this.timeline?.length &&
-            this.timeline[this.timeline.length - 1].getSender() &&
-            this.timeline[this.timeline.length - 1].getSender() === userId
-        ) {
-            // It doesn't matter where the event is in the timeline, the user has read
-            // it because they've sent the latest event.
-            return true;
-        }
-
-        for (let i = this.timeline?.length - 1; i >= 0; --i) {
-            const ev = this.timeline[i];
-
-            // If we encounter the target event first, the user hasn't read it
-            // however if we encounter the readUpToId first then the user has read
-            // it. These rules apply because we're iterating bottom-up.
-            if (ev.getId() === eventId) return false;
-            if (ev.getId() === readUpToId) return true;
-        }
-
-        // We don't know if the user has read it, so assume not.
-        return false;
-    }
-
-    /**
-     * Returns the most recent unthreaded receipt for a given user
-     * @param userId - the MxID of the User
-     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
-     * or a user chooses to use private read receipts (or we have simply not received
-     * a receipt from this user yet).
-     */
-    public abstract getLastUnthreadedReceiptFor(userId: string): Receipt | undefined;
 }
