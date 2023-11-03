@@ -40,6 +40,10 @@ on:
                     Will be GPG signed and an `.asc` file included in the release artifacts if `gpg-fingerprint` is set.
                 type: string
                 required: false
+            expected-asset-count:
+                description: The number of expected assets, including signatures, excluding generated zip & tarball.
+                type: number
+                required: false
 jobs:
     release:
         name: Release
@@ -244,7 +248,27 @@ jobs:
                   TEXT=$(gpg --verify ../$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz || ret=$?)
                   [ $ret -eq 0 ] || echo "::error title=Failed to validate tarball GPG signature::$TEXT"
 
-            # TODO validate release has expected assets
+            - name: Validate release has expected assets
+              if: inputs.expected-asset-count
+              uses: actions/github-script@v6
+              env:
+                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
+              with:
+                  retries: 3
+                  script: |
+                      let { RELEASE_ID: release_id, EXPECTED_ASSET_COUNT } = process.env;
+                      const { owner, repo } = context.repo;
+
+                      const { data: release } = await github.rest.repos.getRelease({
+                          owner,
+                          repo,
+                          release_id,
+                      });
+
+                      if (release.assets.length !== EXPECTED_ASSET_COUNT) {
+                          core.error(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
+                      }
 
             - name: Merge to master
               if: inputs.final
@@ -261,7 +285,7 @@ jobs:
               with:
                   retries: 3
                   script: |
-                      let { RELEASE_ID: release_id, VERSION, MODE } = process.env;
+                      let { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, MODE } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
@@ -271,6 +295,7 @@ jobs:
                           tag_name: VERSION,
                           name: VERSION,
                           draft: false,
+                          body: RELEASE_NOTES,
                       };
 
                       if (MODE === "final") {
