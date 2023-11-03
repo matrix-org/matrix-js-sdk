@@ -41,7 +41,7 @@ export interface CryptoApi {
 
     /**
      * Return the current version of the crypto module.
-     * For example: `Rust SDK ${versions.matrix_sdk_crypto}, Vodozemac ${versions.vodozemac}`.
+     * For example: `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`.
      * @returns the formatted version
      */
     getVersion(): string;

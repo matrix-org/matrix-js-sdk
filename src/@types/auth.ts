@@ -251,12 +251,6 @@ export interface LoginTokenPostResponse {
      */
     login_token: string;
     /**
-     * Expiration in seconds.
-     *
-     * @deprecated this is only provided for compatibility with original revision of [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882).
-     */
-    expires_in: number;
-    /**
      * Expiration in milliseconds.
      */
     expires_in_ms: number;
