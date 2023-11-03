@@ -392,7 +392,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         });
 
         this.txnId = event.txn_id;
-        this.localTimestamp = Date.now() - (this.getAge() ?? this.fallbackAge());
+        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
         this.reEmitter = new TypedReEmitter(this);
     }
 
@@ -661,21 +661,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getAge(): number | undefined {
         return this.getUnsigned().age || this.event.age; // v2 / v1
-    }
-
-    /**
-     * The fallbackAge is computed by using the origin_server_ts. So it is not adjusted
-     * to the local device clock. It should never be used.
-     * If there is no unsigned field in the event this is a better fallback then 0.
-     * It is supposed to only be used like this: `ev.getAge() ?? ev.fallbackAge()`
-     */
-    private fallbackAge(): number {
-        if (!this.getAge()) {
-            logger.warn(
-                "Age for event was not available, using `now - origin_server_ts` as a fallback. If the device clock is not correct issues might occur.",
-            );
-        }
-        return Math.max(Date.now() - this.getTs(), 0);
     }
 
     /**
@@ -1399,7 +1384,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
         }
 
-        this.localTimestamp = Date.now() - (this.getAge() ?? this.fallbackAge());
+        this.localTimestamp = Date.now() - this.getAge()!;
     }
 
     /**
