@@ -236,11 +236,13 @@ jobs:
                   git push origin staging
                   git reset --hard
 
-            # TODO validate release tarball signature
             - name: Validate gpg signature
               if: inputs.gpg-fingerprint
               run: |
-                  echo "::error title=Failed to validate tarball GPG signature::{message}"
+                  wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz -o /tmp/$VERSION.tar.gz
+                  ret=0
+                  TEXT=$(gpg --verify ../$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz || ret=$?)
+                  [ $ret -eq 0 ] || echo "::error title=Failed to validate tarball GPG signature::$TEXT"
 
             # TODO validate release has expected assets
 
