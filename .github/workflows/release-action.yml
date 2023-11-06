@@ -231,13 +231,11 @@ jobs:
                   git push origin staging
                   git reset --hard
 
-            - name: Validate gpg signature
+            - name: Validate tarball signature
               if: inputs.gpg-fingerprint
               run: |
                   wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz -o /tmp/$VERSION.tar.gz
-                  ret=0
-                  TEXT=$(gpg --verify ../sign-release-tarball/$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz || ret=$?)
-                  [ $ret -eq 0 ] || echo "::error title=Failed to validate tarball GPG signature::$TEXT"
+                  gpg --verify ../sign-release-tarball/$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz
 
             - name: Validate release has expected assets
               if: inputs.expected-asset-count
@@ -248,7 +246,7 @@ jobs:
               with:
                   retries: 3
                   script: |
-                      let { RELEASE_ID: release_id, EXPECTED_ASSET_COUNT } = process.env;
+                      const { RELEASE_ID: release_id, EXPECTED_ASSET_COUNT } = process.env;
                       const { owner, repo } = context.repo;
 
                       const { data: release } = await github.rest.repos.getRelease({
@@ -258,7 +256,7 @@ jobs:
                       });
 
                       if (release.assets.length !== EXPECTED_ASSET_COUNT) {
-                          core.error(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
+                          core.setFailed(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
                       }
 
             - name: Merge to master
@@ -276,7 +274,7 @@ jobs:
               with:
                   retries: 3
                   script: |
-                      let { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, MODE } = process.env;
+                      const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, MODE } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
