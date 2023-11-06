@@ -73,6 +73,16 @@ jobs:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: ../action-repo
+                  sparse-checkout: |
+                      .github/actions
+                      scripts/release
+
             - name: Prepare variables
               id: prepare
               run: |
@@ -158,7 +168,7 @@ jobs:
                   inputs.dependencies &&
                   inputs.include-changes &&
                   includes(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
-              uses: matrix-org/matrix-js-sdk/.github/actions/combine-changes@develop
+              uses: ../action-repo/.github/actions/combine-changes@develop
               with:
                   project: ${{ inputs.include-changes }}
 
@@ -178,25 +188,15 @@ jobs:
 
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
+                  git add CHANGELOG.md
 
-            # For the published and dist versions of the package,
-            # we copy the `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if they exist).
-            # This small bit of gymnastics allows us to use the TypeScript source directly for development without
-            # needing to build before linting or testing.
-            - name: Update package.json fields
+            - name: Run pre-release script to update package.json fields
               run: |
-                  for i in main typings browser
-                  do
-                      lib_value=$(jq -r ".matrix_lib_$i" package.json)
-                      if [ "$lib_value" != "null" ]; then
-                          jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
-                      fi
-                  done
+                  ../action-repo/scripts/release/pre-release.sh
+                  git add package.json
 
             - name: Commit changes
-              run: |
-                  git add package.json CHANGELOG.md
-                  git commit -m "$VERSION"
+              run: git commit -m "$VERSION"
 
             - name: Build assets
               if: steps.prepare.outputs.has-dist-script
@@ -204,7 +204,7 @@ jobs:
 
             - name: Upload release assets & signatures
               if: inputs.asset_path
-              uses: matrix-org/matrix-js-sdk/.github/actions/upload-release-assets@develop
+              uses: ../action-repo/.github/actions/upload-release-assets@develop
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
@@ -212,7 +212,7 @@ jobs:
 
             - name: Generate & upload tarball signature
               if: inputs.gpg-fingerprint
-              uses: matrix-org/matrix-js-sdk/.github/actions/sign-release-tarball@develop
+              uses: ../action-repo/.github/actions/sign-release-tarball@develop
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
@@ -302,6 +302,6 @@ jobs:
         name: Publish to npm
         needs: release
         if: inputs.npm
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        uses: ../action-repo/.github/workflows/release-npm.yml@develop
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
