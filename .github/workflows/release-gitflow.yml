@@ -3,6 +3,15 @@ name: Merge master -> develop
 on:
     push:
         branches: [master]
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
+        inputs:
+            dependencies:
+                description: List of dependencies to reset.
+                type: string
+                required: false
 concurrency: ${{ github.workflow }}
 jobs:
     merge:
@@ -49,8 +58,38 @@ jobs:
                       fi
                   done
 
-            - name: Commit and push changes
-              run: |
                   git add package.json
                   git commit -m "Resetting package fields for development"
-                  git push origin develop
+
+            - name: Reset dependencies
+              if: inputs.dependencies
+              run: |
+                  while IFS= read -r PACKAGE; do
+                      [ -z "$PACKAGE" ] && continue
+
+                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
+                      echo "Current $PACKAGE version is $CURRENT_VERSION"
+
+                      if [ "$CURRENT_VERSION" == "null" ]
+                      then
+                          echo "Unable to find $PACKAGE in package.json"
+                          exit 1
+                      fi
+
+                      if [ "$CURRENT_VERSION" == "develop" ]
+                      then
+                          echo "Not updating dependency $PACKAGE"
+                          continue
+                      fi
+
+                      echo "Resetting $1 to develop branch..."
+                      yarn add "github:matrix-org/$PACKAGE#develop"
+                      git add -u
+                      git commit -m "Reset $PACKAGE back to develop branch"
+                  done <<< "$DEPENDENCIES"
+              env:
+                  DEPENDENCIES: ${{ inputs.dependencies }}
+                  FINAL: ${{ inputs.final }}
+
+            - name: Push changes
+              run: git push origin develop
