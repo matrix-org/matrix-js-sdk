@@ -95,7 +95,6 @@ jobs:
               env:
                   BODY: ${{ steps.release.outputs.body }}
                   VERSION: ${{ steps.release.outputs.tag_name }}
-                  GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
 
             - name: Finalise version
               if: inputs.mode == 'final'
