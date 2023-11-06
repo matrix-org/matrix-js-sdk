@@ -1746,6 +1746,7 @@ describe("Room", function () {
             it("should acknowledge if an event has been read", function () {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
+                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
             it("return false for an unknown event", function () {
@@ -3147,106 +3148,195 @@ describe("Room", function () {
         const client = new TestClient(userA).client;
         const room = new Room(roomId, client, userA);
 
-        it("handles missing receipt type", () => {
-            room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                return receiptType === ReceiptType.ReadPrivate ? ({ eventId: "eventId" } as WrappedReceipt) : null;
-            };
-
-            expect(room.getEventReadUpTo(userA)).toEqual("eventId");
-        });
-
-        describe("prefers newer receipt", () => {
-            it("should compare correctly using timelines", () => {
-                room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                    if (receiptType === ReceiptType.ReadPrivate) {
-                        return { eventId: "eventId1" } as WrappedReceipt;
-                    }
-                    if (receiptType === ReceiptType.Read) {
-                        return { eventId: "eventId2" } as WrappedReceipt;
-                    }
-                    return null;
-                };
-
-                for (let i = 1; i <= 2; i++) {
-                    room.getUnfilteredTimelineSet = () =>
-                        ({
-                            compareEventOrdering: (event1, event2) => {
-                                return event1 === `eventId${i}` ? 1 : -1;
-                            },
-                        } as EventTimelineSet);
-
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
-                }
+        describe("invalid receipts", () => {
+            beforeEach(() => {
+                // Clear the spies on logger.warn
+                jest.clearAllMocks();
             });
 
-            describe("correctly compares by timestamp", () => {
-                it("should correctly compare, if we have all receipts", () => {
+            it("ignores receipts pointing at missing events", () => {
+                // Given a receipt exists
+                room.getReadReceiptForUserId = (): WrappedReceipt | null => {
+                    return { eventId: "missingEventId" } as WrappedReceipt;
+                };
+                // But the event ID it contains does not refer to an event we have
+                room.findEventById = jest.fn().mockReturnValue(null);
+
+                // When we ask what they have read
+                // Then we say "nothing"
+                expect(room.getEventReadUpTo(userA)).toBeNull();
+                expect(logger.warn).toHaveBeenCalledWith("Ignoring receipt for missing event with id missingEventId");
+            });
+
+            it("ignores receipts pointing at the wrong thread", () => {
+                // Given a threaded receipt exists
+                room.getReadReceiptForUserId = (): WrappedReceipt | null => {
+                    return { eventId: "wrongThreadEventId", data: { ts: 0, thread_id: "thread1" } } as WrappedReceipt;
+                };
+                // But the event it refers to is in a thread
+                room.findEventById = jest.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
+
+                // When we ask what they have read
+                // Then we say "nothing"
+                expect(room.getEventReadUpTo(userA)).toBeNull();
+                expect(logger.warn).toHaveBeenCalledWith(
+                    "Ignoring receipt because its thread_id (thread1) disagrees with the thread root (thread2) " +
+                        "of the referenced event (event ID = wrongThreadEventId)",
+                );
+            });
+
+            it("accepts unthreaded receipts pointing at an event in a thread", () => {
+                // Given an unthreaded receipt exists
+                room.getReadReceiptForUserId = (): WrappedReceipt | null => {
+                    return { eventId: "inThreadEventId" } as WrappedReceipt;
+                };
+                // And the event it refers to is in a thread
+                room.findEventById = jest.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
+
+                // When we ask what they have read
+                // Then we say the event
+                expect(room.getEventReadUpTo(userA)).toEqual("inThreadEventId");
+            });
+
+            it("accepts main thread receipts pointing at an event in main timeline", () => {
+                // Given a threaded receipt exists, in main thread
+                room.getReadReceiptForUserId = (): WrappedReceipt | null => {
+                    return { eventId: "mainThreadEventId", data: { ts: 12, thread_id: "main" } } as WrappedReceipt;
+                };
+                // And the event it refers to is in a thread
+                room.findEventById = jest.fn().mockReturnValue({ threadRootId: undefined } as MatrixEvent);
+
+                // When we ask what they have read
+                // Then we say the event
+                expect(room.getEventReadUpTo(userA)).toEqual("mainThreadEventId");
+            });
+
+            it("accepts main thread receipts pointing at a thread root", () => {
+                // Given a threaded receipt exists, in main thread
+                room.getReadReceiptForUserId = (): WrappedReceipt | null => {
+                    return { eventId: "rootId", data: { ts: 12, thread_id: "main" } } as WrappedReceipt;
+                };
+                // And the event it refers to is in a thread, because it is a thread root
+                room.findEventById = jest
+                    .fn()
+                    .mockReturnValue({ isThreadRoot: true, threadRootId: "thread1" } as MatrixEvent);
+
+                // When we ask what they have read
+                // Then we say the event
+                expect(room.getEventReadUpTo(userA)).toEqual("rootId");
+            });
+        });
+
+        describe("valid receipts", () => {
+            beforeEach(() => {
+                // When we look up the event referred to by the receipt, it exists
+                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+            });
+
+            it("handles missing receipt type", () => {
+                room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                    return receiptType === ReceiptType.ReadPrivate ? ({ eventId: "eventId" } as WrappedReceipt) : null;
+                };
+                expect(room.getEventReadUpTo(userA)).toEqual("eventId");
+            });
+
+            describe("prefers newer receipt", () => {
+                it("should compare correctly using timelines", () => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                        if (receiptType === ReceiptType.ReadPrivate) {
+                            return { eventId: "eventId1" } as WrappedReceipt;
+                        }
+                        if (receiptType === ReceiptType.Read) {
+                            return { eventId: "eventId2" } as WrappedReceipt;
+                        }
+                        return null;
+                    };
+
                     for (let i = 1; i <= 2; i++) {
                         room.getUnfilteredTimelineSet = () =>
                             ({
-                                compareEventOrdering: (_1, _2) => null,
-                            } as EventTimelineSet);
-                        room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                            if (receiptType === ReceiptType.ReadPrivate) {
-                                return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as WrappedReceipt;
-                            }
-                            if (receiptType === ReceiptType.Read) {
-                                return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as WrappedReceipt;
-                            }
-                            return null;
-                        };
+                                compareEventOrdering: (event1: string, _event2: string) => {
+                                    return event1 === `eventId${i}` ? 1 : -1;
+                                },
+                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                            } as unknown as EventTimelineSet);
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
                     }
                 });
 
-                it("should correctly compare, if private read receipt is missing", () => {
-                    room.getUnfilteredTimelineSet = () =>
-                        ({
-                            compareEventOrdering: (_1, _2) => null,
-                        } as EventTimelineSet);
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2", data: { ts: 1 } } as WrappedReceipt;
-                        }
-                        return null;
-                    };
+                describe("correctly compares by timestamp", () => {
+                    it("should correctly compare, if we have all receipts", () => {
+                        for (let i = 1; i <= 2; i++) {
+                            room.getUnfilteredTimelineSet = () =>
+                                ({
+                                    compareEventOrdering: () => null,
+                                    findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                                } as unknown as EventTimelineSet);
+                            room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                                if (receiptType === ReceiptType.ReadPrivate) {
+                                    return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as WrappedReceipt;
+                                }
+                                if (receiptType === ReceiptType.Read) {
+                                    return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as WrappedReceipt;
+                                }
+                                return null;
+                            };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                            expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
+                        }
+                    });
+
+                    it("should correctly compare, if private read receipt is missing", () => {
+                        room.getUnfilteredTimelineSet = () =>
+                            ({
+                                compareEventOrdering: () => null,
+                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                            } as unknown as EventTimelineSet);
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                            if (receiptType === ReceiptType.Read) {
+                                return { eventId: "eventId2", data: { ts: 1 } } as WrappedReceipt;
+                            }
+                            return null;
+                        };
+
+                        expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                    });
                 });
-            });
 
-            describe("fallback precedence", () => {
-                beforeAll(() => {
-                    room.getUnfilteredTimelineSet = () =>
-                        ({
-                            compareEventOrdering: (_1, _2) => null,
-                        } as EventTimelineSet);
-                });
+                describe("fallback precedence", () => {
+                    beforeAll(() => {
+                        room.getUnfilteredTimelineSet = () =>
+                            ({
+                                compareEventOrdering: () => null,
+                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                            } as unknown as EventTimelineSet);
+                    });
 
-                it("should give precedence to m.read.private", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                        if (receiptType === ReceiptType.ReadPrivate) {
-                            return { eventId: "eventId1", data: { ts: 123 } };
-                        }
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2", data: { ts: 123 } };
-                        }
-                        return null;
-                    };
+                    it("should give precedence to m.read.private", () => {
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                            if (receiptType === ReceiptType.ReadPrivate) {
+                                return { eventId: "eventId1", data: { ts: 123 } };
+                            }
+                            if (receiptType === ReceiptType.Read) {
+                                return { eventId: "eventId2", data: { ts: 123 } };
+                            }
+                            return null;
+                        };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
-                });
+                        expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
+                    });
 
-                it("should give precedence to m.read", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId3" } as WrappedReceipt;
-                        }
-                        return null;
-                    };
+                    it("should give precedence to m.read", () => {
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                            if (receiptType === ReceiptType.Read) {
+                                return { eventId: "eventId3" } as WrappedReceipt;
+                            }
+                            return null;
+                        };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
+                        expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
+                    });
                 });
             });
         });
