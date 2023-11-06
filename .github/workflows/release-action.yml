@@ -245,7 +245,7 @@ jobs:
               run: |
                   wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz -o /tmp/$VERSION.tar.gz
                   ret=0
-                  TEXT=$(gpg --verify ../$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz || ret=$?)
+                  TEXT=$(gpg --verify ../sign-release-tarball/$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz || ret=$?)
                   [ $ret -eq 0 ] || echo "::error title=Failed to validate tarball GPG signature::$TEXT"
 
             - name: Validate release has expected assets

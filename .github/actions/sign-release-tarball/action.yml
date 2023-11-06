@@ -1,5 +1,5 @@
 name: Sign Release Tarball
-description: Generates signature for release tarball and optionally uploads it as a release asset
+description: Generates signature for release tarball and uploads it as a release asset
 inputs:
     gpg-fingerprint:
         description: Fingerprint of the GPG key to use for signing the tarball.
@@ -13,8 +13,9 @@ runs:
         - name: Generate tarball signature
           shell: bash
           run: |
-              git -c tar.tar.gz.command='gzip -cn' archive --format=tar.gz --prefix="${REPO#*/}-${VERSION#v}/" -o "../${VERSION}.tar.gz" "${VERSION}"
-              gpg -u "$GPG_FINGERPRINT" --armor --output "../${VERSION}.tar.gz.asc" --detach-sig "../${VERSION}.tar.gz"
+              mkdir ../sign-release-tarball
+              git -c tar.tar.gz.command='gzip -cn' archive --format=tar.gz --prefix="${REPO#*/}-${VERSION#v}/" -o "../sign-release-tarball/${VERSION}.tar.gz" "${VERSION}"
+              gpg -u "$GPG_FINGERPRINT" --armor --output "../sign-release-tarball/${VERSION}.tar.gz.asc" --detach-sig "../sign-release-tarball/${VERSION}.tar.gz"
           env:
               GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
               REPO: ${{ github.repository }}
@@ -24,4 +25,4 @@ runs:
           uses: shogo82148/actions-upload-release-asset@dccd6d23e64fd6a746dce6814c0bde0a04886085 # v1
           with:
               upload_url: ${{ inputs.upload-url }}
-              asset_path: ../*.tar.gz.asc
+              asset_path: ../sign-release-tarball/*.tar.gz.asc
