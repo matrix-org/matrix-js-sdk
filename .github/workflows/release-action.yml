@@ -222,7 +222,6 @@ jobs:
                   GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
                   git push origin staging "$VERSION"
               env:
-                  GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
                   SIGNING_ID: ${{ steps.gpg.outputs.email }}
 
             # We defer pushing changes until after the release assets are built,
