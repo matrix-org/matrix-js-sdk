@@ -301,6 +301,6 @@ jobs:
         name: Publish to npm
         needs: release
         if: inputs.npm
-        uses: ../action-repo/.github/workflows/release-npm.yml@develop
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
