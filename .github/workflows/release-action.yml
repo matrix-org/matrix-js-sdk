@@ -50,6 +50,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Load GPG key
+              id: gpg
               if: inputs.gpg-fingerprint
               uses: crazy-max/ghaction-import-gpg@111c56156bcc6918c056dbef52164cfa583dc549 # v5
               with:
@@ -81,14 +82,6 @@ jobs:
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
-
-                  if [ -n "$GPG_FINGERPRINT" ]
-                  then
-                      UID=$(gpg --with-colons --fingerprint "$GPG_FINGERPRINT" | awk -F: '$1=="uid" {print $10; exit}')
-                      EMAIL=$(echo "$UID" | awk -F[<>] '{print $2}')
-                      echo "gpg-uid=$UID" >> $GITHUB_OUTPUT
-                      echo "gpg-email=$EMAIL" >> $GITHUB_OUTPUT
-                  fi
               env:
                   BODY: ${{ steps.release.outputs.body }}
                   VERSION: ${{ steps.release.outputs.tag_name }}
@@ -231,7 +224,7 @@ jobs:
                   git push origin staging "$VERSION"
               env:
                   GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
-                  SIGNING_ID: ${{ steps.prepare.outputs.email }}
+                  SIGNING_ID: ${{ steps.gpg.outputs.email }}
 
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
