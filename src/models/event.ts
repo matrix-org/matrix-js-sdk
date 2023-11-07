@@ -668,11 +668,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * It is supposed to only be used like this: `ev.getAge() ?? ev.fallbackAge()`
      */
     private fallbackAge(): number {
-        if (!this.getAge()) {
-            logger.warn(
-                "Age for event was not available, using `now - origin_server_ts` as a fallback. If the device clock is not correct issues might occur.",
-            );
-        }
         return Math.max(Date.now() - this.getTs(), 0);
     }
 
