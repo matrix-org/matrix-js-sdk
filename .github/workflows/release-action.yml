@@ -218,7 +218,7 @@ jobs:
 
             - name: Upload release assets & signatures
               if: inputs.asset_path
-              uses: ../action-repo/.github/actions/upload-release-assets@develop
+              uses: ../action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
@@ -226,7 +226,7 @@ jobs:
 
             - name: Generate & upload tarball signature
               if: inputs.gpg-fingerprint
-              uses: ../action-repo/.github/actions/sign-release-tarball@develop
+              uses: ../action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
