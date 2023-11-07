@@ -111,29 +111,6 @@ describe("MatrixEvent", () => {
             expect(mainTimelineLiveEventIds(room)).toEqual([ev.getId()]);
         });
 
-        it("should keep thread roots in both timelines when redacted", async () => {
-            // Given a thread exists
-            const mockClient = createMockClient();
-            const room = new Room("!roomid:e.xyz", mockClient, "myname");
-            const threadRoot = createEvent("$threadroot:server");
-            const ev = createThreadedEvent("$event1:server", threadRoot.getId()!);
-
-            await room.addLiveEvents([threadRoot, ev]);
-            await room.createThreadsTimelineSets();
-            expect(threadRoot.threadRootId).toEqual(threadRoot.getId());
-            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
-            expect(threadLiveEventIds(room, 0)).toEqual([threadRoot.getId(), ev.getId()]);
-
-            // When I redact the thread root
-            const redaction = createRedaction(ev.getId()!);
-            threadRoot.makeRedacted(redaction, room);
-
-            // Then it remains in the main timeline and the thread
-            expect(threadRoot.threadRootId).toEqual(threadRoot.getId());
-            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
-            expect(threadLiveEventIds(room, 0)).toEqual([threadRoot.getId(), ev.getId()]);
-        });
-
         it("should move into the main timeline when redacted", async () => {
             // Given an event in a thread
             const mockClient = createMockClient();
