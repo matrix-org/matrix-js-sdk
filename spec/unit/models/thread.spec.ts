@@ -149,7 +149,7 @@ describe("Thread", () => {
         });
 
         it("considers other events with no RR as unread", async () => {
-            const { thread, events, threadRoot } = await populateThread({
+            const { thread, events, rootEvent } = await populateThread({
                 room,
                 client,
                 authorId: myUserId,
@@ -163,7 +163,7 @@ describe("Thread", () => {
                 room_id: room.roomId,
                 content: {
                     // unthreaded receipt for the thread root
-                    [threadRoot.getId()]: {
+                    [rootEvent.getId()!]: {
                         [ReceiptType.Read]: {
                             [myUserId]: { ts: 200 },
                         },
