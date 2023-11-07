@@ -167,9 +167,24 @@ jobs:
                   inputs.dependencies &&
                   inputs.include-changes &&
                   includes(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
-              uses: ../action-repo/.github/actions/combine-changes@develop
+              uses: actions/github-script@v6
+              env:
+                  RELEASE_ID: ${{ steps.upstream-release.outputs.body }}
+                  DEPENDENCY: ${{ inputs.include-changes }}
               with:
-                  project: ${{ inputs.include-changes }}
+                  retries: 3
+                  script: |
+                      const { RELEASE_ID: releaseId, DEPENDENCY } = process.env;
+                      const { owner, repo } = context.repo;
+                      const script = require("../action-repo/scripts/release/merge-release-notes.js");
+                      const notes = await script({
+                          github,
+                          owner,
+                          repo,
+                          releaseId,
+                          dependencies: [DEPENDENCY],
+                      });
+                      core.exportVariable("RELEASE_NOTES", notes);
 
             - name: Add to CHANGELOG.md
               if: inputs.mode == 'final'
