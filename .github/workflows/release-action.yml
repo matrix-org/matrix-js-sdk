@@ -221,7 +221,7 @@ jobs:
               run: DIST_VERSION="$VERSION" yarn dist
 
             - name: Upload release assets & signatures
-              if: inputs.asset_path
+              if: inputs.asset-path
               uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
