@@ -88,7 +88,11 @@ jobs:
               id: prepare
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
-                  echo "RELEASE_NOTES<<EOF${BODY}EOF" >> $GITHUB_ENV
+                  {
+                      echo "RELEASE_NOTES<<EOF"
+                      echo $BODY
+                      echo "EOF"
+                  } >> $GITHUB_ENV
 
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
