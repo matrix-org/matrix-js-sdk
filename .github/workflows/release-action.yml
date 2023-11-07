@@ -147,7 +147,6 @@ jobs:
                   echo "updated=$JSON" >> $GITHUB_OUTPUT
               env:
                   DEPENDENCIES: ${{ inputs.dependencies }}
-                  FINAL: ${{ inputs.final }}
 
             - name: Prevent develop dependencies
               if: inputs.dependencies

@@ -10,5 +10,6 @@ set -e
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
 
 if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
-    ./scripts/release/post-merge-master.sh
+    "$(dirname "$0")/scripts/release/post-merge-master.sh"
+    git push origin develop
 fi

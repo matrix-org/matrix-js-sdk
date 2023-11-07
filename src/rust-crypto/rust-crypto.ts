@@ -27,7 +27,7 @@ import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-c
 import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { encodeUri, MapWithDefault } from "../utils";
 import {
@@ -72,6 +72,7 @@ import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -93,16 +94,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     /** whether {@link stop} has been called */
     private stopped = false;
 
-    /** whether {@link outgoingRequestLoop} is currently running */
-    private outgoingRequestLoopRunning = false;
-
-    /**
-     * whether we check the outgoing requests queue again after the current check finishes.
-     *
-     * This should never be `true` unless `outgoingRequestLoopRunning` is also true.
-     */
-    private outgoingRequestLoopOneMoreLoop = false;
-
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
@@ -111,6 +102,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private outgoingRequestProcessor: OutgoingRequestProcessor;
     private crossSigningIdentity: CrossSigningIdentity;
     private readonly backupManager: RustBackupManager;
+    private outgoingRequestsManager: OutgoingRequestsManager;
 
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
 
@@ -143,6 +135,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     ) {
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.outgoingRequestsManager = new OutgoingRequestsManager(
+            this.logger,
+            olmMachine,
+            this.outgoingRequestProcessor,
+        );
+
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this);
 
@@ -267,6 +265,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         this.keyClaimManager.stop();
         this.backupManager.stop();
+        this.outgoingRequestsManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -1270,15 +1269,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             this.roomEncryptors[room.roomId] = new RoomEncryptor(
                 this.olmMachine,
                 this.keyClaimManager,
-                this.outgoingRequestProcessor,
+                this.outgoingRequestsManager,
                 room,
                 config,
             );
         }
-
-        // start tracking devices for any users already known to be in this room.
-        const members = await room.getEncryptionTargetMembers();
-        await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
     }
 
     /** called by the sync loop after processing each sync.
@@ -1290,7 +1285,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public onSyncCompleted(syncState: OnSyncCompletedData): void {
         // Processing the /sync may have produced new outgoing requests which need sending, so kick off the outgoing
         // request loop, if it's not already running.
-        this.outgoingRequestLoop();
+        this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
+            this.logger.warn("onSyncCompleted: Error processing outgoing requests", e);
+        });
     }
 
     /**
@@ -1540,67 +1537,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
-        this.outgoingRequestLoop();
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //
-    // Outgoing requests
-    //
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    /** start the outgoing request loop if it is not already running */
-    private outgoingRequestLoop(): void {
-        if (this.outgoingRequestLoopRunning) {
-            // The loop is already running, but we have reason to believe that there may be new items in the queue.
-            //
-            // There is potential for a race whereby the item is added *after* `OlmMachine.outgoingRequests` checks
-            // the queue, but *before* it returns. In such a case, the item could sit there unnoticed for some time.
-            //
-            // In order to circumvent the race, we set a flag which tells the loop to go round once again even if the
-            // queue appears to be empty.
-            this.outgoingRequestLoopOneMoreLoop = true;
-            return;
-        }
-        // fire off the loop in the background
-        this.outgoingRequestLoopInner().catch((e) => {
-            this.logger.error("Error processing outgoing-message requests from rust crypto-sdk", e);
+        this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
+            this.logger.warn("onKeyVerificationRequest: Error processing outgoing requests", e);
         });
-    }
-
-    private async outgoingRequestLoopInner(): Promise<void> {
-        /* istanbul ignore if */
-        if (this.outgoingRequestLoopRunning) {
-            throw new Error("Cannot run two outgoing request loops");
-        }
-        this.outgoingRequestLoopRunning = true;
-        try {
-            while (!this.stopped) {
-                // we clear the "one more loop" flag just before calling `OlmMachine.outgoingRequests()`, so we can tell
-                // if `this.outgoingRequestLoop()` was called while `OlmMachine.outgoingRequests()` was running.
-                this.outgoingRequestLoopOneMoreLoop = false;
-
-                const outgoingRequests: Object[] = await this.olmMachine.outgoingRequests();
-
-                if (this.stopped) {
-                    // we've been told to stop while `outgoingRequests` was running: exit the loop without processing
-                    // any of the returned requests (anything important will happen next time the client starts.)
-                    return;
-                }
-
-                if (outgoingRequests.length === 0 && !this.outgoingRequestLoopOneMoreLoop) {
-                    // `OlmMachine.outgoingRequests` returned no messages, and there was no call to
-                    // `this.outgoingRequestLoop()` while it was running. We can stop the loop for a while.
-                    return;
-                }
-
-                for (const msg of outgoingRequests) {
-                    await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
-                }
-            }
-        } finally {
-            this.outgoingRequestLoopRunning = false;
-        }
     }
 }
 

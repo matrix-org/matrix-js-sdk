@@ -50,6 +50,7 @@ import {
 import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
+import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -347,6 +348,8 @@ describe("RustCrypto", () => {
                 makeOutgoingRequest: jest.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+
             rustCrypto = new RustCrypto(
                 logger,
                 olmMachine,
@@ -357,6 +360,7 @@ describe("RustCrypto", () => {
                 {} as CryptoCallbacks,
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
         });
 
         it("should poll for outgoing messages and send them", async () => {
@@ -394,50 +398,6 @@ describe("RustCrypto", () => {
             firstOutgoingRequestsDefer.resolve([]);
             await awaitCallToMakeOutgoingRequest();
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
-        });
-
-        it("stops looping when stop() is called", async () => {
-            for (let i = 0; i < 5; i++) {
-                outgoingRequestQueue.push([new KeysQueryRequest("1234", "{}")]);
-            }
-
-            let makeRequestPromise = awaitCallToMakeOutgoingRequest();
-
-            rustCrypto.onSyncCompleted({});
-
-            expect(rustCrypto["outgoingRequestLoopRunning"]).toBeTruthy();
-
-            // go a couple of times round the loop
-            let resolveMakeRequest = await makeRequestPromise;
-            makeRequestPromise = awaitCallToMakeOutgoingRequest();
-            resolveMakeRequest();
-
-            resolveMakeRequest = await makeRequestPromise;
-            makeRequestPromise = awaitCallToMakeOutgoingRequest();
-            resolveMakeRequest();
-
-            // a second sync while this is going on shouldn't make any difference
-            rustCrypto.onSyncCompleted({});
-
-            resolveMakeRequest = await makeRequestPromise;
-            outgoingRequestProcessor.makeOutgoingRequest.mockReset();
-            resolveMakeRequest();
-
-            // now stop...
-            rustCrypto.stop();
-
-            // which should (eventually) cause the loop to stop with no further calls to outgoingRequests
-            olmMachine.outgoingRequests.mockReset();
-
-            await new Promise((resolve) => {
-                setTimeout(resolve, 100);
-            });
-            expect(rustCrypto["outgoingRequestLoopRunning"]).toBeFalsy();
-            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
-            expect(olmMachine.outgoingRequests).not.toHaveBeenCalled();
-
-            // we sent three, so there should be 2 left
-            expect(outgoingRequestQueue.length).toEqual(2);
         });
     });
 

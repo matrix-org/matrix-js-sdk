@@ -20,5 +20,3 @@ if [ -n "$(git ls-files --modified package.json)" ]; then
     echo "Committing develop package.json"
     git commit package.json -m "Resetting package fields for development"
 fi
-
-git push origin develop

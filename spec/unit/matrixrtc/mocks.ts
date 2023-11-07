@@ -61,7 +61,7 @@ export function mockRTCEvent(
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
         getTs: jest.fn().mockReturnValue(1000),
         getLocalAge: getLocalAgeFn,
-        localTimestamp: Date.now(),
+        localTimestamp: Date.now() - getLocalAgeFn(),
         getRoomId: jest.fn().mockReturnValue(roomId),
         sender: {
             userId: "@mock:user.example",
