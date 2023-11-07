@@ -45,8 +45,6 @@ import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
 import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
-import { Room } from "./room";
-import { EventTimeline } from "./event-timeline";
 
 export { EventStatus } from "./event-status";
 
@@ -1153,18 +1151,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @deprecated In favor of the overload that includes a Room argument
-     */
-    public makeRedacted(redactionEvent: MatrixEvent): void;
-    /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
      * @param redactionEvent - event causing the redaction
-     * @param room - the room in which the event exists
      */
-    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void;
-    public makeRedacted(redactionEvent: MatrixEvent, room?: Room): void {
+    public makeRedacted(redactionEvent: MatrixEvent): void {
         // quick sanity-check
         if (!redactionEvent.event) {
             throw new Error("invalid redactionEvent in makeRedacted");
@@ -1206,21 +1198,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             if (content.hasOwnProperty(key) && !keeps[key]) {
                 delete content[key];
             }
-        }
-
-        // If the redacted event was in a thread
-        if (room && this.threadRootId && this.threadRootId !== this.getId()) {
-            // Remove it from its thread
-            this.thread?.timelineSet.removeEvent(this.getId()!);
-            this.setThread(undefined);
-
-            // And insert it into the main timeline
-            const timeline = room.getLiveTimeline();
-            // We use insertEventIntoTimeline to insert it in timestamp order,
-            // because we don't know where it should go (until we have MSC4033).
-            timeline
-                .getTimelineSet()
-                .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
         }
 
         this.invalidateExtensibleEvent();

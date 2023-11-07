@@ -14,19 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
-
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import { Crypto, IEventDecryptionResult } from "../../../src/crypto";
-import {
-    IAnnotatedPushRule,
-    MatrixClient,
-    PushRuleActionName,
-    Room,
-    THREAD_RELATION_TYPE,
-    TweakName,
-} from "../../../src";
+import { IAnnotatedPushRule, PushRuleActionName, TweakName } from "../../../src";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
@@ -86,96 +77,15 @@ describe("MatrixEvent", () => {
         expect(ev.getWireContent().body).toBeUndefined();
         expect(ev.getWireContent().ciphertext).toBe("xyz");
 
-        const mockClient = {} as unknown as MockedObject<MatrixClient>;
-        const room = new Room("!roomid:e.xyz", mockClient, "myname");
         const redaction = new MatrixEvent({
             type: "m.room.redaction",
             redacts: ev.getId(),
         });
 
-        ev.makeRedacted(redaction, room);
+        ev.makeRedacted(redaction);
         expect(ev.getContent().body).toBeUndefined();
         expect(ev.getWireContent().body).toBeUndefined();
         expect(ev.getWireContent().ciphertext).toBeUndefined();
-    });
-
-    it("should remain in the main timeline when redacted", async () => {
-        // Given an event in the main timeline
-        const mockClient = {
-            supportsThreads: jest.fn().mockReturnValue(true),
-            decryptEventIfNeeded: jest.fn().mockReturnThis(),
-            getUserId: jest.fn().mockReturnValue("@user:server"),
-        } as unknown as MockedObject<MatrixClient>;
-        const room = new Room("!roomid:e.xyz", mockClient, "myname");
-        const ev = new MatrixEvent({
-            type: "m.room.message",
-            content: {
-                body: "Test",
-            },
-            event_id: "$event1:server",
-        });
-
-        await room.addLiveEvents([ev]);
-        await room.createThreadsTimelineSets();
-        expect(ev.threadRootId).toBeUndefined();
-        expect(mainTimelineLiveEventIds(room)).toEqual(["$event1:server"]);
-
-        // When I redact it
-        const redaction = new MatrixEvent({
-            type: "m.room.redaction",
-            redacts: ev.getId(),
-        });
-        ev.makeRedacted(redaction, room);
-
-        // Then it remains in the main timeline
-        expect(ev.threadRootId).toBeUndefined();
-        expect(mainTimelineLiveEventIds(room)).toEqual(["$event1:server"]);
-    });
-
-    it("should move into the main timeline when redacted", async () => {
-        // Given an event in a thread
-        const mockClient = {
-            supportsThreads: jest.fn().mockReturnValue(true),
-            decryptEventIfNeeded: jest.fn().mockReturnThis(),
-            getUserId: jest.fn().mockReturnValue("@user:server"),
-        } as unknown as MockedObject<MatrixClient>;
-        const room = new Room("!roomid:e.xyz", mockClient, "myname");
-        const threadRoot = new MatrixEvent({
-            type: "m.room.message",
-            content: {
-                body: "threadRoot",
-            },
-            event_id: "$threadroot:server",
-        });
-        const ev = new MatrixEvent({
-            type: "m.room.message",
-            content: {
-                "body": "Test",
-                "m.relates_to": {
-                    rel_type: THREAD_RELATION_TYPE.name,
-                    event_id: "$threadroot:server",
-                },
-            },
-            event_id: "$event1:server",
-        });
-
-        await room.addLiveEvents([threadRoot, ev]);
-        await room.createThreadsTimelineSets();
-        expect(ev.threadRootId).toEqual("$threadroot:server");
-        expect(mainTimelineLiveEventIds(room)).toEqual(["$threadroot:server"]);
-        expect(threadLiveEventIds(room, 0)).toEqual(["$threadroot:server", "$event1:server"]);
-
-        // When I redact it
-        const redaction = new MatrixEvent({
-            type: "m.room.redaction",
-            redacts: ev.getId(),
-        });
-        ev.makeRedacted(redaction, room);
-
-        // Then it disappears from the thread and appears in the main timeline
-        expect(ev.threadRootId).toBeUndefined();
-        expect(mainTimelineLiveEventIds(room)).toEqual(["$threadroot:server", "$event1:server"]);
-        expect(threadLiveEventIds(room, 0)).not.toContain("$event1:server");
     });
 
     describe("applyVisibilityEvent", () => {
@@ -420,19 +330,3 @@ describe("MatrixEvent", () => {
         expect(stateEvent.threadRootId).toBeUndefined();
     });
 });
-
-function mainTimelineLiveEventIds(room: Room): Array<string> {
-    return room
-        .getLiveTimeline()
-        .getEvents()
-        .map((e) => e.getId()!);
-}
-
-function threadLiveEventIds(room: Room, threadIndex: number): Array<string> {
-    return room
-        .getThreads()
-        [threadIndex].getUnfilteredTimelineSet()
-        .getLiveTimeline()
-        .getEvents()
-        .map((e) => e.getId()!);
-}
