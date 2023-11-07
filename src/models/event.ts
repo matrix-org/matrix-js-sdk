@@ -1210,20 +1210,22 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         // If the redacted event was in a thread
         if (room && this.threadRootId && this.threadRootId !== this.getId()) {
-            // Remove it from its thread
-            this.thread?.timelineSet.removeEvent(this.getId()!);
-            this.setThread(undefined);
-
-            // And insert it into the main timeline
-            const timeline = room.getLiveTimeline();
-            // We use insertEventIntoTimeline to insert it in timestamp order,
-            // because we don't know where it should go (until we have MSC4033).
-            timeline
-                .getTimelineSet()
-                .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
+            this.moveToMainTimeline(room);
         }
 
         this.invalidateExtensibleEvent();
+    }
+
+    private moveToMainTimeline(room: Room): void {
+        // Remove it from its thread
+        this.thread?.timelineSet.removeEvent(this.getId()!);
+        this.setThread(undefined);
+
+        // And insert it into the main timeline
+        const timeline = room.getLiveTimeline();
+        // We use insertEventIntoTimeline to insert it in timestamp order,
+        // because we don't know where it should go (until we have MSC4033).
+        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
     }
 
     /**
