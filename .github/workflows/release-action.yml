@@ -79,7 +79,7 @@ jobs:
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
-                  path: ../action-repo
+                  path: .action-repo
                   sparse-checkout: |
                       .github/actions
                       scripts/release
@@ -176,7 +176,7 @@ jobs:
                   script: |
                       const { RELEASE_ID: releaseId, DEPENDENCY } = process.env;
                       const { owner, repo } = context.repo;
-                      const script = require("../action-repo/scripts/release/merge-release-notes.js");
+                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
                       const notes = await script({
                           github,
                           owner,
@@ -206,7 +206,7 @@ jobs:
 
             - name: Run pre-release script to update package.json fields
               run: |
-                  ../action-repo/scripts/release/pre-release.sh
+                  ./.action-repo/scripts/release/pre-release.sh
                   git add package.json
 
             - name: Commit changes
@@ -218,7 +218,7 @@ jobs:
 
             - name: Upload release assets & signatures
               if: inputs.asset_path
-              uses: ../action-repo/.github/actions/upload-release-assets
+              uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
@@ -226,7 +226,7 @@ jobs:
 
             - name: Generate & upload tarball signature
               if: inputs.gpg-fingerprint
-              uses: ../action-repo/.github/actions/sign-release-tarball
+              uses: ./.action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}

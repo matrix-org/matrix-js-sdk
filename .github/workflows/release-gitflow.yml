@@ -27,7 +27,7 @@ jobs:
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
-                  path: ../action-repo
+                  path: .action-repo
                   sparse-checkout: |
                       scripts/release
 
@@ -49,7 +49,7 @@ jobs:
                   git merge -X ours master
 
             - name: Run post-merge-master script to revert package.json fields
-              run: ../action-repo/scripts/release/post-merge-master.sh
+              run: ./.action-repo/scripts/release/post-merge-master.sh
 
             - name: Reset dependencies
               if: inputs.dependencies
