@@ -175,7 +175,7 @@ echo "yarn version"
 # manually commit the result.
 yarn version --no-git-tag-version --new-version "$release"
 
-"$(dirname "$0")/scripts/release/pre-release.py"
+"$(dirname "$0")/scripts/release/pre-release.sh"
 
 # commit yarn.lock if it exists, is versioned, and is modified
 if [[ -f yarn.lock && $(git status --porcelain yarn.lock | grep '^ M') ]];

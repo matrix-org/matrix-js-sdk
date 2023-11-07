@@ -157,12 +157,12 @@ jobs:
               id: my-script
               env:
                   RELEASE_ID: ${{ steps.release.outputs.id }}
-                  MODE: ${{ inputs.final }}
+                  FINAL: ${{ inputs.final }}
               with:
                   result-encoding: string
                   retries: 3
                   script: |
-                      let { RELEASE_ID: release_id, VERSION, MODE } = process.env;
+                      let { RELEASE_ID: release_id, VERSION, FINAL } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
@@ -174,7 +174,7 @@ jobs:
                           draft: false,
                       };
 
-                      if (MODE === "final") {
+                      if (FINAL == "true") {
                           opts.prerelease = false;
                           opts.make_latest = true;
                       }
