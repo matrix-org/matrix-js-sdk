@@ -47,7 +47,7 @@ jobs:
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
-                  path: ../action-repo
+                  path: .action-repo
                   sparse-checkout: |
                       scripts/release
 
@@ -137,7 +137,7 @@ jobs:
 
             - name: Run pre-release script to update package.json fields
               run: |
-                  ../action-repo/scripts/release/pre-release.sh
+                  ./.action-repo/scripts/release/pre-release.sh
                   git add package.json
 
             - name: Commit and push changes
