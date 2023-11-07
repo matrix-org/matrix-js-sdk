@@ -273,7 +273,7 @@ jobs:
                           release_id,
                       });
 
-                      if (release.assets.length !== EXPECTED_ASSET_COUNT) {
+                      if (release.assets.length !== parseInt(EXPECTED_ASSET_COUNT, 10)) {
                           core.setFailed(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
                       }
 
