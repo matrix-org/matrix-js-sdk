@@ -228,6 +228,13 @@ jobs:
                   upload-url: ${{ steps.release.outputs.upload_url }}
                   asset-path: ${{ inputs.asset-path }}
 
+            - name: Create signed tag
+              if: inputs.gpg-fingerprint
+              run: |
+                  GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
+              env:
+                  SIGNING_ID: ${{ steps.gpg.outputs.email }}
+
             - name: Generate & upload tarball signature
               if: inputs.gpg-fingerprint
               uses: ./.action-repo/.github/actions/sign-release-tarball
@@ -235,20 +242,14 @@ jobs:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.release.outputs.upload_url }}
 
-            - name: Create signed tag
-              if: inputs.gpg-fingerprint
-              run: |
-                  GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
-                  git push origin staging "$VERSION"
-              env:
-                  SIGNING_ID: ${{ steps.gpg.outputs.email }}
-
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
             - name: Push changes to staging
               run: |
-                  git push origin staging
+                  git push origin staging $TAG
                   git reset --hard
+              env:
+                  TAG: ${{ inputs.gpg-fingerprint && env.VERSION || '' }}
 
             - name: Validate tarball signature
               if: inputs.gpg-fingerprint
