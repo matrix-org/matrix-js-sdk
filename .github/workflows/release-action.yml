@@ -252,8 +252,8 @@ jobs:
             - name: Validate tarball signature
               if: inputs.gpg-fingerprint
               run: |
-                  wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz -o /tmp/$VERSION.tar.gz
-                  gpg --verify ../sign-release-tarball/$VERSION.tar.gz.asc /tmp/$VERSION.tar.gz
+                  wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz -o "/tmp/$VERSION.tar.gz"
+                  gpg --verify "$VERSION.tar.gz.asc" "/tmp/$VERSION.tar.gz"
 
             - name: Validate release has expected assets
               if: inputs.expected-asset-count
