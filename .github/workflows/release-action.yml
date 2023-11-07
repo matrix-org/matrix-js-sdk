@@ -288,11 +288,11 @@ jobs:
               uses: actions/github-script@v6
               env:
                   RELEASE_ID: ${{ steps.release.outputs.id }}
-                  MODE: ${{ inputs.final }}
+                  FINAL: ${{ inputs.final }}
               with:
                   retries: 3
                   script: |
-                      const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, MODE } = process.env;
+                      const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, FINAL } = process.env;
                       const { owner, repo } = context.repo;
 
                       const opts = {
@@ -305,7 +305,7 @@ jobs:
                           body: RELEASE_NOTES,
                       };
 
-                      if (MODE === "final") {
+                      if (FINAL == "true") {
                           opts.prerelease = false;
                           opts.make_latest = true;
                       }
