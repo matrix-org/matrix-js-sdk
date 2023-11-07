@@ -48,6 +48,7 @@ jobs:
     release:
         name: Release
         runs-on: ubuntu-latest
+        environment: Release
         steps:
             - name: Load GPG key
               id: gpg
