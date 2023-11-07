@@ -183,8 +183,6 @@ jobs:
                       const script = require("./.action-repo/scripts/release/merge-release-notes.js");
                       const notes = await script({
                           github,
-                          owner,
-                          repo,
                           releaseId,
                           dependencies: [DEPENDENCY],
                       });
