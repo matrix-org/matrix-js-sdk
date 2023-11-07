@@ -166,7 +166,7 @@ jobs:
               if: |
                   inputs.dependencies &&
                   inputs.include-changes &&
-                  includes(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
+                  contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
               uses: actions/github-script@v6
               env:
                   RELEASE_ID: ${{ steps.upstream-release.outputs.body }}
