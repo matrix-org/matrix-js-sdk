@@ -36,6 +36,21 @@ jobs:
                   draft: true
                   latest: true
 
+            - uses: actions/checkout@v4
+              with:
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: ../action-repo
+                  sparse-checkout: |
+                      scripts/release
+
             - name: Load version
               run: echo "VERSION=$VERSION" >> $GITHUB_ENV
               env:
@@ -44,12 +59,6 @@ jobs:
             - name: Finalise version
               if: inputs.mode == 'final'
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
-
-            - uses: actions/checkout@v4
-              with:
-                  ref: staging
-                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
-                  fetch-depth: 0
 
             - name: Set up git
               run: |
@@ -122,26 +131,17 @@ jobs:
 
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
+                  git add CHANGELOG.md
               env:
                   BODY: ${{ steps.release.outputs.body }}
 
-            # For the published and dist versions of the package,
-            # we copy the `matrix_lib_main` and `matrix_lib_typings` fields to `main` and `typings` (if they exist).
-            # This small bit of gymnastics allows us to use the TypeScript source directly for development without
-            # needing to build before linting or testing.
-            - name: Update package.json fields
+            - name: Run pre-release script to update package.json fields
               run: |
-                  for i in main typings browser
-                  do
-                      lib_value=$(jq -r ".matrix_lib_$i" package.json)
-                      if [ "$lib_value" != "null" ]; then
-                          jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
-                      fi
-                  done
+                  ../action-repo/scripts/release/pre-release.sh
+                  git add package.json
 
             - name: Commit and push changes
               run: |
-                  git add package.json CHANGELOG.md
                   git commit -m "$VERSION"
                   git push origin staging
 

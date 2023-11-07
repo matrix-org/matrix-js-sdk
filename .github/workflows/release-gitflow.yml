@@ -22,6 +22,15 @@ jobs:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: ../action-repo
+                  sparse-checkout: |
+                      scripts/release
+
             - uses: actions/setup-node@v3
               with:
                   cache: "yarn"
@@ -39,27 +48,8 @@ jobs:
                   git checkout develop
                   git merge -X ours master
 
-            - name: Update package.json fields
-              run: |
-                  # When merging to develop, we need revert the `main` and `typings` fields if we adjusted them previously.
-                  for i in main typings browser
-                  do
-                      # If a `lib` prefixed value is present, it means we adjusted the field
-                      # earlier at publish time, so we should revert it now.
-                      if [ "$(jq -r ".matrix_lib_$i" package.json)" != "null" ]; then
-                          # If there's a `src` prefixed value, use that, otherwise delete.
-                          # This is used to delete the `typings` field and reset `main` back to the TypeScript source.
-                          src_value=$(jq -r ".matrix_src_$i" package.json)
-                          if [ "$src_value" != "null" ]; then
-                              jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
-                          else
-                              jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
-                          fi
-                      fi
-                  done
-
-                  git add package.json
-                  git commit -m "Resetting package fields for development"
+            - name: Run post-merge-master script to revert package.json fields
+              run: ../action-repo/scripts/release/post-merge-master.sh
 
             - name: Reset dependencies
               if: inputs.dependencies
