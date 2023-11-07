@@ -1210,10 +1210,25 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         // If the redacted event was in a thread
         if (room && this.threadRootId && this.threadRootId !== this.getId()) {
-            this.moveToMainTimeline(room);
+            this.moveAllRelatedToMainTimeline(room);
         }
 
         this.invalidateExtensibleEvent();
+    }
+
+    private moveAllRelatedToMainTimeline(room: Room): void {
+        const thread = this.thread;
+        this.moveToMainTimeline(room);
+
+        // If we dont have access to the thread, we can only move this
+        // event, not things related to it.
+        if (thread) {
+            for (const event of thread.events) {
+                if (event.getRelation()?.event_id === this.getId()) {
+                    event.moveAllRelatedToMainTimeline(room);
+                }
+            }
+        }
     }
 
     private moveToMainTimeline(room: Room): void {
