@@ -188,3 +188,20 @@ jobs:
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    update-labels:
+        name: Advance release blocker labels
+        needs: release
+        runs-on: ubuntu-latest
+        steps:
+            - id: repository
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+              with:
+                  owner: ${{ github.repository_owner }}
+                  repo: ${{ steps.repository.outputs.REPO }}
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  filter-labels: X-Upcoming-Release-Blocker
+                  remove-labels: X-Upcoming-Release-Blocker
+                  add-labels: X-Release-Blocker
