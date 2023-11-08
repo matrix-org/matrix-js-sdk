@@ -3,9 +3,18 @@
 const fs = require("fs");
 
 async function getRelease(github, dependency) {
-    const upstreamPackageJson = JSON.parse(fs.readFileSync(`./node_modules/${dependency}/package.json`, "utf8"));
-    const [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
-    const tag = `v${upstreamPackageJson.version}`;
+    let owner;
+    let repo;
+    let tag;
+    if (dependency.includes("/") && dependency.includes("@")) {
+        owner = dependency.split("/")[0];
+        repo = dependency.split("/")[1].split("@")[0];
+        tag = dependency.split("@")[1];
+    } else {
+        const upstreamPackageJson = JSON.parse(fs.readFileSync(`./node_modules/${dependency}/package.json`, "utf8"));
+        [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
+        tag = `v${upstreamPackageJson.version}`;
+    }
 
     const response = await github.rest.repos.getReleaseByTag({
         owner,
