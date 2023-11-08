@@ -95,7 +95,7 @@
         "babelify": "^10.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.52.0",
+        "eslint": "8.53.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
