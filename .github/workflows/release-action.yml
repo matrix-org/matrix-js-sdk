@@ -60,6 +60,21 @@ jobs:
               if: inputs.mode == 'final'
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
+            - name: Check version number not in use
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      const { VERSION } = process.env;
+                      github.rest.repos.getReleaseByTag({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          tag: VERSION,
+                      }).then(() => {
+                          core.setFailed(`Version ${VERSION} already exists`);
+                      }).catch(() => {
+                        // This is fine, we expect there to not be any release with this version yet
+                      });
+
             - name: Set up git
               run: |
                   git config --global user.email "releases@riot.im"
