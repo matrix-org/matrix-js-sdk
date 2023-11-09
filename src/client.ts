@@ -1217,7 +1217,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
     public olmVersion: [number, number, number] | null = null; // populated after initCrypto
     public usingExternalCrypto = false;
-    public store!: Store;
+    private _store!: Store;
     public deviceId: string | null;
     public credentials: { userId: string | null };
 
@@ -1331,7 +1331,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.identityServer = opts.identityServer;
 
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
-        this.setStore(opts.store || new StubStore());
+        this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
         this.sessionId = randomString(10);
 
@@ -1496,14 +1496,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
     }
 
-    /**
-     * Use this method to set/change the store used by the client
-     * @param newStore - The new store object
-     */
-    public setStore(newStore: Store): void {
-        if (!newStore) throw new Error("store passed to MatrixClient.setStore() is undefined!");
-        this.store = newStore;
-        this.store.setUserCreator((userId) => User.createUser(userId, this));
+    public set store(newStore: Store) {
+        if (!newStore) throw new Error("store passed to MatrixClient.store setter is undefined!");
+        this._store = newStore;
+        this._store.setUserCreator((userId) => User.createUser(userId, this));
+    }
+
+    public get store(): Store {
+        return this._store;
     }
 
     /**
