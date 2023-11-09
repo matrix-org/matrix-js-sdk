@@ -1217,7 +1217,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
     public olmVersion: [number, number, number] | null = null; // populated after initCrypto
     public usingExternalCrypto = false;
-    public store: Store;
+    public store!: Store;
     public deviceId: string | null;
     public credentials: { userId: string | null };
 
