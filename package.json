@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "29.1.0",
+    "version": "30.0.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=18.0.0"
@@ -95,7 +95,7 @@
         "babelify": "^10.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.51.0",
+        "eslint": "8.53.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
@@ -104,7 +104,7 @@
         "eslint-plugin-jsdoc": "^46.0.0",
         "eslint-plugin-matrix-org": "^1.0.0",
         "eslint-plugin-tsdoc": "^0.2.17",
-        "eslint-plugin-unicorn": "^48.0.0",
+        "eslint-plugin-unicorn": "^49.0.0",
         "exorcist": "^2.0.0",
         "fake-indexeddb": "^5.0.0",
         "fetch-mock-jest": "^1.5.1",

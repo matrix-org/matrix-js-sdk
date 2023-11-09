@@ -1,11 +1,38 @@
 name: Release Process
 on:
-    release:
-        types: [published]
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+    workflow_dispatch:
+        inputs:
+            mode:
+                description: What type of release
+                required: true
+                default: rc
+                type: choice
+                options:
+                    - rc
+                    - final
+            docs:
+                description: Publish docs
+                required: true
+                type: boolean
+                default: true
+            npm:
+                description: Publish to npm
+                required: true
+                type: boolean
+                default: true
+concurrency: ${{ github.workflow }}
 jobs:
-    jsdoc:
+    release:
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-action.yml@develop
+        secrets: inherit
+        with:
+            final: ${{ inputs.mode == 'final' }}
+            npm: ${{ inputs.npm }}
+
+    docs:
         name: Publish Documentation
+        needs: release
+        if: inputs.docs
         runs-on: ubuntu-latest
         steps:
             - name: 🧮 Checkout code
@@ -18,7 +45,7 @@ jobs:
                   path: _docs
 
             - name: 🔧 Yarn cache
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v4
               with:
                   cache: "yarn"
 
@@ -36,17 +63,14 @@ jobs:
                   yarn gendoc
                   symlinks -rc _docs
 
-            - name: 🚀 Deploy
+            - name: 🔨 Set up git
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
+
+            - name: 🚀 Deploy
+              run: |
                   git add . --all
                   git commit -m "Update docs"
                   git push
               working-directory: _docs
-
-    npm:
-        name: Publish
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
-        secrets:
-            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

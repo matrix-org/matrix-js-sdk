@@ -17,7 +17,7 @@ limitations under the License.
 import { TextEncoder, TextDecoder } from "util";
 import NodeBuffer from "node:buffer";
 
-import { decodeBase64, encodeBase64, encodeUnpaddedBase64 } from "../../src/base64";
+import { decodeBase64, encodeBase64, encodeUnpaddedBase64, encodeUnpaddedBase64Url } from "../../src/base64";
 
 describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
     let origBuffer = Buffer;
@@ -43,19 +43,27 @@ describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
         global.btoa = undefined;
     });
 
-    it("Should decode properly encoded data", async () => {
+    it("Should decode properly encoded data", () => {
         const decoded = new TextDecoder().decode(decodeBase64("ZW5jb2RpbmcgaGVsbG8gd29ybGQ="));
 
         expect(decoded).toStrictEqual("encoding hello world");
     });
 
-    it("Should decode URL-safe base64", async () => {
+    it("Should encode unpadded URL-safe base64", () => {
+        const toEncode = "?????";
+        const data = new TextEncoder().encode(toEncode);
+
+        const encoded = encodeUnpaddedBase64Url(data);
+        expect(encoded).toEqual("Pz8_Pz8");
+    });
+
+    it("Should decode URL-safe base64", () => {
         const decoded = new TextDecoder().decode(decodeBase64("Pz8_Pz8="));
 
         expect(decoded).toStrictEqual("?????");
     });
 
-    it("Encode unpadded should not have padding", async () => {
+    it("Encode unpadded should not have padding", () => {
         const toEncode = "encoding hello world";
         const data = new TextEncoder().encode(toEncode);
 
@@ -68,7 +76,7 @@ describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
         expect(padding).toStrictEqual("=");
     });
 
-    it("Decode should be indifferent to padding", async () => {
+    it("Decode should be indifferent to padding", () => {
         const withPadding = "ZW5jb2RpbmcgaGVsbG8gd29ybGQ=";
         const withoutPadding = "ZW5jb2RpbmcgaGVsbG8gd29ybGQ";
 

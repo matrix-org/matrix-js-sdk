@@ -228,8 +228,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     };
 
-    private onRedaction = async (event: MatrixEvent, room: Room, threadRootId?: string): Promise<void> => {
-        if (threadRootId !== this.id) return; // ignore redactions for other timelines
+    private onRedaction = async (event: MatrixEvent): Promise<void> => {
+        if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
         if (this.replyCount <= 0) {
             for (const threadEvent of this.timeline) {
                 this.clearEventMetadata(threadEvent);

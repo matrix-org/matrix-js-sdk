@@ -1747,6 +1747,7 @@ describe("Room", function () {
                 const ts = 13787898424;
                 room.addLiveEvents([eventToAck]);
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
+                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
 
@@ -3713,7 +3714,7 @@ describe("Room", function () {
             expect(room.polls.get(pollStartEvent.getId()!)).toBeTruthy();
 
             const redactedEvent = new MatrixEvent({ type: "m.room.redaction" });
-            pollStartEvent.makeRedacted(redactedEvent, room);
+            pollStartEvent.makeRedacted(redactedEvent);
 
             await flushPromises();
 

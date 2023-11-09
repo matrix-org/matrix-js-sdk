@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, EventType, MatrixClient, Room } from "../../../src";
+import { EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
+import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom, mockRTCEvent } from "./mocks";
+import { makeMockRoom, makeMockRoomState, mockRTCEvent } from "./mocks";
 
 const membershipTemplate: CallMembershipData = {
     call_id: "",
@@ -184,8 +185,15 @@ describe("MatrixRTCSession", () => {
 
     describe("joining", () => {
         let mockRoom: Room;
+        let sendStateEventMock: jest.Mock;
+        let sendEventMock: jest.Mock;
 
         beforeEach(() => {
+            sendStateEventMock = jest.fn();
+            sendEventMock = jest.fn();
+            client.sendStateEvent = sendStateEventMock;
+            client.sendEvent = sendEventMock;
+
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         });
@@ -205,8 +213,6 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends a membership event when joining a call", () => {
-            client.sendStateEvent = jest.fn();
-
             sess!.joinRoomSession([mockFocus]);
 
             expect(client.sendStateEvent).toHaveBeenCalledWith(
@@ -230,9 +236,6 @@ describe("MatrixRTCSession", () => {
         });
 
         it("does nothing if join called when already joined", () => {
-            const sendStateEventMock = jest.fn();
-            client.sendStateEvent = sendStateEventMock;
-
             sess!.joinRoomSession([mockFocus]);
 
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
@@ -299,6 +302,237 @@ describe("MatrixRTCSession", () => {
                 jest.useRealTimers();
             }
         });
+
+        it("creates a key when joining", () => {
+            sess!.joinRoomSession([mockFocus], true);
+            const keys = sess?.getKeysForParticipant("@alice:example.org", "AAAAAAA");
+            expect(keys).toHaveLength(1);
+
+            const allKeys = sess!.getEncryptionKeys();
+            expect(allKeys).toBeTruthy();
+            expect(Array.from(allKeys)).toHaveLength(1);
+        });
+
+        it("sends keys when joining", async () => {
+            const eventSentPromise = new Promise((resolve) => {
+                sendEventMock.mockImplementation(resolve);
+            });
+
+            sess!.joinRoomSession([mockFocus], true);
+
+            await eventSentPromise;
+
+            expect(sendEventMock).toHaveBeenCalledWith(expect.stringMatching(".*"), "io.element.call.encryption_keys", {
+                call_id: "",
+                device_id: "AAAAAAA",
+                keys: [
+                    {
+                        index: 0,
+                        key: expect.stringMatching(".*"),
+                    },
+                ],
+            });
+        });
+
+        it("retries key sends", async () => {
+            jest.useFakeTimers();
+            let firstEventSent = false;
+
+            try {
+                const eventSentPromise = new Promise<void>((resolve) => {
+                    sendEventMock.mockImplementation(() => {
+                        if (!firstEventSent) {
+                            jest.advanceTimersByTime(10000);
+
+                            firstEventSent = true;
+                            const e = new Error() as MatrixError;
+                            e.data = {};
+                            throw e;
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                sess!.joinRoomSession([mockFocus], true);
+                jest.advanceTimersByTime(10000);
+
+                await eventSentPromise;
+
+                expect(sendEventMock).toHaveBeenCalledTimes(2);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("cancels key send event that fail", async () => {
+            const eventSentinel = {} as unknown as MatrixEvent;
+
+            client.cancelPendingEvent = jest.fn();
+            sendEventMock.mockImplementation(() => {
+                const e = new Error() as MatrixError;
+                e.data = {};
+                e.event = eventSentinel;
+                throw e;
+            });
+
+            sess!.joinRoomSession([mockFocus], true);
+
+            expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
+        });
+
+        it("Re-sends key if a new member joins", async () => {
+            jest.useFakeTimers();
+            try {
+                const mockRoom = makeMockRoom([membershipTemplate]);
+                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+                const keysSentPromise1 = new Promise((resolve) => {
+                    sendEventMock.mockImplementation(resolve);
+                });
+
+                sess.joinRoomSession([mockFocus], true);
+                await keysSentPromise1;
+
+                sendEventMock.mockClear();
+                jest.advanceTimersByTime(10000);
+
+                const keysSentPromise2 = new Promise((resolve) => {
+                    sendEventMock.mockImplementation(resolve);
+                });
+
+                const onMembershipsChanged = jest.fn();
+                sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+                const member2 = Object.assign({}, membershipTemplate, {
+                    device_id: "BBBBBBB",
+                });
+
+                mockRoom.getLiveTimeline().getState = jest
+                    .fn()
+                    .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId, undefined));
+                sess.onMembershipUpdate();
+
+                await keysSentPromise2;
+
+                expect(sendEventMock).toHaveBeenCalled();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("Rotates key if a member leaves", async () => {
+            jest.useFakeTimers();
+            try {
+                const member2 = Object.assign({}, membershipTemplate, {
+                    device_id: "BBBBBBB",
+                });
+                const mockRoom = makeMockRoom([membershipTemplate, member2]);
+                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+                const onMyEncryptionKeyChanged = jest.fn();
+                sess.on(
+                    MatrixRTCSessionEvent.EncryptionKeyChanged,
+                    (_key: Uint8Array, _idx: number, participantId: string) => {
+                        if (participantId === `${client.getUserId()}:${client.getDeviceId()}`) {
+                            onMyEncryptionKeyChanged();
+                        }
+                    },
+                );
+
+                const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                    sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                });
+
+                sess.joinRoomSession([mockFocus], true);
+                const firstKeysPayload = await keysSentPromise1;
+                expect(firstKeysPayload.keys).toHaveLength(1);
+
+                sendEventMock.mockClear();
+
+                const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                    sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                });
+
+                mockRoom.getLiveTimeline().getState = jest
+                    .fn()
+                    .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId, undefined));
+                sess.onMembershipUpdate();
+
+                jest.advanceTimersByTime(10000);
+
+                const secondKeysPayload = await keysSentPromise2;
+
+                expect(secondKeysPayload.keys).toHaveLength(2);
+                expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(2);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("Doesn't re-send key immediately", async () => {
+            const realSetImmediate = setImmediate;
+            jest.useFakeTimers();
+            try {
+                const mockRoom = makeMockRoom([membershipTemplate]);
+                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+                const keysSentPromise1 = new Promise((resolve) => {
+                    sendEventMock.mockImplementation(resolve);
+                });
+
+                sess.joinRoomSession([mockFocus], true);
+                await keysSentPromise1;
+
+                sendEventMock.mockClear();
+
+                const onMembershipsChanged = jest.fn();
+                sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+                const member2 = Object.assign({}, membershipTemplate, {
+                    device_id: "BBBBBBB",
+                });
+
+                mockRoom.getLiveTimeline().getState = jest
+                    .fn()
+                    .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId, undefined));
+                sess.onMembershipUpdate();
+
+                await new Promise((resolve) => {
+                    realSetImmediate(resolve);
+                });
+
+                expect(sendEventMock).not.toHaveBeenCalled();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+    });
+
+    it("Does not emits if no membership changes", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+        const onMembershipsChanged = jest.fn();
+        sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+        sess.onMembershipUpdate();
+
+        expect(onMembershipsChanged).not.toHaveBeenCalled();
+    });
+
+    it("Emits on membership changes", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+        const onMembershipsChanged = jest.fn();
+        sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+        mockRoom.getLiveTimeline().getState = jest
+            .fn()
+            .mockReturnValue(makeMockRoomState([], mockRoom.roomId, undefined));
+        sess.onMembershipUpdate();
+
+        expect(onMembershipsChanged).toHaveBeenCalled();
     });
 
     it("emits an event at the time a membership event expires", () => {
@@ -408,5 +642,77 @@ describe("MatrixRTCSession", () => {
             },
             "@alice:example.org",
         );
+    });
+
+    it("collects keys from encryption events", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.onCallEncryption({
+            getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+            getContent: jest.fn().mockReturnValue({
+                device_id: "bobsphone",
+                call_id: "",
+                keys: [
+                    {
+                        index: 0,
+                        key: "dGhpcyBpcyB0aGUga2V5",
+                    },
+                ],
+            }),
+            getSender: jest.fn().mockReturnValue("@bob:example.org"),
+        } as unknown as MatrixEvent);
+
+        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
+        expect(bobKeys).toHaveLength(1);
+        expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+    });
+
+    it("collects keys at non-zero indices", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.onCallEncryption({
+            getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+            getContent: jest.fn().mockReturnValue({
+                device_id: "bobsphone",
+                call_id: "",
+                keys: [
+                    {
+                        index: 4,
+                        key: "dGhpcyBpcyB0aGUga2V5",
+                    },
+                ],
+            }),
+            getSender: jest.fn().mockReturnValue("@bob:example.org"),
+        } as unknown as MatrixEvent);
+
+        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
+        expect(bobKeys).toHaveLength(5);
+        expect(bobKeys[0]).toBeFalsy();
+        expect(bobKeys[1]).toBeFalsy();
+        expect(bobKeys[2]).toBeFalsy();
+        expect(bobKeys[3]).toBeFalsy();
+        expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
+    });
+
+    it("ignores keys event for the local participant", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        sess.onCallEncryption({
+            getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+            getContent: jest.fn().mockReturnValue({
+                device_id: client.getDeviceId(),
+                call_id: "",
+                keys: [
+                    {
+                        index: 4,
+                        key: "dGhpcyBpcyB0aGUga2V5",
+                    },
+                ],
+            }),
+            getSender: jest.fn().mockReturnValue(client.getUserId()),
+        } as unknown as MatrixEvent);
+
+        const myKeys = sess.getKeysForParticipant(client.getUserId()!, client.getDeviceId()!)!;
+        expect(myKeys).toBeFalsy();
     });
 });

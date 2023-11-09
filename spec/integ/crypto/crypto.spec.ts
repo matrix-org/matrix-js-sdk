@@ -692,7 +692,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     it("prepareToEncrypt", async () => {
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        const homeserverUrl = aliceClient.getHomeserverUrl();
+        keyResponder = new E2EKeyResponder(homeserverUrl);
+        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+        const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+        keyResponder.addDeviceKeys(testDeviceKeys);
+
         await startClientAndAwaitFirstSync();
         aliceClient.setGlobalErrorOnUnknownDevices(false);
 
@@ -700,10 +706,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // we expect alice first to query bob's keys...
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-        // ... and then claim one of his OTKs
+        // Alice should claim one of Bob's OTKs
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // fire off the prepare request
@@ -720,18 +723,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        const homeserverUrl = aliceClient.getHomeserverUrl();
+        keyResponder = new E2EKeyResponder(homeserverUrl);
+        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+        const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+        keyResponder.addDeviceKeys(testDeviceKeys);
+
         await startClientAndAwaitFirstSync();
 
         // Alice shares a room with Bob
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-        // ... and claim one of his OTKs ...
+        // ... and claim one of Bob's OTKs ...
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // ... and send an m.room_key message
@@ -746,18 +751,20 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("We should start a new megolm session after forceDiscardSession", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        const homeserverUrl = aliceClient.getHomeserverUrl();
+        keyResponder = new E2EKeyResponder(homeserverUrl);
+        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+        const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+        keyResponder.addDeviceKeys(testDeviceKeys);
+
         await startClientAndAwaitFirstSync();
 
         // Alice shares a room with Bob
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
 
-        // Once we send the message, Alice will check Bob's device list (twice, because reasons) ...
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-        // ... and claim one of his OTKs ...
+        // ... and claim one of Bob's OTKs ...
         expectAliceKeyClaim(getTestKeysClaimResponse("@bob:xyz"));
 
         // ... and send an m.room_key message
@@ -2052,12 +2059,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             });
         }
 
-        oldBackendOnly("Sending an event initiates a member list sync", async () => {
+        it("Sending an event initiates a member list sync", async () => {
+            const homeserverUrl = aliceClient.getHomeserverUrl();
+            keyResponder = new E2EKeyResponder(homeserverUrl);
+            keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+            const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+            keyResponder.addDeviceKeys(testDeviceKeys);
+
             // we expect a call to the /members list...
             const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
-
-            // then a request for bob's devices...
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
@@ -2071,12 +2082,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await Promise.all([sendPromise, megolmMessagePromise, memberListPromise]);
         });
 
-        oldBackendOnly("loading the membership list inhibits a later load", async () => {
+        it("loading the membership list inhibits a later load", async () => {
+            const homeserverUrl = aliceClient.getHomeserverUrl();
+            keyResponder = new E2EKeyResponder(homeserverUrl);
+            keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+            const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
+            keyResponder.addDeviceKeys(testDeviceKeys);
+
             const room = aliceClient.getRoom(ROOM_ID)!;
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
-
-            // expect a request for bob's devices...
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
