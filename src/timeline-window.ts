@@ -199,11 +199,11 @@ export class TimelineWindow {
         return false;
     }
 
-    private onTimelineEvent = (_event?: MatrixEvent, _room?: Room, _atStart?: boolean, removed?: boolean): void => {
+    private onTimelineEvent(_event?: MatrixEvent, _room?: Room, _atStart?: boolean, removed?: boolean): void {
         if (removed) {
             this.onEventRemoved();
         }
-    };
+    }
 
     /**
      * If an event was removed, meaning this window is longer than the timeline,
