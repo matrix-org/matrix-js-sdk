@@ -1497,7 +1497,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public set store(newStore: Store) {
-        if (!newStore) throw new Error("store passed to MatrixClient.store setter is undefined!");
         this._store = newStore;
         this._store.setUserCreator((userId) => User.createUser(userId, this));
     }
