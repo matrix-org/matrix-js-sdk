@@ -1331,8 +1331,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.identityServer = opts.identityServer;
 
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
-        this.store = opts.store || new StubStore();
-        this.store.setUserCreator((userId) => User.createUser(userId, this));
+        this.setStore(opts.store || new StubStore());
         this.deviceId = opts.deviceId || null;
         this.sessionId = randomString(10);
 
@@ -1495,6 +1494,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
+    }
+
+    /**
+     * Use this method to set/change the store used by the client
+     * @param newStore - The new store object
+     */
+    public setStore(newStore: Store): void {
+        if (!newStore) throw new Error("store passed to MatrixClient.setStore() is undefined!");
+        this.store = newStore;
+        this.store.setUserCreator((userId) => User.createUser(userId, this));
     }
 
     /**
