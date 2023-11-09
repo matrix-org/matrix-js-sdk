@@ -85,9 +85,7 @@ describe("CallMembership", () => {
 
     it("considers memberships expired when local age large", () => {
         const fakeEvent = makeMockEvent(1000);
-        const evAge = 6000;
-        fakeEvent.getLocalAge = jest.fn().mockReturnValue(evAge);
-        fakeEvent.localTimestamp = Date.now() - evAge;
+        fakeEvent.getLocalAge = jest.fn().mockReturnValue(6000);
         const membership = new CallMembership(fakeEvent, membershipTemplate);
         expect(membership.isExpired()).toEqual(true);
     });
