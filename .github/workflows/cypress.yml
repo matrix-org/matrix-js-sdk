@@ -33,7 +33,6 @@ jobs:
             TCMS_PASSWORD: ${{ secrets.TCMS_PASSWORD }}
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
-            rust-crypto: true
 
     # We want to make the cypress tests a required check for the merge queue.
     #
