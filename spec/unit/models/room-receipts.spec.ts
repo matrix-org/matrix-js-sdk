@@ -279,7 +279,64 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, event3Id)).toBe(false);
     });
 
-    // TODO: mixture of threaded and unthreaded receipts
+    it("correctly reports readness when mixing threaded and unthreaded receipts", () => {
+        // Given we have a setup from this presentation:
+        // https://docs.google.com/presentation/d/1H1gxRmRFAm8d71hCILWmpOYezsvdlb7cB6ANl-20Gns/edit?usp=sharing
+        //
+        //                     Main1----\
+        //                       |       ---Thread1a <- threaded receipt
+        //                       |             |
+        //                       |          Thread1b
+        // threaded receipt -> Main2--\
+        //                       |     ----------------Thread2a <- unthreaded receipt
+        //                     Main3                      |
+        //                                             Thread2b <- threaded receipt
+        //
+        const room = createRoom();
+        const [main1, main1Id] = createEvent();
+        const [main2, main2Id] = createEvent();
+        const [main3, main3Id] = createEvent();
+        const [thread1a, thread1aId] = createThreadedEvent(main1);
+        const [thread1b, thread1bId] = createThreadedEvent(main1);
+        const [thread2a, thread2aId] = createThreadedEvent(main2);
+        const [thread2b, thread2bId] = createThreadedEvent(main2);
+        setupThread(room, main1);
+        setupThread(room, main2);
+        room.addLiveEvents([main1, thread1a, thread1b, main2, thread2a, main3, thread2b]);
+
+        // And the timestamps on the events are consistent with the order above
+        main1.event.origin_server_ts = 1;
+        thread1a.event.origin_server_ts = 2;
+        thread1b.event.origin_server_ts = 3;
+        main2.event.origin_server_ts = 4;
+        thread2a.event.origin_server_ts = 5;
+        main3.event.origin_server_ts = 6;
+        thread2b.event.origin_server_ts = 7;
+        // (Note: in principle, we have the information needed to order these
+        // events without using their timestamps, since they all came in via
+        // addLiveEvents. In reality, some of them would have come in via the
+        // /relations API, making it impossible to get the correct ordering
+        // without MSC4033, which is why we fall back to timestamps. I.e. we
+        // definitely could fix the code to make the above
+        // timestamp-manipulation unnecessary, but it would only make this test
+        // neater, not actually help in the real world.)
+
+        // When the receipts arrive
+        room.addReceipt(createThreadedReceipt(readerId, main2, "main"));
+        room.addReceipt(createThreadedReceipt(readerId, thread1a, main1Id));
+        room.addReceipt(createReceipt(readerId, thread2a));
+        room.addReceipt(createThreadedReceipt(readerId, thread2b, main2Id));
+
+        // Then we correctly identify that only main3 is unread
+        expect(room.hasUserReadEvent(readerId, main1Id)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, main2Id)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, main3Id)).toBe(false);
+        expect(room.hasUserReadEvent(readerId, thread1aId)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, thread1bId)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, thread2aId)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, thread2bId)).toBe(true);
+    });
+
     // TODO: late-arriving receipts (dangling)
 });
 
