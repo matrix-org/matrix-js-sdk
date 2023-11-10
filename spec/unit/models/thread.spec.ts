@@ -149,21 +149,27 @@ describe("Thread", () => {
         });
 
         it("considers other events with no RR as unread", async () => {
-            const { thread, events, rootEvent } = await populateThread({
+            // Given a long thread exists
+            const { thread, events } = await populateThread({
                 room,
                 client,
-                authorId: myUserId,
-                participantUserIds: [myUserId],
+                authorId: "@other:foo.com",
+                participantUserIds: ["@other:foo.com"],
                 length: 25,
                 ts: 190,
             });
 
+            const event1 = events.at(1)!;
+            const event2 = events.at(2)!;
+            const event24 = events.at(24)!;
+
+            // And we have read the second message in it with an unthreaded receipt
             const receipt = new MatrixEvent({
                 type: "m.receipt",
                 room_id: room.roomId,
                 content: {
-                    // unthreaded receipt for the thread root
-                    [rootEvent.getId()!]: {
+                    // unthreaded receipt for the second message in the thread
+                    [event2.getId()!]: {
                         [ReceiptType.Read]: {
                             [myUserId]: { ts: 200 },
                         },
@@ -172,11 +178,9 @@ describe("Thread", () => {
             });
             room.addReceipt(receipt);
 
-            // Before alice's last unthreaded receipt
-            expect(thread.hasUserReadEvent("@alice:example.org", events.at(1)!.getId() ?? "")).toBeTruthy();
-
-            // After alice's last unthreaded receipt
-            expect(thread.hasUserReadEvent("@alice:example.org", events.at(-1)!.getId() ?? "")).toBeFalsy();
+            // Then we have read the first message in the thread, and not the last
+            expect(thread.hasUserReadEvent(myUserId, event1.getId()!)).toBe(true);
+            expect(thread.hasUserReadEvent(myUserId, event24.getId()!)).toBe(false);
         });
 
         it("considers event as read if there's a more recent unthreaded receipt", () => {
