@@ -24,7 +24,7 @@ import {
     KeysUploadRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
-    SigningKeysUploadRequest,
+    UploadSigningKeysRequest,
     ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
@@ -173,10 +173,10 @@ describe("OutgoingRequestProcessor", () => {
         httpBackend.verifyNoOutstandingRequests();
     });
 
-    it("should handle SigningKeysUploadRequests without UIA", async () => {
+    it("should handle UploadSigningKeysRequest without UIA", async () => {
         // first, mock up a request as we might expect to receive it from the Rust layer ...
         const testReq = { foo: "bar" };
-        const outgoingRequest = new SigningKeysUploadRequest(JSON.stringify(testReq));
+        const outgoingRequest = new UploadSigningKeysRequest(JSON.stringify(testReq));
 
         // ... then poke the request into the OutgoingRequestProcessor under test
         const reqProm = processor.makeOutgoingRequest(outgoingRequest);
@@ -200,10 +200,10 @@ describe("OutgoingRequestProcessor", () => {
         httpBackend.verifyNoOutstandingRequests();
     });
 
-    it("should handle SigningKeysUploadRequests with UIA", async () => {
+    it("should handle UploadSigningKeysRequest with UIA", async () => {
         // first, mock up a request as we might expect to receive it from the Rust layer ...
         const testReq = { foo: "bar" };
-        const outgoingRequest = new SigningKeysUploadRequest(JSON.stringify(testReq));
+        const outgoingRequest = new UploadSigningKeysRequest(JSON.stringify(testReq));
 
         // also create a UIA callback
         const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
