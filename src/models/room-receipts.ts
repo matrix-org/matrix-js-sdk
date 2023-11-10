@@ -115,18 +115,30 @@ export class RoomReceipts {
             }
         }
 
-        const timeline =
-            threadId === MAIN_ROOM_TIMELINE
-                ? this.room.getLiveTimeline().getEvents()
-                : this.room.getThread(threadId)?.timeline;
-        if (timeline?.at(-1)?.getSender() === userId) {
+        if (this.userSentLatestEventInThread(threadId, userId)) {
             // The user sent the latest message in this event's thread, so we
             // consider everything in the thread to be read.
+            //
+            // Note: maybe we don't need this because synthetic receipts should
+            // do this job for us?
             return true;
         }
 
         // Neither of the receipts were after the event, so it's unread.
         return false;
+    }
+
+    /**
+     * @returns true if the thread with this ID can be found, and the supplied
+     *          user sent the latest message in it.
+     */
+    private userSentLatestEventInThread(threadId: string, userId: String): boolean {
+        const timeline =
+            threadId === MAIN_ROOM_TIMELINE
+                ? this.room.getLiveTimeline().getEvents()
+                : this.room.getThread(threadId)?.timeline;
+
+        return !!(timeline && timeline.length > 0 && timeline[timeline.length - 1].getSender() === userId);
     }
 }
 
