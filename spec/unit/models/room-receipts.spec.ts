@@ -34,6 +34,17 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, event.getId()!)).toBe(false);
     });
 
+    it("reports events we sent as read even if there are no receipts", () => {
+        // Given there are no receipts in the room
+        const room = createRoom();
+        const [event] = createEventSentBy(readerId);
+        room.addLiveEvents([event]);
+
+        // When I ask about an event I sent, it is read (because a synthetic
+        // receipt was created and stored in RoomReceipts)
+        expect(room.hasUserReadEvent(readerId, event.getId()!)).toBe(true);
+    });
+
     it("reports read if we receive an unthreaded receipt for this event", () => {
         // Given my event exists and is unread
         const room = createRoom();
@@ -60,6 +71,21 @@ describe("RoomReceipts", () => {
 
         // Then the earlier one is read
         expect(room.hasUserReadEvent(readerId, event1Id)).toBe(true);
+    });
+
+    it("reports read for a non-live event if we receive an unthreaded receipt for a live one", () => {
+        // Given we have 2 events: one live and one old
+        const room = createRoom();
+        const [oldEvent, oldEventId] = createEvent();
+        const [liveEvent] = createEvent();
+        room.addLiveEvents([liveEvent]);
+        createOldTimeline(room, [oldEvent]);
+
+        // When we receive a receipt for the live event
+        room.addReceipt(createReceipt(readerId, liveEvent));
+
+        // Then the earlier one is read
+        expect(room.hasUserReadEvent(readerId, oldEventId)).toBe(true);
     });
 
     it("reports unread if we receive an unthreaded receipt for an earlier event", () => {
@@ -93,12 +119,37 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(otherUserId, eventId)).toBe(true);
     });
 
-    ("reports unread if we receive a receipt for an earlier event");
-    ("reports read if we receive a receipt for a later event");
-    ("different ways of events being later or earlier");
-    ("the sender of an event has alreadys read it due to synthetic receipts");
-    ("favours a synthetic receipt if it is later than the real one");
-    ("ignores an earlier receipt");
+    it("reports events we sent as read even if an earlier receipt arrives", () => {
+        // Given we sent an event after some other event
+        const room = createRoom();
+        const [previousEvent] = createEvent();
+        const [myEvent] = createEventSentBy(readerId);
+        room.addLiveEvents([previousEvent, myEvent]);
+
+        // And I just received a receipt for the previous event
+        room.addReceipt(createReceipt(readerId, previousEvent));
+
+        // When I ask about the event I sent, it is read (because of synthetic receipts)
+        expect(room.hasUserReadEvent(readerId, myEvent.getId()!)).toBe(true);
+    });
+
+    it("correctly reports readness even when receipts arrive out of order", () => {
+        // Given we have 3 events
+        const room = createRoom();
+        const [event1] = createEvent();
+        const [event2, event2Id] = createEvent();
+        const [event3, event3Id] = createEvent();
+        room.addLiveEvents([event1, event2, event3]);
+
+        // When we receive receipts for the older events out of order
+        room.addReceipt(createReceipt(readerId, event2));
+        room.addReceipt(createReceipt(readerId, event1));
+
+        // Then we correctly ignore the older receipt
+        expect(room.hasUserReadEvent(readerId, event2Id)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, event3Id)).toBe(false);
+    });
+
     ("threaded receipts");
     ("mixture of threaded and unthreaded receipts");
 });
@@ -117,7 +168,7 @@ const readerId = "reader:r.rr";
 const otherUserId = "other:o.oo";
 
 function createRoom(): Room {
-    return new Room("!rid", createFakeClient(), "@u:s.nz");
+    return new Room("!rid", createFakeClient(), "@u:s.nz", { timelineSupport: true });
 }
 
 let idCounter = 0;
@@ -126,7 +177,11 @@ function nextId(): string {
 }
 
 function createEvent(): [MatrixEvent, string] {
-    const event = new MatrixEvent({ sender: senderId, event_id: nextId() });
+    return createEventSentBy(senderId);
+}
+
+function createEventSentBy(customSenderId: string): [MatrixEvent, string] {
+    const event = new MatrixEvent({ sender: customSenderId, event_id: nextId() });
     return [event, event.getId()!];
 }
 
@@ -143,4 +198,9 @@ function createReceipt(userId: string, referencedEvent: MatrixEvent): MatrixEven
             },
         },
     });
+}
+
+function createOldTimeline(room: Room, events: MatrixEvent[]) {
+    const oldTimeline = room.getUnfilteredTimelineSet().addTimeline();
+    room.getUnfilteredTimelineSet().addEventsToTimeline(events, true, oldTimeline);
 }
