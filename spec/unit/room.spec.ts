@@ -1747,7 +1747,7 @@ describe("Room", function () {
                 const ts = 13787898424;
                 room.addLiveEvents([eventToAck]);
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
-                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+                room.findEventById = jest.fn().mockReturnValue({ getThread: jest.fn() } as unknown as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
 
