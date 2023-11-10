@@ -23,6 +23,7 @@ import {
     HistoryVisibility as RustHistoryVisibility,
     ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
@@ -30,8 +31,8 @@ import { Room } from "../models/room";
 import { Logger, logger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { HistoryVisibility } from "../@types/partials";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -41,21 +42,34 @@ import { HistoryVisibility } from "../@types/partials";
 export class RoomEncryptor {
     private readonly prefixedLogger: Logger;
 
+    /** whether the room members have been loaded and tracked for the first time */
+    private lazyLoadedMembersResolved = false;
+
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
-     * @param outgoingRequestProcessor - The OutgoingRequestProcessor, which sends outgoing requests
+     * @param outgoingRequestManager - The OutgoingRequestManager, which manages the queue of outgoing requests.
      * @param room - The room we want to encrypt for
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
     public constructor(
         private readonly olmMachine: OlmMachine,
         private readonly keyClaimManager: KeyClaimManager,
-        private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
+        private readonly outgoingRequestManager: OutgoingRequestsManager,
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
         this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
+
+        // start tracking devices for any users already known to be in this room.
+        // Do not load members here, would defeat lazy loading.
+        const members = room.getJoinedMembers();
+        // At this point just mark the known members as tracked, it might not be the full list of members
+        // because of lazy loading. This is fine, because we will get a member list update when sending a message for
+        // the first time, see `RoomEncryptor#ensureEncryptionSession`
+        this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId))).then(() => {
+            this.prefixedLogger.debug(`Updated tracked users for room ${room.roomId}`);
+        });
     }
 
     /**
@@ -104,6 +118,28 @@ export class RoomEncryptor {
         }
 
         const members = await this.room.getEncryptionTargetMembers();
+
+        // If this is the first time we are sending a message to the room, we may not yet have seen all the members
+        // (so the Crypto SDK might not have a device list for them). So, if this is the first time we are encrypting
+        // for this room, give the SDK the full list of members, to be on the safe side.
+        //
+        // This could end up being racy (if two calls to ensureEncryptionSession happen at the same time), but that's
+        // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
+        if (!this.lazyLoadedMembersResolved) {
+            await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
+            this.lazyLoadedMembersResolved = true;
+            this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);
+        }
+
+        // Query keys in case we don't have them for newly tracked members.
+        // This must be done before ensuring sessions. If not the devices of these users are not
+        // known yet and will not get the room key.
+        // We don't have API to only get the keys queries related to this member list, so we just
+        // process the pending requests from the olmMachine. (usually these are processed
+        // at the end of the sync, but we can't wait for that).
+        // XXX future improvement process only KeysQueryRequests for the tracked users.
+        await this.outgoingRequestManager.doProcessOutgoingRequests();
+
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,
             members.map((u) => `${u.userId} (${u.membership})`),
@@ -143,7 +179,7 @@ export class RoomEncryptor {
         );
         if (shareMessages) {
             for (const m of shareMessages) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(m);
+                await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
             }
         }
     }

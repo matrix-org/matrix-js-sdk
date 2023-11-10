@@ -21,6 +21,7 @@ import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { MatrixEvent } from "./models/event";
+import { Room, RoomEvent } from "./models/room";
 
 /**
  * @internal
@@ -74,6 +75,10 @@ export class TimelineWindow {
      * are received from /sync; you should arrange to call {@link TimelineWindow#paginate}
      * on {@link RoomEvent.Timeline} events.
      *
+     * <p>Note that constructing an instance of this class for a room adds a
+     * listener for RoomEvent.Timeline events which is never removed. In theory
+     * this should not cause a leak since the EventEmitter uses weak mappings.
+     *
      * @param client -   MatrixClient to be used for context/pagination
      *   requests.
      *
@@ -87,6 +92,7 @@ export class TimelineWindow {
         opts: IOpts = {},
     ) {
         this.windowLimit = opts.windowLimit || 1000;
+        timelineSet.room?.on(RoomEvent.Timeline, this.onTimelineEvent.bind(this));
     }
 
     /**
@@ -191,6 +197,23 @@ export class TimelineWindow {
         }
 
         return false;
+    }
+
+    private onTimelineEvent(_event?: MatrixEvent, _room?: Room, _atStart?: boolean, removed?: boolean): void {
+        if (removed) {
+            this.onEventRemoved();
+        }
+    }
+
+    /**
+     * If an event was removed, meaning this window is longer than the timeline,
+     * shorten the window.
+     */
+    private onEventRemoved(): void {
+        const events = this.getEvents();
+        if (events.length > 0 && events[events.length - 1] === undefined && this.end) {
+            this.end.index--;
+        }
     }
 
     /**

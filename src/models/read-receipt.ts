@@ -26,6 +26,7 @@ import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
+import { logger } from "../logger";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -94,15 +95,119 @@ export abstract class ReadReceipt<
     }
 
     /**
-     * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them.
+     * Get the ID of the event that a given user has read up to, or null if:
+     * - we have received no read receipts for them, or
+     * - the receipt we have points at an event we don't have, or
+     * - the thread ID in the receipt does not match the thread root of the
+     *   referenced event.
+     *
+     * (The event might not exist if it is not loaded, and the thread ID might
+     * not match if the event has moved thread because it was redacted.)
+     *
      * @param userId - The user ID to get read receipt event ID for
      * @param ignoreSynthesized - If true, return only receipts that have been
-     *                                    sent by the server, not implicit ones generated
-     *                                    by the JS SDK.
-     * @returns ID of the latest event that the given user has read, or null.
+     *                            sent by the server, not implicit ones generated
+     *                            by the JS SDK.
+     * @returns ID of the latest existing event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+        // Find what the latest receipt says is the latest event we have read
+        const latestReceipt = this.getLatestReceipt(userId, ignoreSynthesized);
+
+        if (!latestReceipt) {
+            return null;
+        }
+
+        return this.receiptPointsAtConsistentEvent(latestReceipt) ? latestReceipt.eventId : null;
+    }
+
+    /**
+     * Returns true if the event pointed at by this receipt exists, and its
+     * threadRootId is consistent with the thread information in the receipt.
+     */
+    private receiptPointsAtConsistentEvent(receipt: WrappedReceipt): boolean {
+        const event = this.findEventById(receipt.eventId);
+        if (!event) {
+            // If the receipt points at a non-existent event, we have multiple
+            // possibilities:
+            //
+            // 1. We don't have the event because it's not loaded yet - probably
+            //    it's old and we're best off ignoring the receipt - we can just
+            //    send a new one when we read a new event.
+            //
+            // 2. We have a bug e.g. we misclassified this event into the wrong
+            //    thread.
+            //
+            // 3. The referenced event moved out of this thread (e.g. because it
+            //    was deleted.)
+            //
+            // 4. The receipt had the incorrect thread ID (due to a bug in a
+            // client, or malicious behaviour).
+            logger.warn(`Ignoring receipt for missing event with id ${receipt.eventId}`);
+
+            // This receipt is not "valid" because it doesn't point at an event
+            // we have. We want to pretend it doesn't exist.
+            return false;
+        }
+
+        if (!receipt.data?.thread_id) {
+            // If this is an unthreaded receipt, it could point at any event, so
+            // there is no need to validate further - this receipt is valid.
+            return true;
+        }
+        // Otherwise it is a threaded receipt...
+
+        if (receipt.data.thread_id === MAIN_ROOM_TIMELINE) {
+            // The receipt is for the main timeline: we check that the event is
+            // in the main timeline.
+
+            // There are two ways to know an event is in the main timeline:
+            // either it has no threadRootId, or it is a thread root.
+            // (Note: it's a little odd because the thread root is in the main
+            // timeline, but it still has a threadRootId.)
+            const eventIsInMainTimeline = !event.threadRootId || event.isThreadRoot;
+
+            if (eventIsInMainTimeline) {
+                // The receipt is for the main timeline, and so is the event, so
+                // the receipt is valid.
+                return true;
+            }
+        } else {
+            // The receipt is for a different thread (not the main timeline)
+
+            if (event.threadRootId === receipt.data.thread_id) {
+                // If the receipt and event agree on the thread ID, the receipt
+                // is valid.
+                return true;
+            }
+        }
+
+        // The receipt thread ID disagrees with the event thread ID. There are 2
+        // possibilities:
+        //
+        // 1. The event moved to a different thread after the receipt was
+        //    created. This can happen if the event was redacted because that
+        //    moves it to the main timeline.
+        //
+        // 2. There is a bug somewhere - either we put the event into the wrong
+        //    thread, or someone sent an incorrect receipt.
+        //
+        // In many cases, we won't get here because the call to findEventById
+        // would have already returned null. We include this check to cover
+        // cases when `this` is a  room, meaning findEventById will find events
+        // in any thread, and to be defensive against unforeseen code paths.
+        logger.warn(
+            `Ignoring receipt because its thread_id (${receipt.data.thread_id}) disagrees ` +
+                `with the thread root (${event.threadRootId}) of the referenced event ` +
+                `(event ID = ${receipt.eventId})`,
+        );
+
+        // This receipt is not "valid" because it disagrees with us about what
+        // thread the event is in. We want to pretend it doesn't exist.
+        return false;
+    }
+
+    private getLatestReceipt(userId: string, ignoreSynthesized: boolean): WrappedReceipt | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
@@ -118,10 +223,10 @@ export abstract class ReadReceipt<
 
         // The public receipt is more likely to drift out of date so the private
         // one has precedence
-        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
+        if (!comparison) return privateReadReceipt ?? publicReadReceipt ?? null;
 
         // If public read receipt is older, return the private one
-        return (comparison < 0 ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
+        return (comparison < 0 ? privateReadReceipt : publicReadReceipt) ?? null;
     }
 
     public addReceiptToStructure(
@@ -228,6 +333,13 @@ export abstract class ReadReceipt<
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;
 
     public abstract setUnread(type: NotificationCountType, count: number): void;
+
+    /**
+     * Look in this room/thread's timeline to find an event. If `this` is a
+     * room, we look in all threads, but if `this` is a thread, we look only
+     * inside this thread.
+     */
+    public abstract findEventById(eventId: string): MatrixEvent | undefined;
 
     /**
      * This issue should also be addressed on synapse's side and is tracked as part
