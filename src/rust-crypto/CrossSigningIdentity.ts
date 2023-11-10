@@ -134,10 +134,7 @@ export class CrossSigningIdentity {
             outgoingRequests.uploadSignaturesRequest,
         ]) {
             if (req) {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(
-                    outgoingRequests.uploadKeysRequest,
-                    authUploadDeviceSigningKeys,
-                );
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
             }
         }
     }
