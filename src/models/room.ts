@@ -67,7 +67,6 @@ import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
-import { RoomEventsInStreamOrder } from "./room-events-in-stream-order";
 import { compareEventOrdering } from "./compare-events-in-stream-order";
 
 // These constants are used as sane defaults when the homeserver doesn't support
