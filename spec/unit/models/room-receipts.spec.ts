@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, MatrixEvent } from "../../../src";
+import { FeatureSupport, MatrixClient, MatrixEvent, ReceiptContent, THREAD_RELATION_TYPE, Thread } from "../../../src";
 import { Room } from "../../../src/models/room";
 
 /**
@@ -24,6 +24,17 @@ import { Room } from "../../../src/models/room";
  * of how this code is used in the wild.
  */
 describe("RoomReceipts", () => {
+    let previousThreadHasServerSideSupport: FeatureSupport;
+
+    beforeAll(() => {
+        previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+        Thread.hasServerSideSupport = FeatureSupport.Stable;
+    });
+
+    afterAll(() => {
+        Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
+    });
+
     it("reports events unread if there are no receipts", () => {
         // Given there are no receipts in the room
         const room = createRoom();
@@ -109,7 +120,7 @@ describe("RoomReceipts", () => {
         room.addLiveEvents([event]);
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
-        // When we receive a receipt for this event+user
+        // When we receive a receipt for another user
         room.addReceipt(createReceipt(otherUserId, event));
 
         // Then the event is still unread since the receipt was not for us
@@ -150,8 +161,126 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, event3Id)).toBe(false);
     });
 
-    ("threaded receipts");
-    ("mixture of threaded and unthreaded receipts");
+    it("reports read if we receive a threaded receipt for this event (main)", () => {
+        // Given my event exists and is unread
+        const room = createRoom();
+        const [event, eventId] = createEvent();
+        room.addLiveEvents([event]);
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+        // When we receive a receipt for this event+user
+        room.addReceipt(createThreadedReceipt(readerId, event, "main"));
+
+        // Then that event is read
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
+    });
+
+    it("reports read if we receive a threaded receipt for this event (non-main)", () => {
+        // Given my event exists and is unread
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [event, eventId] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, event]);
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+        // When we receive a receipt for this event on this thread
+        room.addReceipt(createThreadedReceipt(readerId, event, rootId));
+
+        // Then that event is read
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
+    });
+
+    it("reports read if we receive an threaded receipt for a later event", () => {
+        // Given we have 2 events in a thread
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [event1, event1Id] = createThreadedEvent(root);
+        const [event2] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, event1, event2]);
+
+        // When we receive a receipt for the later event
+        room.addReceipt(createThreadedReceipt(readerId, event2, rootId));
+
+        // Then the earlier one is read
+        expect(room.hasUserReadEvent(readerId, event1Id)).toBe(true);
+    });
+
+    it("reports unread if we receive an threaded receipt for an earlier event", () => {
+        // Given we have 2 events in a thread
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [event1] = createThreadedEvent(root);
+        const [event2, event2Id] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, event1, event2]);
+
+        // When we receive a receipt for the earlier event
+        room.addReceipt(createThreadedReceipt(readerId, event1, rootId));
+
+        // Then the later one is unread
+        expect(room.hasUserReadEvent(readerId, event2Id)).toBe(false);
+    });
+
+    it("reports unread if we receive an threaded receipt for a different user", () => {
+        // Given my event exists and is unread
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [event, eventId] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, event]);
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+        // When we receive a receipt for another user
+        room.addReceipt(createThreadedReceipt(otherUserId, event, rootId));
+
+        // Then the event is still unread since the receipt was not for us
+        expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+        // But it's read for the other person
+        expect(room.hasUserReadEvent(otherUserId, eventId)).toBe(true);
+    });
+
+    it("reports unread if we receive a receipt for a later event in a different thread", () => {
+        // Given 2 events exist in different threads
+        const room = createRoom();
+        const [root1] = createEvent();
+        const [root2] = createEvent();
+        const [thread1, thread1Id] = createThreadedEvent(root1);
+        const [thread2] = createThreadedEvent(root2);
+        setupThread(room, root1);
+        setupThread(room, root2);
+        room.addLiveEvents([root1, root2, thread1, thread2]);
+
+        // When we receive a receipt for the later event
+        room.addReceipt(createThreadedReceipt(readerId, thread2, root2.getId()!));
+
+        // Then the old one is still unread since the receipt was not for this thread
+        expect(room.hasUserReadEvent(readerId, thread1Id)).toBe(false);
+    });
+
+    it("correctly reports readness even when threaded receipts arrive out of order", () => {
+        // Given we have 3 events
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [event1] = createThreadedEvent(root);
+        const [event2, event2Id] = createThreadedEvent(root);
+        const [event3, event3Id] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, event1, event2, event3]);
+
+        // When we receive receipts for the older events out of order
+        room.addReceipt(createThreadedReceipt(readerId, event2, rootId));
+        room.addReceipt(createThreadedReceipt(readerId, event1, rootId));
+
+        // Then we correctly ignore the older receipt
+        expect(room.hasUserReadEvent(readerId, event2Id)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, event3Id)).toBe(false);
+    });
+
+    // TODO: mixture of threaded and unthreaded receipts
+    // TODO: late-arriving receipts (dangling)
 });
 
 function createFakeClient(): MatrixClient {
@@ -160,6 +289,9 @@ function createFakeClient(): MatrixClient {
         getEventMapper: jest.fn().mockReturnValue(jest.fn()),
         isInitialSyncComplete: jest.fn().mockReturnValue(true),
         supportsThreads: jest.fn().mockReturnValue(true),
+        fetchRoomEvent: jest.fn().mockResolvedValue({}),
+        paginateEventTimeline: jest.fn(),
+        canSupport: { get: jest.fn() },
     } as unknown as MatrixClient;
 }
 
@@ -185,22 +317,69 @@ function createEventSentBy(customSenderId: string): [MatrixEvent, string] {
     return [event, event.getId()!];
 }
 
-function createReceipt(userId: string, referencedEvent: MatrixEvent): MatrixEvent {
-    return new MatrixEvent({
-        type: "m.receipt",
+function createThreadedEvent(root: MatrixEvent): [MatrixEvent, string] {
+    const rootEventId = root.getId()!;
+    const event = new MatrixEvent({
+        sender: senderId,
+        event_id: nextId(),
         content: {
-            [referencedEvent.getId()!]: {
-                "m.read": {
-                    [userId]: {
-                        ts: 123,
-                    },
+            "m.relates_to": {
+                event_id: rootEventId,
+                rel_type: THREAD_RELATION_TYPE.name,
+                ["m.in_reply_to"]: {
+                    event_id: rootEventId,
                 },
             },
         },
+    });
+    return [event, event.getId()!];
+}
+
+function createReceipt(userId: string, referencedEvent: MatrixEvent): MatrixEvent {
+    const content: ReceiptContent = {
+        [referencedEvent.getId()!]: {
+            "m.read": {
+                [userId]: {
+                    ts: 123,
+                },
+            },
+        },
+    };
+
+    return new MatrixEvent({
+        type: "m.receipt",
+        content,
+    });
+}
+
+function createThreadedReceipt(userId: string, referencedEvent: MatrixEvent, threadId: string): MatrixEvent {
+    const content: ReceiptContent = {
+        [referencedEvent.getId()!]: {
+            "m.read": {
+                [userId]: {
+                    ts: 123,
+                    thread_id: threadId,
+                },
+            },
+        },
+    };
+
+    return new MatrixEvent({
+        type: "m.receipt",
+        content,
     });
 }
 
 function createOldTimeline(room: Room, events: MatrixEvent[]) {
     const oldTimeline = room.getUnfilteredTimelineSet().addTimeline();
     room.getUnfilteredTimelineSet().addEventsToTimeline(events, true, oldTimeline);
+}
+
+/**
+ * Perform the hacks required for this room to create a thread based on the root
+ * event supplied.
+ */
+function setupThread(room: Room, root: MatrixEvent) {
+    const thread = room.createThread(root.getId()!, root, [root], false);
+    thread.initialEventsFetched = true;
 }

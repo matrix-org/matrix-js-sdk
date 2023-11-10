@@ -232,17 +232,26 @@ class ReceiptsByUser {
 
         const existingReceipt = userReceipts.getByType(synthetic);
         if (existingReceipt) {
-            const unfilteredTimelineSet = this.room.getUnfilteredTimelineSet();
-            const comparison = unfilteredTimelineSet.compareEventOrdering(eventId, existingReceipt.eventId);
-
-            if (comparison !== null && comparison < 0) {
+            if (isAfter(existingReceipt.eventId, eventId, this.room)) {
                 // The new receipt is before the existing one - don't store it.
                 return;
             }
         }
 
-        // Either there was no (valid) existing receipt, or it was before this
-        // one - add the new receipt.
+        // Possibilities:
+        //
+        // 1. there was no existing receipt, or
+        // 2. the existing receipt was before this one, or
+        // 3. we were unable to compare the receipts.
+        //
+        // In the case of 3 it's difficult to decide what to do, so the
+        // most-recently-received receipt wins.
+        //
+        // Case 3 can only happen if the events for these receipts have
+        // disappeared, which is quite unlikely since the new one has just been
+        // checked, and the old one was checked before it was inserted here.
+        //
+        // We go ahead and store this receipt (replacing the other if it exists)
         userReceipts.set(synthetic, new ReceiptInfo(eventId, receiptType, ts));
     }
 
@@ -340,7 +349,7 @@ function getOrCreate<K, V>(m: Map<K, V>, key: K, createFn: () => V): V {
 }
 
 /**
- * Is left after right in this room's unfiltered timeline?
+ * Is left after right (or the same)?
  *
  * Only returns true if both events can be found, and left is after or the same
  * as right.
@@ -350,4 +359,16 @@ function getOrCreate<K, V>(m: Map<K, V>, key: K, createFn: () => V): V {
 function isAfterOrSame(leftEventId: string, rightEventId: string, room: Room): boolean {
     const comparison = room.compareEventOrdering(leftEventId, rightEventId);
     return comparison !== null && comparison >= 0;
+}
+
+/**
+ * Is left strictly after right?
+ *
+ * Only returns true if both events can be found, and left is strictly after right.
+ *
+ * @returns left \> right
+ */
+function isAfter(leftEventId: string, rightEventId: string, room: Room): boolean {
+    const comparison = room.compareEventOrdering(leftEventId, rightEventId);
+    return comparison !== null && comparison > 0;
 }
