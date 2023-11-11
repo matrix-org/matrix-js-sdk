@@ -10,15 +10,22 @@ on:
                 required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
 jobs:
-    changelog:
-        name: Preview Changelog
+    labels:
+        name: Require change type label
         runs-on: ubuntu-latest
+        permissions:
+            pull-requests: read
         steps:
-            - uses: matrix-org/allchange@main
+            - uses: mheap/github-action-required-labels@4e9ef4ce8c697cf55716ecbf7f13a3d9e0b6ac6a # v5.1.0
               if: github.event_name != 'merge_group'
               with:
-                  ghToken: ${{ secrets.GITHUB_TOKEN }}
-                  requireLabel: true
+                  mode: exactly
+                  count: 1
+                  labels: |
+                      T-Task
+                      T-Defect
+                      T-Deprecation
+                      T-Enhancement
 
     prevent-blocked:
         name: Prevent Blocked
