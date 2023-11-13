@@ -163,6 +163,17 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, myEvent.getId()!)).toBe(true);
     });
 
+    it("considers events after ones we sent to be unread", () => {
+        // Given we sent an event, then another event came in
+        const room = createRoom();
+        const [myEvent] = createEventSentBy(readerId);
+        const [laterEvent] = createEvent();
+        room.addLiveEvents([myEvent, laterEvent]);
+
+        // When I ask about the later event, it is unread (because it's after the synthetic receipt)
+        expect(room.hasUserReadEvent(readerId, laterEvent.getId()!)).toBe(false);
+    });
+
     it("correctly reports readness even when receipts arrive out of order", () => {
         // Given we have 3 events
         const room = createRoom();
