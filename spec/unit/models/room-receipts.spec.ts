@@ -99,6 +99,25 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, oldEventId)).toBe(true);
     });
 
+    it("compares by timestamp if two events are in separate old timelines", () => {
+        // Given we have 2 events, both in old timelines, with event2 after
+        // event1 in terms of timestamps
+        const room = createRoom();
+        const [event1, event1Id] = createEvent();
+        const [event2, event2Id] = createEvent();
+        event1.event.origin_server_ts = 1;
+        event2.event.origin_server_ts = 2;
+        createOldTimeline(room, [event1]);
+        createOldTimeline(room, [event2]);
+
+        // When we receive a receipt for the older event
+        room.addReceipt(createReceipt(readerId, event1));
+
+        // Then the earlier one is read and the later one is not
+        expect(room.hasUserReadEvent(readerId, event1Id)).toBe(true);
+        expect(room.hasUserReadEvent(readerId, event2Id)).toBe(false);
+    });
+
     it("reports unread if we receive an unthreaded receipt for an earlier event", () => {
         // Given we have 2 events
         const room = createRoom();
