@@ -2938,7 +2938,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.roomReceipts.add(content, synthetic);
 
-        // START OF TO-DELETE
+        // TODO: delete the following code when it has been replaced by RoomReceipts
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
@@ -3000,7 +3000,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
             });
         });
-        // END OF TO-DELETE
+        // End of code to delete when replaced by RoomReceipts
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
