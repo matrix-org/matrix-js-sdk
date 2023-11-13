@@ -105,6 +105,21 @@ jobs:
               if: inputs.mode == 'final'
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
+            - name: Check version number not in use
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      const { VERSION } = process.env;
+                      github.rest.repos.getReleaseByTag({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          tag: VERSION,
+                      }).then(() => {
+                          core.setFailed(`Version ${VERSION} already exists`);
+                      }).catch(() => {
+                        // This is fine, we expect there to not be any release with this version yet
+                      });
+
             - name: Set up git
               run: |
                   git config --global user.email "releases@riot.im"
@@ -319,3 +334,20 @@ jobs:
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    update-labels:
+        name: Advance release blocker labels
+        needs: release
+        runs-on: ubuntu-latest
+        steps:
+            - id: repository
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+              with:
+                  owner: ${{ github.repository_owner }}
+                  repo: ${{ steps.repository.outputs.REPO }}
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  filter-labels: X-Upcoming-Release-Blocker
+                  remove-labels: X-Upcoming-Release-Blocker
+                  add-labels: X-Release-Blocker
