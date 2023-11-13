@@ -66,6 +66,8 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
+import { RoomReceipts } from "./room-receipts";
+import { compareEventOrdering } from "./compare-event-ordering";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -430,6 +432,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @experimental
      */
     private visibilityEvents = new Map<string, MatrixEvent[]>();
+
+    /**
+     * The latest receipts (synthetic and real) for each user in each thread
+     * (and unthreaded).
+     */
+    private roomReceipts = new RoomReceipts(this);
 
     /**
      * Construct a new Room.
@@ -2927,6 +2935,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public addReceipt(event: MatrixEvent, synthetic = false): void {
         const content = event.getContent<ReceiptContent>();
+
+        this.roomReceipts.add(content, synthetic);
+
+        // TODO: when we've finished replacing all the receipt code, the
+        // following will be deleted:
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
@@ -2988,6 +3001,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
             });
         });
+        // TODO: end of section that will be deleted when we've rewritten the
+        // receipt code.
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
@@ -3575,6 +3590,19 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Determines if the given user has read a particular event ID with the known
+     * history of the room. This is not a definitive check as it relies only on
+     * what is available to the room at the time of execution.
+     *
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns true if the user has read the event, false otherwise.
+     */
+    public hasUserReadEvent(userId: string, eventId: string): boolean {
+        return this.roomReceipts.hasUserReadEvent(userId, eventId);
+    }
+
+    /**
      * Returns the most recent unthreaded receipt for a given user
      * @param userId - the MxID of the User
      * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
@@ -3606,6 +3634,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const thread of unreadThreads) {
             thread.fixupNotifications(userId);
         }
+    }
+
+    public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
+        return compareEventOrdering(this, leftEventId, rightEventId);
     }
 }
 

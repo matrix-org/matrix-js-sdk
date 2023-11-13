@@ -19,7 +19,7 @@ import { mocked } from "jest-mock";
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
-import { makeThreadEvent, mkThread } from "../../test-utils/thread";
+import { makeThreadEvent, mkThread, populateThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
@@ -148,21 +148,39 @@ describe("Thread", () => {
             expect(thread.hasUserReadEvent(myUserId, events.at(-1)!.getId() ?? "")).toBeTruthy();
         });
 
-        it("considers other events with no RR as unread", () => {
-            const { thread, events } = mkThread({
+        it("considers other events with no RR as unread", async () => {
+            // Given a long thread exists
+            const { thread, events } = await populateThread({
                 room,
                 client,
-                authorId: myUserId,
-                participantUserIds: [myUserId],
+                authorId: "@other:foo.com",
+                participantUserIds: ["@other:foo.com"],
                 length: 25,
                 ts: 190,
             });
 
-            // Before alice's last unthreaded receipt
-            expect(thread.hasUserReadEvent("@alice:example.org", events.at(1)!.getId() ?? "")).toBeTruthy();
+            const event1 = events.at(1)!;
+            const event2 = events.at(2)!;
+            const event24 = events.at(24)!;
 
-            // After alice's last unthreaded receipt
-            expect(thread.hasUserReadEvent("@alice:example.org", events.at(-1)!.getId() ?? "")).toBeFalsy();
+            // And we have read the second message in it with an unthreaded receipt
+            const receipt = new MatrixEvent({
+                type: "m.receipt",
+                room_id: room.roomId,
+                content: {
+                    // unthreaded receipt for the second message in the thread
+                    [event2.getId()!]: {
+                        [ReceiptType.Read]: {
+                            [myUserId]: { ts: 200 },
+                        },
+                    },
+                },
+            });
+            room.addReceipt(receipt);
+
+            // Then we have read the first message in the thread, and not the last
+            expect(thread.hasUserReadEvent(myUserId, event1.getId()!)).toBe(true);
+            expect(thread.hasUserReadEvent(myUserId, event24.getId()!)).toBe(false);
         });
 
         it("considers event as read if there's a more recent unthreaded receipt", () => {
