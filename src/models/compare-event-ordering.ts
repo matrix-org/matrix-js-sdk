@@ -37,8 +37,7 @@ import { Thread } from "./thread";
  * @param rightEventId - the id of the second event
 
  * @returns -1 if left \< right, 1 if left \> right, 0 if left == right, null if
- *          we can't tell (because we can't find the events, or they are both from old
- *          timelines).
+ *          we can't tell (because we can't find the events).
  */
 export function compareEventOrdering(room: Room, leftEventId: string, rightEventId: string): number | null {
     const leftEvent = room.findEventById(leftEventId);
