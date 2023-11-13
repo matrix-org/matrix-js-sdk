@@ -67,7 +67,7 @@ import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
-import { compareEventOrdering } from "./compare-events-in-stream-order";
+import { compareEventOrdering } from "./compare-event-ordering";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
