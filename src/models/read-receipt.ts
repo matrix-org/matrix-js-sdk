@@ -387,4 +387,25 @@ export abstract class ReadReceipt<
                 return receipt.userId;
             });
     }
+
+    /**
+     * Determines if the given user has read a particular event ID with the known
+     * history of the room. This is not a definitive check as it relies only on
+     * what is available to the room at the time of execution.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns True if the user has read the event, false otherwise.
+     */
+    public abstract hasUserReadEvent(userId: string, eventId: string): boolean;
+
+    /**
+     * Returns the most recent unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
+     *
+     * @deprecated use `hasUserReadEvent` or `getEventReadUpTo` instead
+     */
+    public abstract getLastUnthreadedReceiptFor(userId: string): Receipt | undefined;
 }
