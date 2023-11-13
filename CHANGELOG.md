@@ -1,3 +1,9 @@
+Changes in [30.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.1) (2023-11-13)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Ensure `setUserCreator` is called when a store is assigned ([\#3867](https://github.com/matrix-org/matrix-js-sdk/pull/3867)). Fixes vector-im/element-web#26520. Contributed by @MidhunSureshR.
+
 Changes in [30.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.0) (2023-11-07)
 ==================================================================================================
 
