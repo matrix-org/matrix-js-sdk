@@ -1227,7 +1227,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
     public olmVersion: [number, number, number] | null = null; // populated after initCrypto
     public usingExternalCrypto = false;
-    public store: Store;
+    private _store!: Store;
     public deviceId: string | null;
     public credentials: { userId: string | null };
 
@@ -1342,7 +1342,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
-        this.store.setUserCreator((userId) => User.createUser(userId, this));
         this.deviceId = opts.deviceId || null;
         this.sessionId = randomString(10);
 
@@ -1505,6 +1504,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
+    }
+
+    public set store(newStore: Store) {
+        this._store = newStore;
+        this._store.setUserCreator((userId) => User.createUser(userId, this));
+    }
+
+    public get store(): Store {
+        return this._store;
     }
 
     /**
