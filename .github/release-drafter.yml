@@ -19,6 +19,11 @@ version-resolver:
         labels:
             - "X-Breaking-Change"
     default: minor
+exclude-labels:
+    - "T-Task"
+    - "X-Reverted"
+exclude-contributors:
+    - "RiotRobot"
 template: |
     $CHANGES
 prerelease: true
