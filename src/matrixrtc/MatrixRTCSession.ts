@@ -563,7 +563,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const isMyMembership = (m: CallMembership): boolean =>
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
-        if (this.isJoined() && this.makeNewKeyTimeout === undefined) {
+        if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
             const oldMebershipIds = new Set(
                 oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
             );
@@ -767,6 +767,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private onRotateKeyTimeout = (): void => {
+        if (!this.manageMediaKeys) return;
+
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
         this.makeNewSenderKey(true);
