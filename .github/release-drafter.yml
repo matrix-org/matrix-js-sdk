@@ -22,6 +22,8 @@ version-resolver:
 exclude-labels:
     - "T-Task"
     - "X-Reverted"
+exclude-contributors:
+    - "RiotRobot"
 template: |
     $CHANGES
 prerelease: true
