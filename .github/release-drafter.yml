@@ -19,6 +19,9 @@ version-resolver:
         labels:
             - "X-Breaking-Change"
     default: minor
+exclude-labels:
+    - "T-Task"
+    - "X-Reverted"
 template: |
     $CHANGES
 prerelease: true
