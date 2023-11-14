@@ -179,7 +179,7 @@ jobs:
                   fi
 
             - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "$VERSION"
+              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
 
             - name: Ingest upstream changes
               if: |
