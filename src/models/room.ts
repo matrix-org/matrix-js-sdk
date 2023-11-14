@@ -2446,6 +2446,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // they are no longer currently active anyway. So don't bother to
             // reset the lastActiveAgo and lastPresenceTs from the RoomState's user.
         }
+
+        // Update dangling receipts for this event
+        this.roomReceipts.onTimeLineEvent(event);
     }
 
     /**
