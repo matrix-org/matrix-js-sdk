@@ -188,7 +188,7 @@ jobs:
                   contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
               uses: actions/github-script@v6
               env:
-                  RELEASE_ID: ${{ steps.upstream-release.outputs.body }}
+                  RELEASE_ID: ${{ steps.release.outputs.id }}
                   DEPENDENCY: ${{ inputs.include-changes }}
               with:
                   retries: 3
