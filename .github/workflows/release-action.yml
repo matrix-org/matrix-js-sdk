@@ -230,7 +230,7 @@ jobs:
               run: git commit -m "$VERSION"
 
             - name: Build assets
-              if: steps.prepare.outputs.has-dist-script
+              if: steps.prepare.outputs.has-dist-script == '1'
               run: DIST_VERSION="$VERSION" yarn dist
 
             - name: Upload release assets & signatures
