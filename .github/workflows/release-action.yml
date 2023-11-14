@@ -90,7 +90,7 @@ jobs:
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
                   {
                       echo "RELEASE_NOTES<<EOF"
-                      echo $BODY
+                      echo "$BODY"
                       echo "EOF"
                   } >> $GITHUB_ENV
 
@@ -102,7 +102,7 @@ jobs:
                   VERSION: ${{ steps.release.outputs.tag_name }}
 
             - name: Finalise version
-              if: inputs.mode == 'final'
+              if: inputs.final
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
             - name: Check version number not in use
@@ -204,7 +204,7 @@ jobs:
                       core.exportVariable("RELEASE_NOTES", notes);
 
             - name: Add to CHANGELOG.md
-              if: inputs.mode == 'final'
+              if: inputs.final
               run: |
                   mv CHANGELOG.md CHANGELOG.md.old
                   HEADER="Changes in [${VERSION#v}](https://github.com/${{ github.repository }}/releases/tag/$VERSION) ($(date '+%Y-%m-%d'))"
