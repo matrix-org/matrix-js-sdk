@@ -13,7 +13,7 @@ jobs:
     draft:
         runs-on: ubuntu-latest
         steps:
-            - uses: release-drafter/release-drafter@219b17038f47a488197914b7d8f813de08677fc5 # v5
+            - uses: release-drafter/release-drafter@e64b19c4c46173209ed9f2e5a2f4ca7de89a0e86 # v5
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
