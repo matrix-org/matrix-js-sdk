@@ -306,6 +306,7 @@ jobs:
                   FINAL: ${{ inputs.final }}
               with:
                   retries: 3
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   script: |
                       const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, FINAL } = process.env;
                       const { owner, repo } = context.repo;
