@@ -342,7 +342,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - id: repository
-              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
 
             - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
               with:
