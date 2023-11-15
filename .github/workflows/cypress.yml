@@ -20,7 +20,7 @@ jobs:
         # from creeping in. They take a long time to run and consume 4 concurrent runners.
         if: github.event.workflow_run.event == 'merge_group'
 
-        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@03b01b4a50d0f3fbbfa6c1a9314ef2d346d089d4
+        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@f6ef476f7905cc2b1f060f1a360b482e7546e682
         permissions:
             actions: read
             issues: read
