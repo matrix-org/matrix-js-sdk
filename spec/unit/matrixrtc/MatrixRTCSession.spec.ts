@@ -60,6 +60,7 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
         expect(sess?.memberships[0].membershipID).toEqual("bloop");
         expect(sess?.memberships[0].isExpired()).toEqual(false);
+        expect(sess?.callId).toEqual("");
     });
 
     it("ignores expired memberships events", () => {
