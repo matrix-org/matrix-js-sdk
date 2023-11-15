@@ -78,6 +78,9 @@ export type MatrixRTCSessionEventHandlerMap = {
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
+    // The session Id of the call, this is the call_id of the call Member event.
+    private _callId: string | undefined;
+
     // How many ms after we joined the call, that our membership should expire, or undefined
     // if we're not yet joined
     private relativeExpiry: number | undefined;
@@ -106,6 +109,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
+    /**
+     * The callId (sessionId) of the call.
+     *
+     * It can be undefined since the callId is only known once the first membership joins.
+     * The callId is the property that, per definition, groups memberships into one call.
+     */
+    public get callId(): string | undefined {
+        return this._callId;
+    }
     /**
      * Returns all the call memberships for a room, oldest first
      */
@@ -178,6 +190,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         public memberships: CallMembership[],
     ) {
         super();
+        this._callId = memberships[0]?.callId;
         this.setExpiryTimer();
     }
 
@@ -551,6 +564,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
+        this._callId = this._callId ?? this.memberships[0]?.callId;
+
         const changed =
             oldMemberships.length != this.memberships.length ||
             oldMemberships.some((m, i) => !CallMembership.equal(m, this.memberships[i]));
@@ -563,7 +578,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const isMyMembership = (m: CallMembership): boolean =>
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
-        if (this.isJoined() && this.makeNewKeyTimeout === undefined) {
+        if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
             const oldMebershipIds = new Set(
                 oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
             );
@@ -767,6 +782,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private onRotateKeyTimeout = (): void => {
+        if (!this.manageMediaKeys) return;
+
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
         this.makeNewSenderKey(true);

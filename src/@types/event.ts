@@ -94,6 +94,9 @@ export enum EventType {
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
+
+    // MatrixRTC events
+    CallNotify = "org.matrix.msc4075.call.notify",
 }
 
 export enum RelationType {
