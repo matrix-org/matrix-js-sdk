@@ -238,8 +238,9 @@ export type RoomEventHandlerMap = {
      *
      * @param event - The matrix redaction event
      * @param room - The room containing the redacted event
+     * @param threadId - The thread containing the redacted event (before it was redacted)
      */
-    [RoomEvent.Redaction]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.Redaction]: (event: MatrixEvent, room: Room, threadId?: string) => void;
     /**
      * Fires when an event that was previously redacted isn't anymore.
      * This happens when the redaction couldn't be sent and
@@ -2121,6 +2122,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Relations (other than m.thread), redactions, replies to a thread root live only in the main timeline
      * Relations, redactions, replies where the parent cannot be found live in no timelines but should be aggregated regardless.
      * Otherwise, the event lives in the main timeline only.
+     *
+     * Note: when a redaction is applied, the redacted event, events relating
+     * to it, and the redaction event itself, will all move to the main thread.
+     * This method classifies them as inside the thread of the redacted event.
+     * They are moved later as part of makeRedacted.
+     * This will change if MSC3389 is merged.
      */
     public eventShouldLiveIn(
         event: MatrixEvent,
@@ -2337,7 +2344,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
-                redactedEvent.makeRedacted(event);
+                const threadRootId = redactedEvent.threadRootId;
+                redactedEvent.makeRedacted(event, this);
 
                 // If this is in the current state, replace it with the redacted version
                 if (redactedEvent.isState()) {
@@ -2350,7 +2358,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     }
                 }
 
-                this.emit(RoomEvent.Redaction, event, this);
+                this.emit(RoomEvent.Redaction, event, this, threadRootId);
 
                 // TODO: we stash user displaynames (among other things) in
                 // RoomMember objects which are then attached to other events
@@ -2506,7 +2514,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
                 if (redactedEvent) {
                     redactedEvent.markLocallyRedacted(event);
-                    this.emit(RoomEvent.Redaction, event, this);
+                    this.emit(RoomEvent.Redaction, event, this, redactedEvent.threadRootId);
                 }
             }
         } else {
@@ -2941,7 +2949,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.roomReceipts.add(content, synthetic);
 
-        // START OF TO-DELETE
+        // TODO: delete the following code when it has been replaced by RoomReceipts
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
@@ -3003,7 +3011,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
             });
         });
-        // END OF TO-DELETE
+        // End of code to delete when replaced by RoomReceipts
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
