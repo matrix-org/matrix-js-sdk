@@ -161,3 +161,23 @@ export const mkThread = ({
 
     return { thread, rootEvent, events };
 };
+
+/**
+ * Create a thread, and make sure the events added to the thread and the room's
+ * timeline as if they came in via sync.
+ *
+ * Note that mkThread doesn't actually add the events properly to the room.
+ */
+export const populateThread = async ({
+    room,
+    client,
+    authorId,
+    participantUserIds,
+    length = 2,
+    ts = 1,
+}: MakeThreadProps): Promise<MakeThreadResult> => {
+    const ret = mkThread({ room, client, authorId, participantUserIds, length, ts });
+    ret.thread.initialEventsFetched = true;
+    room.addLiveEvents(ret.events);
+    return ret;
+};
