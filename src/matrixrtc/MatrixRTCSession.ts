@@ -79,7 +79,7 @@ export type MatrixRTCSessionEventHandlerMap = {
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
     // The session Id of the call, this is the call_id of the call Member event.
-    private _sessionId: string | undefined;
+    private _callId: string | undefined;
 
     // How many ms after we joined the call, that our membership should expire, or undefined
     // if we're not yet joined
@@ -108,8 +108,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // userId:deviceId => array of keys
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
-    public get sessionId(): string | undefined {
-        return this._sessionId;
+
+    /**
+     * The callId (sessionId) of the call.
+     *
+     * It can be undefined since the callId is only known once the first membership joins.
+     * The callId is the property that, per definition, groups memberships into one call.
+     */
+    public get callId(): string | undefined {
+        return this._callId;
     }
     /**
      * Returns all the call memberships for a room, oldest first
@@ -183,7 +190,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         public memberships: CallMembership[],
     ) {
         super();
-        this._sessionId = memberships[0]?.callId;
+        this._callId = memberships[0]?.callId;
         this.setExpiryTimer();
     }
 
@@ -557,7 +564,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
-        this._sessionId = this._sessionId ?? this.memberships[0]?.callId;
+        this._callId = this._callId ?? this.memberships[0]?.callId;
 
         const changed =
             oldMemberships.length != this.memberships.length ||
