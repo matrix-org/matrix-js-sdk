@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+import { IMentions } from "../matrix";
 export interface EncryptionKeyEntry {
     index: number;
     key: string;
@@ -23,4 +23,13 @@ export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;
     call_id: string;
+}
+
+export type CallNotifyType = "ring" | "notify";
+
+export interface ICallNotifyContent {
+    "application": string;
+    "m.mentions": IMentions;
+    "notify_type": CallNotifyType;
+    "call_id": string;
 }
