@@ -90,7 +90,7 @@ jobs:
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
                   {
                       echo "RELEASE_NOTES<<EOF"
-                      echo $BODY
+                      echo "$BODY"
                       echo "EOF"
                   } >> $GITHUB_ENV
 
@@ -102,7 +102,7 @@ jobs:
                   VERSION: ${{ steps.release.outputs.tag_name }}
 
             - name: Finalise version
-              if: inputs.mode == 'final'
+              if: inputs.final
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
             - name: Check version number not in use
@@ -179,7 +179,7 @@ jobs:
                   fi
 
             - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "$VERSION"
+              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
 
             - name: Ingest upstream changes
               if: |
@@ -188,7 +188,7 @@ jobs:
                   contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
               uses: actions/github-script@v6
               env:
-                  RELEASE_ID: ${{ steps.upstream-release.outputs.body }}
+                  RELEASE_ID: ${{ steps.release.outputs.id }}
                   DEPENDENCY: ${{ inputs.include-changes }}
               with:
                   retries: 3
@@ -204,7 +204,7 @@ jobs:
                       core.exportVariable("RELEASE_NOTES", notes);
 
             - name: Add to CHANGELOG.md
-              if: inputs.mode == 'final'
+              if: inputs.final
               run: |
                   mv CHANGELOG.md CHANGELOG.md.old
                   HEADER="Changes in [${VERSION#v}](https://github.com/${{ github.repository }}/releases/tag/$VERSION) ($(date '+%Y-%m-%d'))"
@@ -230,7 +230,7 @@ jobs:
               run: git commit -m "$VERSION"
 
             - name: Build assets
-              if: steps.prepare.outputs.has-dist-script
+              if: steps.prepare.outputs.has-dist-script == '1'
               run: DIST_VERSION="$VERSION" yarn dist
 
             - name: Upload release assets & signatures
@@ -306,6 +306,7 @@ jobs:
                   FINAL: ${{ inputs.final }}
               with:
                   retries: 3
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   script: |
                       const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, FINAL } = process.env;
                       const { owner, repo } = context.repo;
@@ -341,7 +342,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - id: repository
-              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
 
             - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
               with:

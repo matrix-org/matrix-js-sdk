@@ -3714,7 +3714,7 @@ describe("Room", function () {
             expect(room.polls.get(pollStartEvent.getId()!)).toBeTruthy();
 
             const redactedEvent = new MatrixEvent({ type: "m.room.redaction" });
-            pollStartEvent.makeRedacted(redactedEvent);
+            pollStartEvent.makeRedacted(redactedEvent, room);
 
             await flushPromises();
 
