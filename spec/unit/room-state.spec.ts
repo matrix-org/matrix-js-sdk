@@ -27,6 +27,7 @@ import { M_BEACON } from "../../src/@types/beacon";
 import { MatrixClient } from "../../src/client";
 import { DecryptionError } from "../../src/crypto/algorithms";
 import { defer } from "../../src/utils";
+import { Room } from "../../src/models/room";
 
 describe("RoomState", function () {
     const roomId = "!foo:bar";
@@ -362,9 +363,11 @@ describe("RoomState", function () {
         });
 
         it("does not add redacted beacon info events to state", () => {
+            const mockClient = {} as unknown as MockedObject<MatrixClient>;
             const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId);
             const redactionEvent = new MatrixEvent({ type: "m.room.redaction" });
-            redactedBeaconEvent.makeRedacted(redactionEvent);
+            const room = new Room(roomId, mockClient, userA);
+            redactedBeaconEvent.makeRedacted(redactionEvent, room);
             const emitSpy = jest.spyOn(state, "emit");
 
             state.setStateEvents([redactedBeaconEvent]);
@@ -394,11 +397,13 @@ describe("RoomState", function () {
         });
 
         it("destroys and removes redacted beacon events", () => {
+            const mockClient = {} as unknown as MockedObject<MatrixClient>;
             const beaconId = "$beacon1";
             const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
             const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
             const redactionEvent = new MatrixEvent({ type: "m.room.redaction", redacts: beaconEvent.getId() });
-            redactedBeaconEvent.makeRedacted(redactionEvent);
+            const room = new Room(roomId, mockClient, userA);
+            redactedBeaconEvent.makeRedacted(redactionEvent, room);
 
             state.setStateEvents([beaconEvent]);
             const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
