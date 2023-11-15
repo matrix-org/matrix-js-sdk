@@ -16,7 +16,8 @@ limitations under the License.
 
 import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts";
 import { threadIdForReceipt } from "../client";
-import { Room } from "./room";
+import { Room, RoomEvent } from "./room";
+import { MatrixEvent } from "./event";
 
 /**
  * The latest receipts we have for a room.
@@ -32,6 +33,8 @@ export class RoomReceipts {
         this.threadedReceipts = new ThreadedReceipts(room);
         this.unthreadedReceipts = new ReceiptsByUser(room);
         this.danglingReceipts = new DanglingReceipts();
+        // We listen for timeline events so we can process dangling receipts
+        room.on(RoomEvent.Timeline, this.onTimeLineEvent);
     }
 
     /**
@@ -90,6 +93,40 @@ export class RoomReceipts {
             }
         }
     }
+
+    /**
+     * Look for dangling receipts for the given event ID,
+     * and add them to the thread of unthread receipts if found.
+     * @param eventId - the event ID to look for
+     */
+    public onTimeLineEvent = (event: MatrixEvent): void => {
+        const eventId = event.getId();
+        if (!eventId) return;
+
+        const danglingReceipts = this.danglingReceipts.remove(eventId);
+
+        danglingReceipts?.forEach((danglingReceipt) => {
+            // The receipt is a thread receipt
+            if (danglingReceipt.receipt.thread_id) {
+                this.threadedReceipts.set(
+                    danglingReceipt.receipt.thread_id,
+                    danglingReceipt.eventId,
+                    danglingReceipt.receiptType,
+                    danglingReceipt.userId,
+                    danglingReceipt.receipt.ts,
+                    danglingReceipt.synthetic,
+                );
+            } else {
+                this.unthreadedReceipts.set(
+                    eventId,
+                    danglingReceipt.receiptType,
+                    danglingReceipt.userId,
+                    danglingReceipt.receipt.ts,
+                    danglingReceipt.synthetic,
+                );
+            }
+        });
+    };
 
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         const unthreaded = this.unthreadedReceipts.get(userId);
@@ -337,15 +374,27 @@ class ThreadedReceipts {
  */
 class DanglingReceipts {
     /**
-     * eventId: DanglingReceipt
+     * eventId: DanglingReceipt[]
      */
-    private data = new Map<string, DanglingReceipt>();
+    private data = new Map<string, Array<DanglingReceipt>>();
 
     /**
      * Remember the supplied dangling receipt.
      */
     public add(danglingReceipt: DanglingReceipt): void {
-        this.data.set(danglingReceipt.eventId, danglingReceipt);
+        const danglingReceipts = getOrCreate(this.data, danglingReceipt.eventId, () => []);
+        danglingReceipts.push(danglingReceipt);
+    }
+
+    /**
+     * Remove and return the dangling receipts for the given event ID.
+     * @param eventId - the event ID to look for
+     * @returns the found dangling receipts, or undefined if we don't have one.
+     */
+    public remove(eventId: string): Array<DanglingReceipt> | undefined {
+        const danglingReceipts = this.data.get(eventId);
+        this.data.delete(eventId);
+        return danglingReceipts;
     }
 }
 
