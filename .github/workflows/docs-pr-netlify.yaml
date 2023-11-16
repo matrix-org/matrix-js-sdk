@@ -32,3 +32,4 @@ jobs:
                   site_id: ${{ secrets.NETLIFY_SITE_ID }}
                   desc: Documentation preview
                   deployment_env: PR Documentation Preview
+        environment: PR Documentation Preview
