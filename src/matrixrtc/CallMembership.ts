@@ -91,7 +91,7 @@ export class CallMembership {
     }
 
     public isExpired(): boolean {
-        return this.getMsUntilExpiry() <= 0;
+        return this.getAbsoluteExpiry() < this.parentEvent.getTs() + this.parentEvent.getLocalAge();
     }
 
     public getActiveFoci(): Focus[] {

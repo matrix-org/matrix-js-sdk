@@ -23,7 +23,7 @@ import {
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
-    SigningKeysUploadRequest,
+    UploadSigningKeysRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
@@ -62,7 +62,7 @@ export class OutgoingRequestProcessor {
     ) {}
 
     public async makeOutgoingRequest<T>(
-        msg: OutgoingRequest | SigningKeysUploadRequest,
+        msg: OutgoingRequest | UploadSigningKeysRequest,
         uiaCallback?: UIAuthCallback<T>,
     ): Promise<void> {
         let resp: string;
@@ -92,7 +92,7 @@ export class OutgoingRequestProcessor {
                 `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
             resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
-        } else if (msg instanceof SigningKeysUploadRequest) {
+        } else if (msg instanceof UploadSigningKeysRequest) {
             await this.makeRequestWithUIA(
                 Method.Post,
                 "/_matrix/client/v3/keys/device_signing/upload",

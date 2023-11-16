@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, CrossSigningStatus } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { OlmMachine, CrossSigningStatus, CrossSigningBootstrapRequests } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { BootstrapCrossSigningOpts } from "../crypto-api";
 import { logger } from "../logger";
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { UIAuthCallback } from "../interactive-auth";
 import { ServerSideSecretStorage } from "../secret-storage";
 
@@ -118,7 +118,7 @@ export class CrossSigningIdentity {
     private async resetCrossSigning(authUploadDeviceSigningKeys?: UIAuthCallback<void>): Promise<void> {
         // XXX: We must find a way to make this atomic, currently if the user does not remember his account password
         // or 4S passphrase/key the process will fail in a bad state, with keys rotated but not uploaded or saved in 4S.
-        const outgoingRequests: Array<OutgoingRequest> = await this.olmMachine.bootstrapCrossSigning(true);
+        const outgoingRequests: CrossSigningBootstrapRequests = await this.olmMachine.bootstrapCrossSigning(true);
 
         // If 4S is configured we need to udpate it.
         if (await this.secretStorage.hasKey()) {
@@ -128,8 +128,14 @@ export class CrossSigningIdentity {
             await this.exportCrossSigningKeysToStorage();
         }
         logger.log("bootStrapCrossSigning: publishing keys to server");
-        for (const req of outgoingRequests) {
-            await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
+        for (const req of [
+            outgoingRequests.uploadKeysRequest,
+            outgoingRequests.uploadSigningKeysRequest,
+            outgoingRequests.uploadSignaturesRequest,
+        ]) {
+            if (req) {
+                await this.outgoingRequestProcessor.makeOutgoingRequest(req, authUploadDeviceSigningKeys);
+            }
         }
     }
 

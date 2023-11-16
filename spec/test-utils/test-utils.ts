@@ -315,6 +315,7 @@ export interface IMessageOpts {
     event?: boolean;
     relatesTo?: IEventRelation;
     ts?: number;
+    unsigned?: IUnsigned;
 }
 
 /**
