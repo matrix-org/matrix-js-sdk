@@ -27,7 +27,7 @@ import { EventTimelineSet } from "./event-timeline-set";
 import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
 import { logger } from "../logger";
-import { threadIdForReceipt } from "../client";
+import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -162,11 +162,8 @@ export abstract class ReadReceipt<
             // The receipt is for the main timeline: we check that the event is
             // in the main timeline.
 
-            // There are two ways to know an event is in the main timeline:
-            // either it has no threadRootId, or it is a thread root.
-            // (Note: it's a little odd because the thread root is in the main
-            // timeline, but it still has a threadRootId.)
-            const eventIsInMainTimeline = !event.threadRootId || event.isThreadRoot;
+            // Check if the event is in the main timeline
+            const eventIsInMainTimeline = inMainTimelineForReceipt(event);
 
             if (eventIsInMainTimeline) {
                 // The receipt is for the main timeline, and so is the event, so

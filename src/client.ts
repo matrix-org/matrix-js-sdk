@@ -9913,7 +9913,7 @@ export function threadIdForReceipt(event: MatrixEvent): string {
  * @returns true if this event is considered to be in the main timeline as far
  *               as receipts are concerned.
  */
-function inMainTimelineForReceipt(event: MatrixEvent): boolean {
+export function inMainTimelineForReceipt(event: MatrixEvent): boolean {
     if (!event.threadRootId) {
         // Not in a thread: then it is in the main timeline
         return true;

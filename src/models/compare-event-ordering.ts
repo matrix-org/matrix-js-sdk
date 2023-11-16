@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MatrixEvent } from "./event";
 import { Room } from "./room";
-import { Thread } from "./thread";
+import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
 
 /**
  * Determine the order of two events in a room.
@@ -49,20 +49,20 @@ export function compareEventOrdering(room: Room, leftEventId: string, rightEvent
         return null;
     }
 
-    // Check whether the events are in threads.
-    const leftThread = leftEvent.getThread();
-    const rightThread = rightEvent.getThread();
+    // Check whether the events are in the main timeline
+    const isLeftEventInMainTimeline = inMainTimelineForReceipt(leftEvent);
+    const isRightEventInMainTimeline = inMainTimelineForReceipt(rightEvent);
 
-    if (leftThread || rightThread) {
-        // At least one event is in a thread, so we can't use the room's
-        // unfiltered timeline set.
-        return compareEventsInThreads(leftEventId, rightEventId, leftEvent, rightEvent, leftThread, rightThread);
+    if (isLeftEventInMainTimeline && isRightEventInMainTimeline) {
+        return compareEventsInMainTimeline(room, leftEventId, rightEventId, leftEvent, rightEvent);
     } else {
-        return compareUnthreadedEvents(room, leftEventId, rightEventId, leftEvent, rightEvent);
+        // At least one event is not in the timeline, so we can't use the room's
+        // unfiltered timeline set.
+        return compareEventsInThreads(leftEventId, rightEventId, leftEvent, rightEvent);
     }
 }
 
-function compareUnthreadedEvents(
+function compareEventsInMainTimeline(
     room: Room,
     leftEventId: string,
     rightEventId: string,
@@ -105,10 +105,13 @@ function compareEventsInThreads(
     rightEventId: string,
     leftEvent: MatrixEvent,
     rightEvent: MatrixEvent,
-    leftThread: Thread | undefined,
-    rightThread: Thread | undefined,
 ): number | null {
-    if (leftThread && leftThread === rightThread) {
+    const leftEventThreadId = threadIdForReceipt(leftEvent);
+    const rightEventThreadId = threadIdForReceipt(rightEvent);
+
+    const leftThread = leftEvent.getThread();
+
+    if (leftThread && leftEventThreadId === rightEventThreadId) {
         // They are in the same thread, so we can ask the thread's timeline to
         // figure it out for us
         return leftThread.timelineSet.compareEventOrdering(leftEventId, rightEventId);
