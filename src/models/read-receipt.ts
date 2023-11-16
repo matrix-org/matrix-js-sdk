@@ -27,6 +27,7 @@ import { EventTimelineSet } from "./event-timeline-set";
 import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
 import { logger } from "../logger";
+import { threadIdForReceipt } from "../client";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -35,7 +36,7 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
-                        thread_id: event.threadRootId ?? MAIN_ROOM_TIMELINE,
+                        thread_id: threadIdForReceipt(event),
                     },
                 },
             },
