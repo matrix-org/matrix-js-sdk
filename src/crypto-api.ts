@@ -23,6 +23,7 @@ import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
+import { OwnDeviceKeys } from "./@types/crypto";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -200,6 +201,13 @@ export interface CryptoApi {
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
      */
     getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
+
+    /**
+     * Get the public part of the device keys for the current device.
+     *
+     * @returns The device keys as a `OwnDeviceKeys` object
+     */
+    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.

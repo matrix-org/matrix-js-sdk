@@ -2390,7 +2390,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns base64-encoded ed25519 key. Null if crypto is
      *    disabled.
+     *
+     * @deprecated Use {@link CryptoAPI.getOwnDeviceKeys}
      */
+
     public getDeviceEd25519Key(): string | null {
         return this.crypto?.getDeviceEd25519Key() ?? null;
     }
@@ -2400,6 +2403,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns base64-encoded curve25519 key. Null if crypto is
      *    disabled.
+     *
+     * @deprecated Use {@link CryptoAPI.getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.crypto?.getDeviceCurve25519Key() ?? null;
