@@ -177,11 +177,23 @@ interface IKeyRequestRecipient {
 }
 
 export interface IDecryptOptions {
-    // Emits "event.decrypted" if set to true
+    /** Whether to emit {@link MatrixEventEvent.Decrypted} events on successful decryption. Defaults to true.
+     */
     emit?: boolean;
-    // True if this is a retry (enables more logging)
+
+    /**
+     * True if this is a retry, after receiving an update to the session key. (Enables more logging.)
+     *
+     * This is only intended for use within the js-sdk.
+     *
+     * @internal
+     */
     isRetry?: boolean;
-    // whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key
+
+    /**
+     * Whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key.
+     * Defaults to `false`.
+     */
     forceRedecryptIfUntrusted?: boolean;
 }
 

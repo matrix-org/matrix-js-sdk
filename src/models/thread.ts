@@ -368,7 +368,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (!Thread.hasServerSideSupport) {
             // When there's no server-side support, just add it to the end of the timeline.
             this.addEventToTimeline(event, toStartOfTimeline);
-            this.client.decryptEventIfNeeded(event, {});
+            this.client.decryptEventIfNeeded(event);
         } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
             // When we've asked for the event to be added to the end, and we're
             // not in the initial state, and this event belongs at the end, add it.
