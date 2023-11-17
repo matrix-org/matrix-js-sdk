@@ -18,15 +18,18 @@ import { EventType, MatrixEvent, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-export function makeMockRoom(
-    memberships: CallMembershipData[],
-    getLocalAge: (() => number) | undefined = undefined,
-): Room {
+export function makeMockRoom(memberships: CallMembershipData[], localAge: number | null = null): Room {
     const roomId = randomString(8);
+    // If makeMockRoom is used instead of one of the other functions in this file,
+    // we store it so that subsequent calls calculate the expiration based on it using
+    // Date.now(). So, jest.advanceTimersByTime() can be used to simulate the passage of time.
+
+    // The actual time of the underlying mocked events will be: localTimestamp ?? localAge ?? 0
+    const localTimestamp = Date.now() - (localAge ?? 10);
     return {
         roomId: roomId,
         getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, getLocalAge)),
+            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, localAge, localTimestamp)),
         }),
     } as unknown as Room;
 }
@@ -34,11 +37,12 @@ export function makeMockRoom(
 export function makeMockRoomState(
     memberships: CallMembershipData[],
     roomId: string,
-    getLocalAge: (() => number) | undefined,
+    localAge: number | null = null,
+    localTimestamp: number | null = null,
 ) {
     return {
         getStateEvents: (_: string, stateKey: string) => {
-            const event = mockRTCEvent(memberships, roomId, getLocalAge);
+            const event = mockRTCEvent(memberships, roomId, localAge, localTimestamp);
 
             if (stateKey !== undefined) return event;
             return [event];
@@ -49,9 +53,10 @@ export function makeMockRoomState(
 export function mockRTCEvent(
     memberships: CallMembershipData[],
     roomId: string,
-    getLocalAge: (() => number) | undefined,
+    localAge: number | null,
+    localTimestamp: number | null = null,
 ): MatrixEvent {
-    const getLocalAgeFn = getLocalAge ?? (() => 10);
+    const _localTimestamp = localTimestamp ?? Date.now() - (localAge ?? 10);
 
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
@@ -60,7 +65,7 @@ export function mockRTCEvent(
         }),
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
         getTs: jest.fn().mockReturnValue(1000),
-        localTimestamp: Date.now() - getLocalAgeFn(),
+        localTimestamp: _localTimestamp,
         getRoomId: jest.fn().mockReturnValue(roomId),
         sender: {
             userId: "@mock:user.example",
