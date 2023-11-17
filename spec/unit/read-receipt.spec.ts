@@ -66,6 +66,7 @@ describe("Read receipt", () => {
             room: ROOM_ID,
             content: { body: "This is the thread root" },
         });
+        threadRoot.event.event_id = THREAD_ID;
 
         threadEvent = utils.mkEvent({
             event: true,
