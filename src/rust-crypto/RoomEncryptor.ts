@@ -64,12 +64,13 @@ export class RoomEncryptor {
         // start tracking devices for any users already known to be in this room.
         // Do not load members here, would defeat lazy loading.
         const members = room.getJoinedMembers();
+
         // At this point just mark the known members as tracked, it might not be the full list of members
         // because of lazy loading. This is fine, because we will get a member list update when sending a message for
         // the first time, see `RoomEncryptor#ensureEncryptionSession`
-        this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId))).then(() => {
-            this.prefixedLogger.debug(`Updated tracked users for room ${room.roomId}`);
-        });
+        this.olmMachine
+            .updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)))
+            .catch((e) => this.prefixedLogger.error("Error initializing tracked users", e));
     }
 
     /**
