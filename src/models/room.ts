@@ -550,7 +550,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
             .reverse()
-            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -568,7 +568,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             .getEvents()
             .slice(0) // copy before reversing
             .reverse()
-            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event));
 
         await Promise.allSettled(decryptionPromises);
     }
