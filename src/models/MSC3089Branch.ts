@@ -162,9 +162,8 @@ export class MSC3089Branch {
 
         if (!event) throw new Error("Failed to find event");
 
-        // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
-        // to ensure that the relations system in the sdk will function.
-        await this.client.decryptEventIfNeeded(event, { emit: true, isRetry: true });
+        // Sometimes the event isn't decrypted for us, so do that.
+        await this.client.decryptEventIfNeeded(event);
 
         return event;
     }
