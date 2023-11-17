@@ -24,6 +24,8 @@ async function getRelease(github, dependency) {
     return response.data;
 }
 
+const HEADING_PREFIX = "## ";
+
 const main = async ({ github, releaseId, dependencies }) => {
     const { GITHUB_REPOSITORY } = process.env;
     const [owner, repo] = GITHUB_REPOSITORY.split("/");
@@ -33,7 +35,7 @@ const main = async ({ github, releaseId, dependencies }) => {
     for (const dependency of dependencies) {
         const release = await getRelease(github, dependency);
         for (const line of release.body.split("\n")) {
-            if (line.startsWith("#")) {
+            if (line.startsWith(HEADING_PREFIX)) {
                 heading = line;
                 sections.set(heading, []);
                 continue;
@@ -50,10 +52,20 @@ const main = async ({ github, releaseId, dependencies }) => {
         release_id: releaseId,
     });
 
+    const headings = ["🚨 BREAKING CHANGES", "🦖 Deprecations", "✨ Features", "🐛 Bug Fixes", "🧰 Maintenance"].map(
+        (h) => HEADING_PREFIX + h,
+    );
+
     heading = null;
     const output = [];
     for (const line of [...release.body.split("\n"), null]) {
-        if (line === null || line.startsWith("#")) {
+        if (line === null || line.startsWith(HEADING_PREFIX)) {
+            while (heading && headings[0] !== heading && sections.has(headings[0])) {
+                const heading = headings.shift();
+                output.push(heading);
+                output.push(...sections.get(heading));
+            }
+
             if (heading && sections.has(heading)) {
                 const lastIsBlank = !output.at(-1)?.trim();
                 if (lastIsBlank) output.pop();

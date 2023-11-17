@@ -3030,7 +3030,7 @@ describe("Room", function () {
             const threadRoot = mkMessage();
             const threadResponse1 = mkThreadResponse(threadRoot);
             const threadReaction1 = utils.mkReaction(threadRoot, room.client, userA, roomId);
-            const threadReaction2 = utils.mkReaction(threadRoot, room.client, userA, roomId);
+            const threadReaction2 = utils.mkEdit(threadRoot, room.client, userA, roomId);
             const threadReaction2Redaction = mkRedaction(threadReaction2);
 
             const roots = new Set([threadRoot.getId()!]);
