@@ -142,8 +142,7 @@ export abstract class ReadReceipt<
             //    was deleted.)
             //
             // 4. The receipt had the incorrect thread ID (due to a bug in a
-            // client, or malicious behaviour).
-            logger.warn(`Ignoring receipt for missing event with id ${receipt.eventId}`);
+            //    client, or malicious behaviour).
 
             // This receipt is not "valid" because it doesn't point at an event
             // we have. We want to pretend it doesn't exist.

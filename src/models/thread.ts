@@ -143,6 +143,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
 
+        // each Event in the thread adds a reemitter, so we could hit the listener limit.
+        this.setMaxListeners(1000);
+
         if (!opts?.room) {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
             // Hope is that we end up with a more obvious stack trace.

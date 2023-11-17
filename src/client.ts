@@ -1494,6 +1494,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
+
+        // having lots of event listeners is not unusual. 0 means "unlimited".
+        this.setMaxListeners(0);
     }
 
     public set store(newStore: Store) {
