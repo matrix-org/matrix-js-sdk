@@ -404,7 +404,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         });
 
         this.txnId = event.txn_id;
-        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
+        const age = this.getAge();
+        this.localTimestamp = age ? Date.now() - age : this.getTs() ?? 0;
         this.reEmitter = new TypedReEmitter(this);
     }
 
