@@ -27,6 +27,7 @@ import { EventTimelineSet } from "./event-timeline-set";
 import { MapWithDefault } from "../utils";
 import { NotificationCountType } from "./room";
 import { logger } from "../logger";
+import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -35,7 +36,7 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
-                        thread_id: event.threadRootId ?? MAIN_ROOM_TIMELINE,
+                        thread_id: threadIdForReceipt(event),
                     },
                 },
             },
@@ -161,11 +162,8 @@ export abstract class ReadReceipt<
             // The receipt is for the main timeline: we check that the event is
             // in the main timeline.
 
-            // There are two ways to know an event is in the main timeline:
-            // either it has no threadRootId, or it is a thread root.
-            // (Note: it's a little odd because the thread root is in the main
-            // timeline, but it still has a threadRootId.)
-            const eventIsInMainTimeline = !event.threadRootId || event.isThreadRoot;
+            // Check if the event is in the main timeline
+            const eventIsInMainTimeline = inMainTimelineForReceipt(event);
 
             if (eventIsInMainTimeline) {
                 // The receipt is for the main timeline, and so is the event, so
@@ -396,33 +394,7 @@ export abstract class ReadReceipt<
      * @param eventId - The event ID to check if the user read.
      * @returns True if the user has read the event, false otherwise.
      */
-    public hasUserReadEvent(userId: string, eventId: string): boolean {
-        const readUpToId = this.getEventReadUpTo(userId, false);
-        if (readUpToId === eventId) return true;
-
-        if (
-            this.timeline?.length &&
-            this.timeline[this.timeline.length - 1].getSender() &&
-            this.timeline[this.timeline.length - 1].getSender() === userId
-        ) {
-            // It doesn't matter where the event is in the timeline, the user has read
-            // it because they've sent the latest event.
-            return true;
-        }
-
-        for (let i = this.timeline?.length - 1; i >= 0; --i) {
-            const ev = this.timeline[i];
-
-            // If we encounter the target event first, the user hasn't read it
-            // however if we encounter the readUpToId first then the user has read
-            // it. These rules apply because we're iterating bottom-up.
-            if (ev.getId() === eventId) return false;
-            if (ev.getId() === readUpToId) return true;
-        }
-
-        // We don't know if the user has read it, so assume not.
-        return false;
-    }
+    public abstract hasUserReadEvent(userId: string, eventId: string): boolean;
 
     /**
      * Returns the most recent unthreaded receipt for a given user
@@ -430,6 +402,8 @@ export abstract class ReadReceipt<
      * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
      * or a user chooses to use private read receipts (or we have simply not received
      * a receipt from this user yet).
+     *
+     * @deprecated use `hasUserReadEvent` or `getEventReadUpTo` instead
      */
     public abstract getLastUnthreadedReceiptFor(userId: string): Receipt | undefined;
 }
