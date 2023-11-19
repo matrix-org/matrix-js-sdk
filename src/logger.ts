@@ -18,7 +18,18 @@ limitations under the License.
 import loglevel from "loglevel";
 
 /** Logger interface used within the js-sdk codebase */
-export interface Logger {
+export interface Logger extends BaseLogger {
+    /**
+     * Create a child logger.
+     *
+     * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
+     *    use this as a prefix; others use a different mechanism.
+     */
+    getChild(namespace: string): Logger;
+}
+
+/** The basic interface for a logger which doesn't support children */
+interface BaseLogger {
     /**
      * Output trace message to the logger, with stack trace.
      *
@@ -53,14 +64,6 @@ export interface Logger {
      * @param msg - Data to log.
      */
     error(...msg: any[]): void;
-
-    /**
-     * Create a child logger.
-     *
-     * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
-     *    use this as a prefix; others use a different mechanism.
-     */
-    getChild(namespace: string): Logger;
 }
 
 // This is to demonstrate, that you can use any namespace you want.
@@ -139,3 +142,41 @@ function getPrefixedLogger(prefix: string): PrefixedLogger {
 export const logger = loglevel.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
 logger.setLevel(loglevel.levels.DEBUG, false);
 extendLogger(logger);
+
+/**
+ * A "span" for grouping related log lines together.
+ *
+ * The current implementation just adds the name at the start of each log line.
+ *
+ * This offers a lighter-weight alternative to 'child' loggers returned by {@link Logger#getChild}. In particular,
+ * it's not possible to apply individual filters to the LogSpan such as setting the verbosity level. On the other hand,
+ * no reference to the LogSpan is retained in the logging framework, so it is safe to make lots of them over the course
+ * of an application's life and just drop references to them when the job is done.
+ */
+export class LogSpan implements BaseLogger {
+    private readonly name;
+
+    public constructor(private readonly parent: BaseLogger, name: string) {
+        this.name = name + ":";
+    }
+
+    public trace(...msg: any[]): void {
+        this.parent.trace(this.name, ...msg);
+    }
+
+    public debug(...msg: any[]): void {
+        this.parent.debug(this.name, ...msg);
+    }
+
+    public info(...msg: any[]): void {
+        this.parent.info(this.name, ...msg);
+    }
+
+    public warn(...msg: any[]): void {
+        this.parent.warn(this.name, ...msg);
+    }
+
+    public error(...msg: any[]): void {
+        this.parent.error(this.name, ...msg);
+    }
+}
