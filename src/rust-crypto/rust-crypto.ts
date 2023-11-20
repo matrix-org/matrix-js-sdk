@@ -1560,10 +1560,6 @@ class EventDecryptor {
     ) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        this.logger.info(
-            `Attempting decryption of event ${event.getId()} in ${event.getRoomId()} from ${event.getSender()}`,
-        );
-
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
