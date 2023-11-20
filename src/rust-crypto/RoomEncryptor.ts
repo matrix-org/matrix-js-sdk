@@ -157,13 +157,14 @@ export class RoomEncryptor {
             logger.debug(`Processing outgoing requests`);
             await this.outgoingRequestManager.doProcessOutgoingRequests();
         } else {
-            // if members are already loaded it's less critical to await on key queries.
-            // We might still want to trigger a processOutgoingRequests here, if the
-            // query is done timely enough, the freshly tracked users will get the room key.
+            // If members are already loaded it's less critical to await on key queries.
+            // We might still want to trigger a processOutgoingRequests here.
+            // The next call to ensureSessions will wait a bit on in flight key queries we are
+            // interested in. If a sync handling happens in the meantime, and some new members are added to the room
+            // or have new devices it would give us a chance to query them before sending.
+            // It's less critical due to the racy nature of this process.
             logger.debug(`Processing outgoing requests in background`);
-            this.outgoingRequestManager.doProcessOutgoingRequests().then(() => {
-                // nop
-            });
+            this.outgoingRequestManager.doProcessOutgoingRequests();
         }
 
         logger.debug(
