@@ -17,7 +17,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import type { IEventDecryptionResult, IMegolmSessionData, OwnDeviceKeys } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
@@ -49,6 +49,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     KeyBackupSession,
+    OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -155,21 +156,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
-    }
-
-    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
-        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-            this.olmMachine.userId,
-            this.olmMachine.deviceId,
-        );
-        // could be undefined if there is no such algorithm for that device.
-        if (device.curve25519Key && device.ed25519Key) {
-            return {
-                ed25519: device.ed25519Key.toBase64(),
-                curve25519: device.curve25519Key.toBase64(),
-            };
-        }
-        throw new Error("Device keys not found");
     }
 
     /**
@@ -386,6 +372,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+        // could be undefined if there is no such algorithm for that device.
+        if (device.curve25519Key && device.ed25519Key) {
+            return {
+                ed25519: device.ed25519Key.toBase64(),
+                curve25519: device.curve25519Key.toBase64(),
+            };
+        }
+        throw new Error("Device keys not found");
+    }
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 

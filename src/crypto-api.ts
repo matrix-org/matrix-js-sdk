@@ -23,7 +23,6 @@ import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
-import { OwnDeviceKeys } from "./@types/crypto";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -46,6 +45,13 @@ export interface CryptoApi {
      * @returns the formatted version
      */
     getVersion(): string;
+
+    /**
+     * Get the public part of the device keys for the current device.
+     *
+     * @returns The device keys as a `OwnDeviceKeys` object
+     */
+    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
@@ -201,13 +207,6 @@ export interface CryptoApi {
      * @returns If cross-signing has been initialised on this device, the ID of the given key. Otherwise, null
      */
     getCrossSigningKeyId(type?: CrossSigningKey): Promise<string | null>;
-
-    /**
-     * Get the public part of the device keys for the current device.
-     *
-     * @returns The device keys as a `OwnDeviceKeys` object
-     */
-    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
      * Bootstrap cross-signing by creating keys if needed.
@@ -755,6 +754,14 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+}
+
+/** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
+export interface OwnDeviceKeys {
+    /** Public part of the Ed25519 fingerprint key for the current device, base64 encoded. */
+    ed25519: string;
+    /** Public part of the Curve25519 identity key of the current device, base64 encoded. */
+    curve25519: string;
 }
 
 export * from "./crypto-api/verification";

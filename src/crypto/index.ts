@@ -20,13 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type {
-    IDeviceKeys,
-    IEventDecryptionResult,
-    IMegolmSessionData,
-    IOneTimeKey,
-    OwnDeviceKeys,
-} from "../@types/crypto";
+import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -104,6 +98,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
+    OwnDeviceKeys,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -1975,7 +1970,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns base64-encoded ed25519 key.
      *
-     * @deprecated "Prefer getOwnDeviceKeys (async)"
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1986,7 +1981,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns base64-encoded curve25519 key.
      *
-     * @deprecated "Prefer getOwnDeviceKeys (async)"
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;

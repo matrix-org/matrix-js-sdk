@@ -71,11 +71,3 @@ export interface IOneTimeKey {
     fallback?: boolean;
     signatures?: ISignatures;
 }
-
-/** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
-export interface OwnDeviceKeys {
-    /** Ed25519 fingerprint public key of the current device, base64 encoded. */
-    ed25519: string;
-    /** Curve25519 identity key of the current device, base64 encoded. */
-    curve25519: string;
-}

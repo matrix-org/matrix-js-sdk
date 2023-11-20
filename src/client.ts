@@ -2393,7 +2393,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @deprecated Use {@link CryptoApi.getOwnDeviceKeys}
      */
-
     public getDeviceEd25519Key(): string | null {
         return this.crypto?.getDeviceEd25519Key() ?? null;
     }
