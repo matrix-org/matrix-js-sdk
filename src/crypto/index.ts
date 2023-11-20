@@ -1987,6 +1987,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.olmDevice.deviceCurve25519Key;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
         if (!this.olmDevice.deviceCurve25519Key) {
             throw new Error("Curve25519 key not yet created");
