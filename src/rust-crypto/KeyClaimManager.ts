@@ -17,6 +17,7 @@ limitations under the License.
 import { OlmMachine, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { LogSpan } from "../logger";
 
 /**
  * KeyClaimManager: linearises calls to OlmMachine.getMissingSessions to avoid races
@@ -52,7 +53,7 @@ export class KeyClaimManager {
      *
      * @param userList - list of userIDs to claim
      */
-    public ensureSessionsForUsers(userList: Array<UserId>): Promise<void> {
+    public ensureSessionsForUsers(logger: LogSpan, userList: Array<UserId>): Promise<void> {
         // The Rust-SDK requires that we only have one getMissingSessions process in flight at once. This little dance
         // ensures that, by only having one call to ensureSessionsForUsersInner active at once (and making them
         // queue up in order).
@@ -61,19 +62,22 @@ export class KeyClaimManager {
                 // any errors in the previous claim will have been reported already, so there is nothing to do here.
                 // we just throw away the error and start anew.
             })
-            .then(() => this.ensureSessionsForUsersInner(userList));
+            .then(() => this.ensureSessionsForUsersInner(logger, userList));
         this.currentClaimPromise = prom;
         return prom;
     }
 
-    private async ensureSessionsForUsersInner(userList: Array<UserId>): Promise<void> {
+    private async ensureSessionsForUsersInner(logger: LogSpan, userList: Array<UserId>): Promise<void> {
         // bail out quickly if we've been stopped.
         if (this.stopped) {
             throw new Error(`Cannot ensure Olm sessions: shutting down`);
         }
+        logger.info("Checking for missing Olm sessions");
         const claimRequest = await this.olmMachine.getMissingSessions(userList);
         if (claimRequest) {
+            logger.info("Making /keys/claim request");
             await this.outgoingRequestProcessor.makeOutgoingRequest(claimRequest);
         }
+        logger.info("Olm sessions prepared");
     }
 }

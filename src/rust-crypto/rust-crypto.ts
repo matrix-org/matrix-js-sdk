@@ -390,7 +390,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const encryptor = this.roomEncryptors[room.roomId];
 
         if (encryptor) {
-            encryptor.ensureEncryptionSession(this.globalBlacklistUnverifiedDevices);
+            encryptor.prepareForEncryption(this.globalBlacklistUnverifiedDevices);
         }
     }
 
