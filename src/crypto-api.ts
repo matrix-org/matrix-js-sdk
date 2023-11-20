@@ -760,7 +760,7 @@ export enum EventShieldReason {
 export interface OwnDeviceKeys {
     /** Public part of the Ed25519 fingerprint key for the current device, base64 encoded. */
     ed25519: string;
-    /** Public part of the Curve25519 identity key of the current device, base64 encoded. */
+    /** Public part of the Curve25519 identity key for the current device, base64 encoded. */
     curve25519: string;
 }
 
