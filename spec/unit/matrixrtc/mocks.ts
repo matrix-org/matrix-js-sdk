@@ -21,15 +21,16 @@ import { randomString } from "../../../src/randomstring";
 export function makeMockRoom(memberships: CallMembershipData[], localAge: number | null = null): Room {
     const roomId = randomString(8);
     // If makeMockRoom is used instead of one of the other functions in this file,
-    // we store it so that subsequent calls calculate the expiration based on it using
-    // Date.now(). So, jest.advanceTimersByTime() can be used to simulate the passage of time.
+    // we store the localTimestamp so that subsequent calls calculate the expiration based on the localTimestamp
+    // using Date.now(). So, jest.advanceTimersByTime() can be used to simulate the passage of time.
 
     // The actual time of the underlying mocked events will be: localTimestamp ?? localAge ?? 0
     const localTimestamp = Date.now() - (localAge ?? 10);
     return {
         roomId: roomId,
         getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, localAge, localTimestamp)),
+            // When setting up `makeMockRoomState` we always want to use the localTimestamp instead of localAge.
+            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, null, localTimestamp)),
         }),
     } as unknown as Room;
 }
@@ -37,11 +38,14 @@ export function makeMockRoom(memberships: CallMembershipData[], localAge: number
 export function makeMockRoomState(
     memberships: CallMembershipData[],
     roomId: string,
+    /**`localAge` is ignored if localTimestamp is present.*/
     localAge: number | null = null,
     localTimestamp: number | null = null,
 ) {
     return {
         getStateEvents: (_: string, stateKey: string) => {
+            // If localTimestamp is present mockRTCEvent does not recompute
+            // the localTimestamp based on Date.now() when `getStateEvents` is called.
             const event = mockRTCEvent(memberships, roomId, localAge, localTimestamp);
 
             if (stateKey !== undefined) return event;
@@ -53,6 +57,7 @@ export function makeMockRoomState(
 export function mockRTCEvent(
     memberships: CallMembershipData[],
     roomId: string,
+    /**`localAge` is ignored if localTimestamp is present.*/
     localAge: number | null,
     localTimestamp: number | null = null,
 ): MatrixEvent {
