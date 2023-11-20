@@ -364,7 +364,67 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, thread2bId)).toBe(true);
     });
 
-    // TODO: late-arriving receipts (dangling)
+    describe("dangling receipts", () => {
+        it("reports unread if the unthreaded receipt is in a dangling state", () => {
+            const room = createRoom();
+            const [event, eventId] = createEvent();
+            // When we receive a receipt for this event+user
+            room.addReceipt(createReceipt(readerId, event));
+
+            // The event is not added in the room
+            // So the receipt is in a dangling state
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+            // Add the event to the room
+            // The receipt is removed from the dangling state
+            room.addLiveEvents([event]);
+
+            // Then the event is read
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
+        });
+
+        it("reports unread if the threaded receipt is in a dangling state", () => {
+            const room = createRoom();
+            const [root, rootId] = createEvent();
+            const [event, eventId] = createThreadedEvent(root);
+            setupThread(room, root);
+
+            // When we receive a receipt for this event+user
+            room.addReceipt(createThreadedReceipt(readerId, event, rootId));
+
+            // The event is not added in the room
+            // So the receipt is in a dangling state
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+            // Add the events to the room
+            // The receipt is removed from the dangling state
+            room.addLiveEvents([root, event]);
+
+            // Then the event is read
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
+        });
+
+        it("should handle multiple dangling receipts for the same event", () => {
+            const room = createRoom();
+            const [event, eventId] = createEvent();
+            // When we receive a receipt for this event+user
+            room.addReceipt(createReceipt(readerId, event));
+            // We receive another receipt in the same event for another user
+            room.addReceipt(createReceipt(otherUserId, event));
+
+            // The event is not added in the room
+            // So the receipt is in a dangling state
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
+
+            // Add the event to the room
+            // The two receipts should be processed
+            room.addLiveEvents([event]);
+
+            // Then the event is read
+            // We expect that the receipt of `otherUserId` didn't replace/erase the receipt of `readerId`
+            expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
+        });
+    });
 });
 
 function createFakeClient(): MatrixClient {
