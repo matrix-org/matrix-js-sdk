@@ -129,16 +129,25 @@ export class RoomEncryptor {
             await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
             this.lazyLoadedMembersResolved = true;
             this.prefixedLogger.debug(`Updated tracked users for room ${this.room.roomId}`);
-        }
 
-        // Query keys in case we don't have them for newly tracked members.
-        // This must be done before ensuring sessions. If not the devices of these users are not
-        // known yet and will not get the room key.
-        // We don't have API to only get the keys queries related to this member list, so we just
-        // process the pending requests from the olmMachine. (usually these are processed
-        // at the end of the sync, but we can't wait for that).
-        // XXX future improvement process only KeysQueryRequests for the tracked users.
-        await this.outgoingRequestManager.doProcessOutgoingRequests();
+            // Query keys in case we don't have them for newly tracked members.
+            // It's important after loading members for the first time, as likely most of them won't be
+            // known yet and will be unable to decrypt messages despite being in the room for long.
+            // This must be done before ensuring sessions. If not the devices of these users are not
+            // known yet and will not get the room key.
+            // We don't have API to only get the keys queries related to this member list, so we just
+            // process the pending requests from the olmMachine. (usually these are processed
+            // at the end of the sync, but we can't wait for that).
+            // XXX future improvement process only KeysQueryRequests for the users that have never been queried.
+            await this.outgoingRequestManager.doProcessOutgoingRequests();
+        } else {
+            // if members are already loaded it's less critical to await on key queries.
+            // We might still want to trigger a processOutgoingRequests here, if the
+            // query is done timely enough, the freshly tracked users will get the room key.
+            this.outgoingRequestManager.doProcessOutgoingRequests().then(() => {
+                // nop
+            });
+        }
 
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,
