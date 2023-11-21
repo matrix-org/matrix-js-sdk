@@ -43,8 +43,10 @@ const THREAD_ID = "$thread_event_id";
 const ROOM_ID = "!123:matrix.org";
 
 describe("Read receipt", () => {
+    let threadRoot: MatrixEvent;
     let threadEvent: MatrixEvent;
     let roomEvent: MatrixEvent;
+    let editOfThreadRoot: MatrixEvent;
 
     beforeEach(() => {
         httpBackend = new MockHttpBackend();
@@ -56,6 +58,15 @@ describe("Read receipt", () => {
         });
         client.isGuest = () => false;
         client.supportsThreads = () => true;
+
+        threadRoot = utils.mkEvent({
+            event: true,
+            type: EventType.RoomMessage,
+            user: "@bob:matrix.org",
+            room: ROOM_ID,
+            content: { body: "This is the thread root" },
+        });
+        threadRoot.event.event_id = THREAD_ID;
 
         threadEvent = utils.mkEvent({
             event: true,
@@ -82,6 +93,9 @@ describe("Read receipt", () => {
                 body: "Hello from a room",
             },
         });
+
+        editOfThreadRoot = utils.mkEdit(threadRoot, client, "@bob:matrix.org", ROOM_ID);
+        editOfThreadRoot.setThreadId(THREAD_ID);
     });
 
     describe("sendReceipt", () => {
@@ -208,6 +222,7 @@ describe("Read receipt", () => {
         it.each([
             { getEvent: () => roomEvent, destinationId: MAIN_ROOM_TIMELINE },
             { getEvent: () => threadEvent, destinationId: THREAD_ID },
+            { getEvent: () => editOfThreadRoot, destinationId: MAIN_ROOM_TIMELINE },
         ])("adds the receipt to $destinationId", ({ getEvent, destinationId }) => {
             const event = getEvent();
             const userId = "@bob:example.org";

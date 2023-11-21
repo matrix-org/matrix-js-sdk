@@ -816,7 +816,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
-        return super.hasUserReadEvent(userId, eventId);
+        return this.room.hasUserReadEvent(userId, eventId);
     }
 
     public setUnread(type: NotificationCountType, count: number): void {
