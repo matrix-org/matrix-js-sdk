@@ -18,41 +18,29 @@ import { EventType, MatrixEvent, Room } from "../../../src";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-export function makeMockRoom(
-    memberships: CallMembershipData[],
-    getLocalAge: (() => number) | undefined = undefined,
-): Room {
+export function makeMockRoom(memberships: CallMembershipData[], localAge: number | null = null): Room {
     const roomId = randomString(8);
+    // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
+    const roomState = makeMockRoomState(memberships, roomId, localAge);
     return {
         roomId: roomId,
         getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState(memberships, roomId, getLocalAge)),
+            getState: jest.fn().mockReturnValue(roomState),
         }),
     } as unknown as Room;
 }
 
-export function makeMockRoomState(
-    memberships: CallMembershipData[],
-    roomId: string,
-    getLocalAge: (() => number) | undefined,
-) {
+export function makeMockRoomState(memberships: CallMembershipData[], roomId: string, localAge: number | null = null) {
+    const event = mockRTCEvent(memberships, roomId, localAge);
     return {
         getStateEvents: (_: string, stateKey: string) => {
-            const event = mockRTCEvent(memberships, roomId, getLocalAge);
-
             if (stateKey !== undefined) return event;
             return [event];
         },
     };
 }
 
-export function mockRTCEvent(
-    memberships: CallMembershipData[],
-    roomId: string,
-    getLocalAge: (() => number) | undefined,
-): MatrixEvent {
-    const getLocalAgeFn = getLocalAge ?? (() => 10);
-
+export function mockRTCEvent(memberships: CallMembershipData[], roomId: string, localAge: number | null): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
         getContent: jest.fn().mockReturnValue({
@@ -60,8 +48,7 @@ export function mockRTCEvent(
         }),
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
         getTs: jest.fn().mockReturnValue(1000),
-        getLocalAge: getLocalAgeFn,
-        localTimestamp: Date.now(),
+        localTimestamp: Date.now() - (localAge ?? 10),
         getRoomId: jest.fn().mockReturnValue(roomId),
         sender: {
             userId: "@mock:user.example",
