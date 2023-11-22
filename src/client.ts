@@ -5168,7 +5168,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
-            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
+            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType, unthreaded);
         }
         return promise;
     }

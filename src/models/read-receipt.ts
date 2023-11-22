@@ -29,14 +29,27 @@ import { NotificationCountType } from "./room";
 import { logger } from "../logger";
 import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
 
-export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
+/**
+ * Create a synthetic receipt for the given event
+ * @param userId - The user ID if the receipt sender
+ * @param event - The event that is to be acknowledged
+ * @param receiptType - The type of receipt
+ * @param unthreaded - the receipt is unthreaded
+ * @returns a new event with the synthetic receipt in it
+ */
+export function synthesizeReceipt(
+    userId: string,
+    event: MatrixEvent,
+    receiptType: ReceiptType,
+    unthreaded = false,
+): MatrixEvent {
     return new MatrixEvent({
         content: {
             [event.getId()!]: {
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
-                        thread_id: threadIdForReceipt(event),
+                        ...(!unthreaded && { thread_id: threadIdForReceipt(event) }),
                     },
                 },
             },
@@ -366,9 +379,10 @@ export abstract class ReadReceipt<
      * @param userId - The user ID if the receipt sender
      * @param e - The event that is to be acknowledged
      * @param receiptType - The type of receipt
+     * @param unthreaded - the receipt is unthreaded
      */
-    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
-        this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
+    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType, unthreaded = false): void {
+        this.addReceipt(synthesizeReceipt(userId, e, receiptType, unthreaded), true);
     }
 
     /**
