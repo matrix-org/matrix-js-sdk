@@ -159,7 +159,7 @@ export class RoomEncryptor {
         } else {
             // If members are already loaded it's less critical to await on key queries.
             // We might still want to trigger a processOutgoingRequests here.
-            // The next call to ensureSessions will wait a bit on in flight key queries we are
+            // The call to `ensureSessionsForUsers` below will wait a bit on in-flight key queries we are
             // interested in. If a sync handling happens in the meantime, and some new members are added to the room
             // or have new devices it would give us a chance to query them before sending.
             // It's less critical due to the racy nature of this process.
