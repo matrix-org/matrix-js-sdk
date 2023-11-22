@@ -143,19 +143,30 @@ export class RoomEncryptor {
         // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
         if (!this.lazyLoadedMembersResolved) {
             await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
-            this.lazyLoadedMembersResolved = true;
             logger.debug(`Updated tracked users`);
-        }
+            this.lazyLoadedMembersResolved = true;
 
-        // Query keys in case we don't have them for newly tracked members.
-        // This must be done before ensuring sessions. If not the devices of these users are not
-        // known yet and will not get the room key.
-        // We don't have API to only get the keys queries related to this member list, so we just
-        // process the pending requests from the olmMachine. (usually these are processed
-        // at the end of the sync, but we can't wait for that).
-        // XXX future improvement process only KeysQueryRequests for the tracked users.
-        logger.debug(`Processing outgoing requests`);
-        await this.outgoingRequestManager.doProcessOutgoingRequests();
+            // Query keys in case we don't have them for newly tracked members.
+            // It's important after loading members for the first time, as likely most of them won't be
+            // known yet and will be unable to decrypt messages despite being in the room for long.
+            // This must be done before ensuring sessions. If not the devices of these users are not
+            // known yet and will not get the room key.
+            // We don't have API to only get the keys queries related to this member list, so we just
+            // process the pending requests from the olmMachine. (usually these are processed
+            // at the end of the sync, but we can't wait for that).
+            // XXX future improvement process only KeysQueryRequests for the users that have never been queried.
+            logger.debug(`Processing outgoing requests`);
+            await this.outgoingRequestManager.doProcessOutgoingRequests();
+        } else {
+            // If members are already loaded it's less critical to await on key queries.
+            // We might still want to trigger a processOutgoingRequests here.
+            // The call to `ensureSessionsForUsers` below will wait a bit on in-flight key queries we are
+            // interested in. If a sync handling happens in the meantime, and some new members are added to the room
+            // or have new devices it would give us a chance to query them before sending.
+            // It's less critical due to the racy nature of this process.
+            logger.debug(`Processing outgoing requests in background`);
+            this.outgoingRequestManager.doProcessOutgoingRequests();
+        }
 
         logger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,

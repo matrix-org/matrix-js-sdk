@@ -36,12 +36,12 @@ const main = async ({ github, releaseId, dependencies }) => {
         const release = await getRelease(github, dependency);
         for (const line of release.body.split("\n")) {
             if (line.startsWith(HEADING_PREFIX)) {
-                heading = line;
+                heading = line.trim();
                 sections.set(heading, []);
                 continue;
             }
             if (heading && line) {
-                sections.get(heading).push(line);
+                sections.get(heading).push(line.trim());
             }
         }
     }
@@ -60,10 +60,14 @@ const main = async ({ github, releaseId, dependencies }) => {
     const output = [];
     for (const line of [...release.body.split("\n"), null]) {
         if (line === null || line.startsWith(HEADING_PREFIX)) {
-            while (heading && headings[0] !== heading && sections.has(headings[0])) {
+            // If we have a heading, and it's not the first in the list of pending headings, output the section.
+            // If we're processing the last line (null) then output all remaining sections.
+            while (headings.length > 0 && (line === null || (heading && headings[0] !== heading))) {
                 const heading = headings.shift();
-                output.push(heading);
-                output.push(...sections.get(heading));
+                if (sections.has(heading)) {
+                    output.push(heading);
+                    output.push(...sections.get(heading));
+                }
             }
 
             if (heading && sections.has(heading)) {
