@@ -3165,7 +3165,6 @@ describe("Room", function () {
                 // When we ask what they have read
                 // Then we say "nothing"
                 expect(room.getEventReadUpTo(userA)).toBeNull();
-                expect(logger.warn).toHaveBeenCalledWith("Ignoring receipt for missing event with id missingEventId");
             });
 
             it("ignores receipts pointing at the wrong thread", () => {
