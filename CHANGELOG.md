@@ -1,3 +1,17 @@
+Changes in [30.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.1.0) (2023-11-21)
+==================================================================================================
+## ✨ Features
+
+* Rotate per-participant keys when a member leaves ([#3833](https://github.com/matrix-org/matrix-js-sdk/pull/3833)). Contributed by @dbkr.
+* Add E2EE for embedded mode of Element Call ([#3667](https://github.com/matrix-org/matrix-js-sdk/pull/3667)). Contributed by @SimonBrandner.
+
+## 🐛 Bug Fixes
+
+* Shorten TimelineWindow when an event is removed ([#3862](https://github.com/matrix-org/matrix-js-sdk/pull/3862)). Contributed by @andybalaam.
+* Ignore receipts pointing at missing or invalid events ([#3817](https://github.com/matrix-org/matrix-js-sdk/pull/3817)). Contributed by @andybalaam.
+* Fix members being loaded from server on initial sync (defeating lazy loading) ([#3830](https://github.com/matrix-org/matrix-js-sdk/pull/3830)). Contributed by @BillCarsonFr.
+
+
 Changes in [30.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.1) (2023-11-13)
 ==================================================================================================
 
