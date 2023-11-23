@@ -895,7 +895,7 @@ interface IRoomHierarchy {
 
 export interface TimestampToEventResponse {
     event_id: string;
-    origin_server_ts: string;
+    origin_server_ts: number;
 }
 
 interface IWhoamiResponse {
