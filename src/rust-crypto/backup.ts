@@ -260,7 +260,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         this.backupKeysLoopRunning = true;
 
-        logger.log(`Starting loop for ${this.activeBackupVersion}.`);
+        logger.log(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
 
         // wait between 0 and `maxDelay` seconds, to avoid backup
         // requests from different clients hitting the server all at
@@ -273,27 +273,43 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
-                const request: RustSdkCryptoJs.KeysBackupRequest | null = await this.olmMachine.backupRoomKeys();
+                let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
+                try {
+                    request = await this.olmMachine.backupRoomKeys();
+                } catch (err) {
+                    logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
+                }
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
-                    logger.log(`Ending loop for ${this.activeBackupVersion}.`);
+                    logger.log(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
                     return;
                 }
 
                 try {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     numFailures = 0;
-
-                    const keyCount: RustSdkCryptoJs.RoomKeyCounts = await this.olmMachine.roomKeyCounts();
-                    const remaining = keyCount.total - keyCount.backedUp;
-                    this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
+                    let keyCount: RustSdkCryptoJs.RoomKeyCounts | null = null;
+                    try {
+                        keyCount = await this.olmMachine.roomKeyCounts();
+                    } catch (err) {
+                        logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                    }
+                    if (keyCount) {
+                        const remaining = keyCount.total - keyCount.backedUp;
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
+                    }
                 } catch (err) {
                     numFailures++;
-                    logger.error("Error processing backup request for rust crypto-sdk", err);
+                    logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
                         const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
-                            await this.disableKeyBackup();
+                            logger.log(`Backup: Failed to upload keys to current vesion: ${errCode}.`);
+                            try {
+                                await this.disableKeyBackup();
+                            } catch (error) {
+                                logger.error("Backup: An error occurred while disabling key backup:", error);
+                            }
                             this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
                             // There was an active backup and we are out of sync with the server
                             // force a check server side
