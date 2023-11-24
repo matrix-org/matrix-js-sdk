@@ -51,6 +51,22 @@ jobs:
             - name: Run Linter
               run: "yarn run lint:js"
 
+    workflow_lint:
+        name: "Workflow Lint"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - name: Run Linter
+              run: "yarn lint:workflows"
+
     docs:
         name: "JSDoc Checker"
         runs-on: ubuntu-latest
