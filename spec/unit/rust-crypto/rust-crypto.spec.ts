@@ -871,7 +871,7 @@ describe("RustCrypto", () => {
         });
 
         it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
-            olmMachine.getIdentity.mockResolvedValue({ isVerified: jest.fn().mockReturnValue(true) });
+            olmMachine.getIdentity.mockResolvedValue({ free: jest.fn(), isVerified: jest.fn().mockReturnValue(true) });
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
             expect(userVerificationStatus.isVerified()).toBeTruthy();

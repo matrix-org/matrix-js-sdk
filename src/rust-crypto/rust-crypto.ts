@@ -425,6 +425,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 await this.outgoingRequestProcessor.makeOutgoingRequest(request);
             }
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            userIdentity?.free();
             return userIdentity !== undefined;
         } else if (downloadUncached) {
             // Download the cross signing keys and check if the master key is available
@@ -596,7 +597,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
         }
-        return new UserVerificationStatus(userIdentity.isVerified(), false, false);
+        const verified = userIdentity.isVerified();
+        userIdentity.free();
+        return new UserVerificationStatus(verified, false, false);
     }
 
     /**
@@ -621,42 +624,51 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
-
-        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
-        const privateKeysOnDevice =
-            crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
-
-        if (!userIdentity || !privateKeysOnDevice) {
-            // The public or private keys are not available on this device
+        if (!userIdentity) {
+            // The public keys are not available on this device
             return null;
         }
 
-        if (!userIdentity.isVerified()) {
-            // We have both public and private keys, but they don't match!
-            return null;
-        }
+        try {
+            const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
 
-        let key: string;
-        switch (type) {
-            case CrossSigningKey.Master:
-                key = userIdentity.masterKey;
-                break;
-            case CrossSigningKey.SelfSigning:
-                key = userIdentity.selfSigningKey;
-                break;
-            case CrossSigningKey.UserSigning:
-                key = userIdentity.userSigningKey;
-                break;
-            default:
-                // Unknown type
+            const privateKeysOnDevice =
+                crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
+
+            if (!privateKeysOnDevice) {
+                // The private keys are not available on this device
                 return null;
-        }
+            }
 
-        const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
-        // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-        // We assume only a single key, and we want the bare form without type
-        // prefix, so we select the values.
-        return Object.values(parsedKey.keys)[0];
+            if (!userIdentity.isVerified()) {
+                // We have both public and private keys, but they don't match!
+                return null;
+            }
+
+            let key: string;
+            switch (type) {
+                case CrossSigningKey.Master:
+                    key = userIdentity.masterKey;
+                    break;
+                case CrossSigningKey.SelfSigning:
+                    key = userIdentity.selfSigningKey;
+                    break;
+                case CrossSigningKey.UserSigning:
+                    key = userIdentity.userSigningKey;
+                    break;
+                default:
+                    // Unknown type
+                    return null;
+            }
+
+            const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Object.values(parsedKey.keys)[0];
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
@@ -800,6 +812,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
+        userIdentity?.free();
+
         const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
             await this.getOlmMachineOrThrow().crossSigningStatus();
@@ -917,23 +931,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         if (!userIdentity) throw new Error(`unknown userId ${userId}`);
 
-        // Transform the verification methods into rust objects
-        const methods = this._supportedVerificationMethods.map((method) =>
-            verificationMethodIdentifierToMethod(method),
-        );
-        // Get the request content to send to the DM room
-        const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+        try {
+            // Transform the verification methods into rust objects
+            const methods = this._supportedVerificationMethods.map((method) =>
+                verificationMethodIdentifierToMethod(method),
+            );
+            // Get the request content to send to the DM room
+            const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
 
-        // Send the request content to send to the DM room
-        const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
+            // Send the request content to send to the DM room
+            const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
 
-        // Get a verification request
-        const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
-            new RustSdkCryptoJs.RoomId(roomId),
-            new RustSdkCryptoJs.EventId(eventId),
-            methods,
-        );
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+            // Get a verification request
+            const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
+                new RustSdkCryptoJs.RoomId(roomId),
+                new RustSdkCryptoJs.EventId(eventId),
+                methods,
+            );
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
+            );
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
@@ -995,12 +1017,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("cannot request verification for this device when there is no existing cross-signing key");
         }
 
-        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
-            await userIdentity.requestVerification(
-                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+        try {
+            const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+                await userIdentity.requestVerification(
+                    this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                );
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
