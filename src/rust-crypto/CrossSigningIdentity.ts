@@ -91,10 +91,13 @@ export class CrossSigningIdentity {
                     this.olmMachine.userId,
                     this.olmMachine.deviceId,
                 );
-
-                // Sign the device with our cross-signing key and upload the signature
-                const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
-                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                try {
+                    // Sign the device with our cross-signing key and upload the signature
+                    const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+                    await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                } finally {
+                    device.free();
+                }
             } else {
                 logger.log(
                     "bootStrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
