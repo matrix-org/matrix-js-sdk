@@ -34,6 +34,7 @@ import {
     USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
 } from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -248,6 +249,40 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             await bootstrapCrossSigning(authDict);
             const calls = fetchMock.calls((url, opts) => opts.method != "GET");
             expect(calls.length).toEqual(0);
+        });
+
+        newBackendOnly("will upload existing cross-signing keys to an established secret storage", async () => {
+            // This rather obscure codepath covers the case that:
+            //   - 4S is set up and working
+            //   - our device has private cross-signing keys, but has not published them to 4S
+            //
+            // To arrange that, we call `bootstrapCrossSigning` on our main device, and then (pretend to) set up 4S from
+            // a *different* device. Then, when we call `bootstrapCrossSigning` again, it should do the honours.
+
+            mockSetupCrossSigningRequests();
+            const accountDataAccumulator = new AccountDataAccumulator();
+            accountDataAccumulator.interceptGetAccountData();
+
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+
+            // Pretend that another device has uploaded a 4S key
+            accountDataAccumulator.accountDataEvents.set("m.secret_storage.default_key", { key: "key_id" });
+            accountDataAccumulator.accountDataEvents.set("m.secret_storage.key.key_id", {
+                key: "keykeykey",
+                algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
+            });
+
+            // Prepare for the cross-signing keys
+            const p = accountDataAccumulator.interceptSetAccountData(":type(m.cross_signing..*)");
+
+            await bootstrapCrossSigning(authDict);
+            await p;
+
+            // The cross-signing keys should have been uploaded
+            expect(accountDataAccumulator.accountDataEvents.has("m.cross_signing.master")).toBeTruthy();
+            expect(accountDataAccumulator.accountDataEvents.has("m.cross_signing.self_signing")).toBeTruthy();
+            expect(accountDataAccumulator.accountDataEvents.has("m.cross_signing.user_signing")).toBeTruthy();
         });
     });
 
