@@ -163,8 +163,8 @@ export const mkThread = ({
 };
 
 /**
- * Create a thread, and make sure the events added to the thread and the room's
- * timeline as if they came in via sync.
+ * Create a thread, and make sure the events are added to the thread and the
+ * room's timeline as if they came in via sync.
  *
  * Note that mkThread doesn't actually add the events properly to the room.
  */
