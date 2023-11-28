@@ -454,7 +454,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
         const deviceMapByUserId = new Map<string, Map<string, Device>>();
-        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.getOlmMachineOrThrow().trackedUsers();
 
         // Convert RustSdkCryptoJs.UserId to a `Set<string>`
         const trackedUsers = new Set<string>();
@@ -592,7 +592,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
         const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
-            await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(userId));
+            await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
         }
