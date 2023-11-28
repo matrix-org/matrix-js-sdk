@@ -19,7 +19,7 @@ import { mocked } from "jest-mock";
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
-import { makeThreadEvent, mkThread, populateThread } from "../../test-utils/thread";
+import { makeThreadEvent, mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
 import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
@@ -149,38 +149,20 @@ describe("Thread", () => {
         });
 
         it("considers other events with no RR as unread", () => {
-            // Given a long thread exists
-            const { thread, events } = populateThread({
+            const { thread, events } = mkThread({
                 room,
                 client,
-                authorId: "@other:foo.com",
-                participantUserIds: ["@other:foo.com"],
+                authorId: myUserId,
+                participantUserIds: [myUserId],
                 length: 25,
                 ts: 190,
             });
 
-            const event1 = events.at(1)!;
-            const event2 = events.at(2)!;
-            const event24 = events.at(24)!;
+            // Before alice's last unthreaded receipt
+            expect(thread.hasUserReadEvent("@alice:example.org", events.at(1)!.getId() ?? "")).toBeTruthy();
 
-            // And we have read the second message in it with an unthreaded receipt
-            const receipt = new MatrixEvent({
-                type: "m.receipt",
-                room_id: room.roomId,
-                content: {
-                    // unthreaded receipt for the second message in the thread
-                    [event2.getId()!]: {
-                        [ReceiptType.Read]: {
-                            [myUserId]: { ts: 200 },
-                        },
-                    },
-                },
-            });
-            room.addReceipt(receipt);
-
-            // Then we have read the first message in the thread, and not the last
-            expect(thread.hasUserReadEvent(myUserId, event1.getId()!)).toBe(true);
-            expect(thread.hasUserReadEvent(myUserId, event24.getId()!)).toBe(false);
+            // After alice's last unthreaded receipt
+            expect(thread.hasUserReadEvent("@alice:example.org", events.at(-1)!.getId() ?? "")).toBeFalsy();
         });
 
         it("considers event as read if there's a more recent unthreaded receipt", () => {
@@ -499,13 +481,13 @@ describe("Thread", () => {
 
                 // And a thread with an added event (with later timestamp)
                 const userId = "user1";
-                const { thread, message2 } = await createThreadAnd2Events(client, 1, 100, 200, userId);
+                const { thread, message } = await createThreadAndEvent(client, 1, 100, userId);
 
                 // Then a receipt was added to the thread
                 const receipt = thread.getReadReceiptForUserId(userId);
                 expect(receipt).toBeTruthy();
-                expect(receipt?.eventId).toEqual(message2.getId());
-                expect(receipt?.data.ts).toEqual(200);
+                expect(receipt?.eventId).toEqual(message.getId());
+                expect(receipt?.data.ts).toEqual(100);
                 expect(receipt?.data.thread_id).toEqual(thread.id);
 
                 // (And the receipt was synthetic)
@@ -523,14 +505,14 @@ describe("Thread", () => {
 
                 // And a thread with an added event with a lower timestamp than its other events
                 const userId = "user1";
-                const { thread, message1 } = await createThreadAnd2Events(client, 300, 200, 100, userId);
+                const { thread } = await createThreadAndEvent(client, 200, 100, userId);
 
-                // Then the receipt is for the first message, because its
-                // timestamp is later. This happens because since we have no
+                // Then no receipt was added to the thread (the receipt is still
+                // for the thread root). This happens because since we have no
                 // recursive relations support, we know that sometimes events
                 // appear out of order, so we have to check their timestamps as
                 // a guess of the correct order.
-                expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(message1.getId());
+                expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
             });
         });
 
@@ -548,11 +530,11 @@ describe("Thread", () => {
 
                 // And a thread with an added event (with later timestamp)
                 const userId = "user1";
-                const { thread, message2 } = await createThreadAnd2Events(client, 1, 100, 200, userId);
+                const { thread, message } = await createThreadAndEvent(client, 1, 100, userId);
 
                 // Then a receipt was added to the thread
                 const receipt = thread.getReadReceiptForUserId(userId);
-                expect(receipt?.eventId).toEqual(message2.getId());
+                expect(receipt?.eventId).toEqual(message.getId());
             });
 
             it("Creates a local echo receipt even for events BEFORE an existing receipt", async () => {
@@ -568,24 +550,22 @@ describe("Thread", () => {
 
                 // And a thread with an added event with a lower timestamp than its other events
                 const userId = "user1";
-                const { thread, message2 } = await createThreadAnd2Events(client, 300, 200, 100, userId);
+                const { thread, message } = await createThreadAndEvent(client, 200, 100, userId);
 
-                // Then a receipt was added for the last message, even though it
-                // has lower ts, because relations recursion is available, so we
-                // trust the server to have provided us with events in the right
-                // order.
+                // Then a receipt was added to the thread, because relations
+                // recursion is available, so we trust the server to have
+                // provided us with events in the right order.
                 const receipt = thread.getReadReceiptForUserId(userId);
-                expect(receipt?.eventId).toEqual(message2.getId());
+                expect(receipt?.eventId).toEqual(message.getId());
             });
         });
 
-        async function createThreadAnd2Events(
+        async function createThreadAndEvent(
             client: MatrixClient,
             rootTs: number,
-            message1Ts: number,
-            message2Ts: number,
+            eventTs: number,
             userId: string,
-        ): Promise<{ thread: Thread; message1: MatrixEvent; message2: MatrixEvent }> {
+        ): Promise<{ thread: Thread; message: MatrixEvent }> {
             const room = new Room("room1", client, userId);
 
             // Given a thread
@@ -596,41 +576,24 @@ describe("Thread", () => {
                 participantUserIds: [],
                 ts: rootTs,
             });
-            // Sanity: there is no read receipt on the thread yet because the
-            // thread events don't get properly added to the room by mkThread.
-            expect(thread.getReadReceiptForUserId(userId)).toBeNull();
+            // Sanity: the current receipt is for the thread root
+            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(thread.rootEvent?.getId());
 
             const awaitTimelineEvent = new Promise<void>((res) => thread.on(RoomEvent.Timeline, () => res()));
 
-            // Add a message with ts message1Ts
-            const message1 = makeThreadEvent({
+            // When we add a message that is before the latest receipt
+            const message = makeThreadEvent({
                 event: true,
                 rootEventId: thread.id,
                 replyToEventId: thread.id,
                 user: userId,
                 room: room.roomId,
-                ts: message1Ts,
+                ts: eventTs,
             });
-            await thread.addEvent(message1, false, true);
+            await thread.addEvent(message, false, true);
             await awaitTimelineEvent;
 
-            // Sanity: the thread now has a properly-added event, so this event
-            // has a synthetic receipt.
-            expect(thread.getReadReceiptForUserId(userId)?.eventId).toEqual(message1.getId());
-
-            // Add a message with ts message2Ts
-            const message2 = makeThreadEvent({
-                event: true,
-                rootEventId: thread.id,
-                replyToEventId: thread.id,
-                user: userId,
-                room: room.roomId,
-                ts: message2Ts,
-            });
-            await thread.addEvent(message2, false, true);
-            await awaitTimelineEvent;
-
-            return { thread, message1, message2 };
+            return { thread, message };
         }
 
         function createClientWithEventMapper(canSupport: Map<Feature, ServerSupport> = new Map()): MatrixClient {

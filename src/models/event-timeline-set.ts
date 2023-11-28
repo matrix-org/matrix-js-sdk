@@ -899,10 +899,11 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param eventId1 -   The id of the first event
      * @param eventId2 -   The id of the second event
 
-     * @returns -1 if eventId1 precedes eventId2, and +1 eventId1 succeeds
-     * eventId2. 0 if they are the same event; null if we can't tell (either
-     * because we don't know about one of the events, or because they are in
-     * separate timelines which don't join up).
+     * @returns a number less than zero if eventId1 precedes eventId2, and
+     *    greater than zero if eventId1 succeeds eventId2. zero if they are the
+     *    same event; null if we can't tell (either because we don't know about one
+     *    of the events, or because they are in separate timelines which don't join
+     *    up).
      */
     public compareEventOrdering(eventId1: string, eventId2: string): number | null {
         if (eventId1 == eventId2) {
@@ -934,16 +935,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     idx2 = idx;
                 }
             }
-            const difference = idx1! - idx2!;
-
-            // Return the sign of difference.
-            if (difference < 0) {
-                return -1;
-            } else if (difference > 0) {
-                return 1;
-            } else {
-                return 0;
-            }
+            return idx1! - idx2!;
         }
 
         // the events are in different timelines. Iterate through the
