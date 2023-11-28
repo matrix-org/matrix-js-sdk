@@ -236,6 +236,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
                 `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[ed25519:${SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64}]`,
             );
         });
+
+        it("can bootstrapCrossSigning twice", async () => {
+            mockSetupCrossSigningRequests();
+
+            const authDict = { type: "test" };
+            await bootstrapCrossSigning(authDict);
+
+            // a second call should do nothing except GET requests
+            fetchMock.mockClear();
+            await bootstrapCrossSigning(authDict);
+            const calls = fetchMock.calls((url, opts) => opts.method != "GET");
+            expect(calls.length).toEqual(0);
+        });
     });
 
     describe("getCrossSigningStatus()", () => {
