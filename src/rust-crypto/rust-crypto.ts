@@ -563,7 +563,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (!device) {
             throw new Error(`Unknown device ${userId}|${deviceId}`);
         }
-        await device.setLocalTrust(verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset);
+        try {
+            await device.setLocalTrust(
+                verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset,
+            );
+        } finally {
+            device.free();
+        }
     }
 
     /**
@@ -579,13 +585,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         );
 
         if (!device) return null;
-
-        return new DeviceVerificationStatus({
-            signedByOwner: device.isCrossSignedByOwner(),
-            crossSigningVerified: device.isCrossSigningTrusted(),
-            localVerified: device.isLocallyTrusted(),
-            trustCrossSignedDevices: this._trustCrossSignedDevices,
-        });
+        try {
+            return new DeviceVerificationStatus({
+                signedByOwner: device.isCrossSignedByOwner(),
+                crossSigningVerified: device.isCrossSigningTrusted(),
+                localVerified: device.isLocallyTrusted(),
+                trustCrossSignedDevices: this._trustCrossSignedDevices,
+            });
+        } finally {
+            device.free();
+        }
     }
 
     /**
@@ -1055,12 +1064,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("Not a known device");
         }
 
-        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
-            await device.requestVerification(
-                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+        try {
+            const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+                await device.requestVerification(
+                    this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                );
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+        } finally {
+            device.free();
+        }
     }
 
     /**

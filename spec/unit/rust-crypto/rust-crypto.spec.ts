@@ -645,6 +645,7 @@ describe("RustCrypto", () => {
 
         it("should call getDevice", async () => {
             olmMachine.getDevice.mockResolvedValue({
+                free: jest.fn(),
                 isCrossSigningTrusted: jest.fn().mockReturnValue(false),
                 isLocallyTrusted: jest.fn().mockReturnValue(false),
                 isCrossSignedByOwner: jest.fn().mockReturnValue(false),
