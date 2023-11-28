@@ -5168,7 +5168,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
-            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
+            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType, unthreaded);
         }
         return promise;
     }
@@ -9916,7 +9916,7 @@ export function threadIdForReceipt(event: MatrixEvent): string {
  * @returns true if this event is considered to be in the main timeline as far
  *               as receipts are concerned.
  */
-function inMainTimelineForReceipt(event: MatrixEvent): boolean {
+export function inMainTimelineForReceipt(event: MatrixEvent): boolean {
     if (!event.threadRootId) {
         // Not in a thread: then it is in the main timeline
         return true;
