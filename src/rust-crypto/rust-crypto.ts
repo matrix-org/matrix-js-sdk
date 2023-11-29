@@ -933,6 +933,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             .map(
                 (request) =>
                     new RustVerificationRequest(
+                        this.olmMachine,
                         request,
                         this.outgoingRequestProcessor,
                         this._supportedVerificationMethods,
@@ -963,6 +964,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         if (request) {
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -998,6 +1000,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 methods,
             );
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1073,6 +1076,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1111,6 +1115,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1398,7 +1403,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (request) {
             this.emit(
                 CryptoEvent.VerificationRequestReceived,
-                new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods),
+                new RustVerificationRequest(
+                    this.olmMachine,
+                    request,
+                    this.outgoingRequestProcessor,
+                    this._supportedVerificationMethods,
+                ),
             );
         }
     }
@@ -1615,6 +1625,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this.emit(
                     CryptoEvent.VerificationRequestReceived,
                     new RustVerificationRequest(
+                        this.olmMachine,
                         request,
                         this.outgoingRequestProcessor,
                         this._supportedVerificationMethods,
