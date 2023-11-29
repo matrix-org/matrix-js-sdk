@@ -929,22 +929,26 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             // First ensure that the client checks for keys using the backup version 1
             /// =====
 
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
-                // check that the version is correct
-                const version = new URLSearchParams(new URL(url).search).get("version");
-                if (version == "1") {
-                    return testData.CURVE25519_KEY_BACKUP_DATA;
-                } else {
-                    return {
-                        status: 403,
-                        body: {
-                            current_version: "1",
-                            errcode: "M_WRONG_ROOM_KEYS_VERSION",
-                            error: "Wrong backup version.",
-                        },
-                    };
-                }
-            },{ overwriteRoutes: true });
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                (url, request) => {
+                    // check that the version is correct
+                    const version = new URLSearchParams(new URL(url).search).get("version");
+                    if (version == "1") {
+                        return testData.CURVE25519_KEY_BACKUP_DATA;
+                    } else {
+                        return {
+                            status: 403,
+                            body: {
+                                current_version: "1",
+                                errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                                error: "Wrong backup version.",
+                            },
+                        };
+                    }
+                },
+                { overwriteRoutes: true },
+            );
 
             // Send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
             syncResponder.sendOrQueueSyncResponse(SYNC_RESPONSE);
@@ -955,7 +959,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
             expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
-
 
             // =====
             // Second suppose now that the backup has changed to version 2

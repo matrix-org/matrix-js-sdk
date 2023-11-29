@@ -27,19 +27,40 @@ import { encodeUri, sleep } from "../utils";
 import { RustCrypto } from "./rust-crypto";
 
 /**
- * Extract the dependices of the OnDemandKeyBackupDownloader, main reason is to make testing easier.
+ * Extract the dependence of the PerSessionKeyBackupDownloader, main reason is to make testing easier.
  */
 export interface OnDemandBackupDelegate {
+    /** Gets the current trusted backup if any.*/
     getActiveBackupVersion(): Promise<string | null>;
 
+    /** Gets the current cached backup decryption key if any.*/
     getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null>;
 
-    requestRoomKeyFromBackup(version: string, rooomId: string, sessionId: string): Promise<KeyBackupSession>;
+    /**
+     *  Performs the server request to fetch the key from backup.
+     *
+     *  @param version - The backup version to use.
+     *  @param roomId - The room id of the session.
+     *  @param sessionId - The session id of the session.
+     *
+     */
+    requestRoomKeyFromBackup(version: string, roomId: string, sessionId: string): Promise<KeyBackupSession>;
 
+    /**
+     * Imports the given keys into the crypto store.
+     * @param keys - The keys to import.
+     */
     importRoomKeys(keys: IMegolmSessionData[]): Promise<void>;
 
+    /**
+     * Creates a backup decryptor that can decrypt the key retrieved from backup.
+     * @param key - The cached backup decryption key.
+     */
     createBackupDecryptor(key: RustSdkCryptoJs.BackupDecryptionKey): RustBackupDecryptor;
 
+    /**
+     * Requests the current key backup version from the server.
+     */
     requestKeyBackupVersion(): Promise<KeyBackupInfo | null>;
 
     /**
@@ -104,27 +125,45 @@ export function createDelegate(
     };
 }
 
+/**
+ * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
+ */
 export enum KeyDownloadError {
+    /** The backup version in use is out of sync with the server version. */
     VERSION_MISMATCH = "VERSION_MISMATCH",
+    /** The requested key is not in the backup. */
     MISSING_DECRYPTION_KEY = "MISSING_DECRYPTION_KEY",
+    /** A network error occurred while trying to get the key. */
     NETWORK_ERROR = "NETWORK_ERROR",
+    /** The loop as been stopped. */
     STOPPED = "STOPPED",
+    /** An unknown error occurred while decrypting/importing the key */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
+    /** The server is rate limiting us. */
     RATE_LIMITED = "RATE_LIMITED",
+    /** The backup is not configured correctly, can be that there is no backup, that it's not trusted
+     * , that we don't have the correct key in cache... */
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR",
 }
 
+/** Helper type for requested session*/
 type SessionInfo = { roomId: string; megolmSessionId: string };
 
+/** Helper type for the result of a key download. */
 type KeyDownloadResult =
     | { ok: true; value: KeyBackupSession }
     | { ok: false; error: KeyDownloadError; [key: string]: any };
 
+/** Holds the current backup decryptor and version that should be used. */
 type Configuration = {
     backupVersion: string;
     decryptor: RustBackupDecryptor;
 };
 
+/**
+ * Signaling for the Downloader loop.
+ * Not yet used by API, yet useful for testing.
+ */
 export enum KeyDownloaderEvent {
     DownloadLoopStateUpdate = "download_loop_started",
     DownLoopStep = "download_loop_step",
@@ -141,6 +180,11 @@ export type KeyDownloaderEventMap = {
 /**
  * When an unable to decrypt error is encountered, the client will call this
  * in order to try to download the key from the backup.
+ *
+ * The current backup API is quite limited, there is no pagination, so it can take very long to
+ * get all keys for history. Downloading keys on demand is a way to avoid this problem.
+ * It will create a lot of requests, but form the user point of view, it's better to have that than
+ * waiting for a long time before being able to decrypt a message.
  *
  */
 export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownloaderEvent, KeyDownloaderEventMap> {
@@ -381,6 +425,9 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
                     //     - "error": "No room_keys found" if the key is missing.
                     // For now we check the error message, but this is not ideal.
                     // It's useful to know if the key is missing or if the version is wrong.
+                    // As it's not spec'ed, will work only with synapse, but it's better than nothing?
+                    // Other implementations will consider this as a missing key, but soon after a backup status
+                    // change will trigger a configuration check for future keys (this one won't be retied though)
                     if (e.data.error == "Unknown backup version") {
                         return { ok: false, error: KeyDownloadError.VERSION_MISMATCH };
                     }
