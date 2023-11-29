@@ -1,4 +1,4 @@
-name: Release Action
+name: Release Make
 on:
     workflow_call:
         secrets:

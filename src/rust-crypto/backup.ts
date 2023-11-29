@@ -284,6 +284,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     numFailures = 0;
 
+                    if (this.stopped) break;
                     const keyCount: RustSdkCryptoJs.RoomKeyCounts = await this.olmMachine.roomKeyCounts();
                     const remaining = keyCount.total - keyCount.backedUp;
                     this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
