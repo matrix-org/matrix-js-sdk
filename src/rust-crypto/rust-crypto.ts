@@ -25,11 +25,11 @@ import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { Logger } from "../logger";
-import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { encodeUri, MapWithDefault } from "../utils";
+import { MapWithDefault } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -48,7 +48,6 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    KeyBackupSession,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -73,6 +72,7 @@ import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
+import { createDelegate, PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -81,7 +81,7 @@ interface ISignableObject {
     unsigned?: object;
 }
 
-const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
+// const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -104,7 +104,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly backupManager: RustBackupManager;
     private outgoingRequestsManager: OutgoingRequestsManager;
 
-    private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+    private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
+
+    // private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
 
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
@@ -142,9 +144,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         );
 
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
-        this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+
+        this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
+            createDelegate(this, this.backupManager, this.olmMachine, this.http),
+            logger,
+            2000,
+        );
+
+        this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
+
         this.reemitter.reEmit(this.backupManager, [
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
@@ -156,75 +166,97 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
     }
+    //
+    // /**
+    //  * Starts an attempt to retrieve a session from a key backup, if enough time
+    //  * has elapsed since the last check for this session id.
+    //  *
+    //  * If a backup is found, it is decrypted and imported.
+    //  *
+    //  * @param targetRoomId - ID of the room that the session is used in.
+    //  * @param targetSessionId - ID of the session for which to check backup.
+    //  */
+    // public startQueryKeyBackupRateLimited(targetRoomId: string, targetSessionId: string): void {
+    //     const now = new Date().getTime();
+    //     const lastCheck = this.sessionLastCheckAttemptedTime[targetSessionId];
+    //     if (!lastCheck || now - lastCheck > KEY_BACKUP_CHECK_RATE_LIMIT) {
+    //         this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
+    //         this.queryKeyBackup(targetRoomId, targetSessionId).catch((e) => {
+    //             this.logger.error(`Unhandled error while checking key backup for session ${targetSessionId}`, e);
+    //         });
+    //     } else {
+    //         const lastCheckStr = new Date(lastCheck).toISOString();
+    //         this.logger.debug(
+    //             `Not checking key backup for session ${targetSessionId} (last checked at ${lastCheckStr})`,
+    //         );
+    //     }
+    // }
 
-    /**
-     * Starts an attempt to retrieve a session from a key backup, if enough time
-     * has elapsed since the last check for this session id.
-     *
-     * If a backup is found, it is decrypted and imported.
-     *
-     * @param targetRoomId - ID of the room that the session is used in.
-     * @param targetSessionId - ID of the session for which to check backup.
-     */
-    public startQueryKeyBackupRateLimited(targetRoomId: string, targetSessionId: string): void {
-        const now = new Date().getTime();
-        const lastCheck = this.sessionLastCheckAttemptedTime[targetSessionId];
-        if (!lastCheck || now - lastCheck > KEY_BACKUP_CHECK_RATE_LIMIT) {
-            this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
-            this.queryKeyBackup(targetRoomId, targetSessionId).catch((e) => {
-                this.logger.error(`Unhandled error while checking key backup for session ${targetSessionId}`, e);
-            });
-        } else {
-            const lastCheckStr = new Date(lastCheck).toISOString();
-            this.logger.debug(
-                `Not checking key backup for session ${targetSessionId} (last checked at ${lastCheckStr})`,
-            );
-        }
-    }
-
-    /**
-     * Helper for {@link RustCrypto#startQueryKeyBackupRateLimited}.
-     *
-     * Requests the backup and imports it. Doesn't do any rate-limiting.
-     *
-     * @param targetRoomId - ID of the room that the session is used in.
-     * @param targetSessionId - ID of the session for which to check backup.
-     */
-    private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<void> {
-        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-        if (!backupKeys.decryptionKey) {
-            this.logger.debug(`Not checking key backup for session ${targetSessionId} (no decryption key)`);
-            return;
-        }
-
-        this.logger.debug(`Checking key backup for session ${targetSessionId}`);
-
-        const version = backupKeys.backupVersion;
-        const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
-            $roomId: targetRoomId,
-            $sessionId: targetSessionId,
-        });
-
-        let res: KeyBackupSession;
-        try {
-            res = await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
-                prefix: ClientPrefix.V3,
-            });
-        } catch (e) {
-            this.logger.info(`No luck requesting key backup for session ${targetSessionId}: ${e}`);
-            return;
-        }
-
-        if (this.stopped) return;
-
-        const backupDecryptor = new RustBackupDecryptor(backupKeys.decryptionKey);
-        const sessionsToImport: Record<string, KeyBackupSession> = { [targetSessionId]: res };
-        const keys = await backupDecryptor.decryptSessions(sessionsToImport);
-        for (const k of keys) {
-            k.room_id = targetRoomId;
-        }
-        await this.importRoomKeys(keys);
-    }
+    // /**
+    //  * Helper for {@link RustCrypto#startQueryKeyBackupRateLimited}.
+    //  *
+    //  * Requests the backup and imports it. Doesn't do any rate-limiting.
+    //  *
+    //  * @param targetRoomId - ID of the room that the session is used in.
+    //  * @param targetSessionId - ID of the session for which to check backup.
+    //  */
+    // private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<void> {
+    //     const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+    //     if (!backupKeys.decryptionKey) {
+    //         this.logger.debug(`Not checking key backup for session ${targetSessionId} (no decryption key)`);
+    //         return;
+    //     }
+    //
+    //     const activeBackup = await this.backupManager.getActiveBackupVersion();
+    //     if (!activeBackup) {
+    //         this.logger.warn(`No active key backup, or current backup not trusted aborting key backup download`);
+    //         return;
+    //     }
+    //
+    //     if(activeBackup != backupKeys.backupVersion) {
+    //         this.logger.warn(`Cached backup version ${backupKeys.backupVersion} does not match active backup version ${activeBackup}`);
+    //         // The cached decryption key is out of sync, the user need to resync with 4S or request missing secrets to other sessions.
+    //         return;
+    //     }
+    //
+    //     this.logger.debug(`Checking key backup for session ${targetSessionId}`);
+    //
+    //     const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
+    //         $roomId: targetRoomId,
+    //         $sessionId: targetSessionId,
+    //     });
+    //
+    //     let res: KeyBackupSession;
+    //     try {
+    //         res = await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { activeBackup }, undefined, {
+    //             prefix: ClientPrefix.V3,
+    //         });
+    //     } catch (e) {
+    //         this.logger.info(`No luck requesting key backup for session ${targetSessionId}: ${e}`);
+    //         if (e instanceof MatrixError) {
+    //             const errCode = e.data.errcode;
+    //             if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+    //                 // The active backup version is out of sync, force a check to sync with server.
+    //                 try {
+    //                     this.backupManager.checkKeyBackupAndEnable(true);
+    //                 } catch(e) {
+    //                     this.logger.error(`Error while checking key backup: ${e}`);
+    //                 }
+    //             }
+    //         }
+    //         return;
+    //     }
+    //
+    //     if (this.stopped) return;
+    //
+    //     const backupDecryptor = new RustBackupDecryptor(backupKeys.decryptionKey);
+    //     const sessionsToImport: Record<string, KeyBackupSession> = { [targetSessionId]: res };
+    //     const keys = await backupDecryptor.decryptSessions(sessionsToImport);
+    //     for (const k of keys) {
+    //         k.room_id = targetRoomId;
+    //     }
+    //     await this.importRoomKeys(keys);
+    // }
 
     /**
      * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
@@ -1556,7 +1588,7 @@ class EventDecryptor {
     public constructor(
         private readonly logger: Logger,
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        private readonly crypto: RustCrypto,
+        private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader,
     ) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
@@ -1597,7 +1629,7 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        this.crypto.startQueryKeyBackupRateLimited(
+                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
                             event.getRoomId()!,
                             event.getWireContent().session_id!,
                         );
@@ -1611,7 +1643,7 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        this.crypto.startQueryKeyBackupRateLimited(
+                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
                             event.getRoomId()!,
                             event.getWireContent().session_id!,
                         );
