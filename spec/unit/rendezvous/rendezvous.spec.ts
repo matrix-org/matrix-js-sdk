@@ -136,6 +136,9 @@ function makeMockClient(opts: {
                     setDeviceVerified(userId: string, deviceId: string, verified: boolean): Promise<void> {
                         return Promise.resolve();
                     },
+                    crossSignDevice(deviceId: string): Promise<void> {
+                        return Promise.resolve();
+                    },
                 };
             },
         } as unknown as MatrixClient,
