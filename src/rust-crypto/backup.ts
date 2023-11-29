@@ -156,8 +156,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             );
 
             await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
-            // Emit an event that we have a new backup decryption key, so that client can automatically
-            // start importing all keys from the backup.
+            // Emit an event that we have a new backup decryption key, so that the sdk can start
+            // importing keys from backup if needed.
             this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, backupCheck.backupInfo.version);
             return true;
         } catch (e) {
