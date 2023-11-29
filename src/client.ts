@@ -951,7 +951,7 @@ type CryptoEvents =
     | CryptoEvent.KeyBackupStatus
     | CryptoEvent.KeyBackupFailed
     | CryptoEvent.KeyBackupSessionsRemaining
-    | CryptoEvent.KeyBackupPrivateKeyCached
+    | CryptoEvent.KeyBackupDecryptionKeyCached
     | CryptoEvent.RoomKeyRequest
     | CryptoEvent.RoomKeyRequestCancellation
     | CryptoEvent.VerificationRequest
@@ -2360,7 +2360,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
-            CryptoEvent.KeyBackupPrivateKeyCached,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
         ]);
     }
 

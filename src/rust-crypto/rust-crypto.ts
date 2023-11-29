@@ -149,7 +149,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
-            CryptoEvent.KeyBackupPrivateKeyCached,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
@@ -1113,6 +1113,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
+        this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
     }
 
     /**
@@ -1829,8 +1830,5 @@ type RustCryptoEventMap = {
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
 
-    /**
-     * Fires when the backup decryption key is received via secret sharing.
-     */
-    [CryptoEvent.KeyBackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 } & RustBackupCryptoEventMap;
