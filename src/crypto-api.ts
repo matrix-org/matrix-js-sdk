@@ -47,6 +47,13 @@ export interface CryptoApi {
     getVersion(): string;
 
     /**
+     * Get the public part of the device keys for the current device.
+     *
+     * @returns The public device keys.
+     */
+    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
@@ -762,6 +769,14 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+}
+
+/** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
+export interface OwnDeviceKeys {
+    /** Public part of the Ed25519 fingerprint key for the current device, base64 encoded. */
+    ed25519: string;
+    /** Public part of the Curve25519 identity key for the current device, base64 encoded. */
+    curve25519: string;
 }
 
 export * from "./crypto-api/verification";
