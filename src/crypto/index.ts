@@ -1970,7 +1970,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns base64-encoded ed25519 key.
      *
-     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
