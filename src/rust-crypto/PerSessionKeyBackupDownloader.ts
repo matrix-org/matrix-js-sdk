@@ -167,10 +167,17 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         });
 
         emitter.on(CryptoEvent.KeyBackupFailed, (ev) => {
-            this.logger.info(`Key backup status changed, check configuration`);
+            this.logger.info(`Key backup upload failed, check configuration`);
             // we want to check configuration
             this.onBackupStatusChanged();
         });
+
+        /// TODO When the PR that adds signaling when the decryption is merged, we can use it to trigger a refresh
+        // emitter.on(CryptoEvent.KeyBackupPrivateKeyCached, (ev) => {
+        //     this.logger.info(`Key backup decryption key is known, check configuration`);
+        //     // we want to check configuration
+        //     this.onBackupStatusChanged();
+        // });
     }
 
     public stop(): void {
@@ -180,6 +187,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
     private onBackupStatusChanged(): void {
         // we want to check configuration
         this.hasConfigurationProblem = false;
+        this.configuration = null;
         this.getOrCreateBackupDecryptor(true).then((decryptor) => {
             if (decryptor) {
                 this.downloadKeysLoop();
