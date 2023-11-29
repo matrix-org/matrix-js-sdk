@@ -235,7 +235,7 @@ export enum CryptoEvent {
     /**
      * Fires when a new valid backup decryption key is in cache.
      * This will happen when a secret is received from another session, from secret storage,
-     * or when a new backup is created from this session
+     * or when a new backup is created from this session.
      *
      * The payload is the version of the backup for which we have the key for.
      *

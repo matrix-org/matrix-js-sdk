@@ -1259,13 +1259,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            const keyBackupIsCached = new Promise<void>((resolve) => {
-                aliceClient.on(CryptoEvent.KeyBackupDecryptionKeyCached, (version) => {
-                    if (version === matchingBackupInfo.version) {
-                        resolve();
-                    }
-                });
-            });
+            const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
 

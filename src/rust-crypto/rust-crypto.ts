@@ -1130,11 +1130,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("storeSessionBackupPrivateKey: version is required");
         }
 
-        await this.olmMachine.saveBackupDecryptionKey(
+        await this.backupManager.saveBackupDecryptionKey(
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
-        this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
     }
 
     /**
