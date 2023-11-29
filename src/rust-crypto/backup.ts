@@ -260,7 +260,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         this.backupKeysLoopRunning = true;
 
-        logger.log(`Starting loop for ${this.activeBackupVersion}.`);
+        logger.log(`Starting backup loop. Active backup version ${this.activeBackupVersion}`);
 
         // wait between 0 and `maxDelay` seconds, to avoid backup
         // requests from different clients hitting the server all at
@@ -272,11 +272,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             let numFailures = 0; // number of consecutive network failures for exponential backoff
 
             while (!this.stopped) {
+                logger.log(`Checking for keys requiring backup`);
+
                 // Get a batch of room keys to upload
                 const request: RustSdkCryptoJs.KeysBackupRequest | null = await this.olmMachine.backupRoomKeys();
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
-                    logger.log(`Ending loop for ${this.activeBackupVersion}.`);
+                    logger.log(`Ending backup loop`);
                     return;
                 }
 
@@ -286,11 +288,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
                     if (this.stopped) break;
                     const keyCount: RustSdkCryptoJs.RoomKeyCounts = await this.olmMachine.roomKeyCounts();
+                    logger.log(
+                        `Successfully backed up keys: ${keyCount.backedUp} of ${keyCount.total} keys now backed up`,
+                    );
                     const remaining = keyCount.total - keyCount.backedUp;
                     this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
                 } catch (err) {
                     numFailures++;
-                    logger.error("Error processing backup request for rust crypto-sdk", err);
+                    logger.error("Error making backup request", err);
                     if (err instanceof MatrixError) {
                         const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
