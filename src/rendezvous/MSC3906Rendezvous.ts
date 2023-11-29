@@ -203,7 +203,7 @@ export class MSC3906Rendezvous {
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
         await crypto.setDeviceVerified(userId, this.newDeviceId, true);
-        // TODO: cross sign the device
+        await crypto.crossSignDevice(this.newDeviceId);
 
         const masterPublicKey = (await crypto.getCrossSigningKeyId(CrossSigningKey.Master)) ?? undefined;
 
