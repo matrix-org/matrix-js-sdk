@@ -14,10 +14,11 @@
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
         "gendoc": "typedoc",
-        "lint": "yarn lint:types && yarn lint:js",
+        "lint": "yarn lint:types && yarn lint:js && yarn lint:workflows",
         "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
         "lint:js-fix": "prettier --loglevel=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
+        "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
         "test": "jest",
         "test:watch": "jest --watch",
         "coverage": "yarn test --coverage"
@@ -51,7 +52,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^3.0.1",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^3.1.0",
         "another-json": "^0.2.0",
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
@@ -66,6 +67,8 @@
         "uuid": "9"
     },
     "devDependencies": {
+        "@action-validator/cli": "^0.5.3",
+        "@action-validator/core": "^0.5.3",
         "@babel/cli": "^7.12.10",
         "@babel/core": "^7.12.10",
         "@babel/eslint-parser": "^7.12.10",

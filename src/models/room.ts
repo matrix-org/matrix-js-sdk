@@ -66,6 +66,8 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
+import { RoomReceipts } from "./room-receipts";
+import { compareEventOrdering } from "./compare-event-ordering";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -431,6 +433,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @experimental
      */
     private visibilityEvents = new Map<string, MatrixEvent[]>();
+
+    /**
+     * The latest receipts (synthetic and real) for each user in each thread
+     * (and unthreaded).
+     */
+    private roomReceipts = new RoomReceipts(this);
 
     /**
      * Construct a new Room.
@@ -2935,6 +2943,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public addReceipt(event: MatrixEvent, synthetic = false): void {
         const content = event.getContent<ReceiptContent>();
+
+        this.roomReceipts.add(content, synthetic);
+
+        // TODO: delete the following code when it has been replaced by RoomReceipts
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
@@ -2996,6 +3008,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
             });
         });
+        // End of code to delete when replaced by RoomReceipts
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
@@ -3583,6 +3596,19 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Determines if the given user has read a particular event ID with the known
+     * history of the room. This is not a definitive check as it relies only on
+     * what is available to the room at the time of execution.
+     *
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns true if the user has read the event, false otherwise.
+     */
+    public hasUserReadEvent(userId: string, eventId: string): boolean {
+        return this.roomReceipts.hasUserReadEvent(userId, eventId);
+    }
+
+    /**
      * Returns the most recent unthreaded receipt for a given user
      * @param userId - the MxID of the User
      * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
@@ -3614,6 +3640,30 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const thread of unreadThreads) {
             thread.fixupNotifications(userId);
         }
+    }
+
+    /**
+     * Determine the order of two events in this room.
+     *
+     * In principle this should use the same order as the server, but in practice
+     * this is difficult for events that were not received over the Sync API. See
+     * MSC4033 for details.
+     *
+     * This implementation leans on the order of events within their timelines, and
+     * falls back to comparing event timestamps when they are in different
+     * timelines.
+     *
+     * See https://github.com/matrix-org/matrix-js-sdk/issues/3325 for where we are
+     * tracking the work to fix this.
+     *
+     * @param leftEventId - the id of the first event
+     * @param rightEventId - the id of the second event
+
+     * @returns -1 if left \< right, 1 if left \> right, 0 if left == right, null if
+     *          we can't tell (because we can't find the events).
+     */
+    public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
+        return compareEventOrdering(this, leftEventId, rightEventId);
     }
 }
 
