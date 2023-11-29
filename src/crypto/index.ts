@@ -231,6 +231,14 @@ export enum CryptoEvent {
     KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    /**
+     * Fires when a new valid backup decryption key is in cache.
+     *
+     * The payload is the `KeyBackupInfo`.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupPrivateKeyCached = "crypto.KeyBackupPrivateKeyCached",
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -296,6 +304,7 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+    [CryptoEvent.KeyBackupPrivateKeyCached]: (info: KeyBackupInfo) => void;
     [CryptoEvent.KeySignatureUploadFailure]: (
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
