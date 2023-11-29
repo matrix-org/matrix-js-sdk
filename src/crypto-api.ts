@@ -49,7 +49,7 @@ export interface CryptoApi {
     /**
      * Get the public part of the device keys for the current device.
      *
-     * @returns The device keys as a `OwnDeviceKeys` object
+     * @returns The public device keys.
      */
     getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
