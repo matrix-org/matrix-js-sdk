@@ -2394,7 +2394,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns base64-encoded ed25519 key. Null if crypto is
      *    disabled.
      *
-     * @deprecated Use {@link CryptoApi.getOwnDeviceKeys}
+     * @deprecated Prefer {@link CryptoApi.getOwnDeviceKeys}
      */
     public getDeviceEd25519Key(): string | null {
         return this.crypto?.getDeviceEd25519Key() ?? null;
