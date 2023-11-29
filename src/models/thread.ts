@@ -143,6 +143,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
 
+        // each Event in the thread adds a reemitter, so we could hit the listener limit.
+        this.setMaxListeners(1000);
+
         if (!opts?.room) {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
             // Hope is that we end up with a more obvious stack trace.
@@ -745,6 +748,27 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * @returns ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
+        // TODO: we think the implementation here is not right. Here is a sketch
+        // of the right answer:
+        //
+        // for event in timeline.events.reversed():
+        //     if room.hasUserReadEvent(event):
+        //         return event
+        // return null
+        //
+        // If this is too slow, we might be able to improve it by trying walking
+        // forward from the threaded receipt in this thread. We could alternate
+        // between backwards-from-front and forwards-from-threaded-receipt to
+        // improve our chances of hitting the right answer sooner.
+        //
+        // Either way, it's still fundamentally slow because we have to walk
+        // events.
+        //
+        // We also might just want to limit the time we spend on this by giving
+        // up after, say, 100 events.
+        //
+        // --- andyb
+
         const isCurrentUser = userId === this.client.getUserId();
         const lastReply = this.timeline[this.timeline.length - 1];
         if (isCurrentUser && lastReply) {
@@ -813,7 +837,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
-        return super.hasUserReadEvent(userId, eventId);
+        return this.room.hasUserReadEvent(userId, eventId);
     }
 
     public setUnread(type: NotificationCountType, count: number): void {

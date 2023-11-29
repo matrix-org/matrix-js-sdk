@@ -895,7 +895,7 @@ interface IRoomHierarchy {
 
 export interface TimestampToEventResponse {
     event_id: string;
-    origin_server_ts: string;
+    origin_server_ts: number;
 }
 
 interface IWhoamiResponse {
@@ -1494,6 +1494,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
+
+        // having lots of event listeners is not unusual. 0 means "unlimited".
+        this.setMaxListeners(0);
     }
 
     public set store(newStore: Store) {
@@ -5169,7 +5172,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
-            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
+            room.addLocalEchoReceipt(this.credentials.userId, event, receiptType, unthreaded);
         }
         return promise;
     }
@@ -9917,7 +9920,7 @@ export function threadIdForReceipt(event: MatrixEvent): string {
  * @returns true if this event is considered to be in the main timeline as far
  *               as receipts are concerned.
  */
-function inMainTimelineForReceipt(event: MatrixEvent): boolean {
+export function inMainTimelineForReceipt(event: MatrixEvent): boolean {
     if (!event.threadRootId) {
         // Not in a thread: then it is in the main timeline
         return true;

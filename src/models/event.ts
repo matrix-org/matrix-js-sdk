@@ -404,7 +404,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         });
 
         this.txnId = event.txn_id;
-        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
+        // The localTimestamp is calculated using the age.
+        // Some events lack an `age` property, either because they are EDUs such as typing events,
+        // or due to server-side bugs such as https://github.com/matrix-org/synapse/issues/8429.
+        // The fallback in these cases will be to use the origin_server_ts.
+        // For EDUs, the origin_server_ts also is not defined so we use Date.now().
+        const age = this.getAge();
+        this.localTimestamp = age !== undefined ? Date.now() - age : this.getTs() ?? Date.now();
         this.reEmitter = new TypedReEmitter(this);
     }
 

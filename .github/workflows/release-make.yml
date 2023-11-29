@@ -1,4 +1,4 @@
-name: Release Action
+name: Release Make
 on:
     workflow_call:
         secrets:
@@ -183,9 +183,8 @@ jobs:
 
             - name: Ingest upstream changes
               if: |
-                  inputs.dependencies &&
                   inputs.include-changes &&
-                  contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes)
+                  (!inputs.dependencies || contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes))
               uses: actions/github-script@v7
               env:
                   RELEASE_ID: ${{ steps.release.outputs.id }}

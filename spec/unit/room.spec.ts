@@ -1743,13 +1743,70 @@ describe("Room", function () {
         });
 
         describe("hasUserReadUpTo", function () {
-            it("should acknowledge if an event has been read", function () {
+            it("returns true if there is a receipt for this event (main timeline)", function () {
                 const ts = 13787898424;
+                room.addLiveEvents([eventToAck]);
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
-                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+                room.findEventById = jest.fn().mockReturnValue({ getThread: jest.fn() } as unknown as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
-            it("return false for an unknown event", function () {
+
+            it("returns true if there is a receipt for a later event (main timeline)", async function () {
+                // Given some events exist in the room
+                const events: MatrixEvent[] = [
+                    utils.mkMessage({
+                        room: roomId,
+                        user: userA,
+                        msg: "1111",
+                        event: true,
+                    }),
+                    utils.mkMessage({
+                        room: roomId,
+                        user: userA,
+                        msg: "2222",
+                        event: true,
+                    }),
+                    utils.mkMessage({
+                        room: roomId,
+                        user: userA,
+                        msg: "3333",
+                        event: true,
+                    }),
+                ];
+                await room.addLiveEvents(events);
+
+                // When I add a receipt for the latest one
+                room.addReceipt(mkReceipt(roomId, [mkRecord(events[2].getId()!, "m.read", userB, 102)]));
+
+                // Then the older ones are read too
+                expect(room.hasUserReadEvent(userB, events[0].getId()!)).toEqual(true);
+                expect(room.hasUserReadEvent(userB, events[1].getId()!)).toEqual(true);
+            });
+
+            describe("threads enabled", () => {
+                beforeEach(() => {
+                    jest.spyOn(room.client, "supportsThreads").mockReturnValue(true);
+                });
+
+                afterEach(() => {
+                    jest.restoreAllMocks();
+                });
+
+                it("returns true if there is an unthreaded receipt for a later event in a thread", async () => {
+                    // Given a thread exists in the room
+                    const { thread, events } = mkThread({ room, length: 3 });
+                    thread.initialEventsFetched = true;
+                    await room.addLiveEvents(events);
+
+                    // When I add an unthreaded receipt for the latest thread message
+                    room.addReceipt(mkReceipt(roomId, [mkRecord(events[2].getId()!, "m.read", userB, 102)]));
+
+                    // Then the main timeline message is read
+                    expect(room.hasUserReadEvent(userB, events[0].getId()!)).toEqual(true);
+                });
+            });
+
+            it("returns false for an unknown event", function () {
                 expect(room.hasUserReadEvent(userB, "unknown_event")).toEqual(false);
             });
         });
@@ -3165,7 +3222,6 @@ describe("Room", function () {
                 // When we ask what they have read
                 // Then we say "nothing"
                 expect(room.getEventReadUpTo(userA)).toBeNull();
-                expect(logger.warn).toHaveBeenCalledWith("Ignoring receipt for missing event with id missingEventId");
             });
 
             it("ignores receipts pointing at the wrong thread", () => {
