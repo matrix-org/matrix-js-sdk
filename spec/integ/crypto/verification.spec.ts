@@ -62,6 +62,7 @@ import {
     BOB_TEST_USER_ID,
     CURVE25519_KEY_BACKUP_DATA,
     MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
+    MEGOLM_SESSION_DATA,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
     TEST_DEVICE_ID,
@@ -81,6 +82,7 @@ import {
     ToDeviceEvent,
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
+
 import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
@@ -1259,19 +1261,41 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+            const keyBackupIsCached = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupPrivateKeyCached, () => {
+                    resolve();
+                });
+            });
+
+            const keyBackupStatusEnabled = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            const autoImportFinished = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupAutoImportFinished, (total) => {
+                    if (total > 0) {
+                        resolve();
+                    }
+                });
+            });
+
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+            await keyBackupStatusEnabled;
+            await keyBackupIsCached;
 
             // the backup secret should be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
             expect(cachedKey).toBeTruthy();
             expect(encodeBase64(cachedKey!)).toEqual(BACKUP_DECRYPTION_KEY_BASE64);
+
+            // An auto import should have been triggered
+            await autoImportFinished;
+
         });
 
         newBackendOnly("Should not accept the backup decryption key gossip if private key do not match", async () => {
@@ -1281,14 +1305,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+            const keyBackupStatusUpdate = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    resolve();
+                });
+            });
+
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
 
+            await keyBackupStatusUpdate;
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+            await jest.runAllTimersAsync();
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1305,14 +1332,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const infoCopy = Object.assign({}, matchingBackupInfo);
             delete infoCopy.auth_data.signatures;
 
+            const keyBackupStatusUpdate = new Promise<boolean>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    resolve(enabled);
+                });
+            });
+
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+            const backupStatus = await keyBackupStatusUpdate;
+            expect(backupStatus).toBe(false);
+            await jest.runAllTimersAsync();
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1326,18 +1356,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+
+            const keyBackupStatusUpdate = new Promise<boolean>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    resolve(enabled);
+                });
+            });
+
+
             await sendBackupGossipAndExpectVersion(
                 requestId!,
                 BACKUP_DECRYPTION_KEY_BASE64,
                 unknownAlgorithmBackupInfo,
             );
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+
+            await keyBackupStatusUpdate;
+            await jest.runAllTimersAsync();
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1351,14 +1386,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+            const keyBackupStatusUpdate = new Promise<boolean>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    resolve(enabled);
+                });
+            });
+
             await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+            const backupStatus = await keyBackupStatusUpdate;
+            expect(backupStatus).toBe(true);
+            jest.runAllTimersAsync();
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1400,7 +1438,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 );
             });
 
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
+            const fullBackup = {
+                rooms: {
+                    "!ROOM:ID": {
+                        sessions: {
+                            [MEGOLM_SESSION_DATA.session_id]: CURVE25519_KEY_BACKUP_DATA,
+                        },
+                    },
+                },
+            };
+
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
 
             // The dummy device sends the secret
             returnToDeviceMessageFromSync(toDeviceEvent);
@@ -1539,6 +1588,7 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
             const content = Object.values(messages)[0] as any;
+
             if (content.action == "request") {
                 const name = content.name;
                 const requestId = content.request_id;

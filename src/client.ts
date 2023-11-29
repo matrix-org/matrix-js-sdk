@@ -951,6 +951,9 @@ type CryptoEvents =
     | CryptoEvent.KeyBackupStatus
     | CryptoEvent.KeyBackupFailed
     | CryptoEvent.KeyBackupSessionsRemaining
+    | CryptoEvent.KeyBackupPrivateKeyCached
+    | CryptoEvent.KeyBackupAutoImportStarted
+    | CryptoEvent.KeyBackupAutoImportFinished
     | CryptoEvent.RoomKeyRequest
     | CryptoEvent.RoomKeyRequestCancellation
     | CryptoEvent.VerificationRequest
@@ -2271,6 +2274,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.DeviceVerificationChanged,
             CryptoEvent.UserTrustStatusChanged,
             CryptoEvent.KeysChanged,
+            CryptoEvent.KeyBackupPrivateKeyCached,
         ]);
 
         this.logger.debug("Crypto: initialising crypto object...");
@@ -2352,6 +2356,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             rustCrypto.onLiveEventFromSync(event);
         });
 
+        rustCrypto.on(CryptoEvent.KeyBackupPrivateKeyCached, (info) => {
+            // do not await this, as it can be long.
+            // XXX We need new APIs to do this properly. To avoid having several restore going on at the same time,
+            // there should be proper progress reporting, and a way to cancel a restore.
+            this.emit(CryptoEvent.KeyBackupAutoImportStarted);
+            this.restoreKeyBackupWithCache(undefined, undefined, info).then((result) => {
+                this.emit(CryptoEvent.KeyBackupAutoImportFinished, result.imported);
+                logger.info("Backup restored.");
+            });
+        });
+
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [
             CryptoEvent.VerificationRequestReceived,
@@ -2359,6 +2374,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupPrivateKeyCached,
         ]);
     }
 
