@@ -2326,6 +2326,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        await this.setDeviceVerified(this.userId, deviceId, true);
+    }
+
+    /**
      * Update the blocked/verified state of the given device
      *
      * @param userId - owner of the device

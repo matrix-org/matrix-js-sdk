@@ -574,6 +574,27 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(this.userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+        if (!device) {
+            throw new Error(`Unknown device ${deviceId}`);
+        }
+        try {
+            const outgoingRequest: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
      * Implementation of {@link CryptoApi#getDeviceVerificationStatus}.
      */
     public async getDeviceVerificationStatus(

@@ -162,7 +162,7 @@ export interface CryptoApi {
     /**
      * Mark the given device as locally verified.
      *
-     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * Marking a device as locally verified has much the same effect as completing the verification dance, or receiving
      * a cross-signing signature for it.
      *
      * @param userId - owner of the device
@@ -174,6 +174,21 @@ export interface CryptoApi {
      * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
+
+    /**
+     * Cross-sign one of our own devices.
+     *
+     * This will create a signature for the device using our self-signing key, and publish that signature.
+     * Cross-signing a device indicates, to our other devices and to other users, that we have verified that it really
+     * belongs to us.
+     *
+     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}.
+     *
+     * *Note*: Do not call this unless you have verified, somehow, that the device is genuine!
+     *
+     * @param deviceId - ID of the device to be signed.
+     */
+    crossSignDevice(deviceId: string): Promise<void>;
 
     /**
      * Checks whether cross signing:
