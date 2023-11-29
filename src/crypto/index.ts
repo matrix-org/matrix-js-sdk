@@ -98,6 +98,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
+    OwnDeviceKeys,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -1987,6 +1988,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Ed25519 key for this device
      *
      * @returns base64-encoded ed25519 key.
+     *
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1996,9 +1999,27 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Curve25519 key for this device
      *
      * @returns base64-encoded curve25519 key.
+     *
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        if (!this.olmDevice.deviceCurve25519Key) {
+            throw new Error("Curve25519 key not yet created");
+        }
+        if (!this.olmDevice.deviceEd25519Key) {
+            throw new Error("Ed25519 key not yet created");
+        }
+        return {
+            ed25519: this.olmDevice.deviceEd25519Key,
+            curve25519: this.olmDevice.deviceCurve25519Key,
+        };
     }
 
     /**

@@ -49,6 +49,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     KeyBackupSession,
+    OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -370,6 +371,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public getVersion(): string {
         const versions = RustSdkCryptoJs.getVersions();
         return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+        // could be undefined if there is no such algorithm for that device.
+        if (device.curve25519Key && device.ed25519Key) {
+            return {
+                ed25519: device.ed25519Key.toBase64(),
+                curve25519: device.curve25519Key.toBase64(),
+            };
+        }
+        throw new Error("Device keys not found");
     }
 
     public prepareToEncrypt(room: Room): void {
