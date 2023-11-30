@@ -525,7 +525,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // To fix this, we explicitly call `.free` on each of the objects, which tells the rust code to drop the
         // allocated memory and decrement the refcounts for the crypto store.
 
-        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        // Wait for up to a second for any in-flight device list requests to complete.
+        // The reason for this isn't so much to avoid races (some level of raciness is
+        // inevitable for this method) but to make testing easier.
+        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId, 1);
         try {
             const deviceArray: RustSdkCryptoJs.Device[] = userDevices.devices();
             try {
