@@ -42,6 +42,7 @@ import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event";
 import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
+import { RoomKeySource } from "../../crypto-api";
 import { MatrixError } from "../../http-api";
 import { immediate, MapWithDefault } from "../../utils";
 
@@ -2046,7 +2047,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 extraSessionData,
             )
             .then(() => {
-                if (source !== "backup") {
+                if (source !== RoomKeySource.Backup) {
                     // don't wait for it to complete
                     this.crypto.backupManager.backupGroupSession(session.sender_key, session.session_id).catch((e) => {
                         // This throws if the upload failed, but this is fine

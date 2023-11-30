@@ -570,6 +570,20 @@ export interface ImportRoomKeyProgressData {
 }
 
 /**
+ * Where a room key came from
+ */
+export enum RoomKeySource {
+    /** from key backup */
+    Backup = "backup",
+    /** from a key export */
+    Export = "export",
+    /** via a key forward */
+    Forward = "forward",
+    /** directly from the sender */
+    Direct = "direct",
+}
+
+/**
  * Options object for {@link CryptoApi#importRoomKeys}.
  */
 export interface ImportRoomKeysOpts {
@@ -577,7 +591,8 @@ export interface ImportRoomKeysOpts {
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
     // TODO, the rust SDK will always such imported keys as untrusted
     untrusted?: boolean;
-    source?: String; // TODO: Enum (backup, file, ??)
+    /** Where the room key came from */
+    source?: RoomKeySource;
 }
 
 /**

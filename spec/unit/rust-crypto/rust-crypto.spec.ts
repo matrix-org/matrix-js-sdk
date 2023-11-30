@@ -45,6 +45,7 @@ import {
     EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
+    RoomKeySource,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
@@ -930,6 +931,51 @@ describe("RustCrypto", () => {
             );
             await rustCrypto.onUserIdentityUpdated(new RustSdkCryptoJs.UserId(testData.TEST_USER_ID));
             expect(await keyBackupStatusPromise).toBe(true);
+        });
+
+        it("does not back up keys that came from backup", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+
+            const olmMachine = rustCrypto.getOlmMachineOrThrow();
+
+            await olmMachine.enableBackupV1(
+                testData.SIGNED_BACKUP_DATA.auth_data.public_key,
+                testData.SIGNED_BACKUP_DATA.version,
+            );
+
+            // we import two keys: one "from backup", and one "from export"
+            const [backedUpRoomKey, exportedRoomKey, ..._] = testData.MEGOLM_SESSION_DATA_ARRAY;
+            await rustCrypto.importRoomKeys([backedUpRoomKey], {
+                source: RoomKeySource.Backup,
+            });
+            await rustCrypto.importRoomKeys([exportedRoomKey]);
+
+            // we ask for the keys that should be backed up
+            const roomKeysRequest = await olmMachine.backupRoomKeys();
+            expect(roomKeysRequest).toBeTruthy();
+            const roomKeys = JSON.parse(roomKeysRequest!.body);
+
+            // we expect that the key "from export" is present
+            expect(roomKeys).toMatchObject({
+                "rooms": {
+                    [exportedRoomKey.room_id]: {
+                        sessions: {
+                            [exportedRoomKey.session_id]: {}
+                        }
+                    }
+                }
+            });
+
+            // we expect that the key "from backup" is not present
+            expect(roomKeys).not.toMatchObject({
+                "rooms": {
+                    [backedUpRoomKey.room_id]: {
+                        sessions: {
+                            [backedUpRoomKey.session_id]: {}
+                        }
+                    }
+                }
+            });
         });
     });
 });
