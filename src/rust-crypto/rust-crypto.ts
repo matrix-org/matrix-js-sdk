@@ -150,6 +150,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
@@ -1148,7 +1149,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("storeSessionBackupPrivateKey: version is required");
         }
 
-        await this.olmMachine.saveBackupDecryptionKey(
+        await this.backupManager.saveBackupDecryptionKey(
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
@@ -1867,4 +1868,6 @@ type RustCryptoEventMap = {
      * Fires when the trust status of a user changes.
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
+
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 } & RustBackupCryptoEventMap;
