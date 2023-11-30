@@ -397,6 +397,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(aliceClient.getCrypto()).toHaveProperty("globalBlacklistUnverifiedDevices");
     });
 
+    it("CryptoAPI.getOwnedDeviceKeys returns the correct values", async () => {
+        const homeserverUrl = aliceClient.getHomeserverUrl();
+
+        keyResponder = new E2EKeyResponder(homeserverUrl);
+        await startClientAndAwaitFirstSync();
+        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
+
+        const deviceKeys = await aliceClient.getCrypto()!.getOwnDeviceKeys();
+
+        expect(deviceKeys.curve25519).toEqual(keyReceiver.getDeviceKey());
+        expect(deviceKeys.ed25519).toEqual(keyReceiver.getSigningKey());
+    });
+
     it("Alice receives a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
