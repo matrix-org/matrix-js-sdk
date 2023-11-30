@@ -391,7 +391,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
-        const callback = (progress: BigInt, total: BigInt) => {
+        const callback = (progress: BigInt, total: BigInt): void => {
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
                 successes: Number(progress),
@@ -403,11 +403,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (opts?.source === RoomKeySource.Backup) {
             const keysByRoom: Map<RustSdkCryptoJs.RoomId, Map<string, IMegolmSessionData>> = new Map();
             for (const key of keys) {
-                let room_id = new RustSdkCryptoJs.RoomId(key.room_id);
-                if (!keysByRoom.has(room_id)) {
-                    keysByRoom.set(room_id, new Map());
+                const roomId = new RustSdkCryptoJs.RoomId(key.room_id);
+                if (!keysByRoom.has(roomId)) {
+                    keysByRoom.set(roomId, new Map());
                 }
-                keysByRoom.get(room_id)!.set(key.session_id, key);
+                keysByRoom.get(roomId)!.set(key.session_id, key);
             }
             await this.olmMachine.importBackedUpRoomKeys(keysByRoom, callback);
         } else {
