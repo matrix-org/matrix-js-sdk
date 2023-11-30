@@ -31,8 +31,10 @@ import {
     SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64,
     SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
+    SIGNED_TEST_DEVICE_DATA,
     USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
 } from "../../test-utils/test-data";
+import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 afterEach(() => {
@@ -96,6 +98,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
         /** an object which intercepts `/keys/upload` requests on the test homeserver */
         new E2EKeyReceiver(homeserverUrl);
+
+        // Silence warnings from the backup manager
+        fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
+            status: 404,
+            body: { errcode: "M_NOT_FOUND" },
+        });
 
         await initCrypto(aliceClient);
     });
@@ -337,6 +345,50 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             const userSigningKeyId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.UserSigning);
             expect(userSigningKeyId).toBe(getPubKey(crossSigningKeys.user_signing_key));
+        });
+    });
+
+    describe("crossSignDevice", () => {
+        beforeEach(async () => {
+            jest.useFakeTimers();
+
+            // make sure that there is another device which we can sign
+            e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
+
+            // Complete initialsync, to get the outgoing requests going
+            mockInitialApiRequests(aliceClient.getHomeserverUrl());
+            syncResponder.sendOrQueueSyncResponse({ next_batch: 1 });
+            await aliceClient.startClient();
+            await syncPromise(aliceClient);
+
+            // Wait for legacy crypto to find the device
+            await jest.advanceTimersByTimeAsync(10);
+
+            const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
+            expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();
+        });
+
+        afterEach(async () => {
+            jest.useRealTimers();
+        });
+
+        it("fails for an unknown device", async () => {
+            await expect(aliceClient.getCrypto()!.crossSignDevice("unknown")).rejects.toThrow("Unknown device");
+        });
+
+        it("cross-signs the device", async () => {
+            mockSetupCrossSigningRequests();
+            await aliceClient.getCrypto()!.bootstrapCrossSigning({});
+
+            fetchMock.mockClear();
+            await aliceClient.getCrypto()!.crossSignDevice(testData.TEST_DEVICE_ID);
+
+            // check that a sig for the device was uploaded
+            const calls = fetchMock.calls("upload-sigs");
+            expect(calls.length).toEqual(1);
+            const body = JSON.parse(calls[0][1]!.body as string);
+            const deviceSig = body[aliceClient.getSafeUserId()][testData.TEST_DEVICE_ID];
+            expect(deviceSig).toHaveProperty("signatures");
         });
     });
 });

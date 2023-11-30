@@ -49,6 +49,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     KeyBackupSession,
+    OwnDeviceKeys,
     RoomKeySource,
     UserVerificationStatus,
     VerificationRequest,
@@ -150,6 +151,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
@@ -372,6 +374,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+        // could be undefined if there is no such algorithm for that device.
+        if (device.curve25519Key && device.ed25519Key) {
+            return {
+                ed25519: device.ed25519Key.toBase64(),
+                curve25519: device.curve25519Key.toBase64(),
+            };
+        }
+        throw new Error("Device keys not found");
+    }
+
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 
@@ -581,6 +601,27 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await device.setLocalTrust(
                 verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset,
             );
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(this.userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+        if (!device) {
+            throw new Error(`Unknown device ${deviceId}`);
+        }
+        try {
+            const outgoingRequest: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
         } finally {
             device.free();
         }
@@ -1122,7 +1163,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("storeSessionBackupPrivateKey: version is required");
         }
 
-        await this.olmMachine.saveBackupDecryptionKey(
+        await this.backupManager.saveBackupDecryptionKey(
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
@@ -1841,4 +1882,6 @@ type RustCryptoEventMap = {
      * Fires when the trust status of a user changes.
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
+
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 } & RustBackupCryptoEventMap;

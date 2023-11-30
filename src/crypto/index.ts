@@ -98,6 +98,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
+    OwnDeviceKeys,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -231,6 +232,18 @@ export enum CryptoEvent {
     KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+
+    /**
+     * Fires when a new valid backup decryption key is in cache.
+     * This will happen when a secret is received from another session, from secret storage,
+     * or when a new backup is created from this session.
+     *
+     * The payload is the version of the backup for which we have the key for.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
+
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -296,6 +309,13 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
+
+    /**
+     * Fires when the backup decryption key is received and cached.
+     *
+     * @param version - The version of the backup for which we have the key for.
+     */
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
     [CryptoEvent.KeySignatureUploadFailure]: (
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
@@ -1968,6 +1988,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Ed25519 key for this device
      *
      * @returns base64-encoded ed25519 key.
+     *
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1977,9 +1999,27 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Curve25519 key for this device
      *
      * @returns base64-encoded curve25519 key.
+     *
+     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        if (!this.olmDevice.deviceCurve25519Key) {
+            throw new Error("Curve25519 key not yet created");
+        }
+        if (!this.olmDevice.deviceEd25519Key) {
+            throw new Error("Ed25519 key not yet created");
+        }
+        return {
+            ed25519: this.olmDevice.deviceEd25519Key,
+            curve25519: this.olmDevice.deviceCurve25519Key,
+        };
     }
 
     /**
@@ -2304,6 +2344,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         await this.setDeviceVerification(userId, deviceId, verified);
+    }
+
+    /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        await this.setDeviceVerified(this.userId, deviceId, true);
     }
 
     /**
