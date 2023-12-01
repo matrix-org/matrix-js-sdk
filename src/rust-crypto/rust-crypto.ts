@@ -769,6 +769,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }
 
             // Create a new storage key and add it to secret storage
+            this.logger.info("bootstrapSecretStorage: creating new secret storage key");
             const recoveryKey = await createSecretStorageKey();
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
@@ -783,6 +784,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             hasPrivateKeys &&
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
+            this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
+
             const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
                 await this.olmMachine.exportCrossSigningKeys();
 
