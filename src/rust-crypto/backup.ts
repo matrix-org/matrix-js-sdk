@@ -154,14 +154,23 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-
-            await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
         }
 
         return false;
+    }
+
+    public async saveBackupDecryptionKey(
+        backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
+        version: string,
+    ): Promise<void> {
+        await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, version);
+        // Emit an event that we have a new backup decryption key, so that the sdk can start
+        // importing keys from backup if needed.
+        this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
     }
 
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
@@ -393,7 +402,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             },
         );
 
-        this.olmMachine.saveBackupDecryptionKey(randomKey, res.version);
+        await this.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
             version: res.version,
@@ -503,10 +512,12 @@ export class RustBackupDecryptor implements BackupDecryptor {
 export type RustBackupCryptoEvents =
     | CryptoEvent.KeyBackupStatus
     | CryptoEvent.KeyBackupSessionsRemaining
-    | CryptoEvent.KeyBackupFailed;
+    | CryptoEvent.KeyBackupFailed
+    | CryptoEvent.KeyBackupDecryptionKeyCached;
 
 export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
     [CryptoEvent.KeyBackupFailed]: (errCode: string) => void;
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 };
