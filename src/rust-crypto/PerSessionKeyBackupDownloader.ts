@@ -195,46 +195,46 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
     /** We remember when a session was requested and not found in backup to avoid query again too soon. */
     private sessionLastCheckAttemptedTime: Record<string, number> = {};
 
+    private readonly configurationChangeHandler = () => {
+        this.onBackupStatusChanged();
+    };
+
+    private readonly logger: Logger;
+
     public constructor(
         private readonly delegate: OnDemandBackupDelegate,
-        private readonly logger: Logger,
+        logger: Logger,
         private readonly maxTimeBetweenRetry: number,
     ) {
         super();
 
+        this.logger = logger.getChild("[PerSessionKeyBackupDownloader]");
         const emitter = this.delegate.getCryptoEventEmitter();
 
-        emitter.on(CryptoEvent.KeyBackupStatus, (ev) => {
-            this.logger.info(`Key backup status changed, check configuration`);
-            // we want to check configuration
-            this.onBackupStatusChanged();
-        });
-
-        emitter.on(CryptoEvent.KeyBackupFailed, (ev) => {
-            this.logger.info(`Key backup upload failed, check configuration`);
-            // we want to check configuration
-            this.onBackupStatusChanged();
-        });
-
-        /// TODO When the PR that adds signaling when the decryption is merged, we can use it to trigger a refresh
-        // emitter.on(CryptoEvent.KeyBackupPrivateKeyCached, (ev) => {
-        //     this.logger.info(`Key backup decryption key is known, check configuration`);
-        //     // we want to check configuration
-        //     this.onBackupStatusChanged();
-        // });
+        emitter.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        emitter.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        emitter.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     public stop(): void {
         this.stopped = true;
+        this.delegate.getCryptoEventEmitter().off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        this.delegate.getCryptoEventEmitter().off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        this.delegate
+            .getCryptoEventEmitter()
+            .off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     private onBackupStatusChanged(): void {
+        this.logger.info(`Key backup status change => check configuration`);
         // we want to check configuration
         this.hasConfigurationProblem = false;
         this.configuration = null;
         this.getOrCreateBackupDecryptor(true).then((decryptor) => {
             if (decryptor) {
                 this.downloadKeysLoop();
+            } else {
+                this.emit(KeyDownloaderEvent.QueryKeyError, KeyDownloadError.CONFIGURATION_ERROR);
             }
         });
     }
@@ -459,6 +459,8 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         };
     }
 
+    private currentBackupVersionCheck: Promise<Configuration | null> | null = null;
+
     private async getOrCreateBackupDecryptor(forceCheck: boolean): Promise<Configuration | null> {
         if (this.configuration) {
             return this.configuration;
@@ -468,7 +470,31 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
             return null;
         }
 
-        const currentServerVersion = await this.delegate.requestKeyBackupVersion();
+        // This method can be called rapidly by several emitted CryptoEvent, so we need to make sure that we don't
+        // query the server several times.
+        if (this.currentBackupVersionCheck != null) {
+            this.logger.debug(`Backup: already checking server version, use current promise`);
+            return await this.currentBackupVersionCheck;
+        }
+
+        this.currentBackupVersionCheck = this.internalCheckFromServer();
+        try {
+            return await this.currentBackupVersionCheck;
+        } finally {
+            this.currentBackupVersionCheck = null;
+        }
+    }
+
+    private async internalCheckFromServer(): Promise<Configuration | null> {
+        let currentServerVersion = null;
+        try {
+            currentServerVersion = await this.delegate.requestKeyBackupVersion();
+        } catch (e) {
+            this.logger.debug(`Backup: error while checking server version: ${e}`);
+            this.hasConfigurationProblem = true;
+            return null;
+        }
+        this.logger.debug(`Got current version from server:${currentServerVersion?.version}`);
 
         if (currentServerVersion?.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
             this.logger.info(`getBackupDecryptor Unsupported algorithm ${currentServerVersion?.algorithm}`);
@@ -502,7 +528,9 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         }
 
         if (activeVersion != backupKeys.backupVersion) {
-            this.logger.debug(`Cached key version doesn't match active backup version`);
+            this.logger.debug(
+                `Cached key version <${backupKeys.backupVersion}> doesn't match active backup version <${activeVersion}>`,
+            );
             this.hasConfigurationProblem = true;
             return null;
         }
