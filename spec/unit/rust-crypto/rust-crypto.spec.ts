@@ -45,7 +45,6 @@ import {
     EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
-    RoomKeySource,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
@@ -946,7 +945,7 @@ describe("RustCrypto", () => {
             // we import two keys: one "from backup", and one "from export"
             const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
             await rustCrypto.importRoomKeys([backedUpRoomKey], {
-                source: RoomKeySource.Backup,
+                source: "backup",
             });
             await rustCrypto.importRoomKeys([exportedRoomKey]);
 

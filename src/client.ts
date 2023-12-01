@@ -211,13 +211,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import {
-    BootstrapCrossSigningOpts,
-    CrossSigningKeyInfo,
-    CryptoApi,
-    ImportRoomKeysOpts,
-    RoomKeySource,
-} from "./crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -3983,10 +3977,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importRoomKeys(keys, {
+        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
             progressCallback,
             untrusted,
-            source: RoomKeySource.Backup,
         });
 
         /// in case entering the passphrase would add a new signature?
