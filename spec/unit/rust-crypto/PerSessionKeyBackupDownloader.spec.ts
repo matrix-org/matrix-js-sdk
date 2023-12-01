@@ -162,6 +162,8 @@ describe("PerSessionKeyBackupDownloader", () => {
                     );
                 } else if (session == "sessionA1") {
                     return TestData.CURVE25519_KEY_BACKUP_DATA;
+                } else {
+                    throw new Error("Unexpected session");
                 }
             });
 
