@@ -71,7 +71,8 @@ export interface OnDemandBackupDelegate {
 }
 
 /**
- * Utility to create a delegate for the OnDemandKeyBackupDownloader that is usable by rust crypto.
+ * Utility to create a delegate for the PerSessionKeyBackupDownloader that is usable by rust crypto.
+ *
  * @param rustCrypto - The rust crypto instance.
  * @param backupManager - The backup manager instance.
  * @param olmMachine - The olm machine instance.
@@ -178,13 +179,14 @@ export type KeyDownloaderEventMap = {
 };
 
 /**
- * When an unable to decrypt error is encountered, the client will call this
- * in order to try to download the key from the backup.
+ * This function is called when an 'unable to decrypt' error occurs. It attempts to download the key from the backup.
  *
- * The current backup API is quite limited, there is no pagination, so it can take very long to
- * get all keys for history. Downloading keys on demand is a way to avoid this problem.
- * It will create a lot of requests, but form the user point of view, it's better to have that than
- * waiting for a long time before being able to decrypt a message.
+ * The current backup API lacks pagination, which can lead to lengthy key retrieval times for large histories (several 10s of minutes).
+ * To mitigate this, keys are downloaded on demand as decryption errors occurs.
+ * While this approach may result in numerous requests, it improves user experience by reducing wait times for message decryption.
+ * 
+ * The PerSessionKeyBackupDownloader is resistant to backup configuration changes, it will automatically resume querying when
+ * the backup is configured correctly.
  *
  */
 export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownloaderEvent, KeyDownloaderEventMap> {
@@ -201,6 +203,14 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
     private readonly logger: Logger;
 
+    /**
+     * Creates a new instance of PerSessionKeyBackupDownloader.
+     * 
+     * @param delegate - The delegate to use.
+     * @param logger - The logger to use.
+     * @param maxTimeBetweenRetry - The maximum time to wait between two retries. This is to avoid hammering the server.
+     *
+     */
     public constructor(
         private readonly delegate: OnDemandBackupDelegate,
         logger: Logger,
@@ -276,6 +286,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         this.downloadLoopRunning = false;
         this.emit(KeyDownloaderEvent.DownloadLoopStateUpdate, false);
     }
+
     /**
      * Called when a MissingRoomKey or UnknownMessageIndex decryption error is encountered.
      *
@@ -296,7 +307,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         }
 
         if (this.wasRequestedRecently(megolmSessionId)) {
-            // We already tried to download this session recently, no need to try again.
+            // We already tried to download this session recently and it was not in backup, no need to try again.
             this.logger.trace(
                 `Not checking key backup for session ${megolmSessionId} as it was already requested recently`,
             );
@@ -305,9 +316,9 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
         // We always add the request to the queue, even if we have a configuration problem (can't access backup).
         // This is to make sure that if the configuration problem is resolved, we will try to download the key.
-        // This will happen after an initial sync, at this point the backup will not yet be trusted, but it will be
-        // just after the verification.
-        // We don't need to persist it because currently on refresh the sdk will retry to decrypt the messages.
+        // This will happen after an initial sync, at this point the backup will not yet be trusted and the decryption 
+        // key will not be available, but it will be just after the verification.
+        // We don't need to persist it because currently on refresh the sdk will retry to decrypt the messages in error.
         this.queuedRequests.push({ roomId, megolmSessionId });
 
         // Start the download loop if it's not already running.

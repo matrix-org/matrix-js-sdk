@@ -82,7 +82,7 @@ interface ISignableObject {
     unsigned?: object;
 }
 
-// const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
+const KEY_BACKUP_BACKOFF = 5000; // ms
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -106,8 +106,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private outgoingRequestsManager: OutgoingRequestsManager;
 
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
-
-    // private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
 
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
@@ -151,7 +149,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             createDelegate(this, this.backupManager, this.olmMachine, this.http),
             logger,
-            2000,
+            KEY_BACKUP_BACKOFF,
         );
 
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
@@ -209,6 +207,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager.stop();
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
+        this.perSessionBackupDownloader.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
