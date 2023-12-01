@@ -195,7 +195,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
     /** We remember when a session was requested and not found in backup to avoid query again too soon. */
     private sessionLastCheckAttemptedTime: Record<string, number> = {};
 
-    private readonly configurationChangeHandler = () => {
+    private readonly configurationChangeHandler = (): void => {
         this.onBackupStatusChanged();
     };
 
@@ -402,16 +402,20 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
             return { ok: false, error: KeyDownloadError.CONFIGURATION_ERROR };
         }
 
-        this.logger.debug(`Checking key backup for session ${targetSessionId}`);
-
-        let res: KeyBackupSession;
+        this.logger.debug(`--> Checking key backup for session ${targetSessionId}`);
 
         try {
-            res = await this.delegate.requestRoomKeyFromBackup(
+            const res = await this.delegate.requestRoomKeyFromBackup(
                 configuration.backupVersion,
                 targetRoomId,
                 targetSessionId,
             );
+            if (this.stopped) return { ok: false, error: KeyDownloadError.STOPPED };
+            this.logger.debug(`<-- Got key from backup ${targetSessionId}`);
+            return {
+                ok: true,
+                value: res,
+            };
         } catch (e) {
             if (this.stopped) return { ok: false, error: KeyDownloadError.STOPPED };
 
@@ -450,13 +454,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
             }
             return { ok: false, error: KeyDownloadError.NETWORK_ERROR };
         }
-
-        if (this.stopped) return { ok: false, error: KeyDownloadError.STOPPED };
-
-        return {
-            ok: true,
-            value: res,
-        };
     }
 
     private currentBackupVersionCheck: Promise<Configuration | null> | null = null;
