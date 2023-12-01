@@ -957,7 +957,7 @@ describe("RustCrypto", () => {
 
             // we expect that the key "from export" is present
             expect(roomKeys).toMatchObject({
-                "rooms": {
+                rooms: {
                     [exportedRoomKey.room_id]: {
                         sessions: {
                             [exportedRoomKey.session_id]: {},
@@ -968,7 +968,7 @@ describe("RustCrypto", () => {
 
             // we expect that the key "from backup" is not present
             expect(roomKeys).not.toMatchObject({
-                "rooms": {
+                rooms: {
                     [backedUpRoomKey.room_id]: {
                         sessions: {
                             [backedUpRoomKey.session_id]: {},
