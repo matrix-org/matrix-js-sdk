@@ -28,7 +28,8 @@ jobs:
             pull-requests: read
         secrets:
             # secrets are not automatically shared with called workflows, so share the cypress dashboard key, and the Kiwi login details
-            CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+            KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_RUST: ${{ secrets.KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_RUST}}
+            KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_LEGACY: ${{ secrets.KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_LEGACY}}
             TCMS_USERNAME: ${{ secrets.TCMS_USERNAME }}
             TCMS_PASSWORD: ${{ secrets.TCMS_PASSWORD }}
         with:

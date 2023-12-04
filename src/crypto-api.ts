@@ -47,6 +47,13 @@ export interface CryptoApi {
     getVersion(): string;
 
     /**
+     * Get the public part of the device keys for the current device.
+     *
+     * @returns The public device keys.
+     */
+    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
@@ -162,7 +169,7 @@ export interface CryptoApi {
     /**
      * Mark the given device as locally verified.
      *
-     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * Marking a device as locally verified has much the same effect as completing the verification dance, or receiving
      * a cross-signing signature for it.
      *
      * @param userId - owner of the device
@@ -174,6 +181,21 @@ export interface CryptoApi {
      * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
+
+    /**
+     * Cross-sign one of our own devices.
+     *
+     * This will create a signature for the device using our self-signing key, and publish that signature.
+     * Cross-signing a device indicates, to our other devices and to other users, that we have verified that it really
+     * belongs to us.
+     *
+     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}.
+     *
+     * *Note*: Do not call this unless you have verified, somehow, that the device is genuine!
+     *
+     * @param deviceId - ID of the device to be signed.
+     */
+    crossSignDevice(deviceId: string): Promise<void>;
 
     /**
      * Checks whether cross signing:
@@ -747,6 +769,14 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+}
+
+/** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
+export interface OwnDeviceKeys {
+    /** Public part of the Ed25519 fingerprint key for the current device, base64 encoded. */
+    ed25519: string;
+    /** Public part of the Curve25519 identity key for the current device, base64 encoded. */
+    curve25519: string;
 }
 
 export * from "./crypto-api/verification";

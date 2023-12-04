@@ -52,7 +52,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^3.1.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^3.2.0",
         "another-json": "^0.2.0",
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
@@ -97,7 +97,7 @@
         "babel-jest": "^29.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.53.0",
+        "eslint": "8.54.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",

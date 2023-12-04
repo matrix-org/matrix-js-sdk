@@ -49,6 +49,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     KeyBackupSession,
+    OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -149,6 +150,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
@@ -371,6 +373,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+            this.olmMachine.userId,
+            this.olmMachine.deviceId,
+        );
+        // could be undefined if there is no such algorithm for that device.
+        if (device.curve25519Key && device.ed25519Key) {
+            return {
+                ed25519: device.ed25519Key.toBase64(),
+                curve25519: device.curve25519Key.toBase64(),
+            };
+        }
+        throw new Error("Device keys not found");
+    }
+
     public prepareToEncrypt(room: Room): void {
         const encryptor = this.roomEncryptors[room.roomId];
 
@@ -425,6 +445,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 await this.outgoingRequestProcessor.makeOutgoingRequest(request);
             }
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            userIdentity?.free();
             return userIdentity !== undefined;
         } else if (downloadUncached) {
             // Download the cross signing keys and check if the master key is available
@@ -454,7 +475,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getUserDeviceInfo(userIds: string[], downloadUncached = false): Promise<DeviceMap> {
         const deviceMapByUserId = new Map<string, Map<string, Device>>();
-        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.olmMachine.trackedUsers();
+        const rustTrackedUsers: Set<RustSdkCryptoJs.UserId> = await this.getOlmMachineOrThrow().trackedUsers();
 
         // Convert RustSdkCryptoJs.UserId to a `Set<string>`
         const trackedUsers = new Set<string>();
@@ -504,7 +525,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // To fix this, we explicitly call `.free` on each of the objects, which tells the rust code to drop the
         // allocated memory and decrement the refcounts for the crypto store.
 
-        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        // Wait for up to a second for any in-flight device list requests to complete.
+        // The reason for this isn't so much to avoid races (some level of raciness is
+        // inevitable for this method) but to make testing easier.
+        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId, 1);
         try {
             const deviceArray: RustSdkCryptoJs.Device[] = userDevices.devices();
             try {
@@ -562,7 +586,34 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (!device) {
             throw new Error(`Unknown device ${userId}|${deviceId}`);
         }
-        await device.setLocalTrust(verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset);
+        try {
+            await device.setLocalTrust(
+                verified ? RustSdkCryptoJs.LocalTrust.Verified : RustSdkCryptoJs.LocalTrust.Unset,
+            );
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(this.userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+        if (!device) {
+            throw new Error(`Unknown device ${deviceId}`);
+        }
+        try {
+            const outgoingRequest: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+        } finally {
+            device.free();
+        }
     }
 
     /**
@@ -578,13 +629,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         );
 
         if (!device) return null;
-
-        return new DeviceVerificationStatus({
-            signedByOwner: device.isCrossSignedByOwner(),
-            crossSigningVerified: device.isCrossSigningTrusted(),
-            localVerified: device.isLocallyTrusted(),
-            trustCrossSignedDevices: this._trustCrossSignedDevices,
-        });
+        try {
+            return new DeviceVerificationStatus({
+                signedByOwner: device.isCrossSignedByOwner(),
+                crossSigningVerified: device.isCrossSigningTrusted(),
+                localVerified: device.isLocallyTrusted(),
+                trustCrossSignedDevices: this._trustCrossSignedDevices,
+            });
+        } finally {
+            device.free();
+        }
     }
 
     /**
@@ -592,11 +646,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
         const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
-            await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(userId));
+            await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
         }
-        return new UserVerificationStatus(userIdentity.isVerified(), false, false);
+        const verified = userIdentity.isVerified();
+        userIdentity.free();
+        return new UserVerificationStatus(verified, false, false);
     }
 
     /**
@@ -621,42 +677,51 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(this.userId),
         );
-
-        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
-        const privateKeysOnDevice =
-            crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
-
-        if (!userIdentity || !privateKeysOnDevice) {
-            // The public or private keys are not available on this device
+        if (!userIdentity) {
+            // The public keys are not available on this device
             return null;
         }
 
-        if (!userIdentity.isVerified()) {
-            // We have both public and private keys, but they don't match!
-            return null;
-        }
+        try {
+            const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
 
-        let key: string;
-        switch (type) {
-            case CrossSigningKey.Master:
-                key = userIdentity.masterKey;
-                break;
-            case CrossSigningKey.SelfSigning:
-                key = userIdentity.selfSigningKey;
-                break;
-            case CrossSigningKey.UserSigning:
-                key = userIdentity.userSigningKey;
-                break;
-            default:
-                // Unknown type
+            const privateKeysOnDevice =
+                crossSigningStatus.hasMaster && crossSigningStatus.hasUserSigning && crossSigningStatus.hasSelfSigning;
+
+            if (!privateKeysOnDevice) {
+                // The private keys are not available on this device
                 return null;
-        }
+            }
 
-        const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
-        // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-        // We assume only a single key, and we want the bare form without type
-        // prefix, so we select the values.
-        return Object.values(parsedKey.keys)[0];
+            if (!userIdentity.isVerified()) {
+                // We have both public and private keys, but they don't match!
+                return null;
+            }
+
+            let key: string;
+            switch (type) {
+                case CrossSigningKey.Master:
+                    key = userIdentity.masterKey;
+                    break;
+                case CrossSigningKey.SelfSigning:
+                    key = userIdentity.selfSigningKey;
+                    break;
+                case CrossSigningKey.UserSigning:
+                    key = userIdentity.userSigningKey;
+                    break;
+                default:
+                    // Unknown type
+                    return null;
+            }
+
+            const parsedKey: CrossSigningKeyInfo = JSON.parse(key);
+            // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+            // We assume only a single key, and we want the bare form without type
+            // prefix, so we select the values.
+            return Object.values(parsedKey.keys)[0];
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
@@ -704,6 +769,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }
 
             // Create a new storage key and add it to secret storage
+            this.logger.info("bootstrapSecretStorage: creating new secret storage key");
             const recoveryKey = await createSecretStorageKey();
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
@@ -718,6 +784,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             hasPrivateKeys &&
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
+            this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
+
             const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
                 await this.olmMachine.exportCrossSigningKeys();
 
@@ -800,6 +868,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             Boolean(userIdentity?.masterKey) &&
             Boolean(userIdentity?.selfSigningKey) &&
             Boolean(userIdentity?.userSigningKey);
+        userIdentity?.free();
+
         const privateKeysInSecretStorage = await secretStorageContainsCrossSigningKeys(this.secretStorage);
         const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus | null =
             await this.getOlmMachineOrThrow().crossSigningStatus();
@@ -917,23 +987,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         if (!userIdentity) throw new Error(`unknown userId ${userId}`);
 
-        // Transform the verification methods into rust objects
-        const methods = this._supportedVerificationMethods.map((method) =>
-            verificationMethodIdentifierToMethod(method),
-        );
-        // Get the request content to send to the DM room
-        const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+        try {
+            // Transform the verification methods into rust objects
+            const methods = this._supportedVerificationMethods.map((method) =>
+                verificationMethodIdentifierToMethod(method),
+            );
+            // Get the request content to send to the DM room
+            const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
 
-        // Send the request content to send to the DM room
-        const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
+            // Send the request content to send to the DM room
+            const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
 
-        // Get a verification request
-        const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
-            new RustSdkCryptoJs.RoomId(roomId),
-            new RustSdkCryptoJs.EventId(eventId),
-            methods,
-        );
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+            // Get a verification request
+            const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
+                new RustSdkCryptoJs.RoomId(roomId),
+                new RustSdkCryptoJs.EventId(eventId),
+                methods,
+            );
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
+            );
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
@@ -995,12 +1073,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("cannot request verification for this device when there is no existing cross-signing key");
         }
 
-        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
-            await userIdentity.requestVerification(
-                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+        try {
+            const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+                await userIdentity.requestVerification(
+                    this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                );
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+        } finally {
+            userIdentity.free();
+        }
     }
 
     /**
@@ -1025,12 +1111,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("Not a known device");
         }
 
-        const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
-            await device.requestVerification(
-                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+        try {
+            const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
+                await device.requestVerification(
+                    this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+                );
+            await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
+            return new RustVerificationRequest(
+                request,
+                this.outgoingRequestProcessor,
+                this._supportedVerificationMethods,
             );
-        await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-        return new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods);
+        } finally {
+            device.free();
+        }
     }
 
     /**
@@ -1061,7 +1155,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error("storeSessionBackupPrivateKey: version is required");
         }
 
-        await this.olmMachine.saveBackupDecryptionKey(
+        await this.backupManager.saveBackupDecryptionKey(
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
@@ -1780,4 +1874,6 @@ type RustCryptoEventMap = {
      * Fires when the trust status of a user changes.
      */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
+
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 } & RustBackupCryptoEventMap;
