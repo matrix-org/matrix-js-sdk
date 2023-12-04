@@ -94,15 +94,6 @@ export interface CryptoApi {
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
-     * Import a list of room keys restored from backup
-     *
-     * @param keys - a list of session export objects
-     * @param opts - options object
-     * @returns a promise which resolves once the keys have been imported
-     */
-    importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
-
-    /**
      * Check if the given user has published cross-signing keys.
      *
      * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.

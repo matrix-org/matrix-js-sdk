@@ -944,9 +944,7 @@ describe("RustCrypto", () => {
 
             // we import two keys: one "from backup", and one "from export"
             const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
-            await rustCrypto.importRoomKeys([backedUpRoomKey], {
-                source: "backup",
-            });
+            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey]);
             await rustCrypto.importRoomKeys([exportedRoomKey]);
 
             // we ask for the keys that should be backed up

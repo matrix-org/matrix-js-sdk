@@ -1897,6 +1897,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public importBackedUpRoomKeys(keys: IMegolmSessionData[], opts: ImportRoomKeysOpts = {}): Promise<void> {
+        opts.source = "backup";
+        return this.importRoomKeys(keys, opts);
+    }
+
+    /**
      * Store a set of keys as our own, trusted, cross-signing keys.
      *
      * @param keys - The new trusted set of keys
@@ -3153,17 +3161,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 });
             }),
         ).then();
-    }
-
-    /**
-     * Import a list of room keys previously exported by exportRoomKeys
-     *
-     * @param keys - a list of session export objects
-     * @returns a promise which resolves once the keys have been imported
-     */
-    public importBackedUpRoomKeys(keys: IMegolmSessionData[], opts: ImportRoomKeysOpts = {}): Promise<void> {
-        opts.source = "backup";
-        return this.importRoomKeys(keys, opts);
     }
 
     /**
