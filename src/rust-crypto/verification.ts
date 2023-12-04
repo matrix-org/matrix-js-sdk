@@ -333,6 +333,7 @@ export class RustVerificationRequest
             throw new Error(`Unsupported verification method ${method}`);
         }
 
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
         if (!(await this.getOtherDevice())) {
             throw new Error("startVerification(): other device is unknown");
         }
