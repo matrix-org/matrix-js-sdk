@@ -456,7 +456,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // To fix this, we explicitly call `.free` on each of the objects, which tells the rust code to drop the
         // allocated memory and decrement the refcounts for the crypto store.
 
-        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId);
+        // Wait for up to a second for any in-flight device list requests to complete.
+        // The reason for this isn't so much to avoid races (some level of raciness is
+        // inevitable for this method) but to make testing easier.
+        const userDevices: RustSdkCryptoJs.UserDevices = await this.olmMachine.getUserDevices(rustUserId, 1);
         try {
             const deviceArray: RustSdkCryptoJs.Device[] = userDevices.devices();
             try {
@@ -697,6 +700,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             }
 
             // Create a new storage key and add it to secret storage
+            this.logger.info("bootstrapSecretStorage: creating new secret storage key");
             const recoveryKey = await createSecretStorageKey();
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
@@ -711,6 +715,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             hasPrivateKeys &&
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
+            this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
+
             const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
                 await this.olmMachine.exportCrossSigningKeys();
 
@@ -865,6 +871,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             .map(
                 (request) =>
                     new RustVerificationRequest(
+                        this.olmMachine,
                         request,
                         this.outgoingRequestProcessor,
                         this._supportedVerificationMethods,
@@ -895,6 +902,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         if (request) {
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -930,6 +938,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 methods,
             );
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1005,6 +1014,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1043,6 +1053,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
             return new RustVerificationRequest(
+                this.olmMachine,
                 request,
                 this.outgoingRequestProcessor,
                 this._supportedVerificationMethods,
@@ -1330,7 +1341,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (request) {
             this.emit(
                 CryptoEvent.VerificationRequestReceived,
-                new RustVerificationRequest(request, this.outgoingRequestProcessor, this._supportedVerificationMethods),
+                new RustVerificationRequest(
+                    this.olmMachine,
+                    request,
+                    this.outgoingRequestProcessor,
+                    this._supportedVerificationMethods,
+                ),
             );
         }
     }
@@ -1547,6 +1563,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 this.emit(
                     CryptoEvent.VerificationRequestReceived,
                     new RustVerificationRequest(
+                        this.olmMachine,
                         request,
                         this.outgoingRequestProcessor,
                         this._supportedVerificationMethods,

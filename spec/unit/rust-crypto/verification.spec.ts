@@ -62,9 +62,13 @@ describe("VerificationRequest", () => {
 
     describe("startVerification", () => {
         let request: RustVerificationRequest;
+        let machine: Mocked<RustSdkCryptoJs.OlmMachine>;
+        let inner: Mocked<RustSdkCryptoJs.VerificationRequest>;
 
         beforeEach(() => {
-            request = makeTestRequest();
+            inner = makeMockedInner();
+            machine = { getDevice: jest.fn() } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            request = makeTestRequest(inner, machine);
         });
 
         it("does not permit methods other than SAS", async () => {
@@ -73,7 +77,15 @@ describe("VerificationRequest", () => {
             );
         });
 
+        it("raises an error if the other device is unknown", async () => {
+            await expect(request.startVerification("m.sas.v1")).rejects.toThrow(
+                "startVerification(): other device is unknown",
+            );
+        });
+
         it("raises an error if starting verification does not produce a verifier", async () => {
+            jest.spyOn(inner, "otherDeviceId", "get").mockReturnValue(new RustSdkCryptoJs.DeviceId("other_device"));
+            machine.getDevice.mockResolvedValue({} as RustSdkCryptoJs.Device);
             await expect(request.startVerification("m.sas.v1")).rejects.toThrow(
                 "Still no verifier after startSas() call",
             );
@@ -118,11 +130,13 @@ describe("isVerificationEvent", () => {
 /** build a RustVerificationRequest with default parameters */
 function makeTestRequest(
     inner?: RustSdkCryptoJs.VerificationRequest,
+    olmMachine?: RustSdkCryptoJs.OlmMachine,
     outgoingRequestProcessor?: OutgoingRequestProcessor,
 ): RustVerificationRequest {
     inner ??= makeMockedInner();
+    olmMachine ??= {} as RustSdkCryptoJs.OlmMachine;
     outgoingRequestProcessor ??= {} as OutgoingRequestProcessor;
-    return new RustVerificationRequest(inner, outgoingRequestProcessor, []);
+    return new RustVerificationRequest(olmMachine, inner, outgoingRequestProcessor, []);
 }
 
 /** Mock up a rust-side VerificationRequest */
@@ -133,5 +147,8 @@ function makeMockedInner(): Mocked<RustSdkCryptoJs.VerificationRequest> {
         phase: jest.fn().mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Created),
         isPassive: jest.fn().mockReturnValue(false),
         timeRemainingMillis: jest.fn(),
+        get otherDeviceId() {
+            return undefined;
+        },
     } as unknown as Mocked<RustSdkCryptoJs.VerificationRequest>;
 }

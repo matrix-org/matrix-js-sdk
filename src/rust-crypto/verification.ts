@@ -57,11 +57,13 @@ export class RustVerificationRequest
     /**
      * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
      *
-     * @param inner - VerificationRequest from the Rust SDK
-     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests
-     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called
+     * @param olmMachine - The `OlmMachine` from the underlying rust crypto sdk.
+     * @param inner - VerificationRequest from the Rust SDK.
+     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests.
+     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called.
      */
     public constructor(
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly supportedVerificationMethods: string[],
@@ -133,6 +135,15 @@ export class RustVerificationRequest
     /** For verifications via to-device messages: the ID of the other device. Otherwise, undefined. */
     public get otherDeviceId(): string | undefined {
         return this.inner.otherDeviceId?.toString();
+    }
+
+    /** Get the other device involved in the verification, if it is known */
+    private async getOtherDevice(): Promise<undefined | RustSdkCryptoJs.Device> {
+        const otherDeviceId = this.inner.otherDeviceId;
+        if (!otherDeviceId) {
+            return undefined;
+        }
+        return await this.olmMachine.getDevice(this.inner.otherUserId, otherDeviceId, 5);
     }
 
     /** True if the other party in this request is one of this user's own devices. */
@@ -322,6 +333,11 @@ export class RustVerificationRequest
             throw new Error(`Unsupported verification method ${method}`);
         }
 
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("startVerification(): other device is unknown");
+        }
+
         const res:
             | [RustSdkCryptoJs.Sas, RustSdkCryptoJs.RoomMessageRequest | RustSdkCryptoJs.ToDeviceRequest]
             | undefined = await this.inner.startSas();
@@ -392,6 +408,11 @@ export class RustVerificationRequest
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
     public async generateQRCode(): Promise<Buffer | undefined> {
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("generateQRCode(): other device is unknown");
+        }
+
         const innerVerifier: RustSdkCryptoJs.Qr | undefined = await this.inner.generateQrCode();
         // If we are unable to generate a QRCode, we return undefined
         if (!innerVerifier) return;
