@@ -185,6 +185,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 }
             });
 
+            // @ts-ignore
             const spy = jest.spyOn(downloader, "queryKeyBackup");
 
             // Call 3 times for same key
@@ -212,6 +213,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
             fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
+            // @ts-ignore
             const spy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
@@ -239,6 +241,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 },
             });
 
+            // @ts-ignore
             const spy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
@@ -308,6 +311,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
             mockOlmMachine.getBackupKeys.mockResolvedValue(null);
 
+            // @ts-ignore
             keyQuerySpy = jest.spyOn(downloader, "queryKeyBackup");
         });
 
@@ -461,6 +465,8 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
                 overwriteRoutes: true,
             });
+
+            // @ts-ignore
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             const a0Imported = expectSessionImported("!roomA", "sessionA0");
@@ -563,8 +569,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             // @ts-ignore
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
+            // @ts-ignore
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
             const rateDeferred = defer<void>();
+            // @ts-ignore
             keyQuerySpy.mockImplementation(async (targetRoomId: string, targetSessionId: string) => {
                 const result = await originalImplementation(targetRoomId, targetSessionId);
                 if (!result.ok && result.error === KeyDownloadError.RATE_LIMITED) {
@@ -609,8 +617,11 @@ describe("PerSessionKeyBackupDownloader", () => {
             // @ts-ignore
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
+            // @ts-ignore
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
             const errorDeferred = defer<void>();
+
+            // @ts-ignore
             keyQuerySpy.mockImplementation(async (targetRoomId: string, targetSessionId: string) => {
                 const result = await originalImplementation(targetRoomId, targetSessionId);
                 if (!result.ok && result.error === KeyDownloadError.NETWORK_ERROR) {
@@ -665,6 +676,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 overwriteRoutes: true,
             });
 
+            // @ts-ignore
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
