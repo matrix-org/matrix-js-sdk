@@ -20,9 +20,10 @@ import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Curve25519AuthData, KeyBackupSession } from "../crypto-api/keybackup";
 import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { RustBackupDecryptor, RustBackupManager } from "./backup";
+import { RustBackupManager } from "./backup";
 import { CryptoEvent } from "../matrix";
 import { encodeUri, sleep } from "../utils";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 
 /**
  * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
@@ -56,7 +57,7 @@ type KeyDownloadResult =
 /** Holds the current backup decryptor and version that should be used. */
 type Configuration = {
     backupVersion: string;
-    decryptor: RustBackupDecryptor;
+    decryptor: BackupDecryptor;
 };
 
 /**
