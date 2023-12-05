@@ -1,7 +1,7 @@
 # Triggers after the "Downstream artifacts" build has finished, to run the
-# cypress tests (with access to repo secrets)
+# matrix-react-sdk playwright & cypress tests (with access to repo secrets)
 
-name: matrix-react-sdk Cypress End to End Tests
+name: matrix-react-sdk End to End Tests
 on:
     workflow_run:
         workflows: ["Build downstream artifacts"]
@@ -17,10 +17,10 @@ jobs:
         name: Cypress
 
         # We only want to run the cypress tests on merge queue to prevent regressions
-        # from creeping in. They take a long time to run and consume 4 concurrent runners.
+        # from creeping in. They take a long time to run and consume multiple concurrent runners.
         if: github.event.workflow_run.event == 'merge_group'
 
-        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@4d0a34bb26c179ed709a7e1fd5e63f815b0b96d7
+        uses: matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml@develop
         permissions:
             actions: read
             issues: read
@@ -32,6 +32,20 @@ jobs:
             KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_LEGACY: ${{ secrets.KNAPSACK_PRO_TEST_SUITE_TOKEN_CYPRESS_LEGACY}}
             TCMS_USERNAME: ${{ secrets.TCMS_USERNAME }}
             TCMS_PASSWORD: ${{ secrets.TCMS_PASSWORD }}
+        with:
+            react-sdk-repository: matrix-org/matrix-react-sdk
+
+    playwright:
+        name: Playwright
+        # We only want to run the playwright tests on merge queue to prevent regressions
+        # from creeping in. They take a long time to run and consume multiple concurrent runners.
+        if: github.event.workflow_run.event == 'merge_group'
+        uses: matrix-org/matrix-react-sdk/.github/workflows/end-to-end-tests.yaml@develop
+        permissions:
+            actions: read
+            issues: read
+            statuses: write
+            pull-requests: read
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
 
@@ -50,10 +64,18 @@ jobs:
             statuses: write
         runs-on: ubuntu-latest
         steps:
-            - uses: Sibz/github-status-action@650dd1a882a76dbbbc4576fb5974b8d22f29847f # v1.1.6
+            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               with:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Cypress skipped
-                  context: "${{ github.workflow }} / cypress"
+                  context: "Cypress End to End Tests / cypress"
+                  sha: "${{ github.event.workflow_run.head_sha }}"
+
+            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+              with:
+                  authToken: "${{ secrets.GITHUB_TOKEN }}"
+                  state: success
+                  description: Playwright skipped
+                  context: "End to End Tests / end-to-end-tests"
                   sha: "${{ github.event.workflow_run.head_sha }}"
