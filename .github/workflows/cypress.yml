@@ -70,7 +70,7 @@ jobs:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Cypress skipped
-                  context: "Cypress End to End Tests / cypress"
+                  context: "${{ github.workflow }} / Cypress"
                   sha: "${{ github.event.workflow_run.head_sha }}"
 
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
@@ -78,5 +78,5 @@ jobs:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Playwright skipped
-                  context: "End to End Tests / end-to-end-tests"
+                  context: "${{ github.workflow }} / Playwright"
                   sha: "${{ github.event.workflow_run.head_sha }}"
