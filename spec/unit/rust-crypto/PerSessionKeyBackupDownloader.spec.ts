@@ -16,28 +16,47 @@ limitations under the License.
 
 import { Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import fetchMock from "fetch-mock-jest";
 
 import {
     KeyDownloaderEvent,
     KeyDownloadError,
-    OnDemandBackupDelegate,
     PerSessionKeyBackupDownloader,
 } from "../../../src/rust-crypto/PerSessionKeyBackupDownloader";
 import { logger } from "../../../src/logger";
 import { defer } from "../../../src/utils";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor } from "../../../src/rust-crypto/backup";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "../../../src/rust-crypto/backup";
 import * as TestData from "../../test-utils/test-data";
-import { ConnectionError, CryptoEvent, MatrixError, TypedEventEmitter } from "../../../src";
+import {
+    ConnectionError,
+    CryptoEvent,
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    IHttpOpts,
+    IMegolmSessionData,
+    MatrixHttpApi,
+    TypedEventEmitter,
+} from "../../../src";
+import * as testData from "../../test-utils/test-data";
+import { BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
+import { KeyBackupSession } from "../../../src/crypto-api/keybackup";
 
 describe("PerSessionKeyBackupDownloader", () => {
     /** The downloader under test */
     let downloader: PerSessionKeyBackupDownloader;
 
-    let delegate: Mocked<OnDemandBackupDelegate>;
+    const mockCipherKey: Mocked<KeyBackupSession> = {} as unknown as Mocked<KeyBackupSession>;
+    // let delegate: Mocked<OnDemandBackupDelegate>;
 
     const BACKOFF_TIME = 2000;
 
     const mockEmitter = new TypedEventEmitter() as TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
+
+    let mockHttp: MatrixHttpApi<IHttpOpts & { onlyData: true }>;
+    let mockRustBackupManager: Mocked<RustBackupManager>;
+    let mockOlmMachine: Mocked<OlmMachine>;
+    let mockBackupDecryptor: Mocked<BackupDecryptor>;
 
     async function expectConfigurationError(error: KeyDownloadError): Promise<void> {
         return new Promise<void>((resolve) => {
@@ -68,104 +87,133 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
     }
 
+    function mockClearSession(sessionId: string): Mocked<IMegolmSessionData> {
+        return {
+            session_id: sessionId,
+        } as unknown as Mocked<IMegolmSessionData>;
+    }
+
     beforeEach(async () => {
-        delegate = {
+        mockHttp = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+            baseUrl: "http://server/",
+            prefix: "",
+            onlyData: true,
+        });
+
+        mockBackupDecryptor = {
+            decryptSessions: jest.fn(),
+        } as unknown as Mocked<BackupDecryptor>;
+
+        mockBackupDecryptor.decryptSessions.mockImplementation(async (ciphertexts) => {
+            const sessionId = Object.keys(ciphertexts)[0];
+            return [mockClearSession(sessionId)];
+        });
+
+        mockRustBackupManager = {
             getActiveBackupVersion: jest.fn(),
             getBackupDecryptionKey: jest.fn(),
-            requestRoomKeyFromBackup: jest.fn(),
-            importRoomKeys: jest.fn(),
-            createBackupDecryptor: jest.fn(),
             requestKeyBackupVersion: jest.fn(),
-            getCryptoEventEmitter: jest.fn(),
-        } as unknown as Mocked<OnDemandBackupDelegate>;
+            importRoomKeys: jest.fn(),
+            createBackupDecryptor: jest.fn().mockReturnValue(mockBackupDecryptor),
+        } as unknown as Mocked<RustBackupManager>;
 
-        delegate.getCryptoEventEmitter.mockReturnValue(mockEmitter);
+        mockOlmMachine = {
+            getBackupKeys: jest.fn(),
+        } as unknown as Mocked<OlmMachine>;
 
-        downloader = new PerSessionKeyBackupDownloader(delegate, logger, BACKOFF_TIME);
+        downloader = new PerSessionKeyBackupDownloader(
+            mockRustBackupManager,
+            mockOlmMachine,
+            mockHttp,
+            mockEmitter,
+            logger,
+            BACKOFF_TIME,
+        );
 
         jest.useFakeTimers();
     });
 
     afterEach(() => {
         downloader.stop();
+        fetchMock.mockReset();
         jest.useRealTimers();
     });
 
     describe("Given valid backup available", () => {
         beforeEach(async () => {
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
-            delegate.createBackupDecryptor.mockReturnValue({
-                decryptSessions: jest.fn().mockResolvedValue([TestData.MEGOLM_SESSION_DATA]),
-            } as unknown as RustBackupDecryptor);
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+
+            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
         });
 
         it("Should download and import a missing key from backup", async () => {
             const awaitKeyImported = defer<void>();
-
-            delegate.requestRoomKeyFromBackup.mockResolvedValue(TestData.CURVE25519_KEY_BACKUP_DATA);
-            delegate.importRoomKeys.mockImplementation(async (keys) => {
+            const roomId = "!roomId";
+            const sessionId = "sessionId";
+            const expectAPICall = new Promise<void>((resolve) => {
+                fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/${roomId}/${sessionId}`, (url, request) => {
+                    resolve();
+                    return TestData.CURVE25519_KEY_BACKUP_DATA;
+                });
+            });
+            mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
                 awaitKeyImported.resolve();
             });
+            mockBackupDecryptor.decryptSessions.mockResolvedValue([TestData.MEGOLM_SESSION_DATA]);
 
-            downloader.onDecryptionKeyMissingError("roomId", "sessionId");
+            downloader.onDecryptionKeyMissingError(roomId, sessionId);
 
+            await expectAPICall;
             await awaitKeyImported.promise;
-
-            expect(delegate.requestRoomKeyFromBackup).toHaveBeenCalledWith("1", "roomId", "sessionId");
-            expect(delegate.createBackupDecryptor).toHaveBeenCalledTimes(1);
+            expect(mockRustBackupManager.createBackupDecryptor).toHaveBeenCalledTimes(1);
         });
 
         it("Should not hammer the backup if the key is requested repeatedly", async () => {
             const blockOnServerRequest = defer<void>();
-            // simulate a key not being in the backup
-            delegate.requestRoomKeyFromBackup.mockImplementation(async (version, room, session) => {
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/!roomId/:session_id`, async (url, request) => {
                 await blockOnServerRequest.promise;
-                return TestData.CURVE25519_KEY_BACKUP_DATA;
+                return [mockCipherKey];
             });
 
-            // Call 3 times
+            const awaitKey2Imported = defer<void>();
+
+            mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
+                if (keys[0].session_id === "sessionId2") {
+                    awaitKey2Imported.resolve();
+                }
+            });
+
+            const spy = jest.spyOn(downloader, "queryKeyBackup");
+
+            // Call 3 times for same key
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
+            // Call again for a different key
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId2");
 
-            const session2Imported = new Promise<void>((resolve) => {
-                downloader.on(KeyDownloaderEvent.KeyImported, (roomId, sessionId) => {
-                    if (sessionId === "sessionId2") {
-                        resolve();
-                    }
-                });
-            });
+            // Allow the first server request to complete
             blockOnServerRequest.resolve();
 
-            await session2Imported;
-            expect(delegate.requestRoomKeyFromBackup).toHaveBeenCalledTimes(2);
+            await awaitKey2Imported.promise;
+            expect(spy).toHaveBeenCalledTimes(2);
         });
 
         it("should continue to next key if current not in backup", async () => {
-            delegate.requestRoomKeyFromBackup.mockResolvedValue(TestData.CURVE25519_KEY_BACKUP_DATA);
-
-            delegate.requestRoomKeyFromBackup.mockImplementation(async (version, room, session) => {
-                if (session == "sessionA0") {
-                    throw new MatrixError(
-                        {
-                            errcode: "M_NOT_FOUND",
-                            error: "No room_keys found",
-                        },
-                        404,
-                    );
-                } else if (session == "sessionA1") {
-                    return TestData.CURVE25519_KEY_BACKUP_DATA;
-                } else {
-                    throw new Error("Unexpected session");
-                }
+            fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA0`, {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "No backup found",
+                },
             });
+            fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
             const expectNotFound = expectConfigurationError(KeyDownloadError.MISSING_DECRYPTION_KEY);
@@ -178,17 +226,15 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         it("Should not query repeatedly for a key not in backup", async () => {
-            delegate.requestRoomKeyFromBackup.mockResolvedValue(TestData.CURVE25519_KEY_BACKUP_DATA);
+            fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA0`, {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "No backup found",
+                },
+            });
 
-            delegate.requestRoomKeyFromBackup.mockRejectedValue(
-                new MatrixError(
-                    {
-                        errcode: "M_NOT_FOUND",
-                        error: "No room_keys found",
-                    },
-                    404,
-                ),
-            );
+            const spy = jest.spyOn(downloader, "queryKeyBackup");
 
             const expectNotFound = expectConfigurationError(KeyDownloadError.MISSING_DECRYPTION_KEY);
 
@@ -196,18 +242,19 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             await expectNotFound;
 
-            const currentCallCount = delegate.requestRoomKeyFromBackup.mock.calls.length;
-
             // Should not query again for a key not in backup
-
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-            expect(delegate.requestRoomKeyFromBackup).toHaveBeenCalledTimes(currentCallCount);
+
+            expect(spy).toHaveBeenCalledTimes(1);
 
             // advance time to retry
             jest.advanceTimersByTime(BACKOFF_TIME + 10);
 
             const expectNotFoundSecondAttempt = expectConfigurationError(KeyDownloadError.MISSING_DECRYPTION_KEY);
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
+
+            expect(spy).toHaveBeenCalledTimes(2);
+
             await expectNotFoundSecondAttempt;
         });
 
@@ -216,11 +263,13 @@ describe("PerSessionKeyBackupDownloader", () => {
             const blockOnServerRequest = defer<void>();
             const requestRoomKeyCalled = defer<void>();
 
+            let callCount = 0;
             // Mock the request to block
-            delegate.requestRoomKeyFromBackup.mockImplementation(async (version, room, session) => {
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, async (url, request) => {
                 requestRoomKeyCalled.resolve();
                 await blockOnServerRequest.promise;
-                return TestData.CURVE25519_KEY_BACKUP_DATA;
+                callCount++;
+                return mockCipherKey;
             });
 
             const expectStopped = expectConfigurationError(KeyDownloadError.STOPPED);
@@ -237,8 +286,8 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             blockOnServerRequest.resolve();
             await expectStopped;
-            expect(delegate.importRoomKeys).not.toHaveBeenCalled();
-            expect(delegate.requestRoomKeyFromBackup).toHaveBeenCalledTimes(1);
+            expect(mockRustBackupManager.importRoomKeys).not.toHaveBeenCalled();
+            expect(callCount).toStrictEqual(1);
         });
     });
 
@@ -247,16 +296,23 @@ describe("PerSessionKeyBackupDownloader", () => {
         let configurationErrorPromise: Promise<void>;
 
         beforeEach(async () => {
-            delegate.getActiveBackupVersion.mockResolvedValue(null);
-            delegate.getBackupDecryptionKey.mockResolvedValue(null);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
 
             loopPausedPromise = expectLoopStatus(false);
 
             configurationErrorPromise = expectConfigurationError(KeyDownloadError.CONFIGURATION_ERROR);
         });
 
+        afterEach(async () => {
+            fetchMock.mockClear();
+        });
+
         it("Should not query server if no backup", async () => {
-            delegate.requestKeyBackupVersion.mockResolvedValue(null);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+            });
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
@@ -266,9 +322,10 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should not query server if backup not active", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
-            // but it's not active
-            delegate.getActiveBackupVersion.mockResolvedValue(null);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            // but it's not trusted
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
@@ -278,11 +335,11 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should stop if backup key is not cached", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
-            // it is active
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            // it is trusted
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // but the key is not cached
-            delegate.getBackupDecryptionKey.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
@@ -292,11 +349,11 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should stop if backup key cached as wrong version", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
-            // it is active
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            // it is trusted
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // but the cached key has the wrong version
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: "0",
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
@@ -309,11 +366,11 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should stop if backup key version does not match the active one", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
-            // it is active
-            delegate.getActiveBackupVersion.mockResolvedValue("0");
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            // The sdk is out of sync, the trusted version is the old one
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue("0");
             // key for old backup cached
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: "0",
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
@@ -328,11 +385,13 @@ describe("PerSessionKeyBackupDownloader", () => {
     describe("Given Backup state update", () => {
         it("After initial sync, when backup become trusted it should request keys for past requests", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
 
             // but at this point it's not trusted and we don't have the key
-            delegate.getActiveBackupVersion.mockResolvedValue(null);
-            delegate.getBackupDecryptionKey.mockResolvedValue(null);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey);
 
             const configErrorPromise = expectConfigurationError(KeyDownloadError.CONFIGURATION_ERROR);
 
@@ -350,16 +409,12 @@ describe("PerSessionKeyBackupDownloader", () => {
             await configErrorPromise;
 
             // Now the backup becomes trusted
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // And we have the key in cache
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
-
-            delegate.createBackupDecryptor.mockReturnValue({
-                decryptSessions: jest.fn().mockResolvedValue([TestData.MEGOLM_SESSION_DATA]),
-            } as unknown as RustBackupDecryptor);
 
             const loopShouldResume = expectLoopStatus(true);
             // In that case the sdk would fire a backup status update
@@ -375,18 +430,18 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("If reset from other session, loop should stop until new decryption key is known", async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
             // It's trusted
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // And we have the key in cache
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
 
-            delegate.createBackupDecryptor.mockReturnValue({
-                decryptSessions: jest.fn().mockResolvedValue([TestData.MEGOLM_SESSION_DATA]),
-            } as unknown as RustBackupDecryptor);
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
+                overwriteRoutes: true,
+            });
 
             const a0Imported = expectSessionImported("!roomA", "sessionA0");
 
@@ -396,14 +451,16 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // Now some other session resets the backup and there is a new version
             // the room_keys/keys endpoint will throw
-            delegate.requestRoomKeyFromBackup.mockRejectedValue(
-                new MatrixError(
-                    {
+            fetchMock.get(
+                `express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`,
+                {
+                    status: 404,
+                    body: {
                         errcode: "M_NOT_FOUND",
                         error: "Unknown backup version",
                     },
-                    404,
-                ),
+                },
+                { overwriteRoutes: true },
             );
 
             const loopPausedPromise = expectLoopStatus(false);
@@ -415,13 +472,15 @@ describe("PerSessionKeyBackupDownloader", () => {
             await expectMismatch;
 
             // The new backup is detected, the loop should resume but the cached key is still the old one
-
             const configurationError = expectConfigurationError(KeyDownloadError.CONFIGURATION_ERROR);
 
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue({ ...TestData.SIGNED_BACKUP_DATA, version: "2" });
+            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue({
+                ...TestData.SIGNED_BACKUP_DATA,
+                version: "2",
+            });
             // It's trusted
-            delegate.getActiveBackupVersion.mockResolvedValue("2");
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue("2");
 
             mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
 
@@ -429,12 +488,14 @@ describe("PerSessionKeyBackupDownloader", () => {
             await configurationError;
 
             // Now the new key is cached
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: "2",
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
 
-            delegate.requestRoomKeyFromBackup.mockResolvedValue(TestData.CURVE25519_KEY_BACKUP_DATA);
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
+                overwriteRoutes: true,
+            });
 
             const a1Imported = expectSessionImported("!roomA", "sessionA1");
 
@@ -447,18 +508,14 @@ describe("PerSessionKeyBackupDownloader", () => {
     describe("Error cases", () => {
         beforeEach(async () => {
             // there is a backup
-            delegate.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
             // It's trusted
-            delegate.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // And we have the key in cache
-            delegate.getBackupDecryptionKey.mockResolvedValue({
+            mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
-
-            delegate.createBackupDecryptor.mockReturnValue({
-                decryptSessions: jest.fn().mockResolvedValue([TestData.MEGOLM_SESSION_DATA]),
-            } as unknown as RustBackupDecryptor);
 
             jest.useFakeTimers();
         });
@@ -469,39 +526,44 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should wait on rate limit error", async () => {
             // simulate rate limit error
-            delegate.requestRoomKeyFromBackup
-                .mockImplementationOnce(async () => {
-                    throw new MatrixError(
-                        {
-                            errcode: "M_LIMIT_EXCEEDED",
-                            error: "Too many requests",
-                            retry_after_ms: 5000,
-                        },
-                        429,
-                    );
-                })
-                .mockImplementationOnce(async () => TestData.CURVE25519_KEY_BACKUP_DATA);
+            fetchMock.get(
+                `express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`,
+                {
+                    status: 429,
+                    body: {
+                        errcode: "M_LIMIT_EXCEEDED",
+                        error: "Too many requests",
+                        retry_after_ms: 5000,
+                    },
+                },
+                { overwriteRoutes: true },
+            );
 
             const errorPromise = expectConfigurationError(KeyDownloadError.RATE_LIMITED);
             const keyImported = expectSessionImported("!roomA", "sessionA0");
 
+            const spy = jest.spyOn(downloader, "queryKeyBackup");
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
 
             await errorPromise;
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
+                overwriteRoutes: true,
+            });
+
             // The loop should resume after the retry_after_ms
             jest.advanceTimersByTime(5000 + 100);
             await jest.runAllTimersAsync();
 
+            expect(spy).toHaveBeenCalledTimes(2);
             await keyImported;
         });
 
         it("After a network error the same key is retried", async () => {
             // simulate connectivity error
-            delegate.requestRoomKeyFromBackup
-                .mockImplementationOnce(async () => {
-                    throw new ConnectionError("fetch failed", new Error("fetch failed"));
-                })
-                .mockImplementationOnce(async () => TestData.CURVE25519_KEY_BACKUP_DATA);
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, () => {
+                throw new ConnectionError("fetch failed", new Error("fetch failed"));
+            });
 
             const errorPromise = expectConfigurationError(KeyDownloadError.NETWORK_ERROR);
             const keyImported = expectSessionImported("!roomA", "sessionA0");
@@ -509,6 +571,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
 
             await errorPromise;
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
+                overwriteRoutes: true,
+            });
             // The loop should resume after the retry_after_ms
             jest.advanceTimersByTime(BACKOFF_TIME + 100);
             await jest.runAllTimersAsync();
@@ -517,13 +583,17 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         it("On Unknown error on import skip the key and continue", async () => {
-            delegate.importRoomKeys
+            mockRustBackupManager.importRoomKeys
                 .mockImplementationOnce(async () => {
                     throw new Error("Didn't work");
                 })
                 .mockImplementationOnce(async () => {
                     return;
                 });
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
+                overwriteRoutes: true,
+            });
 
             const errorPromise = expectConfigurationError(KeyDownloadError.UNKNOWN_ERROR);
             const keyImported = expectSessionImported("!roomA", "sessionA1");

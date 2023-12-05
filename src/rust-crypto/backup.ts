@@ -34,6 +34,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -171,6 +172,19 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // Emit an event that we have a new backup decryption key, so that the sdk can start
         // importing keys from backup if needed.
         this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
+    }
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
     }
 
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
@@ -439,6 +453,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
+    }
+
+    /**
+     * Creates a new backup decryptor for the given private key.
+     * @param decryptionKey - The private key to use for decryption.
+     */
+    public createBackupDecryptor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey): BackupDecryptor {
+        return new RustBackupDecryptor(decryptionKey);
     }
 }
 

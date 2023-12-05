@@ -17,114 +17,12 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
-import { IMegolmSessionData } from "../crypto";
+import { Curve25519AuthData, KeyBackupSession } from "../crypto-api/keybackup";
 import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
 import { CryptoEvent, TypedEventEmitter } from "../matrix";
 import { encodeUri, sleep } from "../utils";
-import { RustCrypto } from "./rust-crypto";
-
-/**
- * Extract the dependence of the PerSessionKeyBackupDownloader, main reason is to make testing easier.
- */
-export interface OnDemandBackupDelegate {
-    /** Gets the current trusted backup if any.*/
-    getActiveBackupVersion(): Promise<string | null>;
-
-    /** Gets the current cached backup decryption key if any.*/
-    getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null>;
-
-    /**
-     *  Performs the server request to fetch the key from backup.
-     *
-     *  @param version - The backup version to use.
-     *  @param roomId - The room id of the session.
-     *  @param sessionId - The session id of the session.
-     *
-     */
-    requestRoomKeyFromBackup(version: string, roomId: string, sessionId: string): Promise<KeyBackupSession>;
-
-    /**
-     * Imports the given keys into the crypto store.
-     * @param keys - The keys to import.
-     */
-    importRoomKeys(keys: IMegolmSessionData[]): Promise<void>;
-
-    /**
-     * Creates a backup decryptor that can decrypt the key retrieved from backup.
-     * @param key - The cached backup decryption key.
-     */
-    createBackupDecryptor(key: RustSdkCryptoJs.BackupDecryptionKey): RustBackupDecryptor;
-
-    /**
-     * Requests the current key backup version from the server.
-     */
-    requestKeyBackupVersion(): Promise<KeyBackupInfo | null>;
-
-    /**
-     * The backup downloader will listen to these events to know when to check for backup status changes in order to
-     * resume or stop querying.
-     */
-    getCryptoEventEmitter(): TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
-}
-
-/**
- * Utility to create a delegate for the PerSessionKeyBackupDownloader that is usable by rust crypto.
- *
- * @param rustCrypto - The rust crypto instance.
- * @param backupManager - The backup manager instance.
- * @param olmMachine - The olm machine instance.
- * @param http - The http instance.
- */
-export function createDelegate(
-    rustCrypto: RustCrypto,
-    backupManager: RustBackupManager,
-    olmMachine: OlmMachine,
-    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-): OnDemandBackupDelegate {
-    return {
-        getActiveBackupVersion(): Promise<string | null> {
-            return backupManager.getActiveBackupVersion();
-        },
-
-        async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
-            try {
-                return await olmMachine.getBackupKeys();
-            } catch (e) {
-                return null;
-            }
-        },
-
-        async requestRoomKeyFromBackup(version: string, roomId: string, sessionId: string): Promise<KeyBackupSession> {
-            const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
-                $roomId: roomId,
-                $sessionId: sessionId,
-            });
-
-            return await http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
-                prefix: ClientPrefix.V3,
-            });
-        },
-
-        async importRoomKeys(keys: IMegolmSessionData[]): Promise<void> {
-            return rustCrypto.importRoomKeys(keys);
-        },
-
-        createBackupDecryptor: (key: RustSdkCryptoJs.BackupDecryptionKey): RustBackupDecryptor => {
-            return new RustBackupDecryptor(key);
-        },
-
-        async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
-            return await backupManager.requestKeyBackupVersion();
-        },
-
-        getCryptoEventEmitter(): TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap> {
-            return rustCrypto;
-        },
-    };
-}
 
 /**
  * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
@@ -184,7 +82,7 @@ export type KeyDownloaderEventMap = {
  * The current backup API lacks pagination, which can lead to lengthy key retrieval times for large histories (several 10s of minutes).
  * To mitigate this, keys are downloaded on demand as decryption errors occurs.
  * While this approach may result in numerous requests, it improves user experience by reducing wait times for message decryption.
- * 
+ *
  * The PerSessionKeyBackupDownloader is resistant to backup configuration changes, it will automatically resume querying when
  * the backup is configured correctly.
  *
@@ -205,34 +103,37 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
     /**
      * Creates a new instance of PerSessionKeyBackupDownloader.
-     * 
-     * @param delegate - The delegate to use.
+     *
+     * @param backupManager - The backup manager to use.
+     * @param olmMachine - The olm machine to use.
+     * @param http - The http instance to use.
+     * @param cryptoEventEmitter - The crypto event emitter to use.
      * @param logger - The logger to use.
      * @param maxTimeBetweenRetry - The maximum time to wait between two retries. This is to avoid hammering the server.
      *
      */
     public constructor(
-        private readonly delegate: OnDemandBackupDelegate,
+        private readonly backupManager: RustBackupManager,
+        private readonly olmMachine: OlmMachine,
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        private readonly cryptoEventEmitter: TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>,
         logger: Logger,
         private readonly maxTimeBetweenRetry: number,
     ) {
         super();
 
         this.logger = logger.getChild("[PerSessionKeyBackupDownloader]");
-        const emitter = this.delegate.getCryptoEventEmitter();
 
-        emitter.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        emitter.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        emitter.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
+        cryptoEventEmitter.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        cryptoEventEmitter.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        cryptoEventEmitter.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     public stop(): void {
         this.stopped = true;
-        this.delegate.getCryptoEventEmitter().off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        this.delegate.getCryptoEventEmitter().off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        this.delegate
-            .getCryptoEventEmitter()
-            .off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
+        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     private onBackupStatusChanged(): void {
@@ -287,6 +188,29 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         this.emit(KeyDownloaderEvent.DownloadLoopStateUpdate, false);
     }
 
+    private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
+        try {
+            return await this.olmMachine.getBackupKeys();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    private async requestRoomKeyFromBackup(
+        version: string,
+        roomId: string,
+        sessionId: string,
+    ): Promise<KeyBackupSession> {
+        const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+
+        return await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    }
+
     /**
      * Called when a MissingRoomKey or UnknownMessageIndex decryption error is encountered.
      *
@@ -316,7 +240,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
         // We always add the request to the queue, even if we have a configuration problem (can't access backup).
         // This is to make sure that if the configuration problem is resolved, we will try to download the key.
-        // This will happen after an initial sync, at this point the backup will not yet be trusted and the decryption 
+        // This will happen after an initial sync, at this point the backup will not yet be trusted and the decryption
         // key will not be available, but it will be just after the verification.
         // We don't need to persist it because currently on refresh the sdk will retry to decrypt the messages in error.
         this.queuedRequests.push({ roomId, megolmSessionId });
@@ -416,11 +340,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         this.logger.debug(`--> Checking key backup for session ${targetSessionId}`);
 
         try {
-            const res = await this.delegate.requestRoomKeyFromBackup(
-                configuration.backupVersion,
-                targetRoomId,
-                targetSessionId,
-            );
+            const res = await this.requestRoomKeyFromBackup(configuration.backupVersion, targetRoomId, targetSessionId);
             if (this.stopped) return { ok: false, error: KeyDownloadError.STOPPED };
             this.logger.debug(`<-- Got key from backup ${targetSessionId}`);
             return {
@@ -496,7 +416,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
     private async internalCheckFromServer(): Promise<Configuration | null> {
         let currentServerVersion = null;
         try {
-            currentServerVersion = await this.delegate.requestKeyBackupVersion();
+            currentServerVersion = await this.backupManager.requestKeyBackupVersion();
         } catch (e) {
             this.logger.debug(`Backup: error while checking server version: ${e}`);
             this.hasConfigurationProblem = true;
@@ -516,7 +436,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
             return null;
         }
 
-        const activeVersion = await this.delegate.getActiveBackupVersion();
+        const activeVersion = await this.backupManager.getActiveBackupVersion();
         if (activeVersion == null || currentServerVersion.version != activeVersion) {
             // case when the server side current version is not trusted or is out of sync with the client side active version.
             this.logger.info(
@@ -528,7 +448,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
         const authData = <Curve25519AuthData>currentServerVersion.auth_data;
 
-        const backupKeys = await this.delegate.getBackupDecryptionKey();
+        const backupKeys = await this.getBackupDecryptionKey();
         if (!backupKeys?.decryptionKey) {
             this.logger.debug(`Not checking key backup for session(no decryption key)`);
             this.hasConfigurationProblem = true;
@@ -549,7 +469,7 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
             return null;
         }
 
-        const backupDecryptor = this.delegate.createBackupDecryptor(backupKeys.decryptionKey);
+        const backupDecryptor = this.backupManager.createBackupDecryptor(backupKeys.decryptionKey);
         this.hasConfigurationProblem = false;
         this.configuration = {
             decryptor: backupDecryptor,
@@ -571,6 +491,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }
-        await this.delegate.importRoomKeys(keys);
+        await this.backupManager.importRoomKeys(keys);
     }
 }

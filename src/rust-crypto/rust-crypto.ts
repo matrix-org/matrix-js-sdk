@@ -44,7 +44,6 @@ import {
     EventShieldColour,
     EventShieldReason,
     GeneratedSecretStorageKey,
-    ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
@@ -65,7 +64,7 @@ import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentif
 import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
@@ -349,17 +348,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
-        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
-        const jsonKeys = JSON.stringify(keys);
-        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
-            const importOpt: ImportRoomKeyProgressData = {
-                total: Number(total),
-                successes: Number(progress),
-                stage: "load_keys",
-                failures: 0,
-            };
-            opts?.progressCallback?.(importOpt);
-        });
+        return await this.backupManager.importRoomKeys(keys, opts);
     }
 
     /**
@@ -1191,7 +1180,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error(`getBackupDecryptor key mismatch error`);
         }
 
-        return new RustBackupDecryptor(backupDecryptionKey);
+        return this.backupManager.createBackupDecryptor(backupDecryptionKey);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
