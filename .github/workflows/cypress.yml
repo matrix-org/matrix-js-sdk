@@ -46,6 +46,7 @@ jobs:
             issues: read
             statuses: write
             pull-requests: read
+            deployments: write
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
 
