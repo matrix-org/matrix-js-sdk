@@ -28,7 +28,7 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 /**
  * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
  */
-export enum KeyDownloadError {
+enum KeyDownloadError {
     /** The backup version in use is out of sync with the server version. */
     VERSION_MISMATCH = "VERSION_MISMATCH",
     /** The requested key is not in the backup. */
@@ -61,13 +61,13 @@ type Configuration = {
 };
 
 /**
- * This function is called when an 'unable to decrypt' error occurs. It attempts to download the key from the backup.
+ * Used when an 'unable to decrypt' error occurs. It attempts to download the key from the backup.
  *
  * The current backup API lacks pagination, which can lead to lengthy key retrieval times for large histories (several 10s of minutes).
  * To mitigate this, keys are downloaded on demand as decryption errors occurs.
  * While this approach may result in numerous requests, it improves user experience by reducing wait times for message decryption.
  *
- * The PerSessionKeyBackupDownloader is resistant to backup configuration changes, it will automatically resume querying when
+ * The PerSessionKeyBackupDownloader is resistant to backup configuration changes: it will automatically resume querying when
  * the backup is configured correctly.
  *
  */
@@ -92,7 +92,7 @@ export class PerSessionKeyBackupDownloader {
      * @param olmMachine - The olm machine to use.
      * @param http - The http instance to use.
      * @param logger - The logger to use.
-     * @param maxTimeBetweenRetry - The maximum time to wait between two retries. This is to avoid hammering the server.
+     * @param maxTimeBetweenRetry - The maximum time to wait between two retries in case of errors. To avoid hammering the server.
      *
      */
     public constructor(
@@ -159,6 +159,7 @@ export class PerSessionKeyBackupDownloader {
         return Math.max(Date.now() - lastCheck, 0) < this.maxTimeBetweenRetry;
     }
 
+    // Remembers if we have a configuration problem.
     private hasConfigurationProblem = false;
 
     private pauseLoop(): void {
