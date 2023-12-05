@@ -72,7 +72,7 @@ import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
-import { createDelegate, PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
+import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -146,7 +146,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
 
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
-            createDelegate(this, this.backupManager, this.olmMachine, this.http),
+            this.backupManager,
+            olmMachine,
+            this.http,
             logger,
             KEY_BACKUP_BACKOFF,
         );

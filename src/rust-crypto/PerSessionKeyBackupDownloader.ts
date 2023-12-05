@@ -20,8 +20,8 @@ import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Curve25519AuthData, KeyBackupSession } from "../crypto-api/keybackup";
 import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
-import { CryptoEvent, TypedEventEmitter } from "../matrix";
+import { RustBackupDecryptor, RustBackupManager } from "./backup";
+import { CryptoEvent } from "../matrix";
 import { encodeUri, sleep } from "../utils";
 
 /**
@@ -60,23 +60,6 @@ type Configuration = {
 };
 
 /**
- * Signaling for the Downloader loop.
- * Not yet used by API, yet useful for testing.
- */
-export enum KeyDownloaderEvent {
-    DownloadLoopStateUpdate = "download_loop_started",
-    DownLoopStep = "download_loop_step",
-    QueryKeyError = "query_key_error",
-    KeyImported = "key_imported",
-}
-export type KeyDownloaderEventMap = {
-    [KeyDownloaderEvent.DownloadLoopStateUpdate]: (loopRunning: boolean) => void;
-    [KeyDownloaderEvent.DownLoopStep]: (remaining: number) => void;
-    [KeyDownloaderEvent.QueryKeyError]: (errCode: KeyDownloadError) => void;
-    [KeyDownloaderEvent.KeyImported]: (roomId: string, sessionId: string) => void;
-};
-
-/**
  * This function is called when an 'unable to decrypt' error occurs. It attempts to download the key from the backup.
  *
  * The current backup API lacks pagination, which can lead to lengthy key retrieval times for large histories (several 10s of minutes).
@@ -87,7 +70,7 @@ export type KeyDownloaderEventMap = {
  * the backup is configured correctly.
  *
  */
-export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownloaderEvent, KeyDownloaderEventMap> {
+export class PerSessionKeyBackupDownloader {
     private stopped = false;
 
     private configuration: Configuration | null = null;
@@ -107,7 +90,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
      * @param backupManager - The backup manager to use.
      * @param olmMachine - The olm machine to use.
      * @param http - The http instance to use.
-     * @param cryptoEventEmitter - The crypto event emitter to use.
      * @param logger - The logger to use.
      * @param maxTimeBetweenRetry - The maximum time to wait between two retries. This is to avoid hammering the server.
      *
@@ -116,24 +98,21 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         private readonly backupManager: RustBackupManager,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-        private readonly cryptoEventEmitter: TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>,
         logger: Logger,
         private readonly maxTimeBetweenRetry: number,
     ) {
-        super();
-
         this.logger = logger.getChild("[PerSessionKeyBackupDownloader]");
 
-        cryptoEventEmitter.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        cryptoEventEmitter.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        cryptoEventEmitter.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
+        backupManager.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        backupManager.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        backupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     public stop(): void {
         this.stopped = true;
-        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        this.cryptoEventEmitter.off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
+        this.backupManager.off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
+        this.backupManager.off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
+        this.backupManager.off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
     }
 
     private onBackupStatusChanged(): void {
@@ -144,8 +123,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         this.getOrCreateBackupDecryptor(true).then((decryptor) => {
             if (decryptor) {
                 this.downloadKeysLoop();
-            } else {
-                this.emit(KeyDownloaderEvent.QueryKeyError, KeyDownloadError.CONFIGURATION_ERROR);
             }
         });
     }
@@ -185,7 +162,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
 
     private pauseLoop(): void {
         this.downloadLoopRunning = false;
-        this.emit(KeyDownloaderEvent.DownloadLoopStateUpdate, false);
     }
 
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
@@ -257,25 +233,21 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
         if (this.hasConfigurationProblem) return;
 
         this.downloadLoopRunning = true;
-        this.emit(KeyDownloaderEvent.DownloadLoopStateUpdate, true);
 
         while (this.queuedRequests.length > 0) {
-            this.emit(KeyDownloaderEvent.DownLoopStep, this.queuedRequests.length);
+            // this.emit(KeyDownloaderEvent.DownLoopStep, this.queuedRequests.length);
             // we just peek the first one without removing it, so if a new request for same key comes in while we're
             // processing this one, it won't queue another request.
             const request = this.queuedRequests[0];
             const result = await this.queryKeyBackup(request.roomId, request.megolmSessionId);
             if (this.stopped) {
-                this.emit(KeyDownloaderEvent.QueryKeyError, KeyDownloadError.STOPPED);
                 return;
             }
             if (result.ok) {
                 // We got the encrypted key from backup, let's try to decrypt and import it.
                 try {
                     await this.decryptAndImport(request, result.value);
-                    this.emit(KeyDownloaderEvent.KeyImported, request.roomId, request.megolmSessionId);
                 } catch (e) {
-                    this.emit(KeyDownloaderEvent.QueryKeyError, KeyDownloadError.UNKNOWN_ERROR);
                     this.logger.error(
                         `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
                         e,
@@ -284,7 +256,6 @@ export class PerSessionKeyBackupDownloader extends TypedEventEmitter<KeyDownload
                 // now remove the request from the queue as we've processed it.
                 this.queuedRequests.shift();
             } else {
-                this.emit(KeyDownloaderEvent.QueryKeyError, result.error);
                 this.logger.debug(
                     `Error while downloading key backup for session ${request.megolmSessionId}: ${result.error}`,
                 );
