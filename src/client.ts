@@ -9838,6 +9838,19 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
 
+    // Due to threads, we can get relation events (eg. edits & reactions) that never get
+    // added to a timeline and so cannot be found in their own room (their edit / reaction
+    // still applies to the event it needs to, so it doesn't matter too much). However, if
+    // we try to process notification about this event, we'll get very confused because we
+    // won't be able to find the event in the room, so will assume it must be unread, even
+    // if it's actually read. We therefore skip anything that isn't in the room. This isn't
+    // *great*, so if we can fix the homeless events (eg. with MSC4023) then we should probably
+    // remove this workaround.
+    if (!room.findEventById(eventId)) {
+        logger.info("Decrypted event is not in the room: ignoring");
+        return;
+    }
+
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
     let hasReadEvent;
