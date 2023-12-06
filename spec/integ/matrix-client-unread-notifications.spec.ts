@@ -28,31 +28,69 @@ import {
     NotificationCountType,
     RelationType,
     Room,
+    fixNotificationCountOnDecryption,
 } from "../../src";
 import { TestClient } from "../TestClient";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { mkThread } from "../test-utils/thread";
 import { SyncState } from "../../src/sync";
 
+const userA = "@alice:localhost";
+const userB = "@bob:localhost";
+const selfUserId = userA;
+const selfAccessToken = "aseukfgwef";
+
+function setupTestClient(): [MatrixClient, HttpBackend] {
+    const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
+    const httpBackend = testClient.httpBackend;
+    const client = testClient.client;
+    httpBackend!.when("GET", "/versions").respond(200, {});
+    httpBackend!.when("GET", "/pushrules").respond(200, {});
+    httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+    return [client, httpBackend];
+}
+
+describe("Notification count fixing", () => {
+    let client: MatrixClient | undefined;
+
+    beforeEach(() => {
+        [client] = setupTestClient();
+    });
+
+    it("doesn't increment notification count for events that can't be found in a room", async () => {
+        const roomId = "!room:localhost";
+
+        client!.startClient({ threadSupport: true });
+        const room = new Room(roomId, client!, selfUserId);
+        jest.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
+
+        const event = new MatrixEvent({
+            room_id: roomId,
+            type: "m.reaction",
+            event_id: "$foo",
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: "$foo",
+                    key: "x",
+                },
+            },
+        });
+
+        jest.spyOn(event, "getPushActions").mockReturnValue({
+            notify: true,
+            tweaks: {},
+        });
+
+        fixNotificationCountOnDecryption(client!, event);
+
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
+    });
+});
+
 describe("MatrixClient syncing", () => {
-    const userA = "@alice:localhost";
-    const userB = "@bob:localhost";
-
-    const selfUserId = userA;
-    const selfAccessToken = "aseukfgwef";
-
     let client: MatrixClient | undefined;
     let httpBackend: HttpBackend | undefined;
-
-    const setupTestClient = (): [MatrixClient, HttpBackend] => {
-        const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
-        const httpBackend = testClient.httpBackend;
-        const client = testClient.client;
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
-        return [client, httpBackend];
-    };
 
     beforeEach(() => {
         [client, httpBackend] = setupTestClient();
