@@ -50,7 +50,7 @@ export class RoomList {
         });
     }
 
-    public getRoomEncryption(roomId: string): IRoomEncryption {
+    public getRoomEncryption(roomId: string): IRoomEncryption | null {
         return this.roomEncryption[roomId] || null;
     }
 
