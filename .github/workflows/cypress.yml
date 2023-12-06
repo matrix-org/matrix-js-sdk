@@ -46,6 +46,7 @@ jobs:
             issues: read
             statuses: write
             pull-requests: read
+            deployments: write
         with:
             react-sdk-repository: matrix-org/matrix-react-sdk
 
@@ -69,7 +70,11 @@ jobs:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Cypress skipped
-                  context: "Cypress End to End Tests / cypress"
+
+                  # Keep in step with the `context` that is updated by `Sibz/github-status-action`
+                  # in matrix-org/matrix-react-sdk/.github/workflows/cypress.yaml.
+                  context: "${{ github.workflow }} / cypress"
+
                   sha: "${{ github.event.workflow_run.head_sha }}"
 
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
@@ -77,5 +82,9 @@ jobs:
                   authToken: "${{ secrets.GITHUB_TOKEN }}"
                   state: success
                   description: Playwright skipped
-                  context: "End to End Tests / end-to-end-tests"
+
+                  # Keep in step with the `context` that is updated by `Sibz/github-status-action`
+                  # in matrix-org/matrix-react-sdk/.github/workflows/end-to-end-tests.yaml.
+                  context: "${{ github.workflow }} / end-to-end-tests"
+
                   sha: "${{ github.event.workflow_run.head_sha }}"
