@@ -105,10 +105,10 @@ describe("PerSessionKeyBackupDownloader", () => {
         } as unknown as Mocked<OlmMachine>;
 
         downloader = new PerSessionKeyBackupDownloader(
-            mockRustBackupManager,
+            logger,
             mockOlmMachine,
             mockHttp,
-            logger,
+            mockRustBackupManager,
             BACKOFF_TIME,
         );
 
@@ -428,79 +428,6 @@ describe("PerSessionKeyBackupDownloader", () => {
             await a1Imported;
             await b1Imported;
             await c1Imported;
-        });
-
-        it("If reset from other session, loop should stop until new decryption key is known", async () => {
-            // there is a backup
-            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
-            // It's trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
-            // And we have the key in cache
-            mockOlmMachine.getBackupKeys.mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
-                decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
-            } as unknown as RustSdkCryptoJs.BackupKeys);
-
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
-                overwriteRoutes: true,
-            });
-
-            // @ts-ignore
-            const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
-
-            const a0Imported = expectSessionImported("!roomA", "sessionA0");
-
-            downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-
-            await a0Imported;
-
-            // Now some other session resets the backup and there is a new version
-            // the room_keys/keys endpoint will throw
-            fetchMock.get(
-                `express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`,
-                {
-                    status: 404,
-                    body: {
-                        errcode: "M_NOT_FOUND",
-                        error: "Unknown backup version",
-                    },
-                },
-                { overwriteRoutes: true },
-            );
-
-            downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
-
-            await jest.runAllTimersAsync();
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "VERSION_MISMATCH" }));
-
-            // there is a backup
-            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue({
-                ...TestData.SIGNED_BACKUP_DATA,
-                version: "2",
-            });
-            // It's trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue("2");
-
-            // The new backup is detected, the loop should resume but the cached key is still the old one
-            mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
-
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "VERSION_MISMATCH" }));
-
-            // Now the new key is cached
-            mockOlmMachine.getBackupKeys.mockResolvedValue({
-                backupVersion: "2",
-                decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
-            } as unknown as RustSdkCryptoJs.BackupKeys);
-
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
-                overwriteRoutes: true,
-            });
-
-            const a1Imported = expectSessionImported("!roomA", "sessionA1");
-
-            mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
-
-            await a1Imported;
         });
     });
 

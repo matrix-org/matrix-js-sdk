@@ -173,6 +173,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // importing keys from backup if needed.
         this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
     }
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeys
+     *
+     * @param keys - a list of session export objects
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
         const jsonKeys = JSON.stringify(keys);

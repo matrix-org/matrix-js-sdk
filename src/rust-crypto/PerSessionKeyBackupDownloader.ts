@@ -29,24 +29,27 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend";
  * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
  */
 enum KeyDownloadError {
-    /** The backup version in use is out of sync with the server version. */
-    VERSION_MISMATCH = "VERSION_MISMATCH",
     /** The requested key is not in the backup. */
     MISSING_DECRYPTION_KEY = "MISSING_DECRYPTION_KEY",
     /** A network error occurred while trying to get the key. */
     NETWORK_ERROR = "NETWORK_ERROR",
-    /** The loop as been stopped. */
+    /** The loop has been stopped. */
     STOPPED = "STOPPED",
     /** An unknown error occurred while decrypting/importing the key */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
     /** The server is rate limiting us. */
     RATE_LIMITED = "RATE_LIMITED",
-    /** The backup is not configured correctly, can be that there is no backup, that it's not trusted
-     * , that we don't have the correct key in cache... */
+    /** The backup is not configured correctly.
+     *
+     * Example problems can include:
+     *   * There is no backup
+     *   * Backup is not trusted
+     *   * We don't have the correct key in cache
+     */
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR",
 }
 
-/** Helper type for requested session*/
+/** Details of a megolm session whose key we are trying to fetch. */
 type SessionInfo = { roomId: string; megolmSessionId: string };
 
 /** Helper type for the result of a key download. */
@@ -69,21 +72,31 @@ type Configuration = {
  *
  * The PerSessionKeyBackupDownloader is resistant to backup configuration changes: it will automatically resume querying when
  * the backup is configured correctly.
- *
  */
 export class PerSessionKeyBackupDownloader {
     private stopped = false;
 
+    /** The version and decryption key to use with current backup if all setup correctly */
     private configuration: Configuration | null = null;
 
-    /** We remember when a session was requested and not found in backup to avoid query again too soon. */
-    private sessionLastCheckAttemptedTime: Record<string, number> = {};
+    /** We remember when a session was requested and not found in backup to avoid query again too soon.
+     * Map of session_id to timestamp */
+    private sessionLastCheckAttemptedTime: Map<string, number> = new Map();
 
-    private readonly configurationChangeHandler = (): void => {
-        this.onBackupStatusChanged();
-    };
-
+    /** The logger to use */
     private readonly logger: Logger;
+
+    /** Whether the download loop is running. */
+    private downloadLoopRunning = false;
+
+    /** The list of requests that are queued. */
+    private queuedRequests: SessionInfo[] = [];
+
+    // Remembers if we have a configuration problem.
+    private hasConfigurationProblem = false;
+
+    /** The current server backup version check promise. To avoid doing a server call if one is in flight. */
+    private currentBackupVersionCheck: Promise<Configuration | null> | null = null;
 
     /**
      * Creates a new instance of PerSessionKeyBackupDownloader.
@@ -92,101 +105,21 @@ export class PerSessionKeyBackupDownloader {
      * @param olmMachine - The olm machine to use.
      * @param http - The http instance to use.
      * @param logger - The logger to use.
-     * @param maxTimeBetweenRetry - The maximum time to wait between two retries in case of errors. To avoid hammering the server.
+     * @param backoffDuration - The minimum time to wait between two retries in case of errors. To avoid hammering the server.
      *
      */
     public constructor(
-        private readonly backupManager: RustBackupManager,
+        logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-        logger: Logger,
-        private readonly maxTimeBetweenRetry: number,
+        private readonly backupManager: RustBackupManager,
+        private readonly backoffDuration: number,
     ) {
         this.logger = logger.getChild("[PerSessionKeyBackupDownloader]");
 
-        backupManager.on(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        backupManager.on(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        backupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
-    }
-
-    public stop(): void {
-        this.stopped = true;
-        this.backupManager.off(CryptoEvent.KeyBackupStatus, this.configurationChangeHandler);
-        this.backupManager.off(CryptoEvent.KeyBackupFailed, this.configurationChangeHandler);
-        this.backupManager.off(CryptoEvent.KeyBackupDecryptionKeyCached, this.configurationChangeHandler);
-    }
-
-    private onBackupStatusChanged(): void {
-        this.logger.info(`Key backup status change => check configuration`);
-        // we want to check configuration
-        this.hasConfigurationProblem = false;
-        this.configuration = null;
-        this.getOrCreateBackupDecryptor(true).then((decryptor) => {
-            if (decryptor) {
-                this.downloadKeysLoop();
-            }
-        });
-    }
-
-    private downloadLoopRunning = false;
-
-    private queuedRequests: SessionInfo[] = [];
-
-    private isAlreadyInQueue(roomId: string, megolmSessionId: string): boolean {
-        return (
-            this.queuedRequests.findIndex((info) => {
-                return info.roomId == roomId && info.megolmSessionId == megolmSessionId;
-            }) != -1
-        );
-    }
-
-    private markAsNotFoundInBackup(megolmSessionId: string): void {
-        const now = Date.now();
-        this.sessionLastCheckAttemptedTime[megolmSessionId] = now;
-        // if too big make some cleaning to keep under control
-        if (Object.keys(this.sessionLastCheckAttemptedTime).length > 100) {
-            for (const key in this.sessionLastCheckAttemptedTime) {
-                if (Math.max(now - this.sessionLastCheckAttemptedTime[key], 0) > this.maxTimeBetweenRetry) {
-                    delete this.sessionLastCheckAttemptedTime[key];
-                }
-            }
-        }
-    }
-
-    private wasRequestedRecently(megolmSessionId: string): boolean {
-        const lastCheck = this.sessionLastCheckAttemptedTime[megolmSessionId];
-        if (!lastCheck) return false;
-        return Math.max(Date.now() - lastCheck, 0) < this.maxTimeBetweenRetry;
-    }
-
-    // Remembers if we have a configuration problem.
-    private hasConfigurationProblem = false;
-
-    private pauseLoop(): void {
-        this.downloadLoopRunning = false;
-    }
-
-    private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
-        try {
-            return await this.olmMachine.getBackupKeys();
-        } catch (e) {
-            return null;
-        }
-    }
-
-    private async requestRoomKeyFromBackup(
-        version: string,
-        roomId: string,
-        sessionId: string,
-    ): Promise<KeyBackupSession> {
-        const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
-            $roomId: roomId,
-            $sessionId: sessionId,
-        });
-
-        return await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
-            prefix: ClientPrefix.V3,
-        });
+        backupManager.on(CryptoEvent.KeyBackupStatus, this.onBackupStatusChanged);
+        backupManager.on(CryptoEvent.KeyBackupFailed, this.onBackupStatusChanged);
+        backupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.onBackupStatusChanged);
     }
 
     /**
@@ -227,6 +160,93 @@ export class PerSessionKeyBackupDownloader {
         this.downloadKeysLoop();
     }
 
+    public stop(): void {
+        this.stopped = true;
+        this.backupManager.off(CryptoEvent.KeyBackupStatus, this.onBackupStatusChanged);
+        this.backupManager.off(CryptoEvent.KeyBackupFailed, this.onBackupStatusChanged);
+        this.backupManager.off(CryptoEvent.KeyBackupDecryptionKeyCached, this.onBackupStatusChanged);
+    }
+
+    /**
+     * Called when the backup status changes (CryptoEvents)
+     * This will trigger a check of the backup configuration.
+     */
+    private onBackupStatusChanged = (): void => {
+        // we want to check configuration
+        this.hasConfigurationProblem = false;
+        this.configuration = null;
+        this.getOrCreateBackupConfiguration(true).then((decryptor) => {
+            if (decryptor) {
+                this.downloadKeysLoop();
+            }
+        });
+    };
+
+    /** Returns true if the megolm session is already queued for download. */
+    private isAlreadyInQueue(roomId: string, megolmSessionId: string): boolean {
+        return this.queuedRequests.some((info) => {
+            return info.roomId == roomId && info.megolmSessionId == megolmSessionId;
+        });
+    }
+
+    /**
+     * Marks the session as not found in backup, to avoid retrying to soon for a key not in backup
+     * @param megolmSessionId - The megolm session ID that is missing.
+     * */
+    private markAsNotFoundInBackup(megolmSessionId: string): void {
+        const now = Date.now();
+        this.sessionLastCheckAttemptedTime.set(megolmSessionId, now);
+        // if too big make some cleaning to keep under control
+        if (this.sessionLastCheckAttemptedTime.size > 100) {
+            this.sessionLastCheckAttemptedTime = new Map(
+                Array.from(this.sessionLastCheckAttemptedTime).filter((sid, ts) => {
+                    return Math.max(now - ts, 0) < this.backoffDuration;
+                }),
+            );
+        }
+    }
+
+    /** Returns true if the session was requested recently. */
+    private wasRequestedRecently(megolmSessionId: string): boolean {
+        const lastCheck = this.sessionLastCheckAttemptedTime.get(megolmSessionId);
+        if (!lastCheck) return false;
+        return Math.max(Date.now() - lastCheck, 0) < this.backoffDuration;
+    }
+
+    private pauseLoop(): void {
+        this.downloadLoopRunning = false;
+    }
+
+    private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
+        try {
+            return await this.olmMachine.getBackupKeys();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Requests a key from the server side backup.
+     * @param version - The backup version to use.
+     * @param roomId - The room ID of the room where the error occurred.
+     * @param sessionId - The megolm session ID that is missing.
+     *
+     */
+    private async requestRoomKeyFromBackup(
+        version: string,
+        roomId: string,
+        sessionId: string,
+    ): Promise<KeyBackupSession> {
+        const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+
+        return await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    }
+
     private async downloadKeysLoop(): Promise<void> {
         if (this.downloadLoopRunning) return;
 
@@ -237,7 +257,6 @@ export class PerSessionKeyBackupDownloader {
         this.downloadLoopRunning = true;
 
         while (this.queuedRequests.length > 0) {
-            // this.emit(KeyDownloaderEvent.DownLoopStep, this.queuedRequests.length);
             // we just peek the first one without removing it, so if a new request for same key comes in while we're
             // processing this one, it won't queue another request.
             const request = this.queuedRequests[0];
@@ -262,12 +281,6 @@ export class PerSessionKeyBackupDownloader {
                     `Error while downloading key backup for session ${request.megolmSessionId}: ${result.error}`,
                 );
                 switch (result.error) {
-                    case KeyDownloadError.VERSION_MISMATCH: {
-                        // We don't have the correct decryption key, so stop the loop.
-                        // If we get the key later, we will retry.
-                        this.pauseLoop();
-                        return;
-                    }
                     case KeyDownloadError.MISSING_DECRYPTION_KEY: {
                         this.markAsNotFoundInBackup(request.megolmSessionId);
                         // continue for next one
@@ -281,12 +294,12 @@ export class PerSessionKeyBackupDownloader {
                     }
                     case KeyDownloadError.RATE_LIMITED: {
                         // we want to retry
-                        await sleep(result.retryAfterMs ?? this.maxTimeBetweenRetry);
+                        await sleep(result.retryAfterMs ?? this.backoffDuration);
                         break;
                     }
                     case KeyDownloadError.NETWORK_ERROR: {
                         // We don't want to hammer if there is a problem, so wait a bit.
-                        await sleep(this.maxTimeBetweenRetry);
+                        await sleep(this.backoffDuration);
                         break;
                     }
                     case KeyDownloadError.STOPPED:
@@ -298,6 +311,7 @@ export class PerSessionKeyBackupDownloader {
         }
         this.pauseLoop();
     }
+
     /**
      * Query the backup for a key.
      *
@@ -305,12 +319,12 @@ export class PerSessionKeyBackupDownloader {
      * @param targetSessionId - ID of the session for which to check backup.
      */
     private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<KeyDownloadResult> {
-        const configuration = await this.getOrCreateBackupDecryptor(false);
+        const configuration = await this.getOrCreateBackupConfiguration(false);
         if (!configuration) {
             return { ok: false, error: KeyDownloadError.CONFIGURATION_ERROR };
         }
 
-        this.logger.debug(`--> Checking key backup for session ${targetSessionId}`);
+        this.logger.debug(`Checking key backup for session ${targetSessionId}`);
 
         try {
             const res = await this.requestRoomKeyFromBackup(configuration.backupVersion, targetRoomId, targetSessionId);
@@ -333,12 +347,8 @@ export class PerSessionKeyBackupDownloader {
                     //     - "error": "No room_keys found" if the key is missing.
                     // For now we check the error message, but this is not ideal.
                     // It's useful to know if the key is missing or if the version is wrong.
-                    // As it's not spec'ed, will work only with synapse, but it's better than nothing?
-                    // Other implementations will consider this as a missing key, but soon after a backup status
-                    // change will trigger a configuration check for future keys (this one won't be retied though)
-                    if (e.data.error == "Unknown backup version") {
-                        return { ok: false, error: KeyDownloadError.VERSION_MISMATCH };
-                    }
+                    // As it's not spec'ed, we fallback on considering the key has not in backup,
+                    // notice that this request will be lost if the backup is not configured correctly.
                     return { ok: false, error: KeyDownloadError.MISSING_DECRYPTION_KEY };
                 }
                 if (errCode == "M_LIMIT_EXCEEDED") {
@@ -351,7 +361,7 @@ export class PerSessionKeyBackupDownloader {
                         return {
                             ok: false,
                             error: KeyDownloadError.RATE_LIMITED,
-                            retryAfterMs: this.maxTimeBetweenRetry,
+                            retryAfterMs: this.backoffDuration,
                         };
                     }
                 }
@@ -360,9 +370,33 @@ export class PerSessionKeyBackupDownloader {
         }
     }
 
-    private currentBackupVersionCheck: Promise<Configuration | null> | null = null;
+    private async decryptAndImport(sessionInfo: SessionInfo, data: KeyBackupSession): Promise<void> {
+        const configuration = await this.getOrCreateBackupConfiguration(false);
 
-    private async getOrCreateBackupDecryptor(forceCheck: boolean): Promise<Configuration | null> {
+        if (!configuration) {
+            throw new Error("Backup: No configuration");
+        }
+
+        const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
+
+        const keys = await configuration!.decryptor.decryptSessions(sessionsToImport);
+        for (const k of keys) {
+            k.room_id = sessionInfo.roomId;
+        }
+        await this.backupManager.importRoomKeys(keys);
+    }
+
+    /**
+     * Gets the current backup configuration or create one if it doesn't exist.
+     *
+     * When a valid configuration is found it is cached and returned for subsequent calls.
+     * If a check is forced or a check has not yet been done, a new check is done.
+     *
+     * @param forceCheck - If true, force a check of the backup configuration.
+     *
+     * @returns The current backup configuration or null if there is a configuration problem.
+     */
+    private async getOrCreateBackupConfiguration(forceCheck: boolean): Promise<Configuration | null> {
         if (this.configuration) {
             return this.configuration;
         }
@@ -374,7 +408,7 @@ export class PerSessionKeyBackupDownloader {
         // This method can be called rapidly by several emitted CryptoEvent, so we need to make sure that we don't
         // query the server several times.
         if (this.currentBackupVersionCheck != null) {
-            this.logger.debug(`Backup: already checking server version, use current promise`);
+            this.logger.debug(`Already checking server version, use current promise`);
             return await this.currentBackupVersionCheck;
         }
 
@@ -395,10 +429,10 @@ export class PerSessionKeyBackupDownloader {
             this.hasConfigurationProblem = true;
             return null;
         }
-        this.logger.debug(`Got current version from server:${currentServerVersion?.version}`);
+        this.logger.debug(`Got current backup version from server: ${currentServerVersion?.version}`);
 
         if (currentServerVersion?.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
-            this.logger.info(`getBackupDecryptor Unsupported algorithm ${currentServerVersion?.algorithm}`);
+            this.logger.info(`Unsupported algorithm ${currentServerVersion?.algorithm}`);
             this.hasConfigurationProblem = true;
             return null;
         }
@@ -411,26 +445,26 @@ export class PerSessionKeyBackupDownloader {
 
         const activeVersion = await this.backupManager.getActiveBackupVersion();
         if (activeVersion == null || currentServerVersion.version != activeVersion) {
-            // case when the server side current version is not trusted or is out of sync with the client side active version.
+            // Either the current backup version on server side is not trusted, or it is out of sync with the active version on the client side.
             this.logger.info(
-                `The current backup version ${currentServerVersion.version} is not trusted. Active version=${activeVersion}`,
+                `The current backup version on the server (${currentServerVersion.version}) is not trusted. Version we are currently backing up to: ${activeVersion}`,
             );
             this.hasConfigurationProblem = true;
             return null;
         }
 
-        const authData = <Curve25519AuthData>currentServerVersion.auth_data;
+        const authData = currentServerVersion.auth_data as Curve25519AuthData;
 
         const backupKeys = await this.getBackupDecryptionKey();
         if (!backupKeys?.decryptionKey) {
-            this.logger.debug(`Not checking key backup for session(no decryption key)`);
+            this.logger.debug(`Not checking key backup for session (no decryption key)`);
             this.hasConfigurationProblem = true;
             return null;
         }
 
         if (activeVersion != backupKeys.backupVersion) {
             this.logger.debug(
-                `Cached key version <${backupKeys.backupVersion}> doesn't match active backup version <${activeVersion}>`,
+                `Version for which we have a decryption key (${backupKeys.backupVersion}) doesn't match the version we are backing up to (${activeVersion})`,
             );
             this.hasConfigurationProblem = true;
             return null;
@@ -449,21 +483,5 @@ export class PerSessionKeyBackupDownloader {
             backupVersion: activeVersion,
         };
         return this.configuration;
-    }
-
-    private async decryptAndImport(sessionInfo: SessionInfo, data: KeyBackupSession): Promise<void> {
-        const configuration = await this.getOrCreateBackupDecryptor(false);
-
-        if (!configuration) {
-            throw new Error("Backup: No configuration");
-        }
-
-        const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
-
-        const keys = await configuration!.decryptor.decryptSessions(sessionsToImport);
-        for (const k of keys) {
-            k.room_id = sessionInfo.roomId;
-        }
-        await this.backupManager.importRoomKeys(keys);
     }
 }

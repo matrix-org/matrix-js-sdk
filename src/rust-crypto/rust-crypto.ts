@@ -146,10 +146,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
 
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
-            this.backupManager,
-            olmMachine,
+            this.logger,
+            this.olmMachine,
             this.http,
-            logger,
+            this.backupManager,
             KEY_BACKUP_BACKOFF,
         );
 
