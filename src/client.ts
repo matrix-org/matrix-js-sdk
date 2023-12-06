@@ -51,7 +51,7 @@ import { decodeBase64, encodeBase64 } from "./base64";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from "./ReEmitter";
-import { IRoomEncryption, RoomList } from "./crypto/RoomList";
+import { IRoomEncryption } from "./crypto/RoomList";
 import { logger, Logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
@@ -1272,7 +1272,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected cryptoStore?: CryptoStore;
     protected verificationMethods?: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
-    protected roomList: RoomList;
     protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
     public pushRules?: IPushRules;
@@ -1428,10 +1427,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.livekitServiceURL = opts.livekitServiceURL;
 
-        // List of which rooms have encryption enabled: separate from crypto because
-        // we still want to know which rooms are encrypted even if crypto is disabled:
-        // we don't want to start sending unencrypted events to them.
-        this.roomList = new RoomList(this.cryptoStore);
         this.roomNameGenerator = opts.roomNameGenerator;
 
         this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
@@ -2233,10 +2228,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.logger.debug("Crypto: Starting up crypto store...");
         await this.cryptoStore.startup();
 
-        // initialise the list of encrypted rooms (whether or not crypto is enabled)
-        this.logger.debug("Crypto: initialising roomlist...");
-        await this.roomList.init();
-
         const userId = this.getUserId();
         if (userId === null) {
             throw new Error(
@@ -2251,15 +2242,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
-        const crypto = new Crypto(
-            this,
-            userId,
-            this.deviceId,
-            this.store,
-            this.cryptoStore,
-            this.roomList,
-            this.verificationMethods!,
-        );
+        const crypto = new Crypto(this, userId, this.deviceId, this.store, this.cryptoStore, this.verificationMethods!);
 
         this.reEmitter.reEmit(crypto, [
             CryptoEvent.KeyBackupFailed,
@@ -3283,7 +3266,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we don't have an m.room.encrypted event, but that might be because
         // the server is hiding it from us. Check the store to see if it was
         // previously encrypted.
-        return this.roomList.isRoomEncrypted(roomId);
+        return this.crypto?.isRoomEncrypted(roomId) ?? false;
     }
 
     /**
@@ -4020,7 +4003,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const roomEncryption = this.roomList.getRoomEncryption(roomId);
+        const roomEncryption = this.crypto?.getRoomEncryption(roomId);
         if (!roomEncryption) {
             // unknown room, or unencrypted room
             this.logger.error("Unknown room.  Not sharing decryption keys");
