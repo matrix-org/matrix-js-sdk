@@ -296,8 +296,6 @@ describe("PerSessionKeyBackupDownloader", () => {
     });
 
     describe("Given no usable backup available", () => {
-        // let loopPausedPromise: Promise<void>;
-        // let configurationErrorPromise: Promise<void>;
         let keyQuerySpy: SpyInstance;
 
         beforeEach(async () => {

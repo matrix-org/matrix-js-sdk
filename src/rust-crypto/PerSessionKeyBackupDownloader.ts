@@ -31,7 +31,7 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 enum KeyDownloadErrorCode {
     /** The requested key is not in the backup. */
     MISSING_DECRYPTION_KEY = "MISSING_DECRYPTION_KEY",
-    /** A network error occurred while trying to get the key. */
+    /** A network error occurred while trying to download the key from backup. */
     NETWORK_ERROR = "NETWORK_ERROR",
     /** The loop has been stopped. */
     STOPPED = "STOPPED",
@@ -343,10 +343,9 @@ export class PerSessionKeyBackupDownloader {
                     // Synapse will return:
                     //     - "error": "Unknown backup version" if the version is wrong.
                     //     - "error": "No room_keys found" if the key is missing.
-                    // For now we check the error message, but this is not ideal.
                     // It's useful to know if the key is missing or if the version is wrong.
-                    // As it's not spec'ed, we fall back on considering the key is not in backup,
-                    // notice that this request will be lost if instead the backup got out of sync (updated from other session).
+                    // As it's not spec'ed, we fall back on considering the key is not in backup.
+                    // Notice that this request will be lost if instead the backup got out of sync (updated from other session).
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
                 if (errCode == "M_LIMIT_EXCEEDED") {

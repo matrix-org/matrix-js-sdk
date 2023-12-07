@@ -921,10 +921,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         };
 
         it("If current backup has changed, the manager should switch to the new one on UTD", async () => {
-            // fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
-
-            // aliceClient = await initTestClient();
-
             // =====
             // First ensure that the client checks for keys using the backup version 1
             /// =====
