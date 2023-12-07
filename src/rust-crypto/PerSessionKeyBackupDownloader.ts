@@ -258,56 +258,59 @@ export class PerSessionKeyBackupDownloader {
 
         this.downloadLoopRunning = true;
 
-        while (this.queuedRequests.length > 0) {
-            // we just peek the first one without removing it, so if a new request for same key comes in while we're
-            // processing this one, it won't queue another request.
-            const request = this.queuedRequests[0];
-            try {
-                const result = await this.queryKeyBackup(request.roomId, request.megolmSessionId);
-
-                if (this.stopped) {
-                    return;
-                }
-                // We got the encrypted key from backup, let's try to decrypt and import it.
+        try {
+            while (this.queuedRequests.length > 0) {
+                // we just peek the first one without removing it, so if a new request for same key comes in while we're
+                // processing this one, it won't queue another request.
+                const request = this.queuedRequests[0];
                 try {
-                    await this.decryptAndImport(request, result);
-                } catch (e) {
-                    this.logger.error(
-                        `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
-                        e,
-                    );
-                }
-                // now remove the request from the queue as we've processed it.
-                this.queuedRequests.shift();
-            } catch (err) {
-                if (err instanceof KeyDownloadError) {
-                    switch (err.code) {
-                        case KeyDownloadErrorCode.MISSING_DECRYPTION_KEY:
-                            this.markAsNotFoundInBackup(request.megolmSessionId);
-                            // continue for next one
-                            this.queuedRequests.shift();
-                            break;
-                        case KeyDownloadErrorCode.NETWORK_ERROR:
-                            // We don't want to hammer if there is a problem, so wait a bit.
-                            await sleep(KEY_BACKUP_BACKOFF);
-                            break;
-                        case KeyDownloadErrorCode.STOPPED:
-                            // If the downloader was stopped, we don't want to retry.
-                            this.downloadLoopRunning = false;
-                            return;
-                        case KeyDownloadErrorCode.CONFIGURATION_ERROR:
-                            // Backup is not configured correctly, so stop the loop.
-                            this.downloadLoopRunning = false;
-                            return;
+                    const result = await this.queryKeyBackup(request.roomId, request.megolmSessionId);
+
+                    if (this.stopped) {
+                        return;
                     }
-                } else if (err instanceof KeyDownloadRateLimit) {
-                    // we want to retry after the backoff time
-                    await sleep(err.retryMillis);
+                    // We got the encrypted key from backup, let's try to decrypt and import it.
+                    try {
+                        await this.decryptAndImport(request, result);
+                    } catch (e) {
+                        this.logger.error(
+                            `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
+                            e,
+                        );
+                    }
+                    // now remove the request from the queue as we've processed it.
+                    this.queuedRequests.shift();
+                } catch (err) {
+                    if (err instanceof KeyDownloadError) {
+                        switch (err.code) {
+                            case KeyDownloadErrorCode.MISSING_DECRYPTION_KEY:
+                                this.markAsNotFoundInBackup(request.megolmSessionId);
+                                // continue for next one
+                                this.queuedRequests.shift();
+                                break;
+                            case KeyDownloadErrorCode.NETWORK_ERROR:
+                                // We don't want to hammer if there is a problem, so wait a bit.
+                                await sleep(KEY_BACKUP_BACKOFF);
+                                break;
+                            case KeyDownloadErrorCode.STOPPED:
+                                // If the downloader was stopped, we don't want to retry.
+                                this.downloadLoopRunning = false;
+                                return;
+                            case KeyDownloadErrorCode.CONFIGURATION_ERROR:
+                                // Backup is not configured correctly, so stop the loop.
+                                this.downloadLoopRunning = false;
+                                return;
+                        }
+                    } else if (err instanceof KeyDownloadRateLimit) {
+                        // we want to retry after the backoff time
+                        await sleep(err.retryMillis);
+                    }
                 }
             }
+        } finally {
+            // all pending request have been processed, we can stop the loop.
+            this.downloadLoopRunning = false;
         }
-        // all pending request have been processed, we can stop the loop.
-        this.downloadLoopRunning = false;
     }
 
     /**
