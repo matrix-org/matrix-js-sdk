@@ -1211,6 +1211,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
+        await this.backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
