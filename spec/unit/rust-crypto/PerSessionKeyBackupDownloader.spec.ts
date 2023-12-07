@@ -241,8 +241,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
             await jest.runAllTimersAsync();
 
-            expect(spy).toHaveReturnedWith(Promise.resolve({ ok: false, error: "MISSING_DECRYPTION_KEY" }));
             expect(spy).toHaveBeenCalledTimes(1);
+            const returnedPromise = spy.mock.results[0].value;
+            await expect(returnedPromise).rejects.toThrow("Failed to get key from backup: MISSING_DECRYPTION_KEY");
 
             // Should not query again for a key not in backup
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
@@ -257,7 +258,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(spy).toHaveBeenCalledTimes(2);
-            expect(spy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "MISSING_DECRYPTION_KEY" }));
+            await expect(spy.mock.results[1].value).rejects.toThrow(
+                "Failed to get key from backup: MISSING_DECRYPTION_KEY",
+            );
         });
 
         it("Should stop properly", async () => {
@@ -318,7 +321,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
             await jest.runAllTimersAsync();
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "CONFIGURATION_ERROR" }));
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: CONFIGURATION_ERROR",
+            );
         });
 
         it("Should not query server if backup not active", async () => {
@@ -331,7 +336,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
             await jest.runAllTimersAsync();
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "CONFIGURATION_ERROR" }));
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: CONFIGURATION_ERROR",
+            );
         });
 
         it("Should stop if backup key is not cached", async () => {
@@ -345,7 +352,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
             await jest.runAllTimersAsync();
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "CONFIGURATION_ERROR" }));
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: CONFIGURATION_ERROR",
+            );
         });
 
         it("Should stop if backup key cached as wrong version", async () => {
@@ -362,8 +371,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
             await jest.runAllTimersAsync();
-            // await loopPausedPromise;
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "CONFIGURATION_ERROR" }));
+
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: CONFIGURATION_ERROR",
+            );
         });
 
         it("Should stop if backup key version does not match the active one", async () => {
@@ -380,8 +391,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
             await jest.runAllTimersAsync();
-            // await loopPausedPromise;
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "CONFIGURATION_ERROR" }));
+
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: CONFIGURATION_ERROR",
+            );
         });
     });
 
@@ -475,17 +488,22 @@ describe("PerSessionKeyBackupDownloader", () => {
             const rateDeferred = defer<void>();
             // @ts-ignore
             keyQuerySpy.mockImplementation(async (targetRoomId: string, targetSessionId: string) => {
-                const result = await originalImplementation(targetRoomId, targetSessionId);
-                if (!result.ok && result.error === "RATE_LIMITED") {
-                    rateDeferred.resolve();
+                try {
+                    return await originalImplementation(targetRoomId, targetSessionId);
+                } catch (err: any) {
+                    if (err.name === "KeyDownloadRateLimit") {
+                        rateDeferred.resolve();
+                    }
+                    throw err;
                 }
-                return result;
             });
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
 
             await rateDeferred.promise;
             expect(keyQuerySpy).toHaveBeenCalledTimes(1);
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "RATE_LIMITED" }));
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: rate limited",
+            );
 
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
                 overwriteRoutes: true,
@@ -522,11 +540,14 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // @ts-ignore
             keyQuerySpy.mockImplementation(async (targetRoomId: string, targetSessionId: string) => {
-                const result = await originalImplementation(targetRoomId, targetSessionId);
-                if (!result.ok && result.error === "NETWORK_ERROR") {
-                    errorDeferred.resolve();
+                try {
+                    return await originalImplementation(targetRoomId, targetSessionId);
+                } catch (err: any) {
+                    if (err.name === "KeyDownloadError") {
+                        errorDeferred.resolve();
+                    }
+                    throw err;
                 }
-                return result;
             });
             const keyImported = expectSessionImported("!roomA", "sessionA0");
 
@@ -534,7 +555,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             await errorDeferred.promise;
             await Promise.resolve();
 
-            expect(keyQuerySpy).toHaveReturnedWith(Promise.resolve({ ok: false, error: "NETWORK_ERROR" }));
+            await expect(keyQuerySpy.mock.results[0].value).rejects.toThrow(
+                "Failed to get key from backup: NETWORK_ERROR",
+            );
 
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
                 overwriteRoutes: true,
@@ -580,9 +603,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
             await jest.runAllTimersAsync();
 
-            expect(keyQuerySpy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "UNKNOWN_ERROR" }));
-
             await keyImported.promise;
+
+            expect(keyQuerySpy).toHaveBeenCalledTimes(2);
+            expect(mockRustBackupManager.importRoomKeys).toHaveBeenCalledTimes(2);
         });
     });
 });
