@@ -67,6 +67,10 @@ export async function initRustCrypto(
         storePrefix ?? undefined,
         (storePrefix && storePassphrase) ?? undefined,
     );
+
+    // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.
+    olmMachine.roomKeyRequestsEnabled = false;
+
     const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
