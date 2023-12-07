@@ -219,10 +219,6 @@ export class PerSessionKeyBackupDownloader {
         return Math.max(Date.now() - lastCheck, 0) < KEY_BACKUP_BACKOFF;
     }
 
-    private pauseLoop(): void {
-        this.downloadLoopRunning = false;
-    }
-
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
         try {
             return await this.olmMachine.getBackupKeys();
@@ -297,11 +293,11 @@ export class PerSessionKeyBackupDownloader {
                             break;
                         case KeyDownloadErrorCode.STOPPED:
                             // If the downloader was stopped, we don't want to retry.
-                            this.pauseLoop();
+                            this.downloadLoopRunning = false;
                             return;
                         case KeyDownloadErrorCode.CONFIGURATION_ERROR:
                             // Backup is not configured correctly, so stop the loop.
-                            this.pauseLoop();
+                            this.downloadLoopRunning = false;
                             return;
                     }
                 } else if (err instanceof KeyDownloadRateLimit) {
@@ -311,7 +307,7 @@ export class PerSessionKeyBackupDownloader {
             }
         }
         // all pending request have been processed, we can stop the loop.
-        this.pauseLoop();
+        this.downloadLoopRunning = false;
     }
 
     /**
