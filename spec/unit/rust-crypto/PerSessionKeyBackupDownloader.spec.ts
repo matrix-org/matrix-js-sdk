@@ -474,7 +474,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 try {
                     return await originalImplementation(targetRoomId, targetSessionId);
                 } catch (err: any) {
-                    if (err.name === "KeyDownloadRateLimit") {
+                    if (err.name === "KeyDownloadRateLimitError") {
                         rateDeferred.resolve();
                     }
                     throw err;

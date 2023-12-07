@@ -55,10 +55,10 @@ class KeyDownloadError extends Error {
     }
 }
 
-class KeyDownloadRateLimit extends Error {
+class KeyDownloadRateLimitError extends Error {
     public constructor(public readonly retryMillis: number) {
         super(`Failed to get key from backup: rate limited`);
-        this.name = "KeyDownloadRateLimit";
+        this.name = "KeyDownloadRateLimitError";
     }
 }
 
@@ -302,7 +302,7 @@ export class PerSessionKeyBackupDownloader {
                                 this.downloadLoopRunning = false;
                                 return;
                         }
-                    } else if (err instanceof KeyDownloadRateLimit) {
+                    } else if (err instanceof KeyDownloadRateLimitError) {
                         // we want to retry after the backoff time
                         await sleep(err.retryMillis);
                     }
@@ -352,10 +352,10 @@ export class PerSessionKeyBackupDownloader {
                     const waitTime = e.data.retry_after_ms;
                     if (waitTime > 0) {
                         this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
-                        throw new KeyDownloadRateLimit(waitTime);
+                        throw new KeyDownloadRateLimitError(waitTime);
                     } else {
                         // apply the default backoff time
-                        throw new KeyDownloadRateLimit(KEY_BACKUP_BACKOFF);
+                        throw new KeyDownloadRateLimitError(KEY_BACKUP_BACKOFF);
                     }
                 }
             }
