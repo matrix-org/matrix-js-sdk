@@ -177,10 +177,10 @@ export class PerSessionKeyBackupDownloader {
      * This will trigger a check of the backup configuration.
      */
     private onBackupStatusChanged = (): void => {
-        // we want to check configuration
+        // we want to force check configuration, so we clear the current one.
         this.hasConfigurationProblem = false;
         this.configuration = null;
-        this.getOrCreateBackupConfiguration(true).then((decryptor) => {
+        this.getOrCreateBackupConfiguration().then((decryptor) => {
             if (decryptor) {
                 // restart the download loop if it was stopped
                 this.downloadKeysLoop();
@@ -321,7 +321,7 @@ export class PerSessionKeyBackupDownloader {
      * @param targetSessionId - ID of the session for which to check backup.
      */
     private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<KeyBackupSession> {
-        const configuration = await this.getOrCreateBackupConfiguration(false);
+        const configuration = await this.getOrCreateBackupConfiguration();
         if (!configuration) {
             throw new KeyDownloadError(KeyDownloadErrorCode.CONFIGURATION_ERROR);
         }
@@ -364,7 +364,7 @@ export class PerSessionKeyBackupDownloader {
     }
 
     private async decryptAndImport(sessionInfo: SessionInfo, data: KeyBackupSession): Promise<void> {
-        const configuration = await this.getOrCreateBackupConfiguration(false);
+        const configuration = await this.getOrCreateBackupConfiguration();
 
         if (!configuration) {
             throw new Error("Backup: No configuration");
@@ -385,16 +385,16 @@ export class PerSessionKeyBackupDownloader {
      * When a valid configuration is found it is cached and returned for subsequent calls.
      * Otherwise, if a check is forced or a check has not yet been done, a new check is done.
      *
-     * @param forceCheck - If true, force a check of the backup configuration.
-     *
      * @returns The backup configuration to use or null if there is a configuration problem.
      */
-    private async getOrCreateBackupConfiguration(forceCheck: boolean): Promise<Configuration | null> {
+    private async getOrCreateBackupConfiguration(): Promise<Configuration | null> {
         if (this.configuration) {
             return this.configuration;
         }
 
-        if (this.hasConfigurationProblem && !forceCheck) {
+        // We already tried to check the configuration and it failed.
+        // We don't want to try again immediately, we will retry if a configuration change is detected.
+        if (this.hasConfigurationProblem) {
             return null;
         }
 
