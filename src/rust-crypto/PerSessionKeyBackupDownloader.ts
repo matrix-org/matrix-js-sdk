@@ -25,6 +25,9 @@ import { CryptoEvent } from "../matrix";
 import { encodeUri, sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 
+// The minimum time to wait between two retries in case of errors. To avoid hammering the server.
+const KEY_BACKUP_BACKOFF = 5000; // ms
+
 /**
  * Enumerates the different kind of errors that can occurs when downloading and importing a key from backup.
  */
@@ -110,15 +113,12 @@ export class PerSessionKeyBackupDownloader {
      * @param olmMachine - The olm machine to use.
      * @param http - The http instance to use.
      * @param logger - The logger to use.
-     * @param backoffDuration - The minimum time to wait between two retries in case of errors. To avoid hammering the server.
-     *
      */
     public constructor(
         logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly backupManager: RustBackupManager,
-        private readonly backoffDuration: number,
     ) {
         this.logger = logger.getChild("[PerSessionKeyBackupDownloader]");
 
@@ -206,7 +206,7 @@ export class PerSessionKeyBackupDownloader {
         if (this.sessionLastCheckAttemptedTime.size > 100) {
             this.sessionLastCheckAttemptedTime = new Map(
                 Array.from(this.sessionLastCheckAttemptedTime).filter((sid, ts) => {
-                    return Math.max(now - ts, 0) < this.backoffDuration;
+                    return Math.max(now - ts, 0) < KEY_BACKUP_BACKOFF;
                 }),
             );
         }
@@ -216,7 +216,7 @@ export class PerSessionKeyBackupDownloader {
     private wasRequestedRecently(megolmSessionId: string): boolean {
         const lastCheck = this.sessionLastCheckAttemptedTime.get(megolmSessionId);
         if (!lastCheck) return false;
-        return Math.max(Date.now() - lastCheck, 0) < this.backoffDuration;
+        return Math.max(Date.now() - lastCheck, 0) < KEY_BACKUP_BACKOFF;
     }
 
     private pauseLoop(): void {
@@ -233,10 +233,10 @@ export class PerSessionKeyBackupDownloader {
 
     /**
      * Requests a key from the server side backup.
+     *
      * @param version - The backup version to use.
      * @param roomId - The room ID of the room where the error occurred.
      * @param sessionId - The megolm session ID that is missing.
-     *
      */
     private async requestRoomKeyFromBackup(
         version: string,
@@ -293,7 +293,7 @@ export class PerSessionKeyBackupDownloader {
                             break;
                         case KeyDownloadErrorCode.NETWORK_ERROR:
                             // We don't want to hammer if there is a problem, so wait a bit.
-                            await sleep(this.backoffDuration);
+                            await sleep(KEY_BACKUP_BACKOFF);
                             break;
                         case KeyDownloadErrorCode.STOPPED:
                             // If the downloader was stopped, we don't want to retry.
@@ -355,7 +355,7 @@ export class PerSessionKeyBackupDownloader {
                         throw new KeyDownloadRateLimit(waitTime);
                     } else {
                         // apply the default backoff time
-                        throw new KeyDownloadRateLimit(this.backoffDuration);
+                        throw new KeyDownloadRateLimit(KEY_BACKUP_BACKOFF);
                     }
                 }
             }
@@ -383,7 +383,7 @@ export class PerSessionKeyBackupDownloader {
      * Gets the current backup configuration or create one if it doesn't exist.
      *
      * When a valid configuration is found it is cached and returned for subsequent calls.
-     * If a check is forced or a check has not yet been done, a new check is done.
+     * Otherwise, if a check is forced or a check has not yet been done, a new check is done.
      *
      * @param forceCheck - If true, force a check of the backup configuration.
      *

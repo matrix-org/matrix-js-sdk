@@ -44,7 +44,8 @@ describe("PerSessionKeyBackupDownloader", () => {
 
     const mockCipherKey: Mocked<KeyBackupSession> = {} as unknown as Mocked<KeyBackupSession>;
 
-    const BACKOFF_TIME = 2000;
+    // matches the const in PerSessionKeyBackupDownloader
+    const BACKOFF_TIME = 5000;
 
     const mockEmitter = new TypedEventEmitter() as TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
 
@@ -104,13 +105,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             getBackupKeys: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
 
-        downloader = new PerSessionKeyBackupDownloader(
-            logger,
-            mockOlmMachine,
-            mockHttp,
-            mockRustBackupManager,
-            BACKOFF_TIME,
-        );
+        downloader = new PerSessionKeyBackupDownloader(logger, mockOlmMachine, mockHttp, mockRustBackupManager);
 
         expectedSession = {};
         mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
@@ -268,12 +263,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             const blockOnServerRequest = defer<void>();
             const requestRoomKeyCalled = defer<void>();
 
-            let callCount = 0;
             // Mock the request to block
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, async (url, request) => {
                 requestRoomKeyCalled.resolve();
                 await blockOnServerRequest.promise;
-                callCount++;
                 return mockCipherKey;
             });
 
@@ -291,7 +284,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(mockRustBackupManager.importRoomKeys).not.toHaveBeenCalled();
-            expect(callCount).toStrictEqual(1);
+            expect(
+                fetchMock.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
+            ).toStrictEqual(1);
         });
     });
 
@@ -304,10 +299,6 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // @ts-ignore
             keyQuerySpy = jest.spyOn(downloader, "queryKeyBackup");
-        });
-
-        afterEach(async () => {
-            fetchMock.mockClear();
         });
 
         it("Should not query server if no backup", async () => {
@@ -397,7 +388,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     });
 
     describe("Given Backup state update", () => {
-        it("After initial sync, when backup become trusted it should request keys for past requests", async () => {
+        it("After initial sync, when backup becomes trusted it should request keys for past requests", async () => {
             // there is a backup
             mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
 
@@ -453,12 +444,6 @@ describe("PerSessionKeyBackupDownloader", () => {
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
-
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
         });
 
         it("Should wait on rate limit error", async () => {

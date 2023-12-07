@@ -81,8 +81,6 @@ interface ISignableObject {
     unsigned?: object;
 }
 
-const KEY_BACKUP_BACKOFF = 5000; // ms
-
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  *
@@ -150,7 +148,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             this.olmMachine,
             this.http,
             this.backupManager,
-            KEY_BACKUP_BACKOFF,
         );
 
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
