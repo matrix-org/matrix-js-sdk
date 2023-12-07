@@ -9854,7 +9854,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     // *great*, so if we can fix the homeless events (eg. with MSC4023) then we should probably
     // remove this workaround.
     if (!room.findEventById(eventId)) {
-        logger.info("Decrypted event is not in the room: ignoring");
+        logger.info(`Decrypted event ${event.getId()} is not in room ${room.roomId}: ignoring`);
         return;
     }
 
