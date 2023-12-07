@@ -3984,10 +3984,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importRoomKeys(keys, {
+        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
             progressCallback,
             untrusted,
-            source: "backup",
         });
 
         /// in case entering the passphrase would add a new signature?
