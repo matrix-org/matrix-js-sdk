@@ -84,7 +84,7 @@ type Configuration = {
 export class PerSessionKeyBackupDownloader {
     private stopped = false;
 
-    /** The version and decryption key to use with current backup if all setup correctly */
+    /** The version and decryption key to use with current backup if all set up correctly */
     private configuration: Configuration | null = null;
 
     /** We remember when a session was requested and not found in backup to avoid query again too soon.
@@ -100,7 +100,7 @@ export class PerSessionKeyBackupDownloader {
     /** The list of requests that are queued. */
     private queuedRequests: SessionInfo[] = [];
 
-    // Remembers if we have a configuration problem.
+    /** Remembers if we have a configuration problem. */
     private hasConfigurationProblem = false;
 
     /** The current server backup version check promise. To avoid doing a server call if one is in flight. */
@@ -197,8 +197,9 @@ export class PerSessionKeyBackupDownloader {
 
     /**
      * Marks the session as not found in backup, to avoid retrying to soon for a key not in backup
+     *
      * @param megolmSessionId - The megolm session ID that is missing.
-     * */
+     */
     private markAsNotFoundInBackup(megolmSessionId: string): void {
         const now = Date.now();
         this.sessionLastCheckAttemptedTime.set(megolmSessionId, now);

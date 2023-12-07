@@ -47,8 +47,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     // matches the const in PerSessionKeyBackupDownloader
     const BACKOFF_TIME = 5000;
 
-    const mockEmitter = new TypedEventEmitter() as TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
-
+    let mockEmitter;
     let mockHttp: MatrixHttpApi<IHttpOpts & { onlyData: true }>;
     let mockRustBackupManager: Mocked<RustBackupManager>;
     let mockOlmMachine: Mocked<OlmMachine>;
@@ -56,7 +55,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
     let expectedSession: { [roomId: string]: { [sessionId: string]: IDeferred<void> } };
 
-    async function expectSessionImported(roomId: string, sessionId: string) {
+    function expectSessionImported(roomId: string, sessionId: string) {
         const deferred = defer<void>();
         if (!expectedSession[roomId]) {
             expectedSession[roomId] = {};
@@ -72,6 +71,8 @@ describe("PerSessionKeyBackupDownloader", () => {
     }
 
     beforeEach(async () => {
+        mockEmitter = new TypedEventEmitter() as TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
+
         mockHttp = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
             baseUrl: "http://server/",
             prefix: "",
@@ -89,7 +90,6 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         mockRustBackupManager = {
             getActiveBackupVersion: jest.fn(),
-            getBackupDecryptionKey: jest.fn(),
             requestKeyBackupVersion: jest.fn(),
             importRoomKeys: jest.fn(),
             createBackupDecryptor: jest.fn().mockReturnValue(mockBackupDecryptor),
@@ -176,7 +176,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 }
             });
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             const spy = jest.spyOn(downloader, "queryKeyBackup");
 
             // Call 3 times for same key
@@ -204,7 +204,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
             fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             const spy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
@@ -230,7 +230,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 },
             });
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             const spy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
@@ -297,7 +297,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
             mockOlmMachine.getBackupKeys.mockResolvedValue(null);
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             keyQuerySpy = jest.spyOn(downloader, "queryKeyBackup");
         });
 
@@ -410,7 +410,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomC", "sessionC1");
             await jest.runAllTimersAsync();
 
-            // @ts-ignore
+            // @ts-ignore access to private property
             expect(downloader.hasConfigurationProblem).toEqual(true);
 
             // Now the backup becomes trusted
@@ -466,7 +466,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // @ts-ignore
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
             const rateDeferred = defer<void>();
             // @ts-ignore
@@ -579,7 +579,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 overwriteRoutes: true,
             });
 
-            // @ts-ignore
+            // @ts-ignore access to private function
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
