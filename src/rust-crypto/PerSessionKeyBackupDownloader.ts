@@ -38,14 +38,6 @@ enum KeyDownloadErrorCode {
     NETWORK_ERROR = "NETWORK_ERROR",
     /** The loop has been stopped. */
     STOPPED = "STOPPED",
-    /** The backup is not configured correctly.
-     *
-     * Example problems can include:
-     *   * There is no backup
-     *   * Backup is not trusted
-     *   * We don't have the correct key in cache
-     */
-    CONFIGURATION_ERROR = "CONFIGURATION_ERROR",
 }
 
 class KeyDownloadError extends Error {
@@ -132,7 +124,7 @@ export class PerSessionKeyBackupDownloader {
      *
      * This will try to download the key from the backup if there is a trusted active backup.
      * In case of success the key will be imported and the onRoomKeysUpdated callback will be called
-     * internally by the rust-sdk and decrytion will be retried.
+     * internally by the rust-sdk and decryption will be retried.
      *
      * @param roomId - The room ID of the room where the error occurred.
      * @param megolmSessionId - The megolm session ID that is missing.
@@ -265,14 +257,22 @@ export class PerSessionKeyBackupDownloader {
                 // processing this one, it won't queue another request.
                 const request = this.queuedRequests[0];
                 try {
-                    const result = await this.queryKeyBackup(request.roomId, request.megolmSessionId);
+                    // The backup could have changed between the time we queued the request and now, so we need to check
+                    const configuration = await this.getOrCreateBackupConfiguration();
+                    if (!configuration) {
+                        // Backup is not configured correctly, so stop the loop.
+                        this.downloadLoopRunning = false;
+                        return;
+                    }
+
+                    const result = await this.queryKeyBackup(request.roomId, request.megolmSessionId, configuration);
 
                     if (this.stopped) {
                         return;
                     }
                     // We got the encrypted key from backup, let's try to decrypt and import it.
                     try {
-                        await this.decryptAndImport(request, result);
+                        await this.decryptAndImport(request, result, configuration);
                     } catch (e) {
                         this.logger.error(
                             `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
@@ -297,10 +297,6 @@ export class PerSessionKeyBackupDownloader {
                                 // If the downloader was stopped, we don't want to retry.
                                 this.downloadLoopRunning = false;
                                 return;
-                            case KeyDownloadErrorCode.CONFIGURATION_ERROR:
-                                // Backup is not configured correctly, so stop the loop.
-                                this.downloadLoopRunning = false;
-                                return;
                         }
                     } else if (err instanceof KeyDownloadRateLimitError) {
                         // we want to retry after the backoff time
@@ -319,13 +315,13 @@ export class PerSessionKeyBackupDownloader {
      *
      * @param targetRoomId - ID of the room that the session is used in.
      * @param targetSessionId - ID of the session for which to check backup.
+     * @param configuration - The backup configuration to use.
      */
-    private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<KeyBackupSession> {
-        const configuration = await this.getOrCreateBackupConfiguration();
-        if (!configuration) {
-            throw new KeyDownloadError(KeyDownloadErrorCode.CONFIGURATION_ERROR);
-        }
-
+    private async queryKeyBackup(
+        targetRoomId: string,
+        targetSessionId: string,
+        configuration: Configuration,
+    ): Promise<KeyBackupSession> {
         this.logger.debug(`Checking key backup for session ${targetSessionId}`);
         if (this.stopped) throw new KeyDownloadError(KeyDownloadErrorCode.STOPPED);
         try {
@@ -363,13 +359,11 @@ export class PerSessionKeyBackupDownloader {
         }
     }
 
-    private async decryptAndImport(sessionInfo: SessionInfo, data: KeyBackupSession): Promise<void> {
-        const configuration = await this.getOrCreateBackupConfiguration();
-
-        if (!configuration) {
-            throw new Error("Backup: No configuration");
-        }
-
+    private async decryptAndImport(
+        sessionInfo: SessionInfo,
+        data: KeyBackupSession,
+        configuration: Configuration,
+    ): Promise<void> {
         const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
 
         const keys = await configuration!.decryptor.decryptSessions(sessionsToImport);
