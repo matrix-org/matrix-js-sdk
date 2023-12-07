@@ -376,7 +376,7 @@ export class PerSessionKeyBackupDownloader {
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }
-        await this.backupManager.importRoomKeys(keys);
+        await this.backupManager.importBackedUpRoomKeys(keys);
     }
 
     /**

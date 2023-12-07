@@ -47,7 +47,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     // matches the const in PerSessionKeyBackupDownloader
     const BACKOFF_TIME = 5000;
 
-    let mockEmitter;
+    let mockEmitter: TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
     let mockHttp: MatrixHttpApi<IHttpOpts & { onlyData: true }>;
     let mockRustBackupManager: Mocked<RustBackupManager>;
     let mockOlmMachine: Mocked<OlmMachine>;
@@ -91,7 +91,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         mockRustBackupManager = {
             getActiveBackupVersion: jest.fn(),
             requestKeyBackupVersion: jest.fn(),
-            importRoomKeys: jest.fn(),
+            importBackedUpRoomKeys: jest.fn(),
             createBackupDecryptor: jest.fn().mockReturnValue(mockBackupDecryptor),
             on: jest.fn().mockImplementation((event, listener) => {
                 mockEmitter.on(event, listener);
@@ -108,7 +108,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         downloader = new PerSessionKeyBackupDownloader(logger, mockOlmMachine, mockHttp, mockRustBackupManager);
 
         expectedSession = {};
-        mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
+        mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
             const roomId = keys[0].room_id;
             const sessionId = keys[0].session_id;
             const deferred = expectedSession[roomId] && expectedSession[roomId][sessionId];
@@ -148,7 +148,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                     return TestData.CURVE25519_KEY_BACKUP_DATA;
                 });
             });
-            mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
+            mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
                 awaitKeyImported.resolve();
             });
             mockBackupDecryptor.decryptSessions.mockResolvedValue([TestData.MEGOLM_SESSION_DATA]);
@@ -170,7 +170,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             const awaitKey2Imported = defer<void>();
 
-            mockRustBackupManager.importRoomKeys.mockImplementation(async (keys) => {
+            mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
                 if (keys[0].session_id === "sessionId2") {
                     awaitKey2Imported.resolve();
                 }
@@ -283,7 +283,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // let the first request complete
             await jest.runAllTimersAsync();
 
-            expect(mockRustBackupManager.importRoomKeys).not.toHaveBeenCalled();
+            expect(mockRustBackupManager.importBackedUpRoomKeys).not.toHaveBeenCalled();
             expect(
                 fetchMock.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
             ).toStrictEqual(1);
@@ -562,7 +562,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("On Unknown error on import skip the key and continue", async () => {
             const keyImported = defer<void>();
-            mockRustBackupManager.importRoomKeys
+            mockRustBackupManager.importBackedUpRoomKeys
                 .mockImplementationOnce(async () => {
                     throw new Error("Didn't work");
                 })
@@ -589,7 +589,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await keyImported.promise;
 
             expect(keyQuerySpy).toHaveBeenCalledTimes(2);
-            expect(mockRustBackupManager.importRoomKeys).toHaveBeenCalledTimes(2);
+            expect(mockRustBackupManager.importBackedUpRoomKeys).toHaveBeenCalledTimes(2);
         });
     });
 });
