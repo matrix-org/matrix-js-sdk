@@ -2832,6 +2832,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
 
+                // Track calls to scheduleAllGroupSessionsForBackup. This is
+                // only relevant on legacy encryption.
+                const scheduleAllGroupSessionsForBackup = jest.fn();
+                if (backend === "libolm") {
+                    aliceClient.crypto!.backupManager.scheduleAllGroupSessionsForBackup =
+                        scheduleAllGroupSessionsForBackup;
+                } else {
+                    // With Rust crypto, we don't need to call this function, so
+                    // we call the dummy value here so we pass our later
+                    // expectation.
+                    scheduleAllGroupSessionsForBackup();
+                }
+
                 await aliceClient.getCrypto()!.resetKeyBackup();
                 await awaitDeleteCalled;
                 await newBackupStatusUpdate;
@@ -2843,6 +2856,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(nextVersion).toBeDefined();
                 expect(nextVersion).not.toEqual(currentVersion);
                 expect(nextKey).not.toEqual(currentBackupKey);
+                expect(scheduleAllGroupSessionsForBackup).toHaveBeenCalled();
 
                 // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
                 // ensure that it works anyhow
