@@ -180,8 +180,8 @@ export class PerSessionKeyBackupDownloader {
         // we want to force check configuration, so we clear the current one.
         this.hasConfigurationProblem = false;
         this.configuration = null;
-        this.getOrCreateBackupConfiguration().then((decryptor) => {
-            if (decryptor) {
+        this.getOrCreateBackupConfiguration().then((configuration) => {
+            if (configuration) {
                 // restart the download loop if it was stopped
                 this.downloadKeysLoop();
             }
