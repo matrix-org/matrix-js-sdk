@@ -3646,6 +3646,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Marks all group sessions as needing to be backed up and schedules them to
      * upload in the background as soon as possible.
+     *
+     * (This is done automatically as part of {@link CryptoApi.resetKeyBackup},
+     * so there is probably no need to call this manually.)
      */
     public async scheduleAllGroupSessionsForBackup(): Promise<void> {
         if (!this.crypto) {
@@ -3658,6 +3661,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Marks all group sessions as needing to be backed up without scheduling
      * them to upload in the background.
+     *
+     * (This is done automatically as part of {@link CryptoApi.resetKeyBackup},
+     * so there is probably no need to call this manually.)
+     *
      * @returns Promise which resolves to the number of sessions requiring a backup.
      */
     public flagAllGroupSessionsForBackup(): Promise<number> {
@@ -3977,10 +3984,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importRoomKeys(keys, {
+        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
             progressCallback,
             untrusted,
-            source: "backup",
         });
 
         /// in case entering the passphrase would add a new signature?
@@ -9837,6 +9843,19 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
+
+    // Due to threads, we can get relation events (eg. edits & reactions) that never get
+    // added to a timeline and so cannot be found in their own room (their edit / reaction
+    // still applies to the event it needs to, so it doesn't matter too much). However, if
+    // we try to process notification about this event, we'll get very confused because we
+    // won't be able to find the event in the room, so will assume it must be unread, even
+    // if it's actually read. We therefore skip anything that isn't in the room. This isn't
+    // *great*, so if we can fix the homeless events (eg. with MSC4023) then we should probably
+    // remove this workaround.
+    if (!room.findEventById(eventId)) {
+        logger.info(`Decrypted event ${event.getId()} is not in room ${room.roomId}: ignoring`);
+        return;
+    }
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 

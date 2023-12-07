@@ -1211,6 +1211,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
+        await this.backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
@@ -1894,6 +1895,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         return new LibOlmBackupDecryptor(algorithm);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public importBackedUpRoomKeys(keys: IMegolmSessionData[], opts: ImportRoomKeysOpts = {}): Promise<void> {
+        opts.source = "backup";
+        return this.importRoomKeys(keys, opts);
     }
 
     /**

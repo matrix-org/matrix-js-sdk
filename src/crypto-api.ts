@@ -597,9 +597,10 @@ export interface ImportRoomKeyProgressData {
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
-    // TODO, the rust SDK will always such imported keys as untrusted
+    /** @deprecated the rust SDK will always such imported keys as untrusted */
     untrusted?: boolean;
-    source?: String; // TODO: Enum (backup, file, ??)
+    /** @deprecated not useful externally */
+    source?: string;
 }
 
 /**

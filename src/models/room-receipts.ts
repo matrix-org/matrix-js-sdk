@@ -18,6 +18,7 @@ import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_rece
 import { threadIdForReceipt } from "../client";
 import { Room, RoomEvent } from "./room";
 import { MatrixEvent } from "./event";
+import { logger } from "../logger";
 
 /**
  * The latest receipts we have for a room.
@@ -140,6 +141,11 @@ export class RoomReceipts {
         const event = this.room.findEventById(eventId);
         if (!event) {
             // We don't know whether the user has read it - default to caution and say no.
+            // This shouldn't really happen and feels like it ought to be an exception: let's
+            // log a warn for now.
+            logger.warn(
+                `hasUserReadEvent event ID ${eventId} not found in room ${this.room.roomId}: this shouldn't happen!`,
+            );
             return false;
         }
 
