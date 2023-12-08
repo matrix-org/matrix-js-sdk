@@ -425,7 +425,7 @@ export class RustVerificationRequest
      * this verification.
      */
     public get cancellationCode(): string | null {
-        throw new Error("not implemented");
+        return this.inner.cancelInfo?.cancelCode().toString();
     }
 
     /**
@@ -434,7 +434,14 @@ export class RustVerificationRequest
      * Only defined when phase is Cancelled
      */
     public get cancellingUserId(): string | undefined {
-        throw new Error("not implemented");
+        const cancelInfo = this.inner.cancelInfo;
+        if (!cancelInfo) {
+            return undefined;
+        } else if (cancelInfo.cancelledbyUs()) {
+            return this.olmMachine.userId.toString();
+        } else {
+            return this.inner.otherUserId.toString();
+        }
     }
 }
 
