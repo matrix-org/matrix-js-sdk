@@ -45,6 +45,9 @@ export class RoomEncryptor {
     /** whether the room members have been loaded and tracked for the first time */
     private lazyLoadedMembersResolved = false;
 
+    /** Ensures that there is only one call to shareRoomKeys at a time */
+    private currentShareRoomKeyPromise: Promise<void>;
+
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
@@ -60,6 +63,8 @@ export class RoomEncryptor {
         private encryptionSettings: IContent,
     ) {
         this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
+
+        this.currentShareRoomKeyPromise = Promise.resolve();
 
         // start tracking devices for any users already known to be in this room.
         // Do not load members here, would defeat lazy loading.
@@ -198,16 +203,36 @@ export class RoomEncryptor {
         rustEncryptionSettings.onlyAllowTrustedDevices =
             this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
 
-        const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
-            new RoomId(this.room.roomId),
-            userList,
-            rustEncryptionSettings,
-        );
+        const shareMessages: ToDeviceRequest[] = await this.shareRoomKey(userList, rustEncryptionSettings);
         if (shareMessages) {
             for (const m of shareMessages) {
                 await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
             }
         }
+    }
+
+    /**
+     *  The Rust-SDK requires that we only have one shareRoomKey process in flight at once for a room.
+     *  This method ensures that, by only having one call to shareRoomKey active at once (and making them
+     *  queue up in order).
+     *
+     * @param userList - list of userIDs to share with
+     * @param rustEncryptionSettings - encryption settings to use
+     *
+     * @returns a promise which resolves to the list of ToDeviceRequests to send
+     */
+    private async shareRoomKey(
+        userList: UserId[],
+        rustEncryptionSettings: EncryptionSettings,
+    ): Promise<ToDeviceRequest[]> {
+        const prom = this.currentShareRoomKeyPromise
+            .catch(() => {
+                // any errors in the previous claim will have been reported already, so there is nothing to do here.
+                // we just throw away the error and start anew.
+            })
+            .then(() => this.olmMachine.shareRoomKey(new RoomId(this.room.roomId), userList, rustEncryptionSettings));
+        this.currentShareRoomKeyPromise = prom;
+        return prom;
     }
 
     /**
