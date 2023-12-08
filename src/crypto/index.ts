@@ -480,7 +480,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         logger.debug("Crypto: initialising roomlist...");
         this.roomList = new RoomList(cryptoStore);
-        this.roomList.init();
 
         this.reEmitter = new TypedReEmitter(this);
 
@@ -630,6 +629,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // make sure we are keeping track of our own devices
         // (this is important for key backups & things)
         this.deviceList.startTrackingDeviceList(this.userId);
+
+        logger.debug("Crypto: initialising roomlist...");
+        await this.roomList.init();
 
         logger.log("Crypto: checking for key backup...");
         this.backupManager.checkAndStart();
