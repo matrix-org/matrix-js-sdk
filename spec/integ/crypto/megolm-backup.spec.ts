@@ -18,7 +18,7 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { createClient, CryptoEvent, ICreateClientOpts, MatrixClient, TypedEventEmitter } from "../../../src";
+import { createClient, CryptoEvent, ICreateClientOpts, IEvent, MatrixClient, TypedEventEmitter } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -34,6 +34,7 @@ import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import { flushPromises } from "../../test-utils/flushPromises";
+import { defer, IDeferred } from "../../../src/utils";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 
@@ -885,6 +886,146 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             const noResult = await aliceCrypto.checkKeyBackupAndEnable();
             expect(noResult).toBeNull();
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toBeNull();
+        });
+    });
+
+    describe("Backup Changed from other sessions", () => {
+        beforeEach(async () => {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            // ignore requests to send room key requests
+            fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
+
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            // start after saving the private key
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+            // XXX: should we automatically re-check after a device becomes verified?
+            await waitForDeviceList();
+            await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+        });
+
+        // let aliceClient: MatrixClient;
+
+        const SYNC_RESPONSE = {
+            next_batch: 1,
+            rooms: { join: { [ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } } } },
+        };
+
+        it("If current backup has changed, the manager should switch to the new one on UTD", async () => {
+            // =====
+            // First ensure that the client checks for keys using the backup version 1
+            /// =====
+
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                (url, request) => {
+                    // check that the version is correct
+                    const version = new URLSearchParams(new URL(url).search).get("version");
+                    if (version == "1") {
+                        return testData.CURVE25519_KEY_BACKUP_DATA;
+                    } else {
+                        return {
+                            status: 403,
+                            body: {
+                                current_version: "1",
+                                errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                                error: "Wrong backup version.",
+                            },
+                        };
+                    }
+                },
+                { overwriteRoutes: true },
+            );
+
+            // Send Alice a message that she won't be able to decrypt, and check that she fetches the key from the backup.
+            syncResponder.sendOrQueueSyncResponse(SYNC_RESPONSE);
+            await syncPromise(aliceClient);
+
+            const room = aliceClient.getRoom(ROOM_ID)!;
+            const event = room.getLiveTimeline().getEvents()[0];
+            await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
+
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
+
+            // =====
+            // Second suppose now that the backup has changed to version 2
+            /// =====
+
+            const newBackup = {
+                ...testData.SIGNED_BACKUP_DATA,
+                version: "2",
+            };
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", newBackup, { overwriteRoutes: true });
+            // suppose the new key is now known
+            const aliceCrypto = aliceClient.getCrypto()!;
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                newBackup.version,
+            );
+
+            // A check backup should happen at some point
+            await aliceCrypto.checkKeyBackupAndEnable();
+
+            const awaitHasQueriedNewBackup: IDeferred<void> = defer<void>();
+
+            fetchMock.get(
+                "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
+                (url, request) => {
+                    // check that the version is correct
+                    const version = new URLSearchParams(new URL(url).search).get("version");
+                    if (version == newBackup.version) {
+                        awaitHasQueriedNewBackup.resolve();
+                        return testData.CURVE25519_KEY_BACKUP_DATA;
+                    } else {
+                        // awaitHasQueriedOldBackup.resolve();
+                        return {
+                            status: 403,
+                            body: {
+                                current_version: "2",
+                                errcode: "M_WRONG_ROOM_KEYS_VERSION",
+                                error: "Wrong backup version.",
+                            },
+                        };
+                    }
+                },
+                { overwriteRoutes: true },
+            );
+
+            // Send Alice a message that she won't be able to decrypt, and check that she fetches the key from the new backup.
+            const newMessage: Partial<IEvent> = {
+                type: "m.room.encrypted",
+                room_id: "!room:id",
+                sender: "@alice:localhost",
+                content: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    ciphertext:
+                        "AwgAEpABKvf9FqPW52zeHfeVTn90a3jlBLlx7g6VDEkc2089RQUJoWpSJRiK13E83rN41wgGFJccyfoCr7ZDGJeuGYMGETTrgnLQhLs6JmyPf37JYkzxW8uS8rGUKEqTFQriKhibHVLvVacOlSIObUiKU/V3r176XuixqZF/4eyK9A22JNpInbgI10ZUT6LnApH9LR3FpZbE2zImf1uNPuvp7r0xQbW7CcJjqpH+qTPBD5zFdFnMkc2SnbXCsIOaX11Dm0krWfQz7iA26ZnI1nyZnyh7XPrCnJCRsuQH",
+                    device_id: "WVMJGTSSVB",
+                    sender_key: "E5RiY/YCIrHWaF4u416CqvblC6udK2jt9SJ/h1QeLS0",
+                    session_id: "ybnW+LGdUhoS4fHm1DAEphukO3sZ1GCqZD7UQz7L+GA",
+                },
+                event_id: "$event2",
+                origin_server_ts: 1507753887000,
+            };
+
+            const nextSyncResponse = {
+                next_batch: 2,
+                rooms: { join: { [ROOM_ID]: { timeline: { events: [newMessage] } } } },
+            };
+            syncResponder.sendOrQueueSyncResponse(nextSyncResponse);
+            await syncPromise(aliceClient);
+
+            await awaitHasQueriedNewBackup.promise;
         });
     });
 
