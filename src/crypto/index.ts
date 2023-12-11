@@ -64,7 +64,7 @@ import {
     IUploadKeySignaturesResponse,
     MatrixClient,
 } from "../client";
-import type { IRoomEncryption, RoomList } from "./RoomList";
+import { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
@@ -385,6 +385,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: LegacySecretStorage;
 
+    private readonly roomList: RoomList;
     private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
@@ -473,10 +474,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         private readonly deviceId: string,
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
-        private readonly roomList: RoomList,
         verificationMethods: Array<VerificationMethod | (typeof VerificationBase & { NAME: string })>,
     ) {
         super();
+
+        logger.debug("Crypto: initialising roomlist...");
+        this.roomList = new RoomList(cryptoStore);
+
         this.reEmitter = new TypedReEmitter(this);
 
         if (verificationMethods) {
@@ -625,6 +629,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // make sure we are keeping track of our own devices
         // (this is important for key backups & things)
         this.deviceList.startTrackingDeviceList(this.userId);
+
+        logger.debug("Crypto: initialising roomlist...");
+        await this.roomList.init();
 
         logger.log("Crypto: checking for key backup...");
         this.backupManager.checkAndStart();
@@ -4243,6 +4250,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
         obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
+    }
+
+    /**
+     * @returns true if the room with the supplied ID is encrypted. False if the
+     * room is not encrypted, or is unknown to us.
+     */
+    public isRoomEncrypted(roomId: string): boolean {
+        return this.roomList.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * @returns information about the encryption on the room with the supplied
+     * ID, or null if the room is not encrypted or unknown to us.
+     */
+    public getRoomEncryption(roomId: string): IRoomEncryption | null {
+        return this.roomList.getRoomEncryption(roomId);
     }
 }
 
