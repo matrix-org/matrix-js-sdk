@@ -755,7 +755,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const secretStorageKeyObject = await this.secretStorage.addKey(
             SECRET_STORAGE_ALGORITHM_V1_AES,
-            secretStorageKey.keyInfo,
+            // add the private key in the options in order to encrypt the zero secret for key checks.
+            { ...secretStorageKey.keyInfo, key: secretStorageKey.privateKey },
         );
 
         await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);

@@ -2592,6 +2592,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Wait for the key to be uploaded in the account data
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
+                // check that the key content contains the key check info
+                const keyContent = accountDataAccumulator.accountDataEvents.get(
+                    `m.secret_storage.key.${secretStorageKey}`,
+                )!;
+                // In order to verify if the key is valid, a zero secret is encrypted with the key
+                expect(keyContent.iv).toBeDefined();
+                expect(keyContent.mac).toBeDefined();
+
                 // Return the newly created key in the sync response
                 accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
