@@ -427,7 +427,7 @@ export class RustVerificationRequest
     public get cancellationCode(): string | null {
         const cancelInfo = this.inner.cancelInfo;
         if (cancelInfo) {
-            return cancelInfo.cancelCode().toString();
+            return cancelInfo.cancelCode();
         } else {
             return null;
         }
