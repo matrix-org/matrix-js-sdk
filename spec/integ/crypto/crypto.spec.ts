@@ -2567,6 +2567,30 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await backupStatusUpdate;
         }
 
+        describe("Generate 4S recovery keys", () => {
+            it("should create a random recovery key", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase();
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.passphrase).toBeUndefined();
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+
+            it("should create a recovery key from passphrase", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase("mypassphrase");
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.passphrase?.algorithm).toBe("m.pbkdf2");
+                expect(generatedKey.passphrase?.iterations).toBe(500000);
+
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+        });
+
         describe("bootstrapSecretStorage", () => {
             // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
             newBackendOnly(
