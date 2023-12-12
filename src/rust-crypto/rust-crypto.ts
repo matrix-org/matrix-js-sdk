@@ -54,7 +54,7 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
@@ -748,16 +748,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param secretStorageKey - The secret storage key to add in the secret storage.
      */
     private async addSecretStorageKeyToSecretStorage(secretStorageKey: GeneratedSecretStorageKey): Promise<void> {
-        // keyInfo is required to continue
-        if (!secretStorageKey.keyInfo) {
-            throw new Error("missing keyInfo field in the secret storage key");
-        }
-
-        const secretStorageKeyObject = await this.secretStorage.addKey(
-            SECRET_STORAGE_ALGORITHM_V1_AES,
-            // add the private key in the options in order to encrypt the zero secret for key checks.
-            { ...secretStorageKey.keyInfo, key: secretStorageKey.privateKey },
-        );
+        const secretStorageKeyObject = await this.secretStorage.addKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
+            passphrase: secretStorageKey.passphrase,
+            key: secretStorageKey.privateKey,
+        });
 
         await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
 
@@ -818,30 +812,27 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
      */
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
-        let key: Uint8Array;
-
-        const keyInfo: AddSecretStorageKeyOpts = {};
         if (password) {
             // Generate the key from the passphrase
             const derivation = await keyFromPassphrase(password);
-            keyInfo.passphrase = {
-                algorithm: "m.pbkdf2",
-                iterations: derivation.iterations,
-                salt: derivation.salt,
+            return {
+                passphrase: {
+                    algorithm: "m.pbkdf2",
+                    iterations: derivation.iterations,
+                    salt: derivation.salt,
+                },
+                privateKey: derivation.key,
+                encodedPrivateKey: encodeRecoveryKey(derivation.key),
             };
-            key = derivation.key;
         } else {
             // Using the navigator crypto API to generate the private key
-            key = new Uint8Array(32);
+            const key = new Uint8Array(32);
             crypto.getRandomValues(key);
+            return {
+                privateKey: key,
+                encodedPrivateKey: encodeRecoveryKey(key),
+            };
         }
-
-        const encodedPrivateKey = encodeRecoveryKey(key);
-        return {
-            keyInfo,
-            encodedPrivateKey,
-            privateKey: key,
-        };
     }
 
     /**

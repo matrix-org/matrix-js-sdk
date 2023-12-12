@@ -190,10 +190,7 @@ describe("Secrets", function () {
         };
         resetCrossSigningKeys(alice);
 
-        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
-            pubkey: undefined,
-            key: undefined,
-        });
+        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, { key });
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
         alice.setDefaultSecretStorageKeyId(newKeyId);

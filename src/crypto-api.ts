@@ -18,7 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
+import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
@@ -713,7 +713,8 @@ export interface CrossSigningKeyInfo {
  * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
  */
 export interface GeneratedSecretStorageKey {
-    keyInfo?: AddSecretStorageKeyOpts;
+    /** Information to generate the key from a passphrase if any. */
+    passphrase?: PassphraseInfo;
     /** The raw generated private key. */
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
