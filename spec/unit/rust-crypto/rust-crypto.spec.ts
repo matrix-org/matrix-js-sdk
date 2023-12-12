@@ -739,8 +739,8 @@ describe("RustCrypto", () => {
             // Expect the private key to be an Uint8Array with a length of 32
             expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
             expect(recoveryKey.privateKey.length).toBe(32);
-            // Expect keyInfo to be empty
-            expect(Object.keys(recoveryKey.keyInfo!).length).toBe(0);
+            // Expect passphrase info to be empty
+            expect(recoveryKey.passphrase).toBeUndefined();
         });
 
         it("should create a recovery key with password", async () => {
@@ -752,8 +752,8 @@ describe("RustCrypto", () => {
             expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
             expect(recoveryKey.privateKey.length).toBe(32);
             // Expect keyInfo.passphrase to be filled
-            expect(recoveryKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
-            expect(recoveryKey.keyInfo?.passphrase?.iterations).toBe(500000);
+            expect(recoveryKey.passphrase?.algorithm).toBe("m.pbkdf2");
+            expect(recoveryKey.passphrase?.iterations).toBe(500000);
         });
     });
 
