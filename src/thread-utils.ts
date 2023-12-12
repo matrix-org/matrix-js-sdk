@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IEvent, THREAD_RELATION_TYPE } from "./matrix";
+import { THREAD_RELATION_TYPE } from "./models/thread";
+import { IEvent } from "./models/event";
 
 /**
  * Returns a filter function for the /relations endpoint to filter out relations directly
