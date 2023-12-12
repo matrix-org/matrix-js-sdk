@@ -609,7 +609,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 } else {
                     await this.client.paginateEventTimeline(this.liveTimeline, {
                         backwards: true,
-                        limit: Math.max(1, this.length),
                     });
                 }
                 for (const event of this.replayEvents!) {
