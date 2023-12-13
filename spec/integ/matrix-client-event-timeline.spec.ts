@@ -33,7 +33,7 @@ import {
 import { logger } from "../../src/logger";
 import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
+import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 import { Feature, ServerSupport } from "../../src/feature";
 
