@@ -775,6 +775,59 @@ describe("Thread", () => {
             });
         });
     });
+
+    describe("checkForMissingReceiptEvent", () => {
+        let previousThreadHasServerSideSupport: FeatureSupport;
+
+        beforeAll(() => {
+            previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+            Thread.hasServerSideSupport = FeatureSupport.Stable;
+        });
+
+        afterAll(() => {
+            Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
+        });
+
+        it("Looks up missing events referenced by read receipts", async () => {
+            const client = createClient();
+            const user = "@alice:matrix.org";
+            const roomId = "!test:room";
+            jest.spyOn(client, "getUserId").mockReturnValue(user);
+
+            const thread = await createThread(client, user, roomId);
+
+            const reactionToRoot = mkMessage({
+                event: true,
+                user,
+                room: roomId,
+                relatesTo: {
+                    event_id: thread.id,
+                    rel_type: "m.annotation",
+                    key: "",
+                },
+            });
+            const reactionEventId = reactionToRoot.getId()!;
+            await thread.room.addLiveEvents([reactionToRoot]);
+
+            thread.addReceiptToStructure(
+                reactionEventId,
+                ReceiptType.Read,
+                client.getUserId()!,
+                { ts: 0, thread_id: thread.id },
+                false,
+            );
+
+            const message1 = createThreadMessage(thread.id, user, roomId, "message1");
+            await thread.addEvent(message1, true);
+
+            // This will be called anyway by addEvent but it won't wait for it to complete,
+            // so we gut-wrench to call it again manually such that we can wait for it and
+            // not race.
+            await (thread as any).updateThreadMetadata();
+
+            expect(client.fetchRoomEvent).toHaveBeenCalledWith(roomId, reactionEventId);
+        });
+    });
 });
 
 /**
