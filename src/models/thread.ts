@@ -140,6 +140,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public replayEvents: MatrixEvent[] | null = [];
 
+    private isCheckingForMissingReceiptEvent = false;
+
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
 
@@ -624,6 +626,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
+        this.checkForMissingReceiptEvent();
+
         this.emit(ThreadEvent.Update, this);
     }
 
@@ -653,6 +657,45 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                     }
                 }),
             );
+        }
+    }
+
+    /**
+     * Workaround for servers that don't support MSC3981: if we can't see the event that the threaded
+     * read receipt is pointing to, fetch it by event ID so that we can use it in our unread calculation.
+     * This is mainly for situations where the read receipt is pointing to a relation event that we don't
+     * have because it's too far back in the scrollback for us to have paginated it and it doesn't come down
+     * with the thread events due to lack of MSC3981 support.
+     *
+     * If you are reading this in the future and MSC3981 is merged and widely supported then you, future
+     * space person, get the honour of building a large pyre to incinerate this piece of code and revel
+     * in the delicious Typescript fumes.
+     */
+    private async checkForMissingReceiptEvent(): Promise<void> {
+        if (this.isCheckingForMissingReceiptEvent) return;
+        this.isCheckingForMissingReceiptEvent = true;
+
+        try {
+            const myThreadedReceipt = this.getLatestReceipt(this.client.getUserId()!, true);
+            if (myThreadedReceipt && this.timeline.length > 0 && !this.findEventById(myThreadedReceipt.eventId)) {
+                logger.info(
+                    `Found threaded read receipt in thread ${this.id} referencing unknown event ${myThreadedReceipt.eventId}: attempting to fetch event`,
+                );
+
+                try {
+                    const rawEvent = await this.client.fetchRoomEvent(this.roomId, myThreadedReceipt.eventId);
+                    const ev = new MatrixEvent(rawEvent);
+                    await this.client.decryptEventIfNeeded(ev);
+                    this.insertEventIntoTimeline(ev);
+                    logger.info(
+                        `Found and inserted event for read receipt: ${myThreadedReceipt.eventId} in thread ${this.id}`,
+                    );
+                } catch (e) {
+                    logger.warn("Failed to fetch event referenced by read receipt", e);
+                }
+            }
+        } finally {
+            this.isCheckingForMissingReceiptEvent = false;
         }
     }
 

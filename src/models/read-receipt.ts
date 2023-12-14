@@ -217,7 +217,7 @@ export abstract class ReadReceipt<
         return false;
     }
 
-    private getLatestReceipt(userId: string, ignoreSynthesized: boolean): WrappedReceipt | null {
+    protected getLatestReceipt(userId: string, ignoreSynthesized: boolean): WrappedReceipt | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
         // receipt type here again. IMHO this should be done by the server in
         // some more intelligent manner or the client should just use timestamps
