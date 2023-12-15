@@ -356,7 +356,6 @@ describe("Crypto", function () {
 
         let crypto: Crypto;
         let mockBaseApis: MatrixClient;
-        let mockRoomList: RoomList;
 
         let fakeEmitter: EventEmitter;
 
@@ -390,19 +389,10 @@ describe("Crypto", function () {
                 isGuest: jest.fn(),
                 emit: jest.fn(),
             } as unknown as MatrixClient;
-            mockRoomList = {} as unknown as RoomList;
 
             fakeEmitter = new EventEmitter();
 
-            crypto = new Crypto(
-                mockBaseApis,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockBaseApis, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
             crypto.registerEventHandlers(fakeEmitter as any);
             await crypto.init();
         });
@@ -1341,15 +1331,9 @@ describe("Crypto", function () {
                 setRoomEncryption: jest.fn().mockResolvedValue(undefined),
             } as unknown as RoomList;
 
-            crypto = new Crypto(
-                mockClient,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockClient, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
+            // @ts-ignore we are injecting a mock into a private property
+            crypto.roomList = mockRoomList;
         });
 
         it("should set the algorithm if called for a known room", async () => {
