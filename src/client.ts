@@ -221,6 +221,7 @@ import {
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
+import { getRelationsThreadFilter } from "./thread-utils";
 
 export type Store = IStore;
 
@@ -5968,14 +5969,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const resOlder: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    null,
                     null,
                     { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    null,
                     null,
                     { dir: Direction.Forward, from: res.end, recurse: recurse || undefined },
                 );
@@ -5983,10 +5984,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // Order events from most recent to oldest (reverse-chronological).
                     // We start with the last event, since that's the point at which we have known state.
                     // events_after is already backwards; events_before is forwards.
-                    ...resNewer.chunk.reverse().map(mapper),
+                    ...resNewer.chunk.reverse().filter(getRelationsThreadFilter(thread.id)).map(mapper),
                     event,
-                    ...resOlder.chunk.map(mapper),
+                    ...resOlder.chunk.filter(getRelationsThreadFilter(thread.id)).map(mapper),
                 ];
+
                 for (const event of events) {
                     await timelineSet.thread?.processEvent(event);
                 }
@@ -6361,6 +6363,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         const stateEvents = res.state.filter(noUnsafeEventProps).map(this.getEventMapper());
                         roomState.setUnknownStateEvents(stateEvents);
                     }
+
                     const token = res.end;
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
@@ -6388,7 +6391,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
-            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, THREAD_RELATION_TYPE.name, null, {
+            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, null, null, {
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
@@ -6396,7 +6399,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
-                    const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(mapper);
+                    const matrixEvents = res.chunk
+                        .filter(noUnsafeEventProps)
+                        .filter(getRelationsThreadFilter(thread.id))
+                        .map(mapper);
 
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
@@ -7591,7 +7597,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async relations(
         roomId: string,
         eventId: string,
-        relationType?: RelationType | string | null,
+        relationType: RelationType | string | null,
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<{
@@ -8114,7 +8120,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public fetchRelations(
         roomId: string,
         eventId: string,
-        relationType?: RelationType | string | null,
+        relationType: RelationType | string | null,
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<IRelationsResponse> {
