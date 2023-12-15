@@ -782,10 +782,12 @@ describe("Thread", () => {
         beforeAll(() => {
             previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
             Thread.hasServerSideSupport = FeatureSupport.Stable;
+            jest.useFakeTimers();
         });
 
         afterAll(() => {
             Thread.hasServerSideSupport = previousThreadHasServerSideSupport;
+            jest.useRealTimers();
         });
 
         it("Looks up missing events referenced by read receipts", async () => {
@@ -824,6 +826,8 @@ describe("Thread", () => {
             // so we gut-wrench to call it again manually such that we can wait for it and
             // not race.
             await (thread as any).updateThreadMetadata();
+
+            jest.advanceTimersByTime(1000);
 
             expect(client.fetchRoomEvent).toHaveBeenCalledWith(roomId, reactionEventId);
         });
