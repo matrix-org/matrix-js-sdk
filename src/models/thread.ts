@@ -672,34 +672,36 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * space person, get the honour of building a large pyre to incinerate this piece of code and revel
      * in the delicious Typescript fumes.
      */
-    private checkForMissingReceiptEvent = throttle(async (): Promise<void> => {
+    private checkForMissingReceiptEvent = throttle((): void => {
         if (this.isCheckingForMissingReceiptEvent) return;
         this.isCheckingForMissingReceiptEvent = true;
 
-        try {
-            const myThreadedReceipt = this.getLatestReceipt(this.client.getUserId()!, true);
-            // We check there are messages in the timeline as it doesn't really make sense to check for missing
-            // events if there are no events in the thread at all (yet).
-            if (myThreadedReceipt && this.timeline.length > 0 && !this.findEventById(myThreadedReceipt.eventId)) {
-                logger.info(
-                    `Found threaded read receipt in thread ${this.id} referencing unknown event ${myThreadedReceipt.eventId}: attempting to fetch event`,
-                );
-
-                try {
-                    const rawEvent = await this.client.fetchRoomEvent(this.roomId, myThreadedReceipt.eventId);
-                    const ev = new MatrixEvent(rawEvent);
-                    await this.client.decryptEventIfNeeded(ev);
-                    this.insertEventIntoTimeline(ev);
+        (async (): Promise<void> => {
+            try {
+                const myThreadedReceipt = this.getLatestReceipt(this.client.getUserId()!, true);
+                // We check there are messages in the timeline as it doesn't really make sense to check for missing
+                // events if there are no events in the thread at all (yet).
+                if (myThreadedReceipt && this.timeline.length > 0 && !this.findEventById(myThreadedReceipt.eventId)) {
                     logger.info(
-                        `Found and inserted event for read receipt: ${myThreadedReceipt.eventId} in thread ${this.id}`,
+                        `Found threaded read receipt in thread ${this.id} referencing unknown event ${myThreadedReceipt.eventId}: attempting to fetch event`,
                     );
-                } catch (e) {
-                    logger.warn("Failed to fetch event referenced by read receipt", e);
+
+                    try {
+                        const rawEvent = await this.client.fetchRoomEvent(this.roomId, myThreadedReceipt.eventId);
+                        const ev = new MatrixEvent(rawEvent);
+                        await this.client.decryptEventIfNeeded(ev);
+                        this.insertEventIntoTimeline(ev);
+                        logger.info(
+                            `Found and inserted event for read receipt: ${myThreadedReceipt.eventId} in thread ${this.id}`,
+                        );
+                    } catch (e) {
+                        logger.warn("Failed to fetch event referenced by read receipt", e);
+                    }
                 }
+            } finally {
+                this.isCheckingForMissingReceiptEvent = false;
             }
-        } finally {
-            this.isCheckingForMissingReceiptEvent = false;
-        }
+        })();
     }, 1000);
 
     public setEventMetadata(event: Optional<MatrixEvent>): void {
