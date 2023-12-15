@@ -76,15 +76,7 @@
     "@babel/highlight" "^7.22.13"
     chalk "^2.4.2"
 
-"@babel/code-frame@^7.12.13":
-  version "7.23.5"
-  resolved "https://registry.yarnpkg.com/@babel/code-frame/-/code-frame-7.23.5.tgz#9009b69a8c602293476ad598ff53e4562e15c244"
-  integrity sha512-CgH3s1a96LipHCmSUmYFPwY7MNx8C3avkq7i4Wl3cfa662ldtUe4VM1TPXX70pfmrlWTb6jLqTYrZyT2ZTJBgA==
-  dependencies:
-    "@babel/highlight" "^7.23.4"
-    chalk "^2.4.2"
-
-"@babel/code-frame@^7.22.13", "@babel/code-frame@^7.23.5":
+"@babel/code-frame@^7.12.13", "@babel/code-frame@^7.22.13", "@babel/code-frame@^7.23.5":
   version "7.23.5"
   resolved "https://registry.yarnpkg.com/@babel/code-frame/-/code-frame-7.23.5.tgz#9009b69a8c602293476ad598ff53e4562e15c244"
   integrity sha512-CgH3s1a96LipHCmSUmYFPwY7MNx8C3avkq7i4Wl3cfa662ldtUe4VM1TPXX70pfmrlWTb6jLqTYrZyT2ZTJBgA==
@@ -1678,10 +1670,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@matrix-org/matrix-sdk-crypto-wasm@^3.4.0":
-  version "3.4.0"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-3.4.0.tgz#fc4474c220320687857e1f54f709944e78d48824"
-  integrity sha512-noO6QnH+ypT//CxewoQdlK/z2iuyQo1Ecp1PDaYyr/NV5yXkWvGfGIIcShXqrQJfL5kuWxg/14edNplXsaXoDQ==
+"@matrix-org/matrix-sdk-crypto-wasm@^3.5.0":
+  version "3.5.0"
+  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-3.5.0.tgz#997d63ae12304142513fe93c5e0872ff10ca30b4"
+  integrity sha512-7as0jJTje+rFu9AF8LEO0tmhtHcou2YQnZOtpiP+lS5rDfIPv5CL8/eb45fzDnbQybt9Jm5zdjBdiLBEaUg2dQ==
 
 "@matrix-org/olm@3.2.15":
   version "3.2.15"
