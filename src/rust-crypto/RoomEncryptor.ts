@@ -46,7 +46,7 @@ export class RoomEncryptor {
     private lazyLoadedMembersResolved = false;
 
     /** Ensures that there is only one call to shareRoomKeys at a time */
-    private currentShareRoomKeyPromise: Promise<void>;
+    private currentShareRoomKeyPromise = Promise.resolve();
 
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
@@ -63,8 +63,6 @@ export class RoomEncryptor {
         private encryptionSettings: IContent,
     ) {
         this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
-
-        this.currentShareRoomKeyPromise = Promise.resolve();
 
         // start tracking devices for any users already known to be in this room.
         // Do not load members here, would defeat lazy loading.
