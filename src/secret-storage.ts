@@ -104,7 +104,7 @@ export interface AddSecretStorageKeyOpts {
     passphrase?: PassphraseInfo;
     /** Optional name of the key. */
     name?: string;
-    /** The private key. Will be used to generate the key check values in the key info, it will not be stored on the server */
+    /** The private key. Will be used to generate the key check values in the key info; it will not be stored on the server */
     key: Uint8Array;
 }
 

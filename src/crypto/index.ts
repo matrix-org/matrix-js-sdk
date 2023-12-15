@@ -714,10 +714,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 decryption.init_with_private_key(derivation.key);
                 const privateKey = decryption.get_private_key();
                 return {
-                    passphrase: {
-                        algorithm: "m.pbkdf2",
-                        iterations: derivation.iterations,
-                        salt: derivation.salt,
+                    keyInfo: {
+                        passphrase: {
+                            algorithm: "m.pbkdf2",
+                            iterations: derivation.iterations,
+                            salt: derivation.salt,
+                        },
                     },
                     privateKey: privateKey,
                     encodedPrivateKey: encodeRecoveryKey(privateKey),
@@ -1057,8 +1059,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { passphrase, privateKey } = await createSecretStorageKey();
-            newKeyId = await createSSSS({ passphrase, key: privateKey });
+            const { keyInfo, privateKey } = await createSecretStorageKey();
+            newKeyId = await createSSSS({ passphrase: keyInfo?.passphrase, key: privateKey, name: keyInfo?.name });
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
             logger.log("Secret storage does not exist, using key backup key");

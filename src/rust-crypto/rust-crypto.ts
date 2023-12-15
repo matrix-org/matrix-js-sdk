@@ -749,7 +749,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     private async addSecretStorageKeyToSecretStorage(secretStorageKey: GeneratedSecretStorageKey): Promise<void> {
         const secretStorageKeyObject = await this.secretStorage.addKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
-            passphrase: secretStorageKey.passphrase,
+            passphrase: secretStorageKey.keyInfo?.passphrase,
+            name: secretStorageKey.keyInfo?.name,
             key: secretStorageKey.privateKey,
         });
 
@@ -816,10 +817,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // Generate the key from the passphrase
             const derivation = await keyFromPassphrase(password);
             return {
-                passphrase: {
-                    algorithm: "m.pbkdf2",
-                    iterations: derivation.iterations,
-                    salt: derivation.salt,
+                keyInfo: {
+                    passphrase: {
+                        algorithm: "m.pbkdf2",
+                        iterations: derivation.iterations,
+                        salt: derivation.salt,
+                    },
                 },
                 privateKey: derivation.key,
                 encodedPrivateKey: encodeRecoveryKey(derivation.key),

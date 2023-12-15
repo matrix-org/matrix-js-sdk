@@ -710,11 +710,16 @@ export interface CrossSigningKeyInfo {
 }
 
 /**
- * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}.
+ * Can also be created by {@link CreateSecretStorageOpts#createSecretStorageKey}.
  */
 export interface GeneratedSecretStorageKey {
-    /** Information to generate the key from a passphrase if any. */
-    passphrase?: PassphraseInfo;
+    keyInfo?: {
+        /** If the key was derived from a passphrase, information (algorithm, salt, etc) on that derivation. */
+        passphrase?: PassphraseInfo;
+        /** The optional name of the key (human-readable), would be stored in account_data  */
+        name?: string; // maybe we don't need this?
+    };
     /** The raw generated private key. */
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
