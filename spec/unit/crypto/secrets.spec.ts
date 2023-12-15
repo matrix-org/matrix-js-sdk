@@ -332,7 +332,6 @@ describe("Secrets", function () {
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
             const decryption = new global.Olm.PkDecryption();
-            const storagePublicKey = decryption.generate_key();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(
@@ -375,8 +374,6 @@ describe("Secrets", function () {
             });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
-                    // `pubkey` not used anymore with symmetric 4S
-                    keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
             });

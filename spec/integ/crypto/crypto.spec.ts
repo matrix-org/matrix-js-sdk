@@ -2573,7 +2573,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(generatedKey.privateKey).toBeDefined();
                 expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
                 expect(generatedKey.privateKey.length).toBe(32);
-                expect(generatedKey.passphrase).toBeUndefined();
+                expect(generatedKey.keyInfo?.passphrase).toBeUndefined();
                 expect(generatedKey.encodedPrivateKey).toBeDefined();
                 expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
             });
@@ -2583,8 +2583,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(generatedKey.privateKey).toBeDefined();
                 expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
                 expect(generatedKey.privateKey.length).toBe(32);
-                expect(generatedKey.passphrase?.algorithm).toBe("m.pbkdf2");
-                expect(generatedKey.passphrase?.iterations).toBe(500000);
+                expect(generatedKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
+                expect(generatedKey.keyInfo?.passphrase?.iterations).toBe(500000);
 
                 expect(generatedKey.encodedPrivateKey).toBeDefined();
                 expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
