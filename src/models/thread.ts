@@ -29,6 +29,7 @@ import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
 import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
 import { Feature, ServerSupport } from "../feature";
+import { throttle } from "../utils/throttle";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -671,7 +672,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * space person, get the honour of building a large pyre to incinerate this piece of code and revel
      * in the delicious Typescript fumes.
      */
-    private async checkForMissingReceiptEvent(): Promise<void> {
+    private checkForMissingReceiptEvent = throttle(async (): Promise<void> => {
         if (this.isCheckingForMissingReceiptEvent) return;
         this.isCheckingForMissingReceiptEvent = true;
 
@@ -697,7 +698,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         } finally {
             this.isCheckingForMissingReceiptEvent = false;
         }
-    }
+    }, 1000);
 
     public setEventMetadata(event: Optional<MatrixEvent>): void {
         if (event) {
