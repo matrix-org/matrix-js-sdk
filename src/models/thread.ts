@@ -678,6 +678,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
         try {
             const myThreadedReceipt = this.getLatestReceipt(this.client.getUserId()!, true);
+            // We check there are messages in the timeline as it doesn't really make sense to check for missing
+            // events if there are no events in the thread at all (yet).
             if (myThreadedReceipt && this.timeline.length > 0 && !this.findEventById(myThreadedReceipt.eventId)) {
                 logger.info(
                     `Found threaded read receipt in thread ${this.id} referencing unknown event ${myThreadedReceipt.eventId}: attempting to fetch event`,
