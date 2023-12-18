@@ -190,10 +190,7 @@ describe("Secrets", function () {
         };
         resetCrossSigningKeys(alice);
 
-        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
-            pubkey: undefined,
-            key: undefined,
-        });
+        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, { key });
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
         alice.setDefaultSecretStorageKeyId(newKeyId);
@@ -335,7 +332,6 @@ describe("Secrets", function () {
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
             const decryption = new global.Olm.PkDecryption();
-            const storagePublicKey = decryption.generate_key();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(
@@ -378,8 +374,6 @@ describe("Secrets", function () {
             });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
-                    // `pubkey` not used anymore with symmetric 4S
-                    keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
             });
