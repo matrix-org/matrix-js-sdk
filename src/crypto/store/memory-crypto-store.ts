@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../../logger";
-import { safeSet, deepCompare, promiseTry } from "../../utils";
+import { deepCompare, promiseTry, safeSet } from "../../utils";
 import {
     CryptoStore,
     IDeviceData,
@@ -23,6 +23,7 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
@@ -39,6 +40,7 @@ import { InboundGroupSessionData } from "../OlmDevice";
  */
 
 export class MemoryCryptoStore implements CryptoStore {
+    private migrationState: MigrationState = MigrationState.NOT_STARTED;
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
     private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
@@ -87,6 +89,28 @@ export class MemoryCryptoStore implements CryptoStore {
      */
     public deleteAllData(): Promise<void> {
         return Promise.resolve();
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     *
+     * @internal
+     */
+    public async getMigrationState(): Promise<MigrationState> {
+        return this.migrationState;
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     *
+     * @internal
+     */
+    public async setMigrationState(migrationState: MigrationState): Promise<void> {
+        this.migrationState = migrationState;
     }
 
     /**

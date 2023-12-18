@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import "jest-localstorage-mock";
 import { IndexedDBCryptoStore, LocalStorageCryptoStore, MemoryCryptoStore } from "../../../../src";
-import { CryptoStore } from "../../../../src/crypto/store/base";
+import { CryptoStore, MigrationState } from "../../../../src/crypto/store/base";
 
 describe.each([
     ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
@@ -41,6 +41,21 @@ describe.each([
                 store.storeAccount(txn, "not a real account");
             });
             expect(await store.containsData()).toBe(true);
+        });
+    });
+
+    describe("migrationState", () => {
+        beforeEach(async () => {
+            await store.startup();
+        });
+
+        it("returns 0 at first", async () => {
+            expect(await store.getMigrationState()).toEqual(MigrationState.NOT_STARTED);
+        });
+
+        it("stores updates", async () => {
+            await store.setMigrationState(MigrationState.INITIAL_DATA_MIGRATED);
+            expect(await store.getMigrationState()).toEqual(MigrationState.INITIAL_DATA_MIGRATED);
         });
     });
 });

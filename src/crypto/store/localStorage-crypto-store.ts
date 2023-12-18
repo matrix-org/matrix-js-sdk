@@ -16,7 +16,16 @@ limitations under the License.
 
 import { logger } from "../../logger";
 import { MemoryCryptoStore } from "./memory-crypto-store";
-import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode, SecretStorePrivateKeys } from "./base";
+import {
+    IDeviceData,
+    IProblem,
+    ISession,
+    ISessionInfo,
+    IWithheld,
+    MigrationState,
+    Mode,
+    SecretStorePrivateKeys,
+} from "./base";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { ICrossSigningKey } from "../../client";
@@ -32,6 +41,7 @@ import { safeSet } from "../../utils";
  */
 
 const E2E_PREFIX = "crypto.";
+const KEY_END_TO_END_MIGRATION_STATE = E2E_PREFIX + "migration";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_CROSS_SIGNING_KEYS = E2E_PREFIX + "cross_signing_keys";
 const KEY_NOTIFIED_ERROR_DEVICES = E2E_PREFIX + "notified_error_devices";
@@ -85,6 +95,28 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
      */
     public async containsData(): Promise<boolean> {
         return LocalStorageCryptoStore.exists(this.store);
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     *
+     * @internal
+     */
+    public async getMigrationState(): Promise<MigrationState> {
+        return getJsonItem(this.store, KEY_END_TO_END_MIGRATION_STATE) ?? MigrationState.NOT_STARTED;
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     *
+     * @internal
+     */
+    public async setMigrationState(migrationState: MigrationState): Promise<void> {
+        setJsonItem(this.store, KEY_END_TO_END_MIGRATION_STATE, migrationState);
     }
 
     // Olm Sessions

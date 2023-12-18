@@ -23,6 +23,7 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
@@ -33,8 +34,12 @@ import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { IndexedDBCryptoStore } from "./indexeddb-crypto-store";
 
 const PROFILE_TRANSACTIONS = false;
+
+/* Keys for the `account` object store */
+const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -70,6 +75,35 @@ export class Backend implements CryptoStore {
 
     public async deleteAllData(): Promise<void> {
         throw Error("This is not implemented, call IDBFactory::deleteDatabase(dbName) instead.");
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     */
+    public async getMigrationState(): Promise<MigrationState> {
+        let migrationState = MigrationState.NOT_STARTED;
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+            const getReq = objectStore.get(ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
+            getReq.onsuccess = (): void => {
+                migrationState = getReq.result ?? MigrationState.NOT_STARTED;
+            };
+        });
+        return migrationState;
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     */
+    public async setMigrationState(migrationState: MigrationState): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+            objectStore.put(migrationState, ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
+        });
     }
 
     /**

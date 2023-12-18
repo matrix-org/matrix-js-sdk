@@ -66,6 +66,21 @@ export interface CryptoStore {
     startup(): Promise<CryptoStore>;
 
     deleteAllData(): Promise<void>;
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    getMigrationState(): Promise<MigrationState>;
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    setMigrationState(migrationState: MigrationState): Promise<void>;
+
     getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
     getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;
     getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null>;
@@ -241,4 +256,25 @@ export interface ParkedSharedHistory {
     sessionKey: string;
     keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
     forwardingCurve25519KeyChain: string[];
+}
+
+/**
+ * A record of which steps have been completed in the libolm to Rust Crypto migration.
+ *
+ * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
+ *
+ * @internal
+ */
+export enum MigrationState {
+    /** No migration steps have yet been completed. */
+    NOT_STARTED,
+
+    /** We have migrated the account data, cross-signing keys, etc. */
+    INITIAL_DATA_MIGRATED,
+
+    /** INITIAL_DATA_MIGRATED, and in addition, we have migrated all the Olm sessions. */
+    OLM_SESSIONS_MIGRATED,
+
+    /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
+    MEGOLM_SESSIONS_MIGRATED,
 }

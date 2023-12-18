@@ -27,6 +27,7 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
@@ -206,6 +207,28 @@ export class IndexedDBCryptoStore implements CryptoStore {
             // still use the app.
             logger.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     *
+     * @internal
+     */
+    public getMigrationState(): Promise<MigrationState> {
+        return this.backend!.getMigrationState();
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     *
+     * @internal
+     */
+    public setMigrationState(migrationState: MigrationState): Promise<void> {
+        return this.backend!.setMigrationState(migrationState);
     }
 
     /**
