@@ -332,7 +332,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         logger,
                         "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
                         async () => {
-                            await this.olmMachine.backupRoomKeys();
+                            return await this.olmMachine.backupRoomKeys();
                         },
                     );
                 } catch (err) {
