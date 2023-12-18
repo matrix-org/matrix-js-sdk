@@ -710,8 +710,7 @@ export interface CrossSigningKeyInfo {
 }
 
 /**
- * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}.
- * Can also be created by {@link CreateSecretStorageOpts#createSecretStorageKey}.
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase} or {@link CreateSecretStorageOpts#createSecretStorageKey}.
  */
 export interface GeneratedSecretStorageKey {
     keyInfo?: {
