@@ -16,16 +16,125 @@
  * /
  */
 
-import { HistoryVisibility as RustHistoryVisibility } from "@matrix-org/matrix-sdk-crypto-wasm";
+import {
+    Curve25519PublicKey,
+    Ed25519PublicKey,
+    HistoryVisibility as RustHistoryVisibility,
+    IdentityKeys,
+    OlmMachine,
+} from "@matrix-org/matrix-sdk-crypto-wasm";
+import { Mocked } from "jest-mock";
 
-import { HistoryVisibility } from "../../../src";
-import { toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
+import { HistoryVisibility, MatrixEvent, Room, RoomMember } from "../../../src";
+import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
+import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
+import { defer } from "../../../src/utils";
+import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 
-it.each([
-    [HistoryVisibility.Invited, RustHistoryVisibility.Invited],
-    [HistoryVisibility.Joined, RustHistoryVisibility.Joined],
-    [HistoryVisibility.Shared, RustHistoryVisibility.Shared],
-    [HistoryVisibility.WorldReadable, RustHistoryVisibility.WorldReadable],
-])("JS HistoryVisibility to Rust HistoryVisibility: converts %s to %s", (historyVisibility, expected) => {
-    expect(toRustHistoryVisibility(historyVisibility)).toBe(expected);
+describe("RoomEncryptor", () => {
+    describe("History Visibility", () => {
+        it.each([
+            [HistoryVisibility.Invited, RustHistoryVisibility.Invited],
+            [HistoryVisibility.Joined, RustHistoryVisibility.Joined],
+            [HistoryVisibility.Shared, RustHistoryVisibility.Shared],
+            [HistoryVisibility.WorldReadable, RustHistoryVisibility.WorldReadable],
+        ])("JS HistoryVisibility to Rust HistoryVisibility: converts %s to %s", (historyVisibility, expected) => {
+            expect(toRustHistoryVisibility(historyVisibility)).toBe(expected);
+        });
+    });
+
+    describe("RoomEncryptor", () => {
+        /** The room encryptor under test */
+        let roomEncryptor: RoomEncryptor;
+
+        let mockOlmMachine: Mocked<OlmMachine>;
+        let mockKeyClaimManager: Mocked<KeyClaimManager>;
+        let mockOutgoingRequestManager: Mocked<OutgoingRequestsManager>;
+        let mockRoom: Mocked<Room>;
+
+        function createMockEvent(text: string): Mocked<MatrixEvent> {
+            return {
+                getTxnId: jest.fn().mockReturnValue(""),
+                getType: jest.fn().mockReturnValue("m.room.message"),
+                getContent: jest.fn().mockReturnValue({
+                    body: text,
+                    msgtype: "m.text",
+                }),
+                makeEncrypted: jest.fn().mockReturnValue(undefined),
+            } as unknown as Mocked<MatrixEvent>;
+        }
+
+        beforeEach(() => {
+            mockOlmMachine = {
+                identityKeys: {
+                    curve25519: {
+                        toBase64: jest.fn().mockReturnValue("curve25519"),
+                    } as unknown as Curve25519PublicKey,
+                    ed25519: {
+                        toBase64: jest.fn().mockReturnValue("ed25519"),
+                    } as unknown as Ed25519PublicKey,
+                } as unknown as Mocked<IdentityKeys>,
+                shareRoomKey: jest.fn(),
+                updateTrackedUsers: jest.fn().mockResolvedValue(undefined),
+                encryptRoomEvent: jest.fn().mockResolvedValue("{}"),
+            } as unknown as Mocked<OlmMachine>;
+
+            mockKeyClaimManager = {
+                ensureSessionsForUsers: jest.fn(),
+            } as unknown as Mocked<KeyClaimManager>;
+
+            mockOutgoingRequestManager = {
+                doProcessOutgoingRequests: jest.fn().mockResolvedValue(undefined),
+            } as unknown as Mocked<OutgoingRequestsManager>;
+
+            const mockRoomMember = {
+                userId: "@alice:example.org",
+                membership: "join",
+            } as unknown as Mocked<RoomMember>;
+
+            mockRoom = {
+                roomId: "!foo:example.org",
+                getJoinedMembers: jest.fn().mockReturnValue([mockRoomMember]),
+                getEncryptionTargetMembers: jest.fn().mockReturnValue([mockRoomMember]),
+                shouldEncryptForInvitedMembers: jest.fn().mockReturnValue(true),
+                getHistoryVisibility: jest.fn().mockReturnValue(HistoryVisibility.Invited),
+                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
+            } as unknown as Mocked<Room>;
+
+            roomEncryptor = new RoomEncryptor(
+                mockOlmMachine,
+                mockKeyClaimManager,
+                mockOutgoingRequestManager,
+                mockRoom,
+                { algorithm: "m.megolm.v1.aes-sha2" },
+            );
+        });
+
+        it("should ensure that there is only one shareRoomKey at a time", async () => {
+            const deferredShare = defer<void>();
+            const insideOlmShareRoom = defer<void>();
+
+            mockOlmMachine.shareRoomKey.mockImplementationOnce(async () => {
+                insideOlmShareRoom.resolve();
+                await deferredShare.promise;
+            });
+
+            roomEncryptor.prepareForEncryption(false);
+            await insideOlmShareRoom.promise;
+
+            // call several times more
+            roomEncryptor.prepareForEncryption(false);
+            roomEncryptor.encryptEvent(createMockEvent("Hello"), false);
+            roomEncryptor.prepareForEncryption(false);
+            roomEncryptor.encryptEvent(createMockEvent("World"), false);
+
+            expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(1);
+
+            deferredShare.resolve();
+            await roomEncryptor.prepareForEncryption(false);
+
+            // should have been called again
+            expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(6);
+        });
+    });
 });
