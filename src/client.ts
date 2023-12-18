@@ -8805,8 +8805,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ruleId: Exclude<string, RuleId>,
         body: Pick<IPushRule, "actions" | "conditions" | "pattern">,
     ): Promise<{}> {
-        // NB. Scope not uri encoded because devices need the '/'
-        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+        const path = utils.encodeUri("/pushrules/$scope/$kind/$ruleId", {
+            $scope: scope,
             $kind: kind,
             $ruleId: ruleId,
         });
@@ -8818,8 +8818,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public deletePushRule(scope: string, kind: PushRuleKind, ruleId: Exclude<string, RuleId>): Promise<{}> {
-        // NB. Scope not uri encoded because devices need the '/'
-        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+        const path = utils.encodeUri("/pushrules/$scope/$kind/$ruleId", {
+            $scope: scope,
             $kind: kind,
             $ruleId: ruleId,
         });
@@ -8837,7 +8837,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ruleId: RuleId | string,
         enabled: boolean,
     ): Promise<{}> {
-        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
+        const path = utils.encodeUri("/pushrules/$scope/$kind/$ruleId/enabled", {
+            $scope: scope,
             $kind: kind,
             $ruleId: ruleId,
         });
@@ -8855,7 +8856,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ruleId: RuleId | string,
         actions: PushRuleAction[],
     ): Promise<{}> {
-        const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
+        const path = utils.encodeUri("/pushrules/$scope/$kind/$ruleId/actions", {
+            $scope: scope,
             $kind: kind,
             $ruleId: ruleId,
         });
