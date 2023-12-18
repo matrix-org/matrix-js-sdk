@@ -716,8 +716,8 @@ export interface GeneratedSecretStorageKey {
     keyInfo?: {
         /** If the key was derived from a passphrase, information (algorithm, salt, etc) on that derivation. */
         passphrase?: PassphraseInfo;
-        /** The optional name of the key (human-readable), would be stored in account_data  */
-        name?: string; // maybe we don't need this?
+        /** Optional human-readable name for the key, to be stored in account_data. */
+        name?: string;
     };
     /** The raw generated private key. */
     privateKey: Uint8Array;
