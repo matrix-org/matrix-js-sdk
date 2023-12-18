@@ -513,6 +513,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return this.backend!.getEndToEndSessionsBatch();
     }
 
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        return this.backend!.deleteEndToEndSessionsBatch(sessions);
+    }
+
     // Inbound group sessions
 
     /**
@@ -598,6 +609,19 @@ export class IndexedDBCryptoStore implements CryptoStore {
      */
     public getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null> {
         return this.backend!.getEndToEndInboundGroupSessionsBatch();
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        return this.backend!.deleteEndToEndInboundGroupSessionsBatch(sessions);
     }
 
     // End-to-end device tracking

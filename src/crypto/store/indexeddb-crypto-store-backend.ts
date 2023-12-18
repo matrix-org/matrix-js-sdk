@@ -663,6 +663,29 @@ export class Backend implements CryptoStore {
         return result;
     }
 
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], async (txn) => {
+            try {
+                const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_SESSIONS);
+                for (const { deviceKey, sessionId } of sessions) {
+                    const req = objectStore.delete([deviceKey, sessionId]);
+                    await new Promise((resolve) => {
+                        req.onsuccess = resolve;
+                    });
+                }
+            } catch (e) {
+                abortWithException(txn, <Error>e);
+            }
+        });
+    }
+
     // Inbound group sessions
 
     public getEndToEndInboundGroupSession(
@@ -822,6 +845,31 @@ export class Backend implements CryptoStore {
         }
 
         return result;
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], async (txn) => {
+            try {
+                const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+                for (const { senderKey, sessionId } of sessions) {
+                    const req = objectStore.delete([senderKey, sessionId]);
+                    await new Promise((resolve) => {
+                        req.onsuccess = resolve;
+                    });
+                }
+            } catch (e) {
+                abortWithException(txn, <Error>e);
+            }
+        });
     }
 
     public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {

@@ -140,6 +140,15 @@ export interface CryptoStore {
      */
     getEndToEndSessionsBatch(): Promise<ISessionInfo[] | null>;
 
+    /**
+     * Delete a batch of end-to-end sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndSessionsBatch(sessions: { deviceKey?: string; sessionId?: string }[]): Promise<void>;
+
     // Inbound Group Sessions
     getEndToEndInboundGroupSession(
         senderCurve25519Key: string,
@@ -174,6 +183,15 @@ export interface CryptoStore {
      * @internal
      */
     getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null>;
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndInboundGroupSessionsBatch(sessions: { senderKey: string; sessionId: string }[]): Promise<void>;
 
     // Device Data
     getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;

@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import "jest-localstorage-mock";
 import { IndexedDBCryptoStore, LocalStorageCryptoStore, MemoryCryptoStore } from "../../../../src";
-import { CryptoStore, MigrationState } from "../../../../src/crypto/store/base";
+import { CryptoStore, MigrationState, SESSION_BATCH_SIZE } from "../../../../src/crypto/store/base";
 
 describe.each([
     ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
@@ -59,7 +59,7 @@ describe.each([
         });
     });
 
-    describe("getEndToEndSessionsBatch", () => {
+    describe("get/delete EndToEndSessionsBatch", () => {
         beforeEach(async () => {
             await store.startup();
         });
@@ -72,21 +72,7 @@ describe.each([
             // First store some sessions in the db
             const N_DEVICES = 6;
             const N_SESSIONS_PER_DEVICE = 6;
-            await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_SESSIONS, (txn) => {
-                for (let i = 0; i < N_DEVICES; i++) {
-                    for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
-                        store.storeEndToEndSession(
-                            `device${i}`,
-                            `session${j}`,
-                            {
-                                deviceKey: `device${i}`,
-                                sessionId: `session${j}`,
-                            },
-                            txn,
-                        );
-                    }
-                }
-            });
+            await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
 
             // Then, get a batch and check it looks right.
             const batch = await store.getEndToEndSessionsBatch();
@@ -101,10 +87,51 @@ describe.each([
             }
         });
 
-        // TODO: add a test which deletes them and gets the next batch
+        it("returns another batch of sessions after the first batch is deleted", async () => {
+            // First store some sessions in the db
+            const N_DEVICES = 8;
+            const N_SESSIONS_PER_DEVICE = 8;
+            await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
+
+            // Get the first batch
+            const batch = (await store.getEndToEndSessionsBatch())!;
+            expect(batch.length).toEqual(SESSION_BATCH_SIZE);
+
+            // ... and delete.
+            await store.deleteEndToEndSessionsBatch(batch);
+
+            // Fetch a second batch
+            const batch2 = (await store.getEndToEndSessionsBatch())!;
+            expect(batch2.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE - SESSION_BATCH_SIZE);
+
+            // ... and delete.
+            await store.deleteEndToEndSessionsBatch(batch2);
+
+            // the batch should now be null.
+            expect(await store.getEndToEndSessionsBatch()).toBe(null);
+        });
+
+        /** Create a bunch of fake Olm sessions and stash them in the DB. */
+        async function createSessions(nDevices: number, nSessionsPerDevice: number) {
+            await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_SESSIONS, (txn) => {
+                for (let i = 0; i < nDevices; i++) {
+                    for (let j = 0; j < nSessionsPerDevice; j++) {
+                        store.storeEndToEndSession(
+                            `device${i}`,
+                            `session${j}`,
+                            {
+                                deviceKey: `device${i}`,
+                                sessionId: `session${j}`,
+                            },
+                            txn,
+                        );
+                    }
+                }
+            });
+        }
     });
 
-    describe("getEndToEndInboundGroupSessionsBatch", () => {
+    describe("get/delete EndToEndInboundGroupSessionsBatch", () => {
         beforeEach(async () => {
             await store.startup();
         });
@@ -114,15 +141,51 @@ describe.each([
         });
 
         it("returns a batch of sessions", async () => {
-            /** Pad a string to 43 characters long */
-            function pad43(x: string): string {
-                return x + ".".repeat(43 - x.length);
-            }
             const N_DEVICES = 6;
             const N_SESSIONS_PER_DEVICE = 6;
+            await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
+
+            const batch = await store.getEndToEndInboundGroupSessionsBatch();
+            expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
+            for (let i = 0; i < N_DEVICES; i++) {
+                for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                    const r = batch![i * N_DEVICES + j];
+
+                    expect(r.senderKey).toEqual(pad43(`device${i}`));
+                    expect(r.sessionId).toEqual(`session${j}`);
+                }
+            }
+        });
+
+        it("returns another batch of sessions after the first batch is deleted", async () => {
+            // First store some sessions in the db
+            const N_DEVICES = 8;
+            const N_SESSIONS_PER_DEVICE = 8;
+            await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
+
+            // Get the first batch
+            const batch = (await store.getEndToEndInboundGroupSessionsBatch())!;
+            expect(batch.length).toEqual(SESSION_BATCH_SIZE);
+
+            // ... and delete.
+            await store.deleteEndToEndInboundGroupSessionsBatch(batch);
+
+            // Fetch a second batch
+            const batch2 = (await store.getEndToEndInboundGroupSessionsBatch())!;
+            expect(batch2.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE - SESSION_BATCH_SIZE);
+
+            // ... and delete.
+            await store.deleteEndToEndInboundGroupSessionsBatch(batch2);
+
+            // the batch should now be null.
+            expect(await store.getEndToEndInboundGroupSessionsBatch()).toBe(null);
+        });
+
+        /** Create a bunch of fake megolm sessions and stash them in the DB. */
+        async function createSessions(nDevices: number, nSessionsPerDevice: number) {
             await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, (txn) => {
-                for (let i = 0; i < N_DEVICES; i++) {
-                    for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                for (let i = 0; i < nDevices; i++) {
+                    for (let j = 0; j < nSessionsPerDevice; j++) {
                         store.storeEndToEndInboundGroupSession(
                             pad43(`device${i}`),
                             `session${j}`,
@@ -137,19 +200,11 @@ describe.each([
                     }
                 }
             });
-
-            const batch = await store.getEndToEndInboundGroupSessionsBatch();
-            expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
-            for (let i = 0; i < N_DEVICES; i++) {
-                for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
-                    const r = batch![i * N_DEVICES + j];
-
-                    expect(r.senderKey).toEqual(pad43(`device${i}`));
-                    expect(r.sessionId).toEqual(`session${j}`);
-                }
-            }
-        });
-
-        // TODO: add a test which deletes them and gets the next batch
+        }
     });
 });
+
+/** Pad a string to 43 characters long */
+function pad43(x: string): string {
+    return x + ".".repeat(43 - x.length);
+}

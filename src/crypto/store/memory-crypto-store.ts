@@ -450,6 +450,24 @@ export class MemoryCryptoStore implements CryptoStore {
         return result;
     }
 
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        for (const { deviceKey, sessionId } of sessions) {
+            const deviceSessions = this.sessions[deviceKey] || {};
+            delete deviceSessions[sessionId];
+            if (Object.keys(deviceSessions).length === 0) {
+                // No more sessions for this device.
+                delete this.sessions[deviceKey];
+            }
+        }
+    }
+
     // Inbound Group Sessions
 
     public getEndToEndInboundGroupSession(
@@ -536,6 +554,22 @@ export class MemoryCryptoStore implements CryptoStore {
 
         // There are fewer sessions than the batch size; return the final batch of sessions.
         return result;
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        for (const { senderKey, sessionId } of sessions) {
+            const k = senderKey + "/" + sessionId;
+            delete this.inboundGroupSessions[k];
+        }
     }
 
     // Device Data

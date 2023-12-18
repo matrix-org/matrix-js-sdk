@@ -266,6 +266,26 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return result;
     }
 
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        for (const { deviceKey, sessionId } of sessions) {
+            const deviceSessions = this._getEndToEndSessions(deviceKey) || {};
+            delete deviceSessions[sessionId];
+            if (Object.keys(deviceSessions).length === 0) {
+                // No more sessions for this device.
+                this.store.removeItem(keyEndToEndSessions(deviceKey));
+            } else {
+                setJsonItem(this.store, keyEndToEndSessions(deviceKey), deviceSessions);
+            }
+        }
+    }
+
     // Inbound Group Sessions
 
     public getEndToEndInboundGroupSession(
@@ -365,6 +385,22 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
         // There are fewer sessions than the batch size; return the final batch of sessions.
         return result;
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        for (const { senderKey, sessionId } of sessions) {
+            const k = keyEndToEndInboundGroupSession(senderKey, sessionId);
+            this.store.removeItem(k);
+        }
     }
 
     public getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void {
