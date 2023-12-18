@@ -24,12 +24,12 @@ import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { Logger } from "../logger";
+import { logger, Logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { MapWithDefault } from "../utils";
+import { logDuration, MapWithDefault } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -1225,12 +1225,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         unusedFallbackKeys?: Set<string>;
         devices?: RustSdkCryptoJs.DeviceLists;
     }): Promise<IToDeviceEvent[]> {
-        const result = await this.olmMachine.receiveSyncChanges(
-            events ? JSON.stringify(events) : "[]",
-            devices,
-            oneTimeKeysCounts,
-            unusedFallbackKeys,
-        );
+        const result = await logDuration(logger, "receiveSyncChanges", async () => {
+            return await this.olmMachine.receiveSyncChanges(
+                events ? JSON.stringify(events) : "[]",
+                devices,
+                oneTimeKeysCounts,
+                unusedFallbackKeys,
+            );
+        });
 
         // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
         return JSON.parse(result);

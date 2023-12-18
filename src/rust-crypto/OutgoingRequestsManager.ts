@@ -18,7 +18,7 @@ import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { Logger } from "../logger";
-import { defer, IDeferred } from "../utils";
+import { defer, IDeferred, logDuration } from "../utils";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.
@@ -130,7 +130,9 @@ export class OutgoingRequestsManager {
         for (const request of outgoingRequests) {
             if (this.stopped) return;
             try {
-                await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                await logDuration(this.logger, `Make outgoing request ${request.type}`, async () => {
+                    await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                });
             } catch (e) {
                 // as part of the loop we silently ignore errors, but log them.
                 // The rust sdk will retry the request later as it won't have been marked as sent.
