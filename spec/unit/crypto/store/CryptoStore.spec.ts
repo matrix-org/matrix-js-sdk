@@ -58,4 +58,98 @@ describe.each([
             expect(await store.getMigrationState()).toEqual(MigrationState.INITIAL_DATA_MIGRATED);
         });
     });
+
+    describe("getEndToEndSessionsBatch", () => {
+        beforeEach(async () => {
+            await store.startup();
+        });
+
+        it("returns null at first", async () => {
+            expect(await store.getEndToEndSessionsBatch()).toBe(null);
+        });
+
+        it("returns a batch of sessions", async () => {
+            // First store some sessions in the db
+            const N_DEVICES = 6;
+            const N_SESSIONS_PER_DEVICE = 6;
+            await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_SESSIONS, (txn) => {
+                for (let i = 0; i < N_DEVICES; i++) {
+                    for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                        store.storeEndToEndSession(
+                            `device${i}`,
+                            `session${j}`,
+                            {
+                                deviceKey: `device${i}`,
+                                sessionId: `session${j}`,
+                            },
+                            txn,
+                        );
+                    }
+                }
+            });
+
+            // Then, get a batch and check it looks right.
+            const batch = await store.getEndToEndSessionsBatch();
+            expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
+            for (let i = 0; i < N_DEVICES; i++) {
+                for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                    const r = batch![i * N_DEVICES + j];
+
+                    expect(r.deviceKey).toEqual(`device${i}`);
+                    expect(r.sessionId).toEqual(`session${j}`);
+                }
+            }
+        });
+
+        // TODO: add a test which deletes them and gets the next batch
+    });
+
+    describe("getEndToEndInboundGroupSessionsBatch", () => {
+        beforeEach(async () => {
+            await store.startup();
+        });
+
+        it("returns null at first", async () => {
+            expect(await store.getEndToEndInboundGroupSessionsBatch()).toBe(null);
+        });
+
+        it("returns a batch of sessions", async () => {
+            /** Pad a string to 43 characters long */
+            function pad43(x: string): string {
+                return x + ".".repeat(43 - x.length);
+            }
+            const N_DEVICES = 6;
+            const N_SESSIONS_PER_DEVICE = 6;
+            await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, (txn) => {
+                for (let i = 0; i < N_DEVICES; i++) {
+                    for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                        store.storeEndToEndInboundGroupSession(
+                            pad43(`device${i}`),
+                            `session${j}`,
+                            {
+                                forwardingCurve25519KeyChain: [],
+                                keysClaimed: {},
+                                room_id: "",
+                                session: "",
+                            },
+                            txn,
+                        );
+                    }
+                }
+            });
+
+            const batch = await store.getEndToEndInboundGroupSessionsBatch();
+            expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
+            for (let i = 0; i < N_DEVICES; i++) {
+                for (let j = 0; j < N_SESSIONS_PER_DEVICE; j++) {
+                    const r = batch![i * N_DEVICES + j];
+
+                    expect(r.senderKey).toEqual(pad43(`device${i}`));
+                    expect(r.sessionId).toEqual(`session${j}`);
+                }
+            }
+        });
+
+        // TODO: add a test which deletes them and gets the next batch
+    });
 });

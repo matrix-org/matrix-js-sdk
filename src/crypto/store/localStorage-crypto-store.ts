@@ -25,6 +25,7 @@ import {
     MigrationState,
     Mode,
     SecretStorePrivateKeys,
+    SESSION_BATCH_SIZE,
 } from "./base";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
@@ -235,6 +236,36 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return ret;
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        const result: ISessionInfo[] = [];
+        for (let i = 0; i < this.store.length; ++i) {
+            if (this.store.key(i)?.startsWith(keyEndToEndSessions(""))) {
+                const deviceKey = this.store.key(i)!.split("/")[1];
+                for (const session of Object.values(this._getEndToEndSessions(deviceKey))) {
+                    result.push(session);
+                    if (result.length >= SESSION_BATCH_SIZE) {
+                        return result;
+                    }
+                }
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
+    }
+
     // Inbound Group Sessions
 
     public getEndToEndInboundGroupSession(
@@ -296,6 +327,44 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         txn: unknown,
     ): void {
         setJsonItem(this.store, keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId), sessionData);
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null> {
+        const result: ISession[] = [];
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                // we can't use split, as the components we are trying to split out
+                // might themselves contain '/' characters. We rely on the
+                // senderKey being a (32-byte) curve25519 key, base64-encoded
+                // (hence 43 characters long).
+
+                result.push({
+                    senderKey: key.slice(KEY_INBOUND_SESSION_PREFIX.length, KEY_INBOUND_SESSION_PREFIX.length + 43),
+                    sessionId: key.slice(KEY_INBOUND_SESSION_PREFIX.length + 44),
+                    sessionData: getJsonItem(this.store, key)!,
+                });
+
+                if (result.length >= SESSION_BATCH_SIZE) {
+                    return result;
+                }
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
     }
 
     public getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void {

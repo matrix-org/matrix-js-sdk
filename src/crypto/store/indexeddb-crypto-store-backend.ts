@@ -28,6 +28,7 @@ import {
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
+    SESSION_BATCH_SIZE,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -629,6 +630,39 @@ export class Backend implements CryptoStore {
         return ret;
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     */
+    public async getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        const result: ISessionInfo[] = [];
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_SESSIONS);
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function (): void {
+                try {
+                    const cursor = getReq.result;
+                    if (cursor) {
+                        result.push(cursor.value);
+                        if (result.length < SESSION_BATCH_SIZE) {
+                            cursor.continue();
+                        }
+                    }
+                } catch (e) {
+                    abortWithException(txn, <Error>e);
+                }
+            };
+        });
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        return result;
+    }
+
     // Inbound group sessions
 
     public getEndToEndInboundGroupSession(
@@ -751,6 +785,43 @@ export class Backend implements CryptoStore {
             sessionId,
             session: sessionData,
         });
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     */
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
+        const result: ISession[] = [];
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function (): void {
+                try {
+                    const cursor = getReq.result;
+                    if (cursor) {
+                        result.push({
+                            senderKey: cursor.value.senderCurve25519Key,
+                            sessionId: cursor.value.sessionId,
+                            sessionData: cursor.value.session,
+                        });
+                        if (result.length < SESSION_BATCH_SIZE) {
+                            cursor.continue();
+                        }
+                    }
+                } catch (e) {
+                    abortWithException(txn, <Error>e);
+                }
+            };
+        });
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        return result;
     }
 
     public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {

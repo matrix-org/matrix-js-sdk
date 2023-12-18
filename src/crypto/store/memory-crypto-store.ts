@@ -28,6 +28,7 @@ import {
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
+    SESSION_BATCH_SIZE,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -422,6 +423,33 @@ export class MemoryCryptoStore implements CryptoStore {
         return ret;
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        const result: ISessionInfo[] = [];
+        for (const deviceSessions of Object.values(this.sessions)) {
+            for (const session of Object.values(deviceSessions)) {
+                result.push(session);
+                if (result.length >= SESSION_BATCH_SIZE) {
+                    return result;
+                }
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
+    }
+
     // Inbound Group Sessions
 
     public getEndToEndInboundGroupSession(
@@ -479,6 +507,35 @@ export class MemoryCryptoStore implements CryptoStore {
     ): void {
         const k = senderCurve25519Key + "/" + sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
+        const result: ISession[] = [];
+        for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
+            result.push({
+                senderKey: key.slice(0, 43),
+                sessionId: key.slice(44),
+                sessionData: session,
+            });
+            if (result.length >= SESSION_BATCH_SIZE) {
+                return result;
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
     }
 
     // Device Data

@@ -502,6 +502,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return this.backend!.filterOutNotifiedErrorDevices(devices);
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        return this.backend!.getEndToEndSessionsBatch();
+    }
+
     // Inbound group sessions
 
     /**
@@ -576,6 +587,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
     ): void {
         this.backend!.storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn);
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null> {
+        return this.backend!.getEndToEndInboundGroupSessionsBatch();
     }
 
     // End-to-end device tracking

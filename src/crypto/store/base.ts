@@ -132,6 +132,14 @@ export interface CryptoStore {
     getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
     filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]>;
 
+    /**
+     * Get a batch of end-to-end sessions from the database.
+     *
+     * @returns A batch of Olm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndSessionsBatch(): Promise<ISessionInfo[] | null>;
+
     // Inbound Group Sessions
     getEndToEndInboundGroupSession(
         senderCurve25519Key: string,
@@ -159,6 +167,14 @@ export interface CryptoStore {
         txn: unknown,
     ): void;
 
+    /**
+     * Get a batch of Megolm sessions from the database.
+     *
+     * @returns A batch of Megolm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null>;
+
     // Device Data
     getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;
     storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void;
@@ -182,12 +198,14 @@ export interface CryptoStore {
 
 export type Mode = "readonly" | "readwrite";
 
+/** Data on a Megolm session */
 export interface ISession {
     senderKey: string;
     sessionId: string;
     sessionData?: InboundGroupSessionData;
 }
 
+/** Data on an Olm session */
 export interface ISessionInfo {
     deviceKey?: string;
     sessionId?: string;
@@ -278,3 +296,9 @@ export enum MigrationState {
     /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
     MEGOLM_SESSIONS_MIGRATED,
 }
+
+/**
+ * The size of batches to be returned by {@link CryptoStore#getEndToEndSessionsBatch} and
+ * {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+ */
+export const SESSION_BATCH_SIZE = 50;
