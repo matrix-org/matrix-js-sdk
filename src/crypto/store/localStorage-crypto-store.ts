@@ -76,6 +76,17 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         super();
     }
 
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Implementation of {@link CryptoStore.containsData}.
+     *
+     * @internal
+     */
+    public async containsData(): Promise<boolean> {
+        return LocalStorageCryptoStore.exists(this.store);
+    }
+
     // Olm Sessions
 
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {

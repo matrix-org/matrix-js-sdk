@@ -46,7 +46,25 @@ export interface SecretStorePrivateKeys {
  * Abstraction of things that can store data required for end-to-end encryption
  */
 export interface CryptoStore {
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Unlike the rest of the methods in this interface, can be called before {@link CryptoStore#startup}.
+     *
+     * @internal
+     */
+    containsData(): Promise<boolean>;
+
+    /**
+     * Initialise this crypto store.
+     *
+     * Typically, this involves provisioning storage, and migrating any existing data to the current version of the
+     * storage schema where appropriate.
+     *
+     * Must be called before any of the rest of the methods in this interface.
+     */
     startup(): Promise<CryptoStore>;
+
     deleteAllData(): Promise<void>;
     getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
     getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;

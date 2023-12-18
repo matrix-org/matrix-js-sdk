@@ -38,7 +38,7 @@ import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 
-/**
+/*
  * Internal module. indexeddb storage for e2e.
  */
 
@@ -71,6 +71,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param dbName -   name of db to connect to
      */
     public constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
+
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Implementation of {@link CryptoStore.containsData}.
+     *
+     * @internal
+     */
+    public async containsData(): Promise<boolean> {
+        return IndexedDBCryptoStore.exists(this.indexedDB, this.dbName);
+    }
 
     /**
      * Ensure the database exists and is up-to-date, or fall back to

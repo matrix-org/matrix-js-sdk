@@ -57,6 +57,18 @@ export class MemoryCryptoStore implements CryptoStore {
     private parkedSharedHistory = new Map<string, ParkedSharedHistory[]>(); // keyed by room ID
 
     /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Implementation of {@link CryptoStore.containsData}.
+     *
+     * @internal
+     */
+    public async containsData(): Promise<boolean> {
+        // If it contains anything, it should contain an account.
+        return this.account !== null;
+    }
+
+    /**
      * Ensure the database exists and is up-to-date.
      *
      * This must be called before the store can be used.

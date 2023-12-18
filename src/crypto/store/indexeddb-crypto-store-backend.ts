@@ -40,6 +40,8 @@ const PROFILE_TRANSACTIONS = false;
  * Implementation of a CryptoStore which is backed by an existing
  * IndexedDB connection. Generally you want IndexedDBCryptoStore
  * which connects to the database and defers to one of these.
+ *
+ * @internal
  */
 export class Backend implements CryptoStore {
     private nextTxnId = 0;
@@ -56,11 +58,16 @@ export class Backend implements CryptoStore {
         };
     }
 
+    public async containsData(): Promise<boolean> {
+        throw Error("Not implemented for Backend");
+    }
+
     public async startup(): Promise<CryptoStore> {
         // No work to do, as the startup is done by the caller (e.g IndexedDBCryptoStore)
         // by passing us a ready IDBDatabase instance
         return this;
     }
+
     public async deleteAllData(): Promise<void> {
         throw Error("This is not implemented, call IDBFactory::deleteDatabase(dbName) instead.");
     }
