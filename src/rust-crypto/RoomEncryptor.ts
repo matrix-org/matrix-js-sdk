@@ -33,6 +33,7 @@ import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
 import { HistoryVisibility } from "../@types/partials";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
+import { logDuration } from "../utils";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -98,8 +99,10 @@ export class RoomEncryptor {
             (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
-            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
-                this.prefixedLogger.error("Unable to update tracked users", e);
+            logDuration(this.prefixedLogger, "updateTrackedUsers", async () => {
+                this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
+                    this.prefixedLogger.error("Unable to update tracked users", e);
+                });
             });
         }
 
@@ -116,7 +119,10 @@ export class RoomEncryptor {
      */
     public async prepareForEncryption(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         const logger = new LogSpan(this.prefixedLogger, "prepareForEncryption");
-        await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
+
+        await logDuration(this.prefixedLogger, "prepareForEncryption", async () => {
+            await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
+        });
     }
 
     /**
@@ -159,7 +165,10 @@ export class RoomEncryptor {
             // at the end of the sync, but we can't wait for that).
             // XXX future improvement process only KeysQueryRequests for the users that have never been queried.
             logger.debug(`Processing outgoing requests`);
-            await this.outgoingRequestManager.doProcessOutgoingRequests();
+
+            await logDuration(this.prefixedLogger, "doProcessOutgoingRequests", async () => {
+                await this.outgoingRequestManager.doProcessOutgoingRequests();
+            });
         } else {
             // If members are already loaded it's less critical to await on key queries.
             // We might still want to trigger a processOutgoingRequests here.
@@ -177,7 +186,10 @@ export class RoomEncryptor {
         );
 
         const userList = members.map((u) => new UserId(u.userId));
-        await this.keyClaimManager.ensureSessionsForUsers(logger, userList);
+
+        await logDuration(this.prefixedLogger, "ensureSessionsForUsers", async () => {
+            await this.keyClaimManager.ensureSessionsForUsers(logger, userList);
+        });
 
         const rustEncryptionSettings = new EncryptionSettings();
         rustEncryptionSettings.historyVisibility = toRustHistoryVisibility(this.room.getHistoryVisibility());
@@ -201,12 +213,14 @@ export class RoomEncryptor {
         rustEncryptionSettings.onlyAllowTrustedDevices =
             this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
 
-        const shareMessages: ToDeviceRequest[] = await this.shareRoomKey(userList, rustEncryptionSettings);
-        if (shareMessages) {
-            for (const m of shareMessages) {
-                await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
+        await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
+            const shareMessages: ToDeviceRequest[] = await this.shareRoomKey(userList, rustEncryptionSettings);
+            if (shareMessages) {
+                for (const m of shareMessages) {
+                    await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
+                }
             }
-        }
+        });
     }
 
     /**

@@ -29,7 +29,7 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, immediate } from "../utils";
+import { encodeUri, immediate, logDuration } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
@@ -328,7 +328,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 // Get a batch of room keys to upload
                 let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
                 try {
-                    request = await this.olmMachine.backupRoomKeys();
+                    request = await logDuration(
+                        logger,
+                        "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
+                        async () => {
+                            await this.olmMachine.backupRoomKeys();
+                        },
+                    );
                 } catch (err) {
                     logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
                 }

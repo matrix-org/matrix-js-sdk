@@ -28,7 +28,7 @@ import {
 
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { QueryDict } from "../utils";
+import { logDuration, QueryDict } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
@@ -109,7 +109,9 @@ export class OutgoingRequestProcessor {
 
         if (msg.id) {
             try {
-                await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
+                await logDuration(logger, `Mark Request as sent ${msg.type}`, async () => {
+                    await this.olmMachine.markRequestAsSent(msg.id!, msg.type, resp);
+                });
             } catch (e) {
                 // Ignore errors which are caused by the olmMachine having been freed. The exact error message depends
                 // on whether we are using a release or develop build of rust-sdk-crypto-wasm.
@@ -122,6 +124,8 @@ export class OutgoingRequestProcessor {
                     throw e;
                 }
             }
+        } else {
+            logger.trace(`Outgoing request type:${msg.type} does not have an ID`);
         }
     }
 
