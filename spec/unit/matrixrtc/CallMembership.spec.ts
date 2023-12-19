@@ -29,9 +29,7 @@ const membershipTemplate: CallMembershipData = {
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
-        sender: {
-            userId: "@alice:example.org",
-        },
+        getSender: jest.fn().mockReturnValue("@alice:example.org"),
     } as unknown as MatrixEvent;
 }
 
@@ -87,7 +85,7 @@ describe("CallMembership", () => {
 
     it("considers memberships expired when local age large", () => {
         const fakeEvent = makeMockEvent(1000);
-        fakeEvent.getLocalAge = jest.fn().mockReturnValue(6000);
+        fakeEvent.localTimestamp = Date.now() - 6000;
         const membership = new CallMembership(fakeEvent, membershipTemplate);
         expect(membership.isExpired()).toEqual(true);
     });

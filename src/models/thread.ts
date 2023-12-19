@@ -90,7 +90,40 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     private reEmitter: TypedReEmitter<ThreadEmittedEvents, ThreadEventHandlerMap>;
 
+    /**
+     * The last event in this thread, if we don't yet have this in the timeline.
+     *
+     * When we run {@link processRootEvent} (which I think happens during the
+     * setting-up of the thread), we set this to the event pointed to by the
+     * server in `latest_event` [1] that came through with the thread root.
+     *
+     * [1]: https://spec.matrix.org/v1.8/client-server-api/#server-side-aggregation-of-mthread-relationships
+     *
+     * Later, when we have populated the timeline, this is set to undefined, so
+     * that methods like {@link replyToEvent} fall through to use lastReply,
+     * which looks in the timeline for the latest event that is a "thread reply"
+     * i.e. directly refers to the thread root with an m.thread relation.
+     *
+     * So it looks like this is only really relevant when initialEventsFetched
+     * is false, because as soon as the initial events have been fetched, we
+     * should have a timeline (I think).
+     *
+     * If all replies in this thread are redacted, this is set to the root
+     * event. I'm not clear what the meaning of this is, since usually after the
+     * initial events have been fetched, lastEvent should be undefined.
+     * In fact, the whole usage inside onRedaction looks suspect - it may be
+     * that we were thinking lastEvent always refers to the actual last event,
+     * but it only does so before initialEventsFetched becomes true.
+     *
+     * The usage of lastEvent inside {@link onEcho} looks suspicious, since I'd
+     * think we probably mean {@link replyToEvent} there - we are trying not to
+     * echo a duplicate event, and we probably want that behaviour even after
+     * initialEventsFetched has become true.
+     *
+     * -- andyb
+     */
     private lastEvent: MatrixEvent | undefined;
+
     private replyCount = 0;
     private lastPendingEvent: MatrixEvent | undefined;
     private pendingReplyCount = 0;
@@ -109,6 +142,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
+
+        // each Event in the thread adds a reemitter, so we could hit the listener limit.
+        this.setMaxListeners(1000);
 
         if (!opts?.room) {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
@@ -195,8 +231,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     };
 
-    private onRedaction = async (event: MatrixEvent): Promise<void> => {
-        if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
+    private onRedaction = async (event: MatrixEvent, room: Room, threadRootId?: string): Promise<void> => {
+        if (threadRootId !== this.id) return; // ignore redactions for other timelines
         if (this.replyCount <= 0) {
             for (const threadEvent of this.timeline) {
                 this.clearEventMetadata(threadEvent);
@@ -324,25 +360,34 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * @param emit - whether to emit the Update event if the thread was updated or not.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
+        // Modify this event to point at our room's state, and mark its thread
+        // as this.
         this.setEventMetadata(event);
 
+        // Decide whether this event is going to be added at the end of the timeline.
         const lastReply = this.lastReply();
         const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 
-        // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
-            // all the relevant membership info to hydrate events with a sender
-            // is held in the main room timeline
-            // We want to fetch the room state from there and pass it down to this thread
-            // timeline set to let it reconcile an event with its relevant RoomMember
+            // When there's no server-side support, just add it to the end of the timeline.
             this.addEventToTimeline(event, toStartOfTimeline);
-
-            this.client.decryptEventIfNeeded(event, {});
+            this.client.decryptEventIfNeeded(event);
         } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
+            // When we've asked for the event to be added to the end, and we're
+            // not in the initial state, and this event belongs at the end, add it.
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
+            // If this event is not a direct member of the thread, but is a
+            // reference to something that is, then we have two cases:
+
             if (!this.initialEventsFetched) {
+                // Case 1: we haven't yet fetched events from the server. In
+                // this case, when we do, the events we get back might only be
+                // the first-order ones, so this event (which is second-order -
+                // a reference to something directly in the thread) needs to be
+                // kept so we can replay it when the first-order ones turn up.
+
                 /**
                  * A thread can be fully discovered via a single sync response
                  * And when that's the case we still ask the server to do an initialisation
@@ -354,6 +399,23 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                  */
                 this.replayEvents?.push(event);
             } else {
+                // Case 2: this is happening later, and we have a timeline. In
+                // this case, these events might be out-of order.
+                //
+                // Specifically, if the server doesn't support recursion, so we
+                // only get these events through sync, they might be coming
+                // later than the first-order ones, so we insert them based on
+                // timestamp (despite the problems with this documented in
+                // #3325).
+                //
+                // If the server does support recursion, we should have got all
+                // the interspersed events from the server when we fetched the
+                // initial events, so if they are coming via sync they should be
+                // the latest ones, so we can add them as normal.
+                //
+                // (Note that both insertEventIntoTimeline and addEventToTimeline
+                // do nothing if we have seen this event before.)
+
                 const recursionSupport =
                     this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
 
@@ -367,6 +429,23 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.timelineSet.relations?.aggregateParentEvent(event);
             this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
             return;
+        } else if (this.initialEventsFetched) {
+            // If initial events have not been fetched, we are OK to throw away
+            // this event, because we are about to fetch all the events for this
+            // thread from the server.
+
+            // Otherwise, we should add it, but we suspect it is out of order.
+            if (toStartOfTimeline) {
+                // If we're adding at the start of the timeline, it doesn't
+                // matter that it's out of order.
+                this.addEventToTimeline(event, toStartOfTimeline);
+            } else {
+                // We think this event might be out of order, because isNewestReply
+                // is false (otherwise we would have gone into the earlier if
+                // clause), so try to insert it in the right place based on
+                // timestamp.
+                this.insertEventIntoTimeline(event);
+            }
         }
 
         if (
@@ -530,7 +609,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 } else {
                     await this.client.paginateEventTimeline(this.liveTimeline, {
                         backwards: true,
-                        limit: Math.max(1, this.length),
                     });
                 }
                 for (const event of this.replayEvents!) {
@@ -669,6 +747,27 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * @returns ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
+        // TODO: we think the implementation here is not right. Here is a sketch
+        // of the right answer:
+        //
+        // for event in timeline.events.reversed():
+        //     if room.hasUserReadEvent(event):
+        //         return event
+        // return null
+        //
+        // If this is too slow, we might be able to improve it by trying walking
+        // forward from the threaded receipt in this thread. We could alternate
+        // between backwards-from-front and forwards-from-threaded-receipt to
+        // improve our chances of hitting the right answer sooner.
+        //
+        // Either way, it's still fundamentally slow because we have to walk
+        // events.
+        //
+        // We also might just want to limit the time we spend on this by giving
+        // up after, say, 100 events.
+        //
+        // --- andyb
+
         const isCurrentUser = userId === this.client.getUserId();
         const lastReply = this.timeline[this.timeline.length - 1];
         if (isCurrentUser && lastReply) {
@@ -737,7 +836,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
-        return super.hasUserReadEvent(userId, eventId);
+        return this.room.hasUserReadEvent(userId, eventId);
     }
 
     public setUnread(type: NotificationCountType, count: number): void {

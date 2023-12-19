@@ -18,7 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
+import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
@@ -38,6 +38,20 @@ export interface CryptoApi {
      * If true, all unverified devices will be blacklisted by default
      */
     globalBlacklistUnverifiedDevices: boolean;
+
+    /**
+     * Return the current version of the crypto module.
+     * For example: `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`.
+     * @returns the formatted version
+     */
+    getVersion(): string;
+
+    /**
+     * Get the public part of the device keys for the current device.
+     *
+     * @returns The public device keys.
+     */
+    getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
@@ -155,7 +169,7 @@ export interface CryptoApi {
     /**
      * Mark the given device as locally verified.
      *
-     * Marking a devices as locally verified has much the same effect as completing the verification dance, or receiving
+     * Marking a device as locally verified has much the same effect as completing the verification dance, or receiving
      * a cross-signing signature for it.
      *
      * @param userId - owner of the device
@@ -167,6 +181,21 @@ export interface CryptoApi {
      * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
+
+    /**
+     * Cross-sign one of our own devices.
+     *
+     * This will create a signature for the device using our self-signing key, and publish that signature.
+     * Cross-signing a device indicates, to our other devices and to other users, that we have verified that it really
+     * belongs to us.
+     *
+     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}.
+     *
+     * *Note*: Do not call this unless you have verified, somehow, that the device is genuine!
+     *
+     * @param deviceId - ID of the device to be signed.
+     */
+    crossSignDevice(deviceId: string): Promise<void>;
 
     /**
      * Checks whether cross signing:
@@ -372,10 +401,24 @@ export interface CryptoApi {
      * Store the backup decryption key.
      *
      * This should be called if the client has received the key from another device via secret sharing (gossiping).
+     * It is the responsability of the caller to check that the decryption key is valid for the current backup version.
      *
      * @param key - the backup decryption key
+     *
+     * @deprecated prefer the variant with a `version` parameter.
      */
     storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
+
+    /**
+     * Store the backup decryption key.
+     *
+     * This should be called if the client has received the key from another device via secret sharing (gossiping).
+     * It is the responsability of the caller to check that the decryption key is valid for the given backup version.
+     *
+     * @param key - the backup decryption key
+     * @param version - the backup version corresponding to this decryption key
+     */
+    storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
 
     /**
      * Get the current status of key backup.
@@ -554,9 +597,10 @@ export interface ImportRoomKeyProgressData {
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
-    // TODO, the rust SDK will always such imported keys as untrusted
+    /** @deprecated the rust SDK will always such imported keys as untrusted */
     untrusted?: boolean;
-    source?: String; // TODO: Enum (backup, file, ??)
+    /** @deprecated not useful externally */
+    source?: string;
 }
 
 /**
@@ -666,10 +710,15 @@ export interface CrossSigningKeyInfo {
 }
 
 /**
- * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase} or {@link CreateSecretStorageOpts#createSecretStorageKey}.
  */
 export interface GeneratedSecretStorageKey {
-    keyInfo?: AddSecretStorageKeyOpts;
+    keyInfo?: {
+        /** If the key was derived from a passphrase, information (algorithm, salt, etc) on that derivation. */
+        passphrase?: PassphraseInfo;
+        /** Optional human-readable name for the key, to be stored in account_data. */
+        name?: string;
+    };
     /** The raw generated private key. */
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
@@ -726,6 +775,14 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+}
+
+/** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
+export interface OwnDeviceKeys {
+    /** Public part of the Ed25519 fingerprint key for the current device, base64 encoded. */
+    ed25519: string;
+    /** Public part of the Curve25519 identity key for the current device, base64 encoded. */
+    curve25519: string;
 }
 
 export * from "./crypto-api/verification";

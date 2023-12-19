@@ -45,6 +45,8 @@ import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
 import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
+import { Room } from "./room";
+import { EventTimeline } from "./event-timeline";
 
 export { EventStatus } from "./event-status";
 
@@ -175,11 +177,23 @@ interface IKeyRequestRecipient {
 }
 
 export interface IDecryptOptions {
-    // Emits "event.decrypted" if set to true
+    /** Whether to emit {@link MatrixEventEvent.Decrypted} events on successful decryption. Defaults to true.
+     */
     emit?: boolean;
-    // True if this is a retry (enables more logging)
+
+    /**
+     * True if this is a retry, after receiving an update to the session key. (Enables more logging.)
+     *
+     * This is only intended for use within the js-sdk.
+     *
+     * @internal
+     */
     isRetry?: boolean;
-    // whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key
+
+    /**
+     * Whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key.
+     * Defaults to `false`.
+     */
     forceRedecryptIfUntrusted?: boolean;
 }
 
@@ -390,7 +404,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         });
 
         this.txnId = event.txn_id;
-        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
+        // The localTimestamp is calculated using the age.
+        // Some events lack an `age` property, either because they are EDUs such as typing events,
+        // or due to server-side bugs such as https://github.com/matrix-org/synapse/issues/8429.
+        // The fallback in these cases will be to use the origin_server_ts.
+        // For EDUs, the origin_server_ts also is not defined so we use Date.now().
+        const age = this.getAge();
+        this.localTimestamp = age !== undefined ? Date.now() - age : this.getTs() ?? Date.now();
         this.reEmitter = new TypedReEmitter(this);
     }
 
@@ -414,9 +434,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Gets the event as though it would appear unencrypted. If the event is already not
-     * encrypted, it is simply returned as-is.
-     * @returns The event in wire format.
+     * Gets the event as it would appear if it had been sent unencrypted.
+     *
+     * If the event is encrypted, we attempt to mock up an event as it would have looked had the sender not encrypted it.
+     * If the event is not encrypted, a copy of it is simply returned as-is.
+     *
+     * @returns A shallow copy of the event, in wire format, as it would have been had it not been encrypted.
      */
     public getEffectiveEvent(): IEvent {
         const content = Object.assign({}, this.getContent()); // clone for mutation
@@ -1133,12 +1156,18 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
+     * @deprecated In favor of the overload that includes a Room argument
+     */
+    public makeRedacted(redactionEvent: MatrixEvent): void;
+    /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
      * @param redactionEvent - event causing the redaction
+     * @param room - the room in which the event exists
      */
-    public makeRedacted(redactionEvent: MatrixEvent): void {
+    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void;
+    public makeRedacted(redactionEvent: MatrixEvent, room?: Room): void {
         // quick sanity-check
         if (!redactionEvent.event) {
             throw new Error("invalid redactionEvent in makeRedacted");
@@ -1182,7 +1211,41 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             }
         }
 
+        // If the redacted event was in a thread (but not thread root), move it
+        // to the main timeline. This will change if MSC3389 is merged.
+        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
+            this.moveAllRelatedToMainTimeline(room);
+            redactionEvent.moveToMainTimeline(room);
+        }
+
         this.invalidateExtensibleEvent();
+    }
+
+    private moveAllRelatedToMainTimeline(room: Room): void {
+        const thread = this.thread;
+        this.moveToMainTimeline(room);
+
+        // If we dont have access to the thread, we can only move this
+        // event, not things related to it.
+        if (thread) {
+            for (const event of thread.events) {
+                if (event.getRelation()?.event_id === this.getId()) {
+                    event.moveAllRelatedToMainTimeline(room);
+                }
+            }
+        }
+    }
+
+    private moveToMainTimeline(room: Room): void {
+        // Remove it from its thread
+        this.thread?.timelineSet.removeEvent(this.getId()!);
+        this.setThread(undefined);
+
+        // And insert it into the main timeline
+        const timeline = room.getLiveTimeline();
+        // We use insertEventIntoTimeline to insert it in timestamp order,
+        // because we don't know where it should go (until we have MSC4033).
+        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
     }
 
     /**
@@ -1593,15 +1656,21 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Summarise the event as JSON. This is currently used by React SDK's view
-     * event source feature and Seshat's event indexing, so take care when
-     * adjusting the output here.
+     * Summarise the event as JSON.
      *
      * If encrypted, include both the decrypted and encrypted view of the event.
      *
      * This is named `toJSON` for use with `JSON.stringify` which checks objects
      * for functions named `toJSON` and will call them to customise the output
      * if they are defined.
+     *
+     * **WARNING** Do not log the result of this method; otherwise, it will end up
+     * in rageshakes, leading to a privacy violation.
+     *
+     * @deprecated Prefer to use {@link MatrixEvent#getEffectiveEvent} or similar.
+     * This method will be removed soon; it is too easy to use it accidentally
+     * and cause a privacy violation (cf https://github.com/vector-im/element-web/issues/26380).
+     * In any case, the value it returns is not a faithful serialization of the object.
      */
     public toJSON(): object {
         const event = this.getEffectiveEvent();

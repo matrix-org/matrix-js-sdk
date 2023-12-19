@@ -328,6 +328,7 @@ describe("MatrixClient", function () {
                 "storeFilter",
                 "startup",
                 "deleteAllData",
+                "setUserCreator",
             ] as const
         ).reduce((r, k) => {
             r[k] = jest.fn();

@@ -19,7 +19,6 @@ limitations under the License.
 import { MemoryStore, IOpts as IBaseOpts } from "./memory";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
-import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { logger } from "../logger";
 import { ISavedSync } from "./index";
@@ -140,7 +139,10 @@ export class IndexedDBStore extends MemoryStore {
             .then((userPresenceEvents) => {
                 logger.log(`IndexedDBStore.startup: processing presence events`);
                 userPresenceEvents.forEach(([userId, rawEvent]) => {
-                    const u = new User(userId);
+                    if (!this.createUser) {
+                        throw new Error("createUser is undefined, it should be set with setUserCreator()!");
+                    }
+                    const u = this.createUser(userId);
                     if (rawEvent) {
                         u.setPresenceEvent(new MatrixEvent(rawEvent));
                     }

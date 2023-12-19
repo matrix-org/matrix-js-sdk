@@ -26,7 +26,7 @@ limitations under the License.
 import { Optional } from "matrix-events-sdk";
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
-import { User, UserEvent } from "./models/user";
+import { User } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils";
 import { Filter } from "./filter";
@@ -431,7 +431,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getContent().user_id);
+                        user = User.createUser(presenceEvent.getContent().user_id, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -530,7 +530,7 @@ export class SyncApi {
                             if (user) {
                                 user.setPresenceEvent(presenceEvent);
                             } else {
-                                user = createNewUser(this.client, presenceEvent.getContent().user_id);
+                                user = User.createUser(presenceEvent.getContent().user_id, this.client);
                                 user.setPresenceEvent(presenceEvent);
                                 this.client.store.storeUser(user);
                             }
@@ -1150,7 +1150,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getSender()!);
+                        user = User.createUser(presenceEvent.getSender()!, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -1891,18 +1891,6 @@ export class SyncApi {
         debuglog("Browser thinks we are back online");
         this.startKeepAlives(0);
     };
-}
-
-function createNewUser(client: MatrixClient, userId: string): User {
-    const user = new User(userId);
-    client.reEmitter.reEmit(user, [
-        UserEvent.AvatarUrl,
-        UserEvent.DisplayName,
-        UserEvent.Presence,
-        UserEvent.CurrentlyActive,
-        UserEvent.LastPresenceTs,
-    ]);
-    return user;
 }
 
 // /!\ This function is not intended for public use! It's only exported from

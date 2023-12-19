@@ -100,10 +100,12 @@ export interface PassphraseInfo {
  * Options for {@link ServerSideSecretStorageImpl#addKey}.
  */
 export interface AddSecretStorageKeyOpts {
-    pubkey?: string;
+    /** Information for deriving the key from a passphrase if any. */
     passphrase?: PassphraseInfo;
+    /** Optional name of the key. */
     name?: string;
-    key?: Uint8Array;
+    /** The private key. Will be used to generate the key check values in the key info; it will not be stored on the server */
+    key: Uint8Array;
 }
 
 /**
@@ -380,7 +382,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      */
     public async addKey(
         algorithm: string,
-        opts: AddSecretStorageKeyOpts = {},
+        opts: AddSecretStorageKeyOpts,
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
         if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
@@ -396,11 +398,10 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         if (opts.passphrase) {
             keyInfo.passphrase = opts.passphrase;
         }
-        if (opts.key) {
-            const { iv, mac } = await calculateKeyCheck(opts.key);
-            keyInfo.iv = iv;
-            keyInfo.mac = mac;
-        }
+
+        const { iv, mac } = await calculateKeyCheck(opts.key);
+        keyInfo.iv = iv;
+        keyInfo.mac = mac;
 
         // Create a unique key id. XXX: this is racey.
         if (!keyId) {

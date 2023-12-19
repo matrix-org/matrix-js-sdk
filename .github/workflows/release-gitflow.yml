@@ -1,0 +1,85 @@
+# Gitflow merge-back master->develop
+name: Merge master -> develop
+on:
+    push:
+        branches: [master]
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
+        inputs:
+            dependencies:
+                description: List of dependencies to reset.
+                type: string
+                required: false
+concurrency: ${{ github.workflow }}
+jobs:
+    merge:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: .action-repo
+                  sparse-checkout: |
+                      scripts/release
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - name: Set up git
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+
+            - name: Merge to develop
+              run: |
+                  git checkout develop
+                  git merge -X ours master
+
+            - name: Run post-merge-master script to revert package.json fields
+              run: ./.action-repo/scripts/release/post-merge-master.sh
+
+            - name: Reset dependencies
+              if: inputs.dependencies
+              run: |
+                  while IFS= read -r PACKAGE; do
+                      [ -z "$PACKAGE" ] && continue
+
+                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
+                      echo "Current $PACKAGE version is $CURRENT_VERSION"
+
+                      if [ "$CURRENT_VERSION" == "null" ]
+                      then
+                          echo "Unable to find $PACKAGE in package.json"
+                          exit 1
+                      fi
+
+                      if [ "$CURRENT_VERSION" == "develop" ]
+                      then
+                          echo "Not updating dependency $PACKAGE"
+                          continue
+                      fi
+
+                      echo "Resetting $1 to develop branch..."
+                      yarn add "github:matrix-org/$PACKAGE#develop"
+                      git add -u
+                      git commit -m "Reset $PACKAGE back to develop branch"
+                  done <<< "$DEPENDENCIES"
+              env:
+                  DEPENDENCIES: ${{ inputs.dependencies }}
+                  FINAL: ${{ inputs.final }}
+
+            - name: Push changes
+              run: git push origin develop

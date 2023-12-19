@@ -12,29 +12,26 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 jobs:
     jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})"
+        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-latest
         timeout-minutes: 10
         strategy:
             matrix:
-                specs: [browserify, integ, unit]
-                node: [18, latest]
+                specs: [integ, unit]
+                node: [18, "lts/*", 21]
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
 
             - name: Setup Node
-              uses: actions/setup-node@v3
+              id: setupNode
+              uses: actions/setup-node@v4
               with:
                   cache: "yarn"
                   node-version: ${{ matrix.node }}
 
             - name: Install dependencies
               run: "yarn install"
-
-            - name: Build
-              if: matrix.specs == 'browserify'
-              run: "yarn build"
 
             - name: Get number of CPU cores
               id: cpu-cores
@@ -55,7 +52,7 @@ jobs:
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
-              run: mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+              run: mv coverage/lcov.info coverage/${{ steps.setupNode.output.node-version }}-${{ matrix.specs }}.lcov.info
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
@@ -85,7 +82,7 @@ jobs:
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
-              uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
+              uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success

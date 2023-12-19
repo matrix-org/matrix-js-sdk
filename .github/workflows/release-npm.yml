@@ -1,4 +1,3 @@
-# Must only be called from `release#published` triggers
 name: Publish to npm
 on:
     workflow_call:
@@ -12,9 +11,11 @@ jobs:
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4
+              with:
+                  ref: staging
 
             - name: 🔧 Yarn cache
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v4
               with:
                   cache: "yarn"
                   registry-url: "https://registry.npmjs.org"
@@ -24,7 +25,7 @@ jobs:
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@fe72237be0920f7a0cafd6a966c9b929c9466e9b # v2.2.2
+              uses: JS-DevTools/npm-publish@4b07b26a2f6e0a51846e1870223e545bae91c552 # v3.0.1
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public
@@ -32,7 +33,7 @@ jobs:
                   ignore-scripts: false
 
             - name: 🎖️ Add `latest` dist-tag to final releases
-              if: github.event.release.prerelease == false && steps.npm-publish.outputs.id
+              if: steps.npm-publish.outputs.id && !contains(steps.npm-publish.outputs.id, '-rc.')
               run: npm dist-tag add "$release" latest
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

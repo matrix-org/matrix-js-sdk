@@ -16,7 +16,7 @@ limitations under the License.
 
 import "../../../olm-loader";
 import { MatrixClient, MatrixEvent } from "../../../../src/matrix";
-import { encodeBase64 } from "../../../../src/crypto/olmlib";
+import { encodeBase64 } from "../../../../src/base64";
 import "../../../../src/crypto"; // import this to cycle-break
 import { CrossSigningInfo } from "../../../../src/crypto/CrossSigning";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";

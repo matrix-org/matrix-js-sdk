@@ -41,7 +41,7 @@ export enum AutoDiscoveryAction {
     FAIL_ERROR = "FAIL_ERROR",
 }
 
-enum AutoDiscoveryError {
+export enum AutoDiscoveryError {
     Invalid = "Invalid homeserver discovery response",
     GenericFailure = "Failed to get autodiscovery configuration from server",
     InvalidHsBaseUrl = "Invalid base_url for m.homeserver",
@@ -114,7 +114,7 @@ export class AutoDiscovery {
 
     public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscoveryError.HomeserverTooOld;
 
-    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError);
+    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError) as AutoDiscoveryError[];
 
     /**
      * The auto discovery failed. The client is expected to communicate

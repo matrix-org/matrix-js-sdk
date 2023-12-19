@@ -55,6 +55,7 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
+    CallEncryptionKeysPrefix = "io.element.call.encryption_keys",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
@@ -93,6 +94,9 @@ export enum EventType {
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
+
+    // MatrixRTC events
+    CallNotify = "org.matrix.msc4075.call.notify",
 }
 
 export enum RelationType {

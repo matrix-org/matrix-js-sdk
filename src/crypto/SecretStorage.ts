@@ -73,11 +73,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> im
     /**
      * Add a key for encrypting secrets.
      */
-    public addKey(
-        algorithm: string,
-        opts: AddSecretStorageKeyOpts = {},
-        keyId?: string,
-    ): Promise<SecretStorageKeyObject> {
+    public addKey(algorithm: string, opts: AddSecretStorageKeyOpts, keyId?: string): Promise<SecretStorageKeyObject> {
         return this.storageImpl.addKey(algorithm, opts, keyId);
     }
 

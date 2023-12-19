@@ -66,6 +66,8 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
+import { RoomReceipts } from "./room-receipts";
+import { compareEventOrdering } from "./compare-event-ordering";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -236,8 +238,9 @@ export type RoomEventHandlerMap = {
      *
      * @param event - The matrix redaction event
      * @param room - The room containing the redacted event
+     * @param threadId - The thread containing the redacted event (before it was redacted)
      */
-    [RoomEvent.Redaction]: (event: MatrixEvent, room: Room) => void;
+    [RoomEvent.Redaction]: (event: MatrixEvent, room: Room, threadId?: string) => void;
     /**
      * Fires when an event that was previously redacted isn't anymore.
      * This happens when the redaction couldn't be sent and
@@ -432,6 +435,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private visibilityEvents = new Map<string, MatrixEvent[]>();
 
     /**
+     * The latest receipts (synthetic and real) for each user in each thread
+     * (and unthreaded).
+     */
+    private roomReceipts = new RoomReceipts(this);
+
+    /**
      * Construct a new Room.
      *
      * <p>For a room, we store an ordered sequence of timelines, which may or may not
@@ -549,7 +558,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
             .reverse()
-            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -567,7 +576,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             .getEvents()
             .slice(0) // copy before reversing
             .reverse()
-            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -2113,6 +2122,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Relations (other than m.thread), redactions, replies to a thread root live only in the main timeline
      * Relations, redactions, replies where the parent cannot be found live in no timelines but should be aggregated regardless.
      * Otherwise, the event lives in the main timeline only.
+     *
+     * Note: when a redaction is applied, the redacted event, events relating
+     * to it, and the redaction event itself, will all move to the main thread.
+     * This method classifies them as inside the thread of the redacted event.
+     * They are moved later as part of makeRedacted.
+     * This will change if MSC3389 is merged.
      */
     public eventShouldLiveIn(
         event: MatrixEvent,
@@ -2329,7 +2344,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
-                redactedEvent.makeRedacted(event);
+                const threadRootId = redactedEvent.threadRootId;
+                redactedEvent.makeRedacted(event, this);
 
                 // If this is in the current state, replace it with the redacted version
                 if (redactedEvent.isState()) {
@@ -2342,7 +2358,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     }
                 }
 
-                this.emit(RoomEvent.Redaction, event, this);
+                this.emit(RoomEvent.Redaction, event, this, threadRootId);
 
                 // TODO: we stash user displaynames (among other things) in
                 // RoomMember objects which are then attached to other events
@@ -2495,7 +2511,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
                 if (redactedEvent) {
                     redactedEvent.markLocallyRedacted(event);
-                    this.emit(RoomEvent.Redaction, event, this);
+                    this.emit(RoomEvent.Redaction, event, this, redactedEvent.threadRootId);
                 }
             }
         } else {
@@ -2927,6 +2943,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public addReceipt(event: MatrixEvent, synthetic = false): void {
         const content = event.getContent<ReceiptContent>();
+
+        this.roomReceipts.add(content, synthetic);
+
+        // TODO: delete the following code when it has been replaced by RoomReceipts
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
@@ -2988,6 +3008,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
             });
         });
+        // End of code to delete when replaced by RoomReceipts
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
@@ -3575,6 +3596,19 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Determines if the given user has read a particular event ID with the known
+     * history of the room. This is not a definitive check as it relies only on
+     * what is available to the room at the time of execution.
+     *
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns true if the user has read the event, false otherwise.
+     */
+    public hasUserReadEvent(userId: string, eventId: string): boolean {
+        return this.roomReceipts.hasUserReadEvent(userId, eventId);
+    }
+
+    /**
      * Returns the most recent unthreaded receipt for a given user
      * @param userId - the MxID of the User
      * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
@@ -3606,6 +3640,30 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const thread of unreadThreads) {
             thread.fixupNotifications(userId);
         }
+    }
+
+    /**
+     * Determine the order of two events in this room.
+     *
+     * In principle this should use the same order as the server, but in practice
+     * this is difficult for events that were not received over the Sync API. See
+     * MSC4033 for details.
+     *
+     * This implementation leans on the order of events within their timelines, and
+     * falls back to comparing event timestamps when they are in different
+     * timelines.
+     *
+     * See https://github.com/matrix-org/matrix-js-sdk/issues/3325 for where we are
+     * tracking the work to fix this.
+     *
+     * @param leftEventId - the id of the first event
+     * @param rightEventId - the id of the second event
+
+     * @returns -1 if left \< right, 1 if left \> right, 0 if left == right, null if
+     *          we can't tell (because we can't find the events).
+     */
+    public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
+        return compareEventOrdering(this, leftEventId, rightEventId);
     }
 }
 

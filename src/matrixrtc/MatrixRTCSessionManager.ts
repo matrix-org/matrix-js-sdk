@@ -17,10 +17,11 @@ limitations under the License.
 import { logger } from "../logger";
 import { MatrixClient, ClientEvent } from "../client";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Room } from "../models/room";
+import { Room, RoomEvent } from "../models/room";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MatrixEvent } from "../models/event";
 import { MatrixRTCSession } from "./MatrixRTCSession";
+import { EventType } from "../@types/event";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -62,6 +63,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.client.on(ClientEvent.Room, this.onRoom);
+        this.client.on(RoomEvent.Timeline, this.onTimeline);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
     }
 
@@ -72,6 +74,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.roomSessions.clear();
 
         this.client.removeListener(ClientEvent.Room, this.onRoom);
+        this.client.removeListener(RoomEvent.Timeline, this.onTimeline);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
     }
 
@@ -95,6 +98,18 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
+    private onTimeline = (event: MatrixEvent): void => {
+        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return;
+
+        const room = this.client.getRoom(event.getRoomId());
+        if (!room) {
+            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
+            return;
+        }
+
+        this.getRoomSession(room).onCallEncryption(event);
+    };
+
     private onRoom = (room: Room): void => {
         this.refreshRoom(room);
     };
@@ -106,7 +121,9 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
             return;
         }
 
-        this.refreshRoom(room);
+        if (event.getType() == EventType.GroupCallMemberPrefix) {
+            this.refreshRoom(room);
+        }
     };
 
     private refreshRoom(room: Room): void {

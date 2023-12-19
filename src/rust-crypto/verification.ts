@@ -57,11 +57,13 @@ export class RustVerificationRequest
     /**
      * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
      *
-     * @param inner - VerificationRequest from the Rust SDK
-     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests
-     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called
+     * @param olmMachine - The `OlmMachine` from the underlying rust crypto sdk.
+     * @param inner - VerificationRequest from the Rust SDK.
+     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests.
+     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called.
      */
     public constructor(
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly supportedVerificationMethods: string[],
@@ -133,6 +135,15 @@ export class RustVerificationRequest
     /** For verifications via to-device messages: the ID of the other device. Otherwise, undefined. */
     public get otherDeviceId(): string | undefined {
         return this.inner.otherDeviceId?.toString();
+    }
+
+    /** Get the other device involved in the verification, if it is known */
+    private async getOtherDevice(): Promise<undefined | RustSdkCryptoJs.Device> {
+        const otherDeviceId = this.inner.otherDeviceId;
+        if (!otherDeviceId) {
+            return undefined;
+        }
+        return await this.olmMachine.getDevice(this.inner.otherUserId, otherDeviceId, 5);
     }
 
     /** True if the other party in this request is one of this user's own devices. */
@@ -322,6 +333,11 @@ export class RustVerificationRequest
             throw new Error(`Unsupported verification method ${method}`);
         }
 
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("startVerification(): other device is unknown");
+        }
+
         const res:
             | [RustSdkCryptoJs.Sas, RustSdkCryptoJs.RoomMessageRequest | RustSdkCryptoJs.ToDeviceRequest]
             | undefined = await this.inner.startSas();
@@ -392,7 +408,15 @@ export class RustVerificationRequest
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
     public async generateQRCode(): Promise<Buffer | undefined> {
-        const innerVerifier: RustSdkCryptoJs.Qr = await this.inner.generateQrCode();
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("generateQRCode(): other device is unknown");
+        }
+
+        const innerVerifier: RustSdkCryptoJs.Qr | undefined = await this.inner.generateQrCode();
+        // If we are unable to generate a QRCode, we return undefined
+        if (!innerVerifier) return;
+
         return Buffer.from(innerVerifier.toBytes());
     }
 
@@ -566,7 +590,11 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
                 return VerificationPhase.Started;
             case QrState.Confirmed:
                 // we have confirmed the other side's scan and sent an `m.key.verification.done`.
-                return VerificationPhase.Done;
+                //
+                // However, the verification is not yet "Done", because we have to wait until we have received the
+                // `m.key.verification.done` from the other side (in particular, we don't mark the device/identity as
+                // verified until that happens). If we return "Done" too soon, we risk the user cancelling the flow.
+                return VerificationPhase.Started;
             case QrState.Reciprocated:
                 // although the rust SDK doesn't immediately send the `m.key.verification.start` on transition into this
                 // state, `RustVerificationRequest.scanQrCode` immediately calls `reciprocate()` and does so, so in practice
