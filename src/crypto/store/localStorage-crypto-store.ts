@@ -17,6 +17,7 @@ limitations under the License.
 import { logger } from "../../logger";
 import { MemoryCryptoStore } from "./memory-crypto-store";
 import {
+    CryptoStore,
     IDeviceData,
     IProblem,
     ISession,
@@ -72,7 +73,7 @@ function keyEndToEndRoomsPrefix(roomId: string): string {
     return KEY_ROOMS_PREFIX + roomId;
 }
 
-export class LocalStorageCryptoStore extends MemoryCryptoStore {
+export class LocalStorageCryptoStore extends MemoryCryptoStore implements CryptoStore {
     public static exists(store: Storage): boolean {
         const length = store.length;
         for (let i = 0; i < length; i++) {
@@ -239,7 +240,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     /**
      * Fetch a batch of Olm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.
      *
      * @internal
      */
@@ -352,7 +353,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     /**
      * Fetch a batch of Megolm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */
@@ -390,7 +391,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     /**
      * Delete a batch of Megolm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     * Implementation of {@link CryptoStore.deleteEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */

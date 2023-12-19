@@ -505,7 +505,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Fetch a batch of Olm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#getEndToEndSessionsBatch}.
+     * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.
      *
      * @internal
      */
@@ -603,7 +603,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Fetch a batch of Megolm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+     * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */
@@ -614,7 +614,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Delete a batch of Megolm sessions from the database.
      *
-     * Implementation of {@link CryptoStore#deleteEndToEndInboundGroupSessionsBatch}.
+     * Implementation of {@link CryptoStore.deleteEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */
