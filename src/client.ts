@@ -7450,16 +7450,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.serverVersionsPromise;
         }
 
+        // We send an authenticated request as of MSC4026
         this.serverVersionsPromise = this.http
-            .request<IServerVersions>(
-                Method.Get,
-                "/_matrix/client/versions",
-                undefined, // queryParams
-                undefined, // data
-                {
-                    prefix: "",
-                },
-            )
+            .authedRequest<IServerVersions>(Method.Get, "/_matrix/client/versions", undefined, undefined, {
+                prefix: "",
+            })
             .catch((e) => {
                 // Need to unset this if it fails, otherwise we'll never retry
                 this.serverVersionsPromise = undefined;
@@ -7732,6 +7727,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setAccessToken(token: string): void {
         this.http.opts.accessToken = token;
+        // The /versions response can vary for different users so clear the cache
+        this.serverVersionsPromise = undefined;
     }
 
     /**
