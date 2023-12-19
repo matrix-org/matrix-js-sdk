@@ -23,23 +23,31 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
+    SESSION_BATCH_SIZE,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { IndexedDBCryptoStore } from "./indexeddb-crypto-store";
 
 const PROFILE_TRANSACTIONS = false;
+
+/* Keys for the `account` object store */
+const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
  * IndexedDB connection. Generally you want IndexedDBCryptoStore
  * which connects to the database and defers to one of these.
+ *
+ * @internal
  */
 export class Backend implements CryptoStore {
     private nextTxnId = 0;
@@ -56,13 +64,47 @@ export class Backend implements CryptoStore {
         };
     }
 
+    public async containsData(): Promise<boolean> {
+        throw Error("Not implemented for Backend");
+    }
+
     public async startup(): Promise<CryptoStore> {
         // No work to do, as the startup is done by the caller (e.g IndexedDBCryptoStore)
         // by passing us a ready IDBDatabase instance
         return this;
     }
+
     public async deleteAllData(): Promise<void> {
         throw Error("This is not implemented, call IDBFactory::deleteDatabase(dbName) instead.");
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     */
+    public async getMigrationState(): Promise<MigrationState> {
+        let migrationState = MigrationState.NOT_STARTED;
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+            const getReq = objectStore.get(ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
+            getReq.onsuccess = (): void => {
+                migrationState = getReq.result ?? MigrationState.NOT_STARTED;
+            };
+        });
+        return migrationState;
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     */
+    public async setMigrationState(migrationState: MigrationState): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+            objectStore.put(migrationState, ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
+        });
     }
 
     /**
@@ -588,6 +630,62 @@ export class Backend implements CryptoStore {
         return ret;
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.
+     */
+    public async getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        const result: ISessionInfo[] = [];
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_SESSIONS);
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function (): void {
+                try {
+                    const cursor = getReq.result;
+                    if (cursor) {
+                        result.push(cursor.value);
+                        if (result.length < SESSION_BATCH_SIZE) {
+                            cursor.continue();
+                        }
+                    }
+                } catch (e) {
+                    abortWithException(txn, <Error>e);
+                }
+            };
+        });
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        return result;
+    }
+
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], async (txn) => {
+            try {
+                const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_SESSIONS);
+                for (const { deviceKey, sessionId } of sessions) {
+                    const req = objectStore.delete([deviceKey, sessionId]);
+                    await new Promise((resolve) => {
+                        req.onsuccess = resolve;
+                    });
+                }
+            } catch (e) {
+                abortWithException(txn, <Error>e);
+            }
+        });
+    }
+
     // Inbound group sessions
 
     public getEndToEndInboundGroupSession(
@@ -709,6 +807,68 @@ export class Backend implements CryptoStore {
             senderCurve25519Key,
             sessionId,
             session: sessionData,
+        });
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
+     */
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
+        const result: ISession[] = [];
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function (): void {
+                try {
+                    const cursor = getReq.result;
+                    if (cursor) {
+                        result.push({
+                            senderKey: cursor.value.senderCurve25519Key,
+                            sessionId: cursor.value.sessionId,
+                            sessionData: cursor.value.session,
+                        });
+                        if (result.length < SESSION_BATCH_SIZE) {
+                            cursor.continue();
+                        }
+                    }
+                } catch (e) {
+                    abortWithException(txn, <Error>e);
+                }
+            };
+        });
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        return result;
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        await this.doTxn("readwrite", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], async (txn) => {
+            try {
+                const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+                for (const { senderKey, sessionId } of sessions) {
+                    const req = objectStore.delete([senderKey, sessionId]);
+                    await new Promise((resolve) => {
+                        req.onsuccess = resolve;
+                    });
+                }
+            } catch (e) {
+                abortWithException(txn, <Error>e);
+            }
         });
     }
 

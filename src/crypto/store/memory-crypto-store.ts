@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../../logger";
-import { safeSet, deepCompare, promiseTry } from "../../utils";
+import { deepCompare, promiseTry, safeSet } from "../../utils";
 import {
     CryptoStore,
     IDeviceData,
@@ -23,10 +23,12 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
+    SESSION_BATCH_SIZE,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -39,6 +41,7 @@ import { InboundGroupSessionData } from "../OlmDevice";
  */
 
 export class MemoryCryptoStore implements CryptoStore {
+    private migrationState: MigrationState = MigrationState.NOT_STARTED;
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
     private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
@@ -55,6 +58,18 @@ export class MemoryCryptoStore implements CryptoStore {
     private sessionsNeedingBackup: { [sessionKey: string]: boolean } = {};
     private sharedHistoryInboundGroupSessions: { [roomId: string]: [senderKey: string, sessionId: string][] } = {};
     private parkedSharedHistory = new Map<string, ParkedSharedHistory[]>(); // keyed by room ID
+
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Implementation of {@link CryptoStore.containsData}.
+     *
+     * @internal
+     */
+    public async containsData(): Promise<boolean> {
+        // If it contains anything, it should contain an account.
+        return this.account !== null;
+    }
 
     /**
      * Ensure the database exists and is up-to-date.
@@ -75,6 +90,28 @@ export class MemoryCryptoStore implements CryptoStore {
      */
     public deleteAllData(): Promise<void> {
         return Promise.resolve();
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     *
+     * @internal
+     */
+    public async getMigrationState(): Promise<MigrationState> {
+        return this.migrationState;
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     *
+     * @internal
+     */
+    public async setMigrationState(migrationState: MigrationState): Promise<void> {
+        this.migrationState = migrationState;
     }
 
     /**
@@ -386,6 +423,51 @@ export class MemoryCryptoStore implements CryptoStore {
         return ret;
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        const result: ISessionInfo[] = [];
+        for (const deviceSessions of Object.values(this.sessions)) {
+            for (const session of Object.values(deviceSessions)) {
+                result.push(session);
+                if (result.length >= SESSION_BATCH_SIZE) {
+                    return result;
+                }
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
+    }
+
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        for (const { deviceKey, sessionId } of sessions) {
+            const deviceSessions = this.sessions[deviceKey] || {};
+            delete deviceSessions[sessionId];
+            if (Object.keys(deviceSessions).length === 0) {
+                // No more sessions for this device.
+                delete this.sessions[deviceKey];
+            }
+        }
+    }
+
     // Inbound Group Sessions
 
     public getEndToEndInboundGroupSession(
@@ -443,6 +525,51 @@ export class MemoryCryptoStore implements CryptoStore {
     ): void {
         const k = senderCurve25519Key + "/" + sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
+        const result: ISession[] = [];
+        for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
+            result.push({
+                senderKey: key.slice(0, 43),
+                sessionId: key.slice(44),
+                sessionData: session,
+            });
+            if (result.length >= SESSION_BATCH_SIZE) {
+                return result;
+            }
+        }
+
+        if (result.length === 0) {
+            // No sessions left.
+            return null;
+        }
+
+        // There are fewer sessions than the batch size; return the final batch of sessions.
+        return result;
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public async deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        for (const { senderKey, sessionId } of sessions) {
+            const k = senderKey + "/" + sessionId;
+            delete this.inboundGroupSessions[k];
+        }
     }
 
     // Device Data
