@@ -6,14 +6,51 @@ on:
             SONAR_TOKEN:
                 required: true
         inputs:
+            sharded:
+                type: boolean
+                required: false
+                description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
             extra_args:
                 type: string
                 required: false
                 description: "Extra args to pass to SonarCloud"
 jobs:
+    # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
+    prepare:
+        name: Prepare
+        if: |
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event != 'merge_group' &&
+            inputs.sharded
+        runs-on: ubuntu-latest
+        outputs:
+            extra_args: |
+                -Dsonar.javascript.lcov.reportPaths=${{ steps.extra_args.outputs.reportPaths }}
+                -Dsonar.testExecutionReportPaths=${{ steps.extra_args.outputs.testExecutionReportPaths }}
+        steps:
+            # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
+            # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+            - name: 📥 Download artifact
+              uses: dawidd6/action-download-artifact@f29d1b6a8930683e80acedfbe6baa2930cd646b4 # v2
+              with:
+                  workflow: tests.yaml
+                  run_id: ${{ github.event.workflow_run.id }}
+                  name: coverage
+                  path: coverage
+
+            - id: extra_args
+              run: |
+                  coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',' | sed 's/,$//g')
+                  echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
+                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',' | sed 's/,$//g')
+                  echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
+
     sonarqube:
         runs-on: ubuntu-latest
-        if: github.event.workflow_run.conclusion == 'success'
+        needs: prepare
+        if: |
+            always() && !failure() && !cancelled() &&
+            github.event.workflow_run.conclusion == 'success'
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Cypress is done.
@@ -40,7 +77,7 @@ jobs:
                   coverage_run_id: ${{ github.event.workflow_run.id }}
                   coverage_workflow_name: tests.yml
                   coverage_extract_path: coverage
-                  extra_args: ${{ inputs.extra_args }}
+                  extra_args: ${{ inputs.extra_args }} ${{ needs.prepare.outputs.extra_args }}
 
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               if: always()
