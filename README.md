@@ -11,7 +11,7 @@
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
 browser or in Node.js.
 
-#### Minimum Matrix server version: v1.1
+#### Minimum Matrix server version: v1.5
 
 The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only
 guarantees that a feature will be supported for at least 4 spec releases. For example, if a feature the js-sdk supports
