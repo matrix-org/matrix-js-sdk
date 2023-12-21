@@ -52,6 +52,11 @@ describe("RoomEncryptor", () => {
         let mockOutgoingRequestManager: Mocked<OutgoingRequestsManager>;
         let mockRoom: Mocked<Room>;
 
+        const mockRoomMember = {
+            userId: "@alice:example.org",
+            membership: "join",
+        } as unknown as Mocked<RoomMember>;
+
         function createMockEvent(text: string): Mocked<MatrixEvent> {
             return {
                 getTxnId: jest.fn().mockReturnValue(""),
@@ -65,6 +70,7 @@ describe("RoomEncryptor", () => {
         }
 
         beforeEach(() => {
+            jest.useFakeTimers();
             mockOlmMachine = {
                 identityKeys: {
                     curve25519: {
@@ -87,11 +93,6 @@ describe("RoomEncryptor", () => {
                 doProcessOutgoingRequests: jest.fn().mockResolvedValue(undefined),
             } as unknown as Mocked<OutgoingRequestsManager>;
 
-            const mockRoomMember = {
-                userId: "@alice:example.org",
-                membership: "join",
-            } as unknown as Mocked<RoomMember>;
-
             mockRoom = {
                 roomId: "!foo:example.org",
                 getJoinedMembers: jest.fn().mockReturnValue([mockRoomMember]),
@@ -108,6 +109,10 @@ describe("RoomEncryptor", () => {
                 mockRoom,
                 { algorithm: "m.megolm.v1.aes-sha2" },
             );
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
         });
 
         it("should ensure that there is only one shareRoomKey at a time", async () => {
@@ -135,6 +140,53 @@ describe("RoomEncryptor", () => {
 
             // should have been called again
             expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(6);
+        });
+
+        it("Should maintain order of encryption requests", async () => {
+            const firstTargetMembers = defer<void>();
+            const secondTargetMembers = defer<void>();
+
+            mockOlmMachine.shareRoomKey.mockResolvedValue(undefined);
+
+            // Took this method to demonstrate the race condition
+            mockRoom.getEncryptionTargetMembers
+                .mockImplementationOnce(async () => {
+                    await firstTargetMembers.promise;
+                    return [mockRoomMember];
+                })
+                .mockImplementationOnce(async () => {
+                    await secondTargetMembers.promise;
+                    return [mockRoomMember];
+                });
+
+            let firstMessageFinished: string | null = null;
+
+            const firstRequest = roomEncryptor.encryptEvent(createMockEvent("Hello"), false);
+            const secondRequest = roomEncryptor.encryptEvent(createMockEvent("Edit of Hello"), false);
+
+            firstRequest.then(() => {
+                if (firstMessageFinished === null) {
+                    firstMessageFinished = "hello";
+                }
+            });
+
+            secondRequest.then(() => {
+                if (firstMessageFinished === null) {
+                    firstMessageFinished = "edit";
+                }
+            });
+
+            // suppose the second getEncryptionTargetMembers call returns first
+            secondTargetMembers.resolve();
+            await jest.runAllTimersAsync();
+
+            firstTargetMembers.resolve();
+            await jest.runAllTimersAsync();
+
+            await Promise.all([firstRequest, secondRequest]);
+
+            expect(firstMessageFinished).toBe("hello");
+
         });
     });
 });
