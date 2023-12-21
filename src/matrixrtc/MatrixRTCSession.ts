@@ -133,7 +133,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
             if (eventMemberships === undefined) {
-                logger.warn(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
+                logger.debug(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
                 continue;
             }
             if (!Array.isArray(eventMemberships)) {
