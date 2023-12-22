@@ -145,7 +145,7 @@ export class RoomEncryptor {
         const logger = new LogSpan(this.prefixedLogger, event ? event.getTxnId() ?? "" : "prepareForEncryption");
         const prom = this.currentEncryptionPromise
             .catch(() => {
-                // any errors in the previous claim will have been reported already, so there is nothing to do here.
+                // Any errors in the previous call will have been reported already, so there is nothing to do here.
                 // we just throw away the error and start anew.
             })
             .then(async () => {
