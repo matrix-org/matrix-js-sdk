@@ -46,8 +46,11 @@ export class RoomEncryptor {
     /** whether the room members have been loaded and tracked for the first time */
     private lazyLoadedMembersResolved = false;
 
-    /** Ensures that there is only one call to shareRoomKeys at a time */
-    private currentShareRoomKeyPromise = Promise.resolve();
+    /**
+     * Ensures that there is only one encryption operation at a time for that room
+     * An encryption operation is either a prepareForEncryption or an encryptEvent call.
+     */
+    private currentEncryptionPromise: Promise<void> = Promise.resolve();
 
     /**
      * @param olmMachine - The rust-sdk's OlmMachine
@@ -118,11 +121,32 @@ export class RoomEncryptor {
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
     public async prepareForEncryption(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
-        const logger = new LogSpan(this.prefixedLogger, "prepareForEncryption");
+        // We consider a prepareForEncryption as an encryption promise as it will potentially share keys
+        // even if it doesn't send an event.
+        // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
+        // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
+        // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
+        return this.enqueuePromise(
+            this.ensureEncryptionSession(
+                new LogSpan(this.prefixedLogger, "prepareForEncryption"),
+                globalBlacklistUnverifiedDevices,
+            ),
+        );
+    }
 
-        await logDuration(this.prefixedLogger, "prepareForEncryption", async () => {
-            await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
-        });
+    /**
+     * Encrypt an event for this room.
+     *
+     * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
+     * then encrypt the event using the session.
+     *
+     * @param event - Event to be encrypted.
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     */
+    public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+        // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
+        // events order after they have been encrypted.
+        return this.enqueuePromise(this.encryptEventInner(event, globalBlacklistUnverifiedDevices));
     }
 
     /**
@@ -214,7 +238,11 @@ export class RoomEncryptor {
             this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
 
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
-            const shareMessages: ToDeviceRequest[] = await this.shareRoomKey(userList, rustEncryptionSettings);
+            const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
+                new RoomId(this.room.roomId),
+                userList,
+                rustEncryptionSettings,
+            );
             if (shareMessages) {
                 for (const m of shareMessages) {
                     await this.outgoingRequestManager.outgoingRequestProcessor.makeOutgoingRequest(m);
@@ -224,33 +252,12 @@ export class RoomEncryptor {
     }
 
     /**
-     *  The Rust-SDK requires that we only have one shareRoomKey process in flight at once for a room.
-     *  This method ensures that, by only having one call to shareRoomKey active at once (and making them
-     *  queue up in order).
-     *
-     * @param userList - list of userIDs to share with
-     * @param rustEncryptionSettings - encryption settings to use
-     *
-     * @returns a promise which resolves to the list of ToDeviceRequests to send
-     */
-    private async shareRoomKey(
-        userList: UserId[],
-        rustEncryptionSettings: EncryptionSettings,
-    ): Promise<ToDeviceRequest[]> {
-        const prom = this.currentShareRoomKeyPromise
-            .catch(() => {
-                // any errors in the previous claim will have been reported already, so there is nothing to do here.
-                // we just throw away the error and start anew.
-            })
-            .then(() => this.olmMachine.shareRoomKey(new RoomId(this.room.roomId), userList, rustEncryptionSettings));
-        this.currentShareRoomKeyPromise = prom;
-        return prom;
-    }
-
-    /**
      * Discard any existing group session for this room
      */
     public async forceDiscardSession(): Promise<void> {
+        // XXX Clarify if also need to ensure order for that call to.
+        // It will mark the session as invalidated but not delete it, so if the current encryption promise
+        // has already check for rotation it will not be affected.
         const r = await this.olmMachine.invalidateGroupSession(new RoomId(this.room.roomId));
         if (r) {
             this.prefixedLogger.info("Discarded existing group session");
@@ -258,15 +265,26 @@ export class RoomEncryptor {
     }
 
     /**
-     * Encrypt an event for this room
+     * Ensures order of encryption promise (encryptEvent or prepareForEncryption )to avoid message ordering issues,
+     * as the scheduler only ensures events order after they have been encrypted.
      *
-     * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
-     * then encrypt the event using the session.
+     * @param promise - The promise to enqueue
      *
-     * @param event - Event to be encrypted.
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @returns A new promise that will be queued and resolved when the enqueued promise is resolved.
      */
-    public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    private enqueuePromise(promise: Promise<void>): Promise<void> {
+        const prom = this.currentEncryptionPromise
+            .catch(() => {
+                // any errors in the previous claim will have been reported already, so there is nothing to do here.
+                // we just throw away the error and start anew.
+            })
+            .then(() => promise);
+
+        this.currentEncryptionPromise = prom;
+        return prom;
+    }
+
+    private async encryptEventInner(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         const logger = new LogSpan(this.prefixedLogger, event.getTxnId() ?? "");
         await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
 

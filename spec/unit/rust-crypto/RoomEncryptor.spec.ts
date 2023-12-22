@@ -186,7 +186,6 @@ describe("RoomEncryptor", () => {
             await Promise.all([firstRequest, secondRequest]);
 
             expect(firstMessageFinished).toBe("hello");
-
         });
     });
 });
