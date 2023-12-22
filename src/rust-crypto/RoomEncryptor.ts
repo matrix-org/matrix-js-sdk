@@ -47,8 +47,9 @@ export class RoomEncryptor {
     private lazyLoadedMembersResolved = false;
 
     /**
-     * Ensures that there is only one encryption operation at a time for that room
-     * An encryption operation is either a prepareForEncryption or an encryptEvent call.
+     * Ensures that there is only one encryption operation at a time for that room.
+     *
+     * An encryption operation is either a  {@link #prepareForEncryption} or an {@link #encryptEvent} call.
      */
     private currentEncryptionPromise: Promise<void> = Promise.resolve();
 
