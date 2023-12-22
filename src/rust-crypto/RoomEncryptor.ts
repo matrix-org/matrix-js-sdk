@@ -135,7 +135,9 @@ export class RoomEncryptor {
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
         // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
         // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
-        return this.enqueueOperation({ globalBlacklistUnverifiedDevices });
+        return await logDuration(this.prefixedLogger, "prepareForEncryption", async () => {
+            await this.enqueueOperation({ globalBlacklistUnverifiedDevices });
+        });
     }
 
     /**
