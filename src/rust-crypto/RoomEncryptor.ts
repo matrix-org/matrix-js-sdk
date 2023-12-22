@@ -130,7 +130,7 @@ export class RoomEncryptor {
     }
 
     /**
-     * Encrypt an event for this room.
+     * Encrypt an event for this room, or prepare for encryption.
      *
      * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
      * then encrypt the event using the session.
