@@ -70,7 +70,6 @@ describe("RoomEncryptor", () => {
         }
 
         beforeEach(() => {
-            jest.useFakeTimers();
             mockOlmMachine = {
                 identityKeys: {
                     curve25519: {
@@ -109,10 +108,6 @@ describe("RoomEncryptor", () => {
                 mockRoom,
                 { algorithm: "m.megolm.v1.aes-sha2" },
             );
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
         });
 
         it("should ensure that there is only one shareRoomKey at a time", async () => {
@@ -178,10 +173,7 @@ describe("RoomEncryptor", () => {
 
             // suppose the second getEncryptionTargetMembers call returns first
             secondTargetMembers.resolve();
-            await jest.runAllTimersAsync();
-
             firstTargetMembers.resolve();
-            await jest.runAllTimersAsync();
 
             await Promise.all([firstRequest, secondRequest]);
 
