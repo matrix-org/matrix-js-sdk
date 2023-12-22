@@ -126,9 +126,7 @@ export class RoomEncryptor {
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
         // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
         // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
-        return await logDuration(this.prefixedLogger, "prepareForEncryption", async () => {
-            await this.enqueueOperation(null, globalBlacklistUnverifiedDevices);
-        });
+        await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
     }
 
     /**
@@ -137,13 +135,31 @@ export class RoomEncryptor {
      * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
      * then encrypt the event using the session.
      *
-     * @param event - Event to be encrypted.
+     * @param event - Event to be encrypted or null if only preparing for encryption (pre share room key)
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
-    public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    public encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
-        return this.enqueueOperation(event, globalBlacklistUnverifiedDevices);
+        const logger = new LogSpan(this.prefixedLogger, event ? event.getTxnId() ?? "" : "prepareForEncryption");
+        const prom = this.currentEncryptionPromise
+            .catch(() => {
+                // any errors in the previous claim will have been reported already, so there is nothing to do here.
+                // we just throw away the error and start anew.
+            })
+            .then(async () => {
+                await logDuration(logger, "ensureEncryptionSession", async () => {
+                    await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
+                });
+                if (event) {
+                    await logDuration(logger, "encryptEventInner", async () => {
+                        await this.encryptEventInner(logger, event);
+                    });
+                }
+            });
+
+        this.currentEncryptionPromise = prom;
+        return prom;
     }
 
     /**
@@ -261,37 +277,7 @@ export class RoomEncryptor {
         }
     }
 
-    /**
-     * Ensures order of encryption operations (encryptEvent or prepareForEncryption) to avoid message ordering issues.
-     *
-     * @param event - The event to encrypt, or null if we just want to prepare for encryption.
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not share the room key to unverified devices
-     *
-     * @returns A new promise that will resolve when this operation is done after the pending ones.
-     */
-    private enqueueOperation(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
-        const prom = this.currentEncryptionPromise
-            .catch(() => {
-                // any errors in the previous claim will have been reported already, so there is nothing to do here.
-                // we just throw away the error and start anew.
-            })
-            .then(() => {
-                if (event) {
-                    return this.encryptEventInner(event, globalBlacklistUnverifiedDevices);
-                } else {
-                    const logger = new LogSpan(this.prefixedLogger, "prepareForEncryption");
-                    return this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
-                }
-            });
-
-        this.currentEncryptionPromise = prom;
-        return prom;
-    }
-
-    private async encryptEventInner(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
-        const logger = new LogSpan(this.prefixedLogger, event.getTxnId() ?? "");
-        await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
-
+    private async encryptEventInner(logger: LogSpan, event: MatrixEvent): Promise<void> {
         logger.debug("Encrypting actual message content");
         const encryptedContent = await this.olmMachine.encryptRoomEvent(
             new RoomId(this.room.roomId),
