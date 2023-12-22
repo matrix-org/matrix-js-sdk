@@ -269,9 +269,6 @@ export class RoomEncryptor {
      * Discard any existing group session for this room
      */
     public async forceDiscardSession(): Promise<void> {
-        // XXX Clarify if also need to ensure order for that call to.
-        // It will mark the session as invalidated but not delete it, so if the current encryption promise
-        // has already check for rotation it will not be affected.
         const r = await this.olmMachine.invalidateGroupSession(new RoomId(this.room.roomId));
         if (r) {
             this.prefixedLogger.info("Discarded existing group session");
