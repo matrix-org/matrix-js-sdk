@@ -36,15 +36,6 @@ import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { logDuration } from "../utils";
 
 /**
- * An encryption operation, can be either a prepareForEncryption or an encryptEvent call.
- * If event is undefined, it's a prepareForEncryption call, otherwise it's an encryptEvent call.
- */
-type EncryptionOperation = {
-    event?: MatrixEvent;
-    globalBlacklistUnverifiedDevices: boolean;
-};
-
-/**
  * RoomEncryptor: responsible for encrypting messages to a given room
  *
  * @internal
@@ -136,7 +127,7 @@ export class RoomEncryptor {
         // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
         // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
         return await logDuration(this.prefixedLogger, "prepareForEncryption", async () => {
-            await this.enqueueOperation({ globalBlacklistUnverifiedDevices });
+            await this.enqueueOperation(null, globalBlacklistUnverifiedDevices);
         });
     }
 
@@ -152,7 +143,7 @@ export class RoomEncryptor {
     public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
-        return this.enqueueOperation({ event, globalBlacklistUnverifiedDevices });
+        return this.enqueueOperation(event, globalBlacklistUnverifiedDevices);
     }
 
     /**
@@ -273,21 +264,23 @@ export class RoomEncryptor {
     /**
      * Ensures order of encryption operations (encryptEvent or prepareForEncryption) to avoid message ordering issues.
      *
-     * @param operation - The operation to enqueue
+     * @param event - The event to encrypt, or null if we just want to prepare for encryption.
+     * @param globalBlacklistUnverifiedDevices - When `true`, it will not share the room key to unverified devices
      *
      * @returns A new promise that will resolve when this operation is done after the pending ones.
      */
-    private enqueueOperation(operation: EncryptionOperation): Promise<void> {
+    private enqueueOperation(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         const prom = this.currentEncryptionPromise
             .catch(() => {
                 // any errors in the previous claim will have been reported already, so there is nothing to do here.
                 // we just throw away the error and start anew.
             })
             .then(() => {
-                if (operation.event) {
-                    return this.encryptEventInner(operation.event, operation.globalBlacklistUnverifiedDevices);
+                if (event) {
+                    return this.encryptEventInner(event, globalBlacklistUnverifiedDevices);
                 } else {
-                    return this.prepareForEncryption(operation.globalBlacklistUnverifiedDevices);
+                    const logger = new LogSpan(this.prefixedLogger, "prepareForEncryption");
+                    return this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
                 }
             });
 
