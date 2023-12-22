@@ -136,7 +136,7 @@ export class RoomEncryptor {
      * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
      * then, if an event is provided, encrypt it using the session.
      *
-     * @param event - Event to be encrypted or null if only preparing for encryption (pre share room key)
+     * @param event - Event to be encrypted, or null if only preparing for encryption (in which case we will pre-share the room key).
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
     public encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
