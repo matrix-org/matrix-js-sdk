@@ -125,8 +125,10 @@ export class RoomEncryptor {
         // We consider a prepareForEncryption as an encryption promise as it will potentially share keys
         // even if it doesn't send an event.
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
-        // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
-        // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
+        // message is finally sent.
+        // If `encryptEvent` is invoked before `prepareForEncryption` as completed, the `encryptEvent` call will wait for
+        // `prepareForEncryption` to have completed before executing.
+        // The part where `encryptEvent` shares the room key would be no op as it was already performed by prepareForEncryption.
         await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
     }
 
