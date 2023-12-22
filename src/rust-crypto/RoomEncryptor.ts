@@ -134,7 +134,7 @@ export class RoomEncryptor {
      * Encrypt an event for this room, or prepare for encryption.
      *
      * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
-     * then encrypt the event using the session.
+     * then, if an event is provided, encrypt it using the session.
      *
      * @param event - Event to be encrypted or null if only preparing for encryption (pre share room key)
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
