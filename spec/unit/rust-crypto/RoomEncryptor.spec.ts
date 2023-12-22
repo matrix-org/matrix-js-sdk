@@ -137,6 +137,7 @@ describe("RoomEncryptor", () => {
             expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(6);
         });
 
+        // Regression test for https://github.com/element-hq/element-web/issues/26684
         it("Should maintain order of encryption requests", async () => {
             const firstTargetMembers = defer<void>();
             const secondTargetMembers = defer<void>();
