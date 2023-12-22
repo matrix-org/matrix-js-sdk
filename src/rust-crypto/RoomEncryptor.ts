@@ -36,6 +36,15 @@ import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { logDuration } from "../utils";
 
 /**
+ * An encryption operation, can be either a prepareForEncryption or an encryptEvent call.
+ * If event is undefined, it's a prepareForEncryption call, otherwise it's an encryptEvent call.
+ */
+type EncryptionOperation = {
+    event?: MatrixEvent;
+    globalBlacklistUnverifiedDevices: boolean;
+};
+
+/**
  * RoomEncryptor: responsible for encrypting messages to a given room
  *
  * @internal
@@ -126,12 +135,7 @@ export class RoomEncryptor {
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
         // message is finally sent. The actual event encryption request will arrive after wait for the prepareForEncryption
         // promise to resolve, and then do again an ensureEncryptionSession that should be no op as we already share the room key.
-        return this.enqueuePromise(
-            this.ensureEncryptionSession(
-                new LogSpan(this.prefixedLogger, "prepareForEncryption"),
-                globalBlacklistUnverifiedDevices,
-            ),
-        );
+        return this.enqueueOperation({ globalBlacklistUnverifiedDevices });
     }
 
     /**
@@ -146,7 +150,7 @@ export class RoomEncryptor {
     public async encryptEvent(event: MatrixEvent, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
-        return this.enqueuePromise(this.encryptEventInner(event, globalBlacklistUnverifiedDevices));
+        return this.enqueueOperation({ event, globalBlacklistUnverifiedDevices });
     }
 
     /**
@@ -265,20 +269,25 @@ export class RoomEncryptor {
     }
 
     /**
-     * Ensures order of encryption promise (encryptEvent or prepareForEncryption )to avoid message ordering issues,
-     * as the scheduler only ensures events order after they have been encrypted.
+     * Ensures order of encryption operations (encryptEvent or prepareForEncryption) to avoid message ordering issues.
      *
-     * @param promise - The promise to enqueue
+     * @param operation - The operation to enqueue
      *
-     * @returns A new promise that will be queued and resolved when the enqueued promise is resolved.
+     * @returns A new promise that will resolve when this operation is done after the pending ones.
      */
-    private enqueuePromise(promise: Promise<void>): Promise<void> {
+    private enqueueOperation(operation: EncryptionOperation): Promise<void> {
         const prom = this.currentEncryptionPromise
             .catch(() => {
                 // any errors in the previous claim will have been reported already, so there is nothing to do here.
                 // we just throw away the error and start anew.
             })
-            .then(() => promise);
+            .then(() => {
+                if (operation.event) {
+                    return this.encryptEventInner(operation.event, operation.globalBlacklistUnverifiedDevices);
+                } else {
+                    return this.prepareForEncryption(operation.globalBlacklistUnverifiedDevices);
+                }
+            });
 
         this.currentEncryptionPromise = prom;
         return prom;
