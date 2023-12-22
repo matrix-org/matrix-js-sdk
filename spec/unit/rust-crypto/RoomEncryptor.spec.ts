@@ -144,7 +144,7 @@ describe("RoomEncryptor", () => {
 
             mockOlmMachine.shareRoomKey.mockResolvedValue(undefined);
 
-            // Took this method to demonstrate the race condition
+            // Hook into this method to demonstrate the race condition
             mockRoom.getEncryptionTargetMembers
                 .mockImplementationOnce(async () => {
                     await firstTargetMembers.promise;
