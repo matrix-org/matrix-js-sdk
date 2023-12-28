@@ -74,7 +74,7 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
+import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
@@ -340,7 +340,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     function createCryptoCallbacks(): CryptoCallbacks {
         // Store the cached secret storage key and return it when `getSecretStorageKey` is called
         let cachedKey: { keyId: string; key: Uint8Array };
-        const cacheSecretStorageKey = (keyId: string, keyInfo: AddSecretStorageKeyOpts, key: Uint8Array) => {
+        const cacheSecretStorageKey = (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => {
             cachedKey = {
                 keyId,
                 key,
@@ -2567,6 +2567,30 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await backupStatusUpdate;
         }
 
+        describe("Generate 4S recovery keys", () => {
+            it("should create a random recovery key", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase();
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.keyInfo?.passphrase).toBeUndefined();
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+
+            it("should create a recovery key from passphrase", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase("mypassphrase");
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
+                expect(generatedKey.keyInfo?.passphrase?.iterations).toBe(500000);
+
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+        });
+
         describe("bootstrapSecretStorage", () => {
             // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
             newBackendOnly(
@@ -2591,6 +2615,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 // Wait for the key to be uploaded in the account data
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
+
+                // check that the key content contains the key check info
+                const keyContent = accountDataAccumulator.accountDataEvents.get(
+                    `m.secret_storage.key.${secretStorageKey}`,
+                )!;
+                // In order to verify if the key is valid, a zero secret is encrypted with the key
+                expect(keyContent.iv).toBeDefined();
+                expect(keyContent.mac).toBeDefined();
 
                 // Return the newly created key in the sync response
                 accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
@@ -2832,6 +2864,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
 
+                // Track calls to scheduleAllGroupSessionsForBackup. This is
+                // only relevant on legacy encryption.
+                const scheduleAllGroupSessionsForBackup = jest.fn();
+                if (backend === "libolm") {
+                    aliceClient.crypto!.backupManager.scheduleAllGroupSessionsForBackup =
+                        scheduleAllGroupSessionsForBackup;
+                } else {
+                    // With Rust crypto, we don't need to call this function, so
+                    // we call the dummy value here so we pass our later
+                    // expectation.
+                    scheduleAllGroupSessionsForBackup();
+                }
+
                 await aliceClient.getCrypto()!.resetKeyBackup();
                 await awaitDeleteCalled;
                 await newBackupStatusUpdate;
@@ -2843,6 +2888,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(nextVersion).toBeDefined();
                 expect(nextVersion).not.toEqual(currentVersion);
                 expect(nextKey).not.toEqual(currentBackupKey);
+                expect(scheduleAllGroupSessionsForBackup).toHaveBeenCalled();
 
                 // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
                 // ensure that it works anyhow

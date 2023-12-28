@@ -27,6 +27,7 @@ import {
     ISession,
     ISessionInfo,
     IWithheld,
+    MigrationState,
     Mode,
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
@@ -38,7 +39,7 @@ import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 
-/**
+/*
  * Internal module. indexeddb storage for e2e.
  */
 
@@ -71,6 +72,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param dbName -   name of db to connect to
      */
     public constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
+
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Implementation of {@link CryptoStore.containsData}.
+     *
+     * @internal
+     */
+    public async containsData(): Promise<boolean> {
+        return IndexedDBCryptoStore.exists(this.indexedDB, this.dbName);
+    }
 
     /**
      * Ensure the database exists and is up-to-date, or fall back to
@@ -195,6 +207,28 @@ export class IndexedDBCryptoStore implements CryptoStore {
             // still use the app.
             logger.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
+    }
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.getMigrationState}.
+     *
+     * @internal
+     */
+    public getMigrationState(): Promise<MigrationState> {
+        return this.backend!.getMigrationState();
+    }
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * Implementation of {@link CryptoStore.setMigrationState}.
+     *
+     * @internal
+     */
+    public setMigrationState(migrationState: MigrationState): Promise<void> {
+        return this.backend!.setMigrationState(migrationState);
     }
 
     /**
@@ -468,6 +502,28 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return this.backend!.filterOutNotifiedErrorDevices(devices);
     }
 
+    /**
+     * Fetch a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
+        return this.backend!.getEndToEndSessionsBatch();
+    }
+
+    /**
+     * Delete a batch of Olm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndSessionsBatch}.
+     *
+     * @internal
+     */
+    public deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
+        return this.backend!.deleteEndToEndSessionsBatch(sessions);
+    }
+
     // Inbound group sessions
 
     /**
@@ -542,6 +598,30 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
     ): void {
         this.backend!.storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn);
+    }
+
+    /**
+     * Fetch a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null> {
+        return this.backend!.getEndToEndInboundGroupSessionsBatch();
+    }
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Implementation of {@link CryptoStore.deleteEndToEndInboundGroupSessionsBatch}.
+     *
+     * @internal
+     */
+    public deleteEndToEndInboundGroupSessionsBatch(
+        sessions: { senderKey: string; sessionId: string }[],
+    ): Promise<void> {
+        return this.backend!.deleteEndToEndInboundGroupSessionsBatch(sessions);
     }
 
     // End-to-end device tracking

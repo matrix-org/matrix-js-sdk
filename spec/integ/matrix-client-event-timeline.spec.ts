@@ -33,7 +33,7 @@ import {
 import { logger } from "../../src/logger";
 import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
+import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 import { Feature, ServerSupport } from "../../src/feature";
 
@@ -623,9 +623,7 @@ describe("MatrixClient event timelines", function () {
                     "GET",
                     "/rooms/!foo%3Abar/relations/" +
                         encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward }),
                 )
                 .respond(200, function () {
                     return {
@@ -1154,10 +1152,7 @@ describe("MatrixClient event timelines", function () {
         httpBackend
             .when(
                 "GET",
-                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name),
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" + encodeURIComponent(THREAD_ROOT_UPDATED.event_id!),
             )
             .respond(200, {
                 chunk: [THREAD_REPLY3.event, THREAD_REPLY2.event, THREAD_REPLY],
@@ -1262,11 +1257,8 @@ describe("MatrixClient event timelines", function () {
                 "GET",
                 "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                     encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
                     buildRelationPaginationQuery({
                         dir: Direction.Backward,
-                        limit: 3,
                         recurse: true,
                     }),
             )
@@ -1321,11 +1313,7 @@ describe("MatrixClient event timelines", function () {
         function respondToThread(root: Partial<IEvent>, replies: Partial<IEvent>[]): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                    encodeURIComponent(root.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                    "?dir=b&limit=1",
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" + encodeURIComponent(root.event_id!) + "?dir=b",
             );
             request.respond(200, function () {
                 return {
@@ -2034,9 +2022,7 @@ describe("MatrixClient event timelines", function () {
                     "GET",
                     "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                         encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward }),
                 )
                 .respond(200, function () {
                     return {

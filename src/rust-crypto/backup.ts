@@ -29,11 +29,12 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, immediate } from "../utils";
+import { encodeUri, immediate, logDuration } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -173,6 +174,49 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
     }
 
+    /**
+     * Import a list of room keys previously exported by exportRoomKeys
+     *
+     * @param keys - a list of session export objects
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        const jsonKeys = JSON.stringify(keys);
+        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: BigInt, total: BigInt): void => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public async importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        const keysByRoom: Map<RustSdkCryptoJs.RoomId, Map<string, IMegolmSessionData>> = new Map();
+        for (const key of keys) {
+            const roomId = new RustSdkCryptoJs.RoomId(key.room_id);
+            if (!keysByRoom.has(roomId)) {
+                keysByRoom.set(roomId, new Map());
+            }
+            keysByRoom.get(roomId)!.set(key.session_id, key);
+        }
+        await this.olmMachine.importBackedUpRoomKeys(keysByRoom, (progress: BigInt, total: BigInt): void => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
+    }
+
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
 
     /** Helper for `checkKeyBackup` */
@@ -284,7 +328,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 // Get a batch of room keys to upload
                 let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
                 try {
-                    request = await this.olmMachine.backupRoomKeys();
+                    request = await logDuration(
+                        logger,
+                        "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
+                        async () => {
+                            return await this.olmMachine.backupRoomKeys();
+                        },
+                    );
                 } catch (err) {
                     logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
                 }
@@ -348,7 +398,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      *
      * @returns Information object from API or null if there is no active backup.
      */
-    private async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
+    public async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
         try {
             return await this.http.authedRequest<KeyBackupInfo>(
                 Method.Get,
@@ -439,6 +489,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
+    }
+
+    /**
+     * Creates a new backup decryptor for the given private key.
+     * @param decryptionKey - The private key to use for decryption.
+     */
+    public createBackupDecryptor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey): BackupDecryptor {
+        return new RustBackupDecryptor(decryptionKey);
     }
 }
 

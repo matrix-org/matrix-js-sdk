@@ -57,7 +57,8 @@ import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
+import { ClientEvent, ClientEventHandlerMap } from "../../../src/client"
+import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -799,8 +800,8 @@ describe("RustCrypto", () => {
             // Expect the private key to be an Uint8Array with a length of 32
             expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
             expect(recoveryKey.privateKey.length).toBe(32);
-            // Expect keyInfo to be empty
-            expect(Object.keys(recoveryKey.keyInfo!).length).toBe(0);
+            // Expect passphrase info to be absent
+            expect(recoveryKey.keyInfo?.passphrase).toBeUndefined();
         });
 
         it("should create a recovery key with password", async () => {
@@ -991,6 +992,48 @@ describe("RustCrypto", () => {
             );
             await rustCrypto.onUserIdentityUpdated(new RustSdkCryptoJs.UserId(testData.TEST_USER_ID));
             expect(await keyBackupStatusPromise).toBe(true);
+        });
+
+        it("does not back up keys that came from backup", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            await olmMachine.enableBackupV1(
+                (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            // we import two keys: one "from backup", and one "from export"
+            const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
+            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey]);
+            await rustCrypto.importRoomKeys([exportedRoomKey]);
+
+            // we ask for the keys that should be backed up
+            const roomKeysRequest = await olmMachine.backupRoomKeys();
+            expect(roomKeysRequest).toBeTruthy();
+            const roomKeys = JSON.parse(roomKeysRequest!.body);
+
+            // we expect that the key "from export" is present
+            expect(roomKeys).toMatchObject({
+                rooms: {
+                    [exportedRoomKey.room_id]: {
+                        sessions: {
+                            [exportedRoomKey.session_id]: {},
+                        },
+                    },
+                },
+            });
+
+            // we expect that the key "from backup" is not present
+            expect(roomKeys).not.toMatchObject({
+                rooms: {
+                    [backedUpRoomKey.room_id]: {
+                        sessions: {
+                            [backedUpRoomKey.session_id]: {},
+                        },
+                    },
+                },
+            });
         });
     });
 });

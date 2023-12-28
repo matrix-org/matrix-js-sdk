@@ -51,7 +51,7 @@ import { decodeBase64, encodeBase64 } from "./base64";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from "./ReEmitter";
-import { IRoomEncryption, RoomList } from "./crypto/RoomList";
+import { IRoomEncryption } from "./crypto/RoomList";
 import { logger, Logger } from "./logger";
 import { SERVICE_TYPES } from "./service-types";
 import {
@@ -221,6 +221,7 @@ import {
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
+import { getRelationsThreadFilter } from "./thread-utils";
 
 export type Store = IStore;
 
@@ -1272,7 +1273,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected cryptoStore?: CryptoStore;
     protected verificationMethods?: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
-    protected roomList: RoomList;
     protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
     public pushRules?: IPushRules;
@@ -1428,10 +1428,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.livekitServiceURL = opts.livekitServiceURL;
 
-        // List of which rooms have encryption enabled: separate from crypto because
-        // we still want to know which rooms are encrypted even if crypto is disabled:
-        // we don't want to start sending unencrypted events to them.
-        this.roomList = new RoomList(this.cryptoStore);
         this.roomNameGenerator = opts.roomNameGenerator;
 
         this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
@@ -2233,10 +2229,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.logger.debug("Crypto: Starting up crypto store...");
         await this.cryptoStore.startup();
 
-        // initialise the list of encrypted rooms (whether or not crypto is enabled)
-        this.logger.debug("Crypto: initialising roomlist...");
-        await this.roomList.init();
-
         const userId = this.getUserId();
         if (userId === null) {
             throw new Error(
@@ -2251,15 +2243,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
-        const crypto = new Crypto(
-            this,
-            userId,
-            this.deviceId,
-            this.store,
-            this.cryptoStore,
-            this.roomList,
-            this.verificationMethods!,
-        );
+        const crypto = new Crypto(this, userId, this.deviceId, this.store, this.cryptoStore, this.verificationMethods!);
 
         this.reEmitter.reEmit(crypto, [
             CryptoEvent.KeyBackupFailed,
@@ -3283,7 +3267,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we don't have an m.room.encrypted event, but that might be because
         // the server is hiding it from us. Check the store to see if it was
         // previously encrypted.
-        return this.roomList.isRoomEncrypted(roomId);
+        return this.crypto?.isRoomEncrypted(roomId) ?? false;
     }
 
     /**
@@ -3646,6 +3630,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Marks all group sessions as needing to be backed up and schedules them to
      * upload in the background as soon as possible.
+     *
+     * (This is done automatically as part of {@link CryptoApi.resetKeyBackup},
+     * so there is probably no need to call this manually.)
      */
     public async scheduleAllGroupSessionsForBackup(): Promise<void> {
         if (!this.crypto) {
@@ -3658,6 +3645,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Marks all group sessions as needing to be backed up without scheduling
      * them to upload in the background.
+     *
+     * (This is done automatically as part of {@link CryptoApi.resetKeyBackup},
+     * so there is probably no need to call this manually.)
+     *
      * @returns Promise which resolves to the number of sessions requiring a backup.
      */
     public flagAllGroupSessionsForBackup(): Promise<number> {
@@ -3977,10 +3968,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importRoomKeys(keys, {
+        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
             progressCallback,
             untrusted,
-            source: "backup",
         });
 
         /// in case entering the passphrase would add a new signature?
@@ -4013,7 +4003,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const roomEncryption = this.roomList.getRoomEncryption(roomId);
+        const roomEncryption = this.crypto?.getRoomEncryption(roomId);
         if (!roomEncryption) {
             // unknown room, or unencrypted room
             this.logger.error("Unknown room.  Not sharing decryption keys");
@@ -5979,14 +5969,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const resOlder: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    null,
                     null,
                     { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
-                    THREAD_RELATION_TYPE.name,
+                    null,
                     null,
                     { dir: Direction.Forward, from: res.end, recurse: recurse || undefined },
                 );
@@ -5994,10 +5984,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // Order events from most recent to oldest (reverse-chronological).
                     // We start with the last event, since that's the point at which we have known state.
                     // events_after is already backwards; events_before is forwards.
-                    ...resNewer.chunk.reverse().map(mapper),
+                    ...resNewer.chunk.reverse().filter(getRelationsThreadFilter(thread.id)).map(mapper),
                     event,
-                    ...resOlder.chunk.map(mapper),
+                    ...resOlder.chunk.filter(getRelationsThreadFilter(thread.id)).map(mapper),
                 ];
+
                 for (const event of events) {
                     await timelineSet.thread?.processEvent(event);
                 }
@@ -6372,6 +6363,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         const stateEvents = res.state.filter(noUnsafeEventProps).map(this.getEventMapper());
                         roomState.setUnknownStateEvents(stateEvents);
                     }
+
                     const token = res.end;
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
@@ -6399,7 +6391,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
-            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, THREAD_RELATION_TYPE.name, null, {
+            promise = this.fetchRelations(eventTimeline.getRoomId() ?? "", thread.id, null, null, {
                 dir,
                 limit: opts.limit,
                 from: token ?? undefined,
@@ -6407,7 +6399,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             })
                 .then(async (res) => {
                     const mapper = this.getEventMapper();
-                    const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(mapper);
+                    const matrixEvents = res.chunk
+                        .filter(noUnsafeEventProps)
+                        .filter(getRelationsThreadFilter(thread.id))
+                        .map(mapper);
 
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
@@ -7455,16 +7450,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.serverVersionsPromise;
         }
 
+        // We send an authenticated request as of MSC4026
         this.serverVersionsPromise = this.http
-            .request<IServerVersions>(
-                Method.Get,
-                "/_matrix/client/versions",
-                undefined, // queryParams
-                undefined, // data
-                {
-                    prefix: "",
-                },
-            )
+            .authedRequest<IServerVersions>(Method.Get, "/_matrix/client/versions", undefined, undefined, {
+                prefix: "",
+            })
             .catch((e) => {
                 // Need to unset this if it fails, otherwise we'll never retry
                 this.serverVersionsPromise = undefined;
@@ -7602,7 +7592,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async relations(
         roomId: string,
         eventId: string,
-        relationType?: RelationType | string | null,
+        relationType: RelationType | string | null,
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<{
@@ -7737,6 +7727,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setAccessToken(token: string): void {
         this.http.opts.accessToken = token;
+        // The /versions response can vary for different users so clear the cache
+        this.serverVersionsPromise = undefined;
     }
 
     /**
@@ -8125,7 +8117,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public fetchRelations(
         roomId: string,
         eventId: string,
-        relationType?: RelationType | string | null,
+        relationType: RelationType | string | null,
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<IRelationsResponse> {
@@ -9837,6 +9829,19 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const room = cli.getRoom(event.getRoomId());
     if (!room || !ourUserId || !eventId) return;
+
+    // Due to threads, we can get relation events (eg. edits & reactions) that never get
+    // added to a timeline and so cannot be found in their own room (their edit / reaction
+    // still applies to the event it needs to, so it doesn't matter too much). However, if
+    // we try to process notification about this event, we'll get very confused because we
+    // won't be able to find the event in the room, so will assume it must be unread, even
+    // if it's actually read. We therefore skip anything that isn't in the room. This isn't
+    // *great*, so if we can fix the homeless events (eg. with MSC4023) then we should probably
+    // remove this workaround.
+    if (!room.findEventById(eventId)) {
+        logger.info(`Decrypted event ${event.getId()} is not in room ${room.roomId}: ignoring`);
+        return;
+    }
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 

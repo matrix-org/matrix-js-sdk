@@ -1,3 +1,17 @@
+Changes in [30.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.3.0) (2023-12-19)
+==================================================================================================
+## ✨ Features
+
+* Element-R: disable sending room key requests ([#3939](https://github.com/matrix-org/matrix-js-sdk/pull/3939)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix notifications appearing for old events ([#3946](https://github.com/matrix-org/matrix-js-sdk/pull/3946)). Contributed by @dbkr.
+* Don't back up keys that we got from backup ([#3934](https://github.com/matrix-org/matrix-js-sdk/pull/3934)). Contributed by @uhoreg.
+* Fix upload with empty Content-Type ([#3918](https://github.com/matrix-org/matrix-js-sdk/pull/3918)). Contributed by @JakubOnderka.
+* Prevent phantom notifications from events not in a room's timeline ([#3942](https://github.com/matrix-org/matrix-js-sdk/pull/3942)). Contributed by @dbkr.
+
+
 Changes in [30.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.2.0) (2023-12-05)
 ==================================================================================================
 ## ✨ Features

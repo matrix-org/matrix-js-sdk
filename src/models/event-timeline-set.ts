@@ -839,7 +839,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         const data: IRoomTimelineData = {
             timeline: timeline,
-            liveEvent: timeline == this.liveTimeline,
+            // The purpose of this method is inserting events in the middle of the
+            // timeline, so the events are, by definition, not live (whether or not
+            // we're adding them to the live timeline).
+            liveEvent: false,
         };
         this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }

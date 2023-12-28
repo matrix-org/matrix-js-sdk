@@ -18,7 +18,7 @@ import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
 import { UIAuthCallback } from "./interactive-auth";
-import { AddSecretStorageKeyOpts, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
+import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
 import { VerificationRequest } from "./crypto-api/verification";
 import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
 import { ISignatures } from "./@types/signed";
@@ -597,9 +597,10 @@ export interface ImportRoomKeyProgressData {
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
-    // TODO, the rust SDK will always such imported keys as untrusted
+    /** @deprecated the rust SDK will always such imported keys as untrusted */
     untrusted?: boolean;
-    source?: String; // TODO: Enum (backup, file, ??)
+    /** @deprecated not useful externally */
+    source?: string;
 }
 
 /**
@@ -709,10 +710,15 @@ export interface CrossSigningKeyInfo {
 }
 
 /**
- * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase}
+ * Recovery key created by {@link CryptoApi#createRecoveryKeyFromPassphrase} or {@link CreateSecretStorageOpts#createSecretStorageKey}.
  */
 export interface GeneratedSecretStorageKey {
-    keyInfo?: AddSecretStorageKeyOpts;
+    keyInfo?: {
+        /** If the key was derived from a passphrase, information (algorithm, salt, etc) on that derivation. */
+        passphrase?: PassphraseInfo;
+        /** Optional human-readable name for the key, to be stored in account_data. */
+        name?: string;
+    };
     /** The raw generated private key. */
     privateKey: Uint8Array;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */

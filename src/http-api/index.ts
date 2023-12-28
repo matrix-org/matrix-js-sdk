@@ -50,7 +50,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         const abortController = opts.abortController ?? new AbortController();
 
         // If the file doesn't have a mime type, use a default since the HS errors if we don't supply one.
-        const contentType = opts.type ?? (file as File).type ?? "application/octet-stream";
+        const contentType = (opts.type ?? (file as File).type) || "application/octet-stream";
         const fileName = opts.name ?? (file as File).name;
 
         const upload = {

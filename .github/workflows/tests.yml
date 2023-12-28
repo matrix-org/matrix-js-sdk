@@ -52,7 +52,7 @@ jobs:
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
-              run: mv coverage/lcov.info coverage/${{ steps.setupNode.output.node-version }}-${{ matrix.specs }}.lcov.info
+              run: mv coverage/lcov.info coverage/${{ steps.setupNode.outputs.node-version }}-${{ matrix.specs }}.lcov.info
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
