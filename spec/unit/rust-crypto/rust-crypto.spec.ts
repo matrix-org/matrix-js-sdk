@@ -57,7 +57,7 @@ import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { ClientEvent, ClientEventHandlerMap } from "../../../src/client"
+import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 
 const TEST_USER = "@alice:example.com";
