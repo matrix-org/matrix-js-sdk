@@ -16,8 +16,12 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import fetchMock from "fetch-mock-jest";
 
-import { createClient } from "../../../src";
+import { createClient, IndexedDBCryptoStore } from "../../../src";
+import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
+
+jest.setTimeout(15000);
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -87,6 +91,47 @@ describe("MatrixClient.initRustCrypto", () => {
 
         await matrixClient.initRustCrypto();
         await matrixClient.initRustCrypto();
+    });
+
+    it("should migrate from libolm", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+            auth_data: {
+                public_key: "q+HZiJdHl2Yopv9GGvv7EYSzDMrAiRknK4glSdoaomI",
+                signatures: {
+                    "@vdhtest200713:matrix.org": {
+                        "ed25519:gh9fGr39eNZUdWynEMJ/q/WZq/Pk/foFxHXFBFm18ZI":
+                            "reDp6Mu+j+tfUL3/T6f5OBT3N825Lzpc43vvG+RvjX6V+KxXzodBQArgCoeEHLtL9OgSBmNrhTkSOX87MWCKAw",
+                        "ed25519:KMFSTJSMLB":
+                            "F8tyV5W6wNi0GXTdSg+gxSCULQi0EYxdAAqfkyNq58KzssZMw5i+PRA0aI2b+D7NH/aZaJrtiYNHJ0gWLSQvAw",
+                    },
+                },
+            },
+            version: "7",
+            algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            etag: "1",
+            count: 79,
+        });
+
+        const testStoreName = "test-store";
+        await populateStore(testStoreName);
+        const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@vdhtest200713:matrix.org",
+            deviceId: "KMFSTJSMLB",
+            cryptoStore,
+            pickleKey: "+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o",
+        });
+
+        await matrixClient.initRustCrypto();
+
+        // Do some basic checks on the imported data
+        const deviceKeys = await matrixClient.getCrypto()!.getOwnDeviceKeys();
+        expect(deviceKeys.curve25519).toEqual("LKv0bKbc0EC4h0jknbemv3QalEkeYvuNeUXVRgVVTTU");
+        expect(deviceKeys.ed25519).toEqual("qK70DEqIXq7T+UU3v/al47Ab4JkMEBLpNrTBMbS5rrw");
+
+        expect(await matrixClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual("7");
     });
 });
 

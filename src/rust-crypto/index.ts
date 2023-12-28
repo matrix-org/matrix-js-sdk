@@ -22,6 +22,8 @@ import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
 import { Logger } from "../logger";
+import { CryptoStore } from "../crypto/store/base";
+import { migrateFromLegacyCrypto } from "./libolm_migration";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -64,6 +66,12 @@ export async function initRustCrypto(args: {
      * will be unencrypted.
      */
     storePassphrase?: string;
+
+    /** If defined, we will check if any data needs migrating from this store to the rust store. */
+    legacyCryptoStore?: CryptoStore;
+
+    /** The pickle key for `legacyCryptoStore` */
+    legacyPickleKey?: string;
 }): Promise<RustCrypto> {
     const { logger } = args;
 
@@ -79,6 +87,15 @@ export async function initRustCrypto(args: {
         args.storePrefix ?? undefined,
         (args.storePrefix && args.storePassphrase) ?? undefined,
     );
+
+    if (args.legacyCryptoStore) {
+        // We have a legacy crypto store, which we may need to migrate from.
+        await migrateFromLegacyCrypto({
+            legacyStore: args.legacyCryptoStore,
+            storeHandle,
+            ...args,
+        });
+    }
 
     const rustCrypto = await initOlmMachine(
         logger,
