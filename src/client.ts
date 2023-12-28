@@ -2329,6 +2329,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             storePrefix: useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
             storePassphrase: this.pickleKey,
         });
+
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;

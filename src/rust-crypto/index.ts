@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
@@ -73,6 +74,12 @@ export async function initRustCrypto(args: {
     // enable tracing in the rust-sdk
     new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
 
+    logger.debug("Opening Rust CryptoStore");
+    const storeHandle: StoreHandle = await StoreHandle.open(
+        args.storePrefix ?? undefined,
+        (args.storePrefix && args.storePassphrase) ?? undefined,
+    );
+
     const rustCrypto = await initOlmMachine(
         logger,
         args.http,
@@ -80,9 +87,10 @@ export async function initRustCrypto(args: {
         args.deviceId,
         args.secretStorage,
         args.cryptoCallbacks,
-        args.storePrefix,
-        args.storePassphrase,
+        storeHandle,
     );
+
+    storeHandle.free();
 
     logger.debug("Completed rust crypto-sdk setup");
     return rustCrypto;
@@ -95,15 +103,14 @@ async function initOlmMachine(
     deviceId: string,
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
-    storePrefix: string | null,
-    storePassphrase: string | undefined,
+    storeHandle: StoreHandle,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
+
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.init_from_store(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
-        storePrefix ?? undefined,
-        (storePrefix && storePassphrase) ?? undefined,
+        storeHandle,
     );
 
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.

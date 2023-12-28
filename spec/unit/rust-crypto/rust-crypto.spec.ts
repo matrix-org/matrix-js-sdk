@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { KeysQueryRequest, OlmMachine, StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked, Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
@@ -81,8 +81,11 @@ describe("initRustCrypto", () => {
     }
 
     it("passes through the store params", async () => {
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -95,17 +98,16 @@ describe("initRustCrypto", () => {
             storePassphrase: "storePassphrase",
         });
 
-        expect(OlmMachine.initialize).toHaveBeenCalledWith(
-            expect.anything(),
-            expect.anything(),
-            "storePrefix",
-            "storePassphrase",
-        );
+        expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase");
+        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("suppresses the storePassphrase if storePrefix is unset", async () => {
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -118,12 +120,16 @@ describe("initRustCrypto", () => {
             storePassphrase: "storePassphrase",
         });
 
-        expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
+        expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
+        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("Should get secrets from inbox on start", async () => {
-        const testOlmMachine = makeTestOlmMachine() as OlmMachine;
-        jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
