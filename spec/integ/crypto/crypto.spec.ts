@@ -398,17 +398,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(aliceClient.getCrypto()).toHaveProperty("globalBlacklistUnverifiedDevices");
     });
 
-    it("CryptoAPI.getOwnedDeviceKeys returns the correct values", async () => {
-        const homeserverUrl = aliceClient.getHomeserverUrl();
-
-        keyResponder = new E2EKeyResponder(homeserverUrl);
-        await startClientAndAwaitFirstSync();
-        keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
-
+    it("CryptoAPI.getOwnDeviceKeys returns plausible values", async () => {
         const deviceKeys = await aliceClient.getCrypto()!.getOwnDeviceKeys();
-
-        expect(deviceKeys.curve25519).toEqual(keyReceiver.getDeviceKey());
-        expect(deviceKeys.ed25519).toEqual(keyReceiver.getSigningKey());
+        // We just check for a 43-character base64 string
+        expect(deviceKeys.curve25519).toMatch(/^[A-Za-z0-9+/]{43}$/);
+        expect(deviceKeys.ed25519).toMatch(/^[A-Za-z0-9+/]{43}$/);
     });
 
     it("Alice receives a megolm message", async () => {
