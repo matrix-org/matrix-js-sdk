@@ -324,9 +324,11 @@ describe("RustCrypto", () => {
             secretStorage,
         );
 
-        rustCrypto["checkKeyBackupAndEnable"] = async () => { return null; };
+        rustCrypto["checkKeyBackupAndEnable"] = async () => {
+            return null;
+        };
         (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
-        const resetKeyBackup = rustCrypto["resetKeyBackup"] = jest.fn();
+        const resetKeyBackup = (rustCrypto["resetKeyBackup"] = jest.fn());
 
         async function createSecretStorageKey() {
             return {
@@ -1054,7 +1056,10 @@ async function makeTestRustCrypto(
 
 /** emulate account data, storing in memory
  */
-class DummyAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> implements AccountDataClient {
+class DummyAccountDataClient
+    extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
+    implements AccountDataClient
+{
     private storage: Map<string, any> = new Map();
 
     public constructor() {
@@ -1073,10 +1078,13 @@ class DummyAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, 
 
     public async setAccountData(eventType: string, content: any): Promise<{}> {
         this.storage.set(eventType, content);
-        this.emit(ClientEvent.AccountData, new MatrixEvent({
-            content,
-            type: eventType,
-        }));
+        this.emit(
+            ClientEvent.AccountData,
+            new MatrixEvent({
+                content,
+                type: eventType,
+            }),
+        );
         return {};
     }
 }
