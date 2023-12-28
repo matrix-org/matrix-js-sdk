@@ -2317,16 +2317,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        const rustCrypto = await RustCrypto.initRustCrypto(
-            this.logger,
-            this.http,
-            userId,
-            deviceId,
-            this.secretStorage,
-            this.cryptoCallbacks,
-            useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
-            this.pickleKey,
-        );
+
+        const rustCrypto = await RustCrypto.initRustCrypto({
+            logger: this.logger,
+            http: this.http,
+            userId: userId,
+            deviceId: deviceId,
+            secretStorage: this.secretStorage,
+            cryptoCallbacks: this.cryptoCallbacks,
+            storePrefix: useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
+            storePassphrase: this.pickleKey,
+        });
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;

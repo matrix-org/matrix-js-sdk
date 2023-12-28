@@ -25,22 +25,69 @@ import { Logger } from "../logger";
 /**
  * Create a new `RustCrypto` implementation
  *
- * @param logger - A `Logger` instance that will be used for debug output.
- * @param http - Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
- *     We expect it to set the access token, etc.
- * @param userId - The local user's User ID.
- * @param deviceId - The local user's Device ID.
- * @param secretStorage - Interface to server-side secret storage.
- * @param cryptoCallbacks - Crypto callbacks provided by the application
- * @param storePrefix - the prefix to use on the indexeddbs created by rust-crypto.
- *     If `null`, a memory store will be used.
- * @param storePassphrase - a passphrase to use to encrypt the indexeddbs created by rust-crypto.
- *     Ignored if `storePrefix` is null. If this is `undefined` (and `storePrefix` is not null), the indexeddbs
- *     will be unencrypted.
- *
+ * @param args - Parameter object
  * @internal
  */
-export async function initRustCrypto(
+export async function initRustCrypto(args: {
+    /** A `Logger` instance that will be used for debug output. */
+    logger: Logger;
+
+    /**
+     * Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
+     * We expect it to set the access token, etc.
+     */
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>;
+
+    /** The local user's User ID. */
+    userId: string;
+
+    /** The local user's Device ID. */
+    deviceId: string;
+
+    /** Interface to server-side secret storage. */
+    secretStorage: ServerSideSecretStorage;
+
+    /** Crypto callbacks provided by the application. */
+    cryptoCallbacks: ICryptoCallbacks;
+
+    /**
+     * The prefix to use on the indexeddbs created by rust-crypto.
+     * If `null`, a memory store will be used.
+     */
+    storePrefix: string | null;
+
+    /**
+     * A passphrase to use to encrypt the indexeddbs created by rust-crypto.
+     *
+     * Ignored if `storePrefix` is null. If this is `undefined` (and `storePrefix` is not null), the indexeddbs
+     * will be unencrypted.
+     */
+    storePassphrase?: string;
+}): Promise<RustCrypto> {
+    const { logger } = args;
+
+    // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
+    await RustSdkCryptoJs.initAsync();
+
+    // enable tracing in the rust-sdk
+    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
+
+    const rustCrypto = await initOlmMachine(
+        logger,
+        args.http,
+        args.userId,
+        args.deviceId,
+        args.secretStorage,
+        args.cryptoCallbacks,
+        args.storePrefix,
+        args.storePassphrase,
+    );
+
+    logger.info("Completed rust crypto-sdk setup");
+    return rustCrypto;
+}
+
+async function initOlmMachine(
     logger: Logger,
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
@@ -50,20 +97,10 @@ export async function initRustCrypto(
     storePrefix: string | null,
     storePassphrase: string | undefined,
 ): Promise<RustCrypto> {
-    // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
-    await RustSdkCryptoJs.initAsync();
-
-    // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
-
-    const u = new RustSdkCryptoJs.UserId(userId);
-    const d = new RustSdkCryptoJs.DeviceId(deviceId);
     logger.info("Init OlmMachine");
-
-    // TODO: use the pickle key for the passphrase
     const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
-        u,
-        d,
+        new RustSdkCryptoJs.UserId(userId),
+        new RustSdkCryptoJs.DeviceId(deviceId),
         storePrefix ?? undefined,
         (storePrefix && storePassphrase) ?? undefined,
     );
@@ -101,6 +138,5 @@ export async function initRustCrypto(
     // XXX: find a less hacky way to do this.
     await olmMachine.outgoingRequests();
 
-    logger.info("Completed rust crypto-sdk setup");
     return rustCrypto;
 }
