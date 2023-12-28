@@ -35,6 +35,7 @@ import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
+import { IKeyBackupInfo } from "../crypto/keybackup";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -399,23 +400,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns Information object from API or null if there is no active backup.
      */
     public async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
-        try {
-            return await this.http.authedRequest<KeyBackupInfo>(
-                Method.Get,
-                "/room_keys/version",
-                undefined,
-                undefined,
-                {
-                    prefix: ClientPrefix.V3,
-                },
-            );
-        } catch (e) {
-            if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
-                return null;
-            } else {
-                throw e;
-            }
-        }
+        return await requestKeyBackupVersion(this.http);
     }
 
     /**
@@ -564,6 +549,22 @@ export class RustBackupDecryptor implements BackupDecryptor {
      */
     public free(): void {
         this.decryptionKey.free();
+    }
+}
+
+export async function requestKeyBackupVersion(
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+): Promise<IKeyBackupInfo | null> {
+    try {
+        return await http.authedRequest<KeyBackupInfo>(Method.Get, "/room_keys/version", undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    } catch (e) {
+        if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
+            return null;
+        } else {
+            throw e;
+        }
     }
 }
 
