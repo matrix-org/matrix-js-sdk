@@ -145,6 +145,11 @@ describe.each([
             const N_SESSIONS_PER_DEVICE = 6;
             await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
 
+            // Mark one of the sessions as needing backup
+            await store.doTxn("readwrite", IndexedDBCryptoStore.STORE_BACKUP, async (txn) => {
+                await store.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }], txn);
+            });
+
             const batch = await store.getEndToEndInboundGroupSessionsBatch();
             expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
             for (let i = 0; i < N_DEVICES; i++) {
@@ -153,6 +158,9 @@ describe.each([
 
                     expect(r.senderKey).toEqual(pad43(`device${i}`));
                     expect(r.sessionId).toEqual(`session${j}`);
+
+                    // only the last session needs backup
+                    expect(r.needsBackup).toBe(i === 5 && j === 5);
                 }
             }
         });

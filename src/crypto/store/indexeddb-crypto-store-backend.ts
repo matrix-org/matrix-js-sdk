@@ -21,6 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
+    ISessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -815,29 +816,39 @@ export class Backend implements CryptoStore {
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
-        const result: ISession[] = [];
-        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-            const objectStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
-            const getReq = objectStore.openCursor();
-            getReq.onsuccess = function (): void {
-                try {
-                    const cursor = getReq.result;
-                    if (cursor) {
-                        result.push({
-                            senderKey: cursor.value.senderCurve25519Key,
-                            sessionId: cursor.value.sessionId,
-                            sessionData: cursor.value.session,
-                        });
-                        if (result.length < SESSION_BATCH_SIZE) {
-                            cursor.continue();
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISessionExtended[]> {
+        const result: ISessionExtended[] = [];
+        await this.doTxn(
+            "readonly",
+            [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
+            (txn) => {
+                const sessionStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+                const backupStore = txn.objectStore(IndexedDBCryptoStore.STORE_BACKUP);
+
+                const getReq = sessionStore.openCursor();
+                getReq.onsuccess = function (): void {
+                    try {
+                        const cursor = getReq.result;
+                        if (cursor) {
+                            const backupGetReq = backupStore.get(cursor.key);
+                            backupGetReq.onsuccess = (): void => {
+                                result.push({
+                                    senderKey: cursor.value.senderCurve25519Key,
+                                    sessionId: cursor.value.sessionId,
+                                    sessionData: cursor.value.session,
+                                    needsBackup: backupGetReq.result !== undefined,
+                                });
+                                if (result.length < SESSION_BATCH_SIZE) {
+                                    cursor.continue();
+                                }
+                            };
                         }
+                    } catch (e) {
+                        abortWithException(txn, <Error>e);
                     }
-                } catch (e) {
-                    abortWithException(txn, <Error>e);
-                }
-            };
-        });
+                };
+            },
+        );
 
         if (result.length === 0) {
             // No sessions left.

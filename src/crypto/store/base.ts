@@ -182,7 +182,7 @@ export interface CryptoStore {
      * @returns A batch of Megolm Sessions, or `null` if no sessions are left.
      * @internal
      */
-    getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null>;
+    getEndToEndInboundGroupSessionsBatch(): Promise<ISessionExtended[] | null>;
 
     /**
      * Delete a batch of Megolm sessions from the database.
@@ -221,6 +221,11 @@ export interface ISession {
     senderKey: string;
     sessionId: string;
     sessionData?: InboundGroupSessionData;
+}
+
+/** Extended data on a Megolm session */
+export interface ISessionExtended extends ISession {
+    needsBackup: boolean;
 }
 
 /** Data on an Olm session */
