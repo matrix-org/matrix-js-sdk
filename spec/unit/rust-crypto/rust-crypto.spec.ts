@@ -823,11 +823,6 @@ describe("RustCrypto", () => {
     it("should wait for a keys/query before returning devices", async () => {
         jest.useFakeTimers();
 
-        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-            baseUrl: "http://server/",
-            prefix: "",
-            onlyData: true,
-        });
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
             device_keys: {
@@ -837,7 +832,7 @@ describe("RustCrypto", () => {
             },
         });
 
-        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
 
         // an attempt to fetch the device list should block
         const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
@@ -963,12 +958,6 @@ describe("RustCrypto", () => {
             // Return the key backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
-            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                baseUrl: "http://server/",
-                prefix: "",
-                onlyData: true,
-            });
-
             const olmMachine = {
                 getIdentity: jest.fn(),
                 // Force the backup to be trusted by the olmMachine
@@ -981,7 +970,7 @@ describe("RustCrypto", () => {
             const rustCrypto = new RustCrypto(
                 logger,
                 olmMachine,
-                mockHttpApi,
+                makeMatrixHttpApi(),
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
@@ -1039,6 +1028,15 @@ describe("RustCrypto", () => {
         });
     });
 });
+
+/** Build a MatrixHttpApi instance */
+function makeMatrixHttpApi(): MatrixHttpApi<IHttpOpts & { onlyData: true }> {
+    return new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+        baseUrl: "http://server/",
+        prefix: "",
+        onlyData: true,
+    });
+}
 
 /** build a basic RustCrypto instance for testing
  *
