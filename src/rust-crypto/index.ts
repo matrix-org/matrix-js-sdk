@@ -67,6 +67,7 @@ export async function initRustCrypto(args: {
     const { logger } = args;
 
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
+    logger.debug("Initialising Rust crypto-sdk WASM artifact");
     await RustSdkCryptoJs.initAsync();
 
     // enable tracing in the rust-sdk
@@ -83,7 +84,7 @@ export async function initRustCrypto(args: {
         args.storePassphrase,
     );
 
-    logger.info("Completed rust crypto-sdk setup");
+    logger.debug("Completed rust crypto-sdk setup");
     return rustCrypto;
 }
 
@@ -97,7 +98,7 @@ async function initOlmMachine(
     storePrefix: string | null,
     storePassphrase: string | undefined,
 ): Promise<RustCrypto> {
-    logger.info("Init OlmMachine");
+    logger.debug("Init OlmMachine");
     const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
