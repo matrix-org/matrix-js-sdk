@@ -58,7 +58,7 @@ await client.startClient({ initialSyncLimit: 10 });
 You can perform a call to `/sync` to get the current state of the client:
 
 ```javascript
-client.once("sync", function (state, prevState, res) {
+client.once(ClientEvent.sync, function (state, prevState, res) {
     if (state === "PREPARED") {
         console.log("prepared");
     } else {
@@ -83,7 +83,7 @@ client.sendEvent("roomId", "m.room.message", content, "", (err, res) => {
 To listen for message events:
 
 ```javascript
-client.on("Room.timeline", function (event, room, toStartOfTimeline) {
+client.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (event.getType() !== "m.room.message") {
         return; // only use messages
     }
@@ -144,12 +144,12 @@ are updated.
 
 ```javascript
 // Listen for low-level MatrixEvents
-client.on("event", function (event) {
+client.on(ClientEvent.Event, function (event) {
     console.log(event.getType());
 });
 
 // Listen for typing changes
-client.on("RoomMember.typing", function (event, member) {
+client.on(RoomMemberEvent.Typing, function (event, member) {
     if (member.typing) {
         console.log(member.name + " is typing...");
     } else {
@@ -211,7 +211,7 @@ const matrixClient = sdk.createClient({
 ### Automatically join rooms when invited
 
 ```javascript
-matrixClient.on("RoomMember.membership", function (event, member) {
+matrixClient.on(RoomMemberEvent.Membership, function (event, member) {
     if (member.membership === "invite" && member.userId === myUserId) {
         matrixClient.joinRoom(member.roomId).then(function () {
             console.log("Auto-joined %s", member.roomId);
@@ -225,7 +225,7 @@ matrixClient.startClient();
 ### Print out messages for all rooms
 
 ```javascript
-matrixClient.on("Room.timeline", function (event, room, toStartOfTimeline) {
+matrixClient.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
@@ -257,7 +257,7 @@ Output:
 ### Print out membership lists whenever they are changed
 
 ```javascript
-matrixClient.on("RoomState.members", function (event, state, member) {
+matrixClient.on(RoomStateEvent.Members, function (event, state, member) {
     const room = matrixClient.getRoom(state.roomId);
     if (!room) {
         return;
