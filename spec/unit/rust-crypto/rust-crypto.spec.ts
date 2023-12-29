@@ -38,7 +38,13 @@ import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import {
+    AccountDataClient,
+    AddSecretStorageKeyOpts,
+    SecretStorageCallbacks,
+    ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
+} from "../../../src/secret-storage";
 import {
     CryptoCallbacks,
     EventShieldColour,
@@ -51,6 +57,7 @@ import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
+import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 
 const TEST_USER = "@alice:example.com";
@@ -292,6 +299,62 @@ describe("RustCrypto", () => {
         rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
         await rustCrypto.bootstrapCrossSigning({});
         expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
+    });
+
+    it("bootstrapSecretStorage creates new backup when requested", async () => {
+        const secretStorageCallbacks = {
+            getSecretStorageKey: async (keys: any, name: string) => {
+                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+            },
+        } as SecretStorageCallbacks;
+        const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+        const outgoingRequestProcessor = {
+            makeOutgoingRequest: jest.fn(),
+        } as unknown as Mocked<OutgoingRequestProcessor>;
+
+        const rustCrypto = await makeTestRustCrypto(
+            new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            }),
+            testData.TEST_USER_ID,
+            undefined,
+            secretStorage,
+        );
+
+        rustCrypto["checkKeyBackupAndEnable"] = async () => {
+            return null;
+        };
+        (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+        const resetKeyBackup = (rustCrypto["resetKeyBackup"] = jest.fn());
+
+        async function createSecretStorageKey() {
+            return {
+                keyInfo: {} as AddSecretStorageKeyOpts,
+                privateKey: new Uint8Array(32),
+            };
+        }
+
+        // create initial secret storage
+        await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+        await rustCrypto.bootstrapSecretStorage({
+            createSecretStorageKey,
+            setupNewSecretStorage: true,
+            setupNewKeyBackup: true,
+        });
+        // check that rustCrypto.resetKeyBackup was called
+        expect(resetKeyBackup.mock.calls).toHaveLength(1);
+
+        // reset secret storage
+        await rustCrypto.bootstrapSecretStorage({
+            createSecretStorageKey,
+            setupNewSecretStorage: true,
+            setupNewKeyBackup: true,
+        });
+        // check that rustCrypto.resetKeyBackup was called again
+        expect(resetKeyBackup.mock.calls).toHaveLength(2);
     });
 
     it("isSecretStorageReady", async () => {
@@ -989,4 +1052,39 @@ async function makeTestRustCrypto(
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
     return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+}
+
+/** emulate account data, storing in memory
+ */
+class DummyAccountDataClient
+    extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
+    implements AccountDataClient
+{
+    private storage: Map<string, any> = new Map();
+
+    public constructor() {
+        super();
+    }
+
+    public async getAccountDataFromServer<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+        const ret = this.storage.get(eventType);
+
+        if (eventType) {
+            return ret as T;
+        } else {
+            return null;
+        }
+    }
+
+    public async setAccountData(eventType: string, content: any): Promise<{}> {
+        this.storage.set(eventType, content);
+        this.emit(
+            ClientEvent.AccountData,
+            new MatrixEvent({
+                content,
+                type: eventType,
+            }),
+        );
+        return {};
+    }
 }
