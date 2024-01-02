@@ -127,7 +127,11 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
         let count = 0;
         for (let i = 0; i < this.store.length; ++i) {
-            if (this.store.key(i)?.startsWith(keyEndToEndSessions(""))) ++count;
+            const key = this.store.key(i);
+            if (key?.startsWith(keyEndToEndSessions(""))) {
+                const sessions = getJsonItem(this.store, key);
+                count += Object.keys(sessions ?? {}).length;
+            }
         }
         func(count);
     }

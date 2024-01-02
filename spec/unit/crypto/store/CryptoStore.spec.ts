@@ -74,6 +74,12 @@ describe.each([
             const N_SESSIONS_PER_DEVICE = 6;
             await createSessions(N_DEVICES, N_SESSIONS_PER_DEVICE);
 
+            let nSessions = 0;
+            await store.doTxn("readonly", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) =>
+                store.countEndToEndSessions(txn, (n) => (nSessions = n)),
+            );
+            expect(nSessions).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
+
             // Then, get a batch and check it looks right.
             const batch = await store.getEndToEndSessionsBatch();
             expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);

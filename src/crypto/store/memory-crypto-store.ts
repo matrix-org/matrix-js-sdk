@@ -336,7 +336,11 @@ export class MemoryCryptoStore implements CryptoStore {
     // Olm Sessions
 
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
-        func(Object.keys(this.sessions).length);
+        let count = 0;
+        for (const deviceSessions of Object.values(this.sessions)) {
+            count += Object.keys(deviceSessions).length;
+        }
+        func(count);
     }
 
     public getEndToEndSession(
