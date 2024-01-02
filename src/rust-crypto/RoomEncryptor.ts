@@ -128,7 +128,7 @@ export class RoomEncryptor {
         // message is finally sent.
         // If `encryptEvent` is invoked before `prepareForEncryption` has completed, the `encryptEvent` call will wait for
         // `prepareForEncryption` to complete before executing.
-        // The part where `encryptEvent` shares the room key would be no op as it was already performed by prepareForEncryption.
+        // The part where `encryptEvent` shares the room key will then usually be a no-op as it was already performed by `prepareForEncryption`.
         await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
     }
 
