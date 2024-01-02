@@ -126,8 +126,8 @@ export class RoomEncryptor {
         // even if it doesn't send an event.
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
         // message is finally sent.
-        // If `encryptEvent` is invoked before `prepareForEncryption` as completed, the `encryptEvent` call will wait for
-        // `prepareForEncryption` to have completed before executing.
+        // If `encryptEvent` is invoked before `prepareForEncryption` has completed, the `encryptEvent` call will wait for
+        // `prepareForEncryption` to complete before executing.
         // The part where `encryptEvent` shares the room key would be no op as it was already performed by prepareForEncryption.
         await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
     }
