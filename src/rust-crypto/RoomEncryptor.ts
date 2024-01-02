@@ -49,7 +49,7 @@ export class RoomEncryptor {
     /**
      * Ensures that there is only one encryption operation at a time for that room.
      *
-     * An encryption operation is either a  {@link prepareForEncryption} or an {@link encryptEvent} call.
+     * An encryption operation is either a {@link prepareForEncryption} or an {@link encryptEvent} call.
      */
     private currentEncryptionPromise: Promise<void> = Promise.resolve();
 
