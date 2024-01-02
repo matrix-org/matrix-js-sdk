@@ -732,10 +732,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+        }
 
-            if (setupNewKeyBackup) {
-                await this.resetKeyBackup();
-            }
+        if (setupNewKeyBackup) {
+            await this.resetKeyBackup();
         }
     }
 
