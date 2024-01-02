@@ -533,6 +533,17 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        return Object.keys(this.inboundGroupSessions).length;
+    }
+
+    /**
      * Fetch a batch of Megolm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.

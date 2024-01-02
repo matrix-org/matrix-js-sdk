@@ -177,6 +177,13 @@ export interface CryptoStore {
     ): void;
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * @internal
+     */
+    countEndToEndInboundGroupSessions(): Promise<number>;
+
+    /**
      * Get a batch of Megolm sessions from the database.
      *
      * @returns A batch of Megolm Sessions, or `null` if no sessions are left.

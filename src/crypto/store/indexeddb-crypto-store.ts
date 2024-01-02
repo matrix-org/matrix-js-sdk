@@ -507,6 +507,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public countEndToEndInboundGroupSessions(): Promise<number> {
+        return this.backend!.countEndToEndInboundGroupSessions();
+    }
+
+    /**
      * Fetch a batch of Olm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndSessionsBatch}.

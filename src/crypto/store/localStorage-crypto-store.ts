@@ -356,6 +356,24 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        let count = 0;
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Fetch a batch of Megolm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.

@@ -156,6 +156,8 @@ describe.each([
                 await store.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }], txn);
             });
 
+            expect(await store.countEndToEndInboundGroupSessions()).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
+
             const batch = await store.getEndToEndInboundGroupSessionsBatch();
             expect(batch!.length).toEqual(N_DEVICES * N_SESSIONS_PER_DEVICE);
             for (let i = 0; i < N_DEVICES; i++) {
