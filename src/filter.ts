@@ -92,7 +92,10 @@ export class Filter {
      * @param userId - The user ID for this filter.
      * @param filterId - The filter ID if known.
      */
-    public constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
+    public constructor(
+        public readonly userId: string | undefined | null,
+        public filterId?: string,
+    ) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)

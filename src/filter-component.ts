@@ -62,7 +62,10 @@ export interface IFilterComponent {
  * 'Filters' are referred to as 'FilterCollections'.
  */
 export class FilterComponent {
-    public constructor(private filterJson: IFilterComponent, public readonly userId?: string | undefined | null) {}
+    public constructor(
+        private filterJson: IFilterComponent,
+        public readonly userId?: string | undefined | null,
+    ) {}
 
     /**
      * Checks with the filter component matches the given event

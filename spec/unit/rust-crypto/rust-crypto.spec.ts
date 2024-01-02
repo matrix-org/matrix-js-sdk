@@ -484,7 +484,7 @@ describe("RustCrypto", () => {
                 decryptEvent: () =>
                     ({
                         senderCurve25519Key: "1234",
-                    } as IEventDecryptionResult),
+                    }) as IEventDecryptionResult,
             } as unknown as CryptoBackend;
             await event.attemptDecryption(mockCryptoBackend);
 
@@ -524,7 +524,7 @@ describe("RustCrypto", () => {
                 decryptEvent: () =>
                     ({
                         clearEvent: { content: { body: "1234" } },
-                    } as unknown as IEventDecryptionResult),
+                    }) as unknown as IEventDecryptionResult,
             } as unknown as CryptoBackend;
             await encryptedEvent.attemptDecryption(mockCryptoBackend);
             return encryptedEvent;

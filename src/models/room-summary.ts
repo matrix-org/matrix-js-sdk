@@ -40,5 +40,8 @@ interface IInfo {
  * @param info - Optional. The summary info. Additional keys are supported.
  */
 export class RoomSummary {
-    public constructor(public readonly roomId: string, info?: IInfo) {}
+    public constructor(
+        public readonly roomId: string,
+        info?: IInfo,
+    ) {}
 }

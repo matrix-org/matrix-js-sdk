@@ -196,7 +196,11 @@ export class RoomReceipts {
  * maps in RoomReceipts.
  */
 class ReceiptInfo {
-    public constructor(public eventId: string, public receiptType: string, public ts: number) {}
+    public constructor(
+        public eventId: string,
+        public receiptType: string,
+        public ts: number,
+    ) {}
 }
 
 /**

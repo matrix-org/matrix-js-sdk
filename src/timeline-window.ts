@@ -441,7 +441,10 @@ export class TimelineIndex {
     public pendingPaginate?: Promise<boolean>;
 
     // index: the indexes are relative to BaseIndex, so could well be negative.
-    public constructor(public timeline: EventTimeline, public index: number) {}
+    public constructor(
+        public timeline: EventTimeline,
+        public index: number,
+    ) {}
 
     /**
      * @returns the minimum possible value for the index in the current

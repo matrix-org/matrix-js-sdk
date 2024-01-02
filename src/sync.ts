@@ -234,7 +234,11 @@ export class SyncApi {
      * @param syncOpts - sync-specific options passed by the client
      * @internal
      */
-    public constructor(private readonly client: MatrixClient, opts?: IStoredClientOpts, syncOpts?: SyncApiOptions) {
+    public constructor(
+        private readonly client: MatrixClient,
+        opts?: IStoredClientOpts,
+        syncOpts?: SyncApiOptions,
+    ) {
         this.opts = defaultClientOpts(opts);
         this.syncOpts = defaultSyncApiOpts(syncOpts);
 
