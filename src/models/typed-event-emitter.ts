@@ -44,8 +44,8 @@ type EventEmitterErrorListener = (error: Error) => void;
 export type Listener<E extends string, A extends ListenerMap<E>, T extends E | EventEmitterEvents> = T extends E
     ? A[T]
     : T extends EventEmitterEvents
-    ? EventEmitterErrorListener
-    : EventEmitterEventListener;
+      ? EventEmitterErrorListener
+      : EventEmitterEventListener;
 
 /**
  * Typed Event Emitter class which can act as a Base Model for all our model

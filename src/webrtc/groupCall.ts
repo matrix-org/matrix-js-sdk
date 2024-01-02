@@ -1605,17 +1605,20 @@ export class GroupCall extends TypedEventEmitter<
             await this.addDeviceToMemberState();
 
             // Resend the state event every so often so it doesn't become stale
-            this.resendMemberStateTimer = setInterval(async () => {
-                logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
-                try {
-                    await this.addDeviceToMemberState();
-                } catch (e) {
-                    logger.error(
-                        `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
-                        e,
-                    );
-                }
-            }, (DEVICE_TIMEOUT * 3) / 4);
+            this.resendMemberStateTimer = setInterval(
+                async () => {
+                    logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
+                    try {
+                        await this.addDeviceToMemberState();
+                    } catch (e) {
+                        logger.error(
+                            `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
+                            e,
+                        );
+                    }
+                },
+                (DEVICE_TIMEOUT * 3) / 4,
+            );
         } else {
             // Remove the local device
             await this.updateDevices(

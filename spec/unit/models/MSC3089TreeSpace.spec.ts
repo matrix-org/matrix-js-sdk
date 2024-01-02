@@ -399,7 +399,7 @@ describe("MSC3089TreeSpace", () => {
                 ];
             },
         };
-        client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
+        client.getRoom = () => ({}) as Room; // to appease the TreeSpace constructor
 
         const getFn = jest.fn().mockImplementation((roomId: string) => {
             if (roomId === thirdChildRoom) {
@@ -422,7 +422,7 @@ describe("MSC3089TreeSpace", () => {
     });
 
     it("should find specific directories", () => {
-        client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
+        client.getRoom = () => ({}) as Room; // to appease the TreeSpace constructor
 
         // Only mocking used API
         const firstSubdirectory = { roomId: "!first:example.org" } as any as MSC3089TreeSpace;

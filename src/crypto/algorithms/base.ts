@@ -210,7 +210,11 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    public constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
+    public constructor(
+        public readonly code: string,
+        msg: string,
+        details?: Record<string, string | Error>,
+    ) {
         super(msg);
         this.code = code;
         this.name = "DecryptionError";
@@ -242,7 +246,11 @@ export class UnknownDeviceError extends Error {
      * @param msg - message describing the problem
      * @param devices - set of unknown devices per user we're warning about
      */
-    public constructor(msg: string, public readonly devices: DeviceInfoMap, public event?: MatrixEvent) {
+    public constructor(
+        msg: string,
+        public readonly devices: DeviceInfoMap,
+        public event?: MatrixEvent,
+    ) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;

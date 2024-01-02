@@ -140,7 +140,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public replayEvents: MatrixEvent[] | null = [];
 
-    public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
+    public constructor(
+        public readonly id: string,
+        public rootEvent: MatrixEvent | undefined,
+        opts: IThreadOpts,
+    ) {
         super();
 
         // each Event in the thread adds a reemitter, so we could hit the listener limit.

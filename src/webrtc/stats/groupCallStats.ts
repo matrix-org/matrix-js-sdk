@@ -25,7 +25,11 @@ export class GroupCallStats {
     public readonly reports = new StatsReportEmitter();
     private readonly summaryStatsReportGatherer = new SummaryStatsReportGatherer(this.reports);
 
-    public constructor(private groupCallId: string, private userId: string, private interval: number = 10000) {}
+    public constructor(
+        private groupCallId: string,
+        private userId: string,
+        private interval: number = 10000,
+    ) {}
 
     public start(): void {
         if (this.timer === undefined && this.interval > 0) {

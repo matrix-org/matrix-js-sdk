@@ -37,7 +37,10 @@ export class CallMembership {
         return deepCompare(a.data, b.data);
     }
 
-    public constructor(private parentEvent: MatrixEvent, private data: CallMembershipData) {
+    public constructor(
+        private parentEvent: MatrixEvent,
+        private data: CallMembershipData,
+    ) {
         if (typeof data.expires !== "number") throw new Error("Malformed membership: expires must be numeric");
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");

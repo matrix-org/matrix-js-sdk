@@ -164,7 +164,10 @@ class OutboundSessionInfo {
      * @param sharedHistory - whether the session can be freely shared with
      *    other group members, according to the room history visibility settings
      */
-    public constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
+    public constructor(
+        public readonly sessionId: string,
+        public readonly sharedHistory = false,
+    ) {
         this.creationTime = new Date().getTime();
     }
 

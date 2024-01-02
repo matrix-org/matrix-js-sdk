@@ -156,7 +156,10 @@ extendLogger(logger);
 export class LogSpan implements BaseLogger {
     private readonly name;
 
-    public constructor(private readonly parent: BaseLogger, name: string) {
+    public constructor(
+        private readonly parent: BaseLogger,
+        name: string,
+    ) {
         this.name = name + ":";
     }
 
