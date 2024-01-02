@@ -191,7 +191,9 @@ export class RoomEncryptor {
         // This could end up being racy (if two calls to ensureEncryptionSession happen at the same time), but that's
         // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
         if (!this.lazyLoadedMembersResolved) {
-            await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
+            await logDuration(this.prefixedLogger, "loadMembersIfNeeded: updateTrackedUsers", async () => {
+                await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
+            });
             logger.debug(`Updated tracked users`);
             this.lazyLoadedMembersResolved = true;
 
