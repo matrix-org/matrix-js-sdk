@@ -72,6 +72,13 @@ export async function initRustCrypto(args: {
 
     /** The pickle key for `legacyCryptoStore` */
     legacyPickleKey?: string;
+
+    /**
+     * A callback which will receive progress updates on migration from `legacyCryptoStore`.
+     *
+     * Called with (-1, -1) to mark the end of migration.
+     */
+    legacyMigrationProgressListener?: (progress: number, total: number) => void;
 }): Promise<RustCrypto> {
     const { logger } = args;
 

@@ -823,7 +823,7 @@ export class Backend implements CryptoStore {
         await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
             const sessionStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
             const countReq = sessionStore.count();
-            countReq.onsuccess = () => {
+            countReq.onsuccess = (): void => {
                 result = countReq.result;
             };
         });
