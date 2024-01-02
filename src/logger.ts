@@ -29,7 +29,7 @@ export interface Logger extends BaseLogger {
 }
 
 /** The basic interface for a logger which doesn't support children */
-interface BaseLogger {
+export interface BaseLogger {
     /**
      * Output trace message to the logger, with stack trace.
      *

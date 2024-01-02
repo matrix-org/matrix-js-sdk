@@ -25,7 +25,7 @@ import { Optional } from "matrix-events-sdk";
 import { IEvent, MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
-import { Logger } from "./logger";
+import { BaseLogger } from "./logger";
 
 const interns = new Map<string, string>();
 
@@ -395,7 +395,7 @@ export function sleep<T>(ms: number, value?: T): Promise<T> {
  * @param name - The name of the operation.
  * @param block - The block to execute.
  */
-export async function logDuration<T>(logger: Logger, name: string, block: () => Promise<T>): Promise<T> {
+export async function logDuration<T>(logger: BaseLogger, name: string, block: () => Promise<T>): Promise<T> {
     const start = Date.now();
     try {
         return await block();
