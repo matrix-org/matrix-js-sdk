@@ -16,7 +16,7 @@
         "gendoc": "typedoc",
         "lint": "yarn lint:types && yarn lint:js && yarn lint:workflows",
         "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
-        "lint:js-fix": "prettier --loglevel=warn --write . && eslint --fix src spec",
+        "lint:js-fix": "prettier --log-level=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
         "test": "jest",
