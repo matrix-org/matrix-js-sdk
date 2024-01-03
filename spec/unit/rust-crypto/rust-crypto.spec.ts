@@ -84,16 +84,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine();
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            "storePrefix",
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storePassphrase: "storePassphrase",
+        });
 
         expect(OlmMachine.initialize).toHaveBeenCalledWith(
             expect.anything(),
@@ -107,16 +107,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine();
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            null,
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: null,
+            storePassphrase: "storePassphrase",
+        });
 
         expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
     });
@@ -125,16 +125,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine() as OlmMachine;
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            "storePrefix",
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storePassphrase: "storePassphrase",
+        });
 
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
@@ -823,11 +823,6 @@ describe("RustCrypto", () => {
     it("should wait for a keys/query before returning devices", async () => {
         jest.useFakeTimers();
 
-        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-            baseUrl: "http://server/",
-            prefix: "",
-            onlyData: true,
-        });
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
             device_keys: {
@@ -837,7 +832,7 @@ describe("RustCrypto", () => {
             },
         });
 
-        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
 
         // an attempt to fetch the device list should block
         const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
@@ -963,12 +958,6 @@ describe("RustCrypto", () => {
             // Return the key backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
-            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                baseUrl: "http://server/",
-                prefix: "",
-                onlyData: true,
-            });
-
             const olmMachine = {
                 getIdentity: jest.fn(),
                 // Force the backup to be trusted by the olmMachine
@@ -981,7 +970,7 @@ describe("RustCrypto", () => {
             const rustCrypto = new RustCrypto(
                 logger,
                 olmMachine,
-                mockHttpApi,
+                makeMatrixHttpApi(),
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
@@ -1040,6 +1029,15 @@ describe("RustCrypto", () => {
     });
 });
 
+/** Build a MatrixHttpApi instance */
+function makeMatrixHttpApi(): MatrixHttpApi<IHttpOpts & { onlyData: true }> {
+    return new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+        baseUrl: "http://server/",
+        prefix: "",
+        onlyData: true,
+    });
+}
+
 /** build a basic RustCrypto instance for testing
  *
  * just provides default arguments for initRustCrypto()
@@ -1051,7 +1049,16 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+    return await initRustCrypto({
+        logger,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        storePrefix: null,
+        storePassphrase: undefined,
+    });
 }
 
 /** emulate account data, storing in memory

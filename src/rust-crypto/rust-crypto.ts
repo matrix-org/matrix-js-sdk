@@ -315,18 +315,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
      */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
-        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-            this.olmMachine.userId,
-            this.olmMachine.deviceId,
-        );
-        // could be undefined if there is no such algorithm for that device.
-        if (device.curve25519Key && device.ed25519Key) {
-            return {
-                ed25519: device.ed25519Key.toBase64(),
-                curve25519: device.curve25519Key.toBase64(),
-            };
-        }
-        throw new Error("Device keys not found");
+        const keys = this.olmMachine.identityKeys;
+        return { ed25519: keys.ed25519.toBase64(), curve25519: keys.curve25519.toBase64() };
     }
 
     public prepareToEncrypt(room: Room): void {
