@@ -778,7 +778,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // The user may have been the sender, but they can't redact their own message
         // if redactions are blocked.
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
-        
+
         if (!canRedact) return false;
         if (mxEvent.getSender() === userId) return true;
 
