@@ -1263,7 +1263,7 @@ describe("Crypto", function () {
                     ({
                         init_with_private_key: jest.fn(),
                         free,
-                    } as unknown as PkDecryption),
+                    }) as unknown as PkDecryption,
             );
             client.client.checkSecretStoragePrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();
@@ -1289,7 +1289,7 @@ describe("Crypto", function () {
                     ({
                         init_with_seed: jest.fn(),
                         free,
-                    } as unknown as PkSigning),
+                    }) as unknown as PkSigning,
             );
             client.client.checkCrossSigningPrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();

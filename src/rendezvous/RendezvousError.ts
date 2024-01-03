@@ -17,7 +17,10 @@ limitations under the License.
 import { RendezvousFailureReason } from ".";
 
 export class RendezvousError extends Error {
-    public constructor(message: string, public readonly code: RendezvousFailureReason) {
+    public constructor(
+        message: string,
+        public readonly code: RendezvousFailureReason,
+    ) {
         super(message);
     }
 }

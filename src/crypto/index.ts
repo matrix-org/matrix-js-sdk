@@ -973,7 +973,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     // TODO this does not resolve with what it says it does
     public async bootstrapSecretStorage({
-        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({} as IRecoveryKey),
+        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({}) as IRecoveryKey,
         keyBackupInfo,
         setupNewKeyBackup,
         setupNewSecretStorage,
@@ -2243,10 +2243,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const res = await this.baseApis.uploadKeysRequest(requestBody);
 
         if (fallbackJson) {
-            this.fallbackCleanup = setTimeout(() => {
-                delete this.fallbackCleanup;
-                this.olmDevice.forgetOldFallbackKey();
-            }, 60 * 60 * 1000);
+            this.fallbackCleanup = setTimeout(
+                () => {
+                    delete this.fallbackCleanup;
+                    this.olmDevice.forgetOldFallbackKey();
+                },
+                60 * 60 * 1000,
+            );
         }
 
         await this.olmDevice.markKeysAsPublished();

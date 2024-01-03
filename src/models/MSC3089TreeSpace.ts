@@ -85,7 +85,10 @@ export enum TreePermissions {
 export class MSC3089TreeSpace {
     public readonly room: Room;
 
-    public constructor(private client: MatrixClient, public readonly roomId: string) {
+    public constructor(
+        private client: MatrixClient,
+        public readonly roomId: string,
+    ) {
         this.room = this.client.getRoom(this.roomId)!;
 
         if (!this.room) throw new Error("Unknown room");

@@ -71,7 +71,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param indexedDB -  global indexedDB instance
      * @param dbName -   name of db to connect to
      */
-    public constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
+    public constructor(
+        private readonly indexedDB: IDBFactory,
+        private readonly dbName: string,
+    ) {}
 
     /**
      * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).

@@ -52,6 +52,11 @@ describe("RoomEncryptor", () => {
         let mockOutgoingRequestManager: Mocked<OutgoingRequestsManager>;
         let mockRoom: Mocked<Room>;
 
+        const mockRoomMember = {
+            userId: "@alice:example.org",
+            membership: "join",
+        } as unknown as Mocked<RoomMember>;
+
         function createMockEvent(text: string): Mocked<MatrixEvent> {
             return {
                 getTxnId: jest.fn().mockReturnValue(""),
@@ -86,11 +91,6 @@ describe("RoomEncryptor", () => {
             mockOutgoingRequestManager = {
                 doProcessOutgoingRequests: jest.fn().mockResolvedValue(undefined),
             } as unknown as Mocked<OutgoingRequestsManager>;
-
-            const mockRoomMember = {
-                userId: "@alice:example.org",
-                membership: "join",
-            } as unknown as Mocked<RoomMember>;
 
             mockRoom = {
                 roomId: "!foo:example.org",
@@ -135,6 +135,50 @@ describe("RoomEncryptor", () => {
 
             // should have been called again
             expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(6);
+        });
+
+        // Regression test for https://github.com/element-hq/element-web/issues/26684
+        it("Should maintain order of encryption requests", async () => {
+            const firstTargetMembers = defer<void>();
+            const secondTargetMembers = defer<void>();
+
+            mockOlmMachine.shareRoomKey.mockResolvedValue(undefined);
+
+            // Hook into this method to demonstrate the race condition
+            mockRoom.getEncryptionTargetMembers
+                .mockImplementationOnce(async () => {
+                    await firstTargetMembers.promise;
+                    return [mockRoomMember];
+                })
+                .mockImplementationOnce(async () => {
+                    await secondTargetMembers.promise;
+                    return [mockRoomMember];
+                });
+
+            let firstMessageFinished: string | null = null;
+
+            const firstRequest = roomEncryptor.encryptEvent(createMockEvent("Hello"), false);
+            const secondRequest = roomEncryptor.encryptEvent(createMockEvent("Edit of Hello"), false);
+
+            firstRequest.then(() => {
+                if (firstMessageFinished === null) {
+                    firstMessageFinished = "hello";
+                }
+            });
+
+            secondRequest.then(() => {
+                if (firstMessageFinished === null) {
+                    firstMessageFinished = "edit";
+                }
+            });
+
+            // suppose the second getEncryptionTargetMembers call returns first
+            secondTargetMembers.resolve();
+            firstTargetMembers.resolve();
+
+            await Promise.all([firstRequest, secondRequest]);
+
+            expect(firstMessageFinished).toBe("hello");
         });
     });
 });

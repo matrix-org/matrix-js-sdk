@@ -50,5 +50,8 @@ export class SearchResult {
      * @param context -  the matching event and its
      *    context
      */
-    public constructor(public readonly rank: number, public readonly context: EventContext) {}
+    public constructor(
+        public readonly rank: number,
+        public readonly context: EventContext,
+    ) {}
 }
