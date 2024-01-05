@@ -46,8 +46,41 @@ export interface SecretStorePrivateKeys {
  * Abstraction of things that can store data required for end-to-end encryption
  */
 export interface CryptoStore {
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Unlike the rest of the methods in this interface, can be called before {@link CryptoStore#startup}.
+     *
+     * @internal
+     */
+    containsData(): Promise<boolean>;
+
+    /**
+     * Initialise this crypto store.
+     *
+     * Typically, this involves provisioning storage, and migrating any existing data to the current version of the
+     * storage schema where appropriate.
+     *
+     * Must be called before any of the rest of the methods in this interface.
+     */
     startup(): Promise<CryptoStore>;
+
     deleteAllData(): Promise<void>;
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    getMigrationState(): Promise<MigrationState>;
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    setMigrationState(migrationState: MigrationState): Promise<void>;
+
     getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
     getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;
     getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null>;
@@ -99,6 +132,23 @@ export interface CryptoStore {
     getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
     filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]>;
 
+    /**
+     * Get a batch of end-to-end sessions from the database.
+     *
+     * @returns A batch of Olm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndSessionsBatch(): Promise<ISessionInfo[] | null>;
+
+    /**
+     * Delete a batch of end-to-end sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndSessionsBatch(sessions: { deviceKey?: string; sessionId?: string }[]): Promise<void>;
+
     // Inbound Group Sessions
     getEndToEndInboundGroupSession(
         senderCurve25519Key: string,
@@ -126,6 +176,23 @@ export interface CryptoStore {
         txn: unknown,
     ): void;
 
+    /**
+     * Get a batch of Megolm sessions from the database.
+     *
+     * @returns A batch of Megolm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null>;
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndInboundGroupSessionsBatch(sessions: { senderKey: string; sessionId: string }[]): Promise<void>;
+
     // Device Data
     getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;
     storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void;
@@ -149,12 +216,14 @@ export interface CryptoStore {
 
 export type Mode = "readonly" | "readwrite";
 
+/** Data on a Megolm session */
 export interface ISession {
     senderKey: string;
     sessionId: string;
     sessionData?: InboundGroupSessionData;
 }
 
+/** Data on an Olm session */
 export interface ISessionInfo {
     deviceKey?: string;
     sessionId?: string;
@@ -224,3 +293,30 @@ export interface ParkedSharedHistory {
     keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
     forwardingCurve25519KeyChain: string[];
 }
+
+/**
+ * A record of which steps have been completed in the libolm to Rust Crypto migration.
+ *
+ * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
+ *
+ * @internal
+ */
+export enum MigrationState {
+    /** No migration steps have yet been completed. */
+    NOT_STARTED,
+
+    /** We have migrated the account data, cross-signing keys, etc. */
+    INITIAL_DATA_MIGRATED,
+
+    /** INITIAL_DATA_MIGRATED, and in addition, we have migrated all the Olm sessions. */
+    OLM_SESSIONS_MIGRATED,
+
+    /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
+    MEGOLM_SESSIONS_MIGRATED,
+}
+
+/**
+ * The size of batches to be returned by {@link CryptoStore#getEndToEndSessionsBatch} and
+ * {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+ */
+export const SESSION_BATCH_SIZE = 50;

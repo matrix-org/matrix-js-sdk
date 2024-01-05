@@ -1003,9 +1003,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         if (!shouldLiveInRoom && !shouldLiveInThread) {
             logger.warn(
-                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${
-                    this.room?.roomId
-                } eventId=${event.getId()} threadId=${event.threadRootId}`,
+                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${this.room
+                    ?.roomId} eventId=${event.getId()} threadId=${event.threadRootId}`,
             );
         }
 

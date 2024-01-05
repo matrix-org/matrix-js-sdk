@@ -954,7 +954,7 @@ describe("Group Call", function () {
                             },
                         },
                     }),
-                } as MatrixEvent);
+                }) as MatrixEvent;
 
             it("should mute remote feed's audio after receiving metadata with video audio", async () => {
                 const metadataEvent = getMetadataEvent(true, false);
@@ -965,7 +965,7 @@ describe("Group Call", function () {
 
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
-                call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -992,7 +992,7 @@ describe("Group Call", function () {
 
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2).get(FAKE_DEVICE_ID_2)!;
-                call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -1310,7 +1310,7 @@ describe("Group Call", function () {
 
             // @ts-ignore
             const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
-            call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+            call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
             call.onNegotiateReceived({
                 getContent: () => ({
                     [SDPStreamMetadataKey]: {

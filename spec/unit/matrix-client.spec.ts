@@ -2211,8 +2211,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": true,
                 },
             };
-            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
@@ -2250,8 +2249,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": false,
                 },
             };
-            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
             // populate version support

@@ -38,7 +38,13 @@ import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import {
+    AccountDataClient,
+    AddSecretStorageKeyOpts,
+    SecretStorageCallbacks,
+    ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
+} from "../../../src/secret-storage";
 import {
     CryptoCallbacks,
     EventShieldColour,
@@ -51,6 +57,7 @@ import * as testData from "../../test-utils/test-data";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
+import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 
 const TEST_USER = "@alice:example.com";
@@ -77,16 +84,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine();
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            "storePrefix",
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storePassphrase: "storePassphrase",
+        });
 
         expect(OlmMachine.initialize).toHaveBeenCalledWith(
             expect.anything(),
@@ -100,16 +107,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine();
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            null,
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: null,
+            storePassphrase: "storePassphrase",
+        });
 
         expect(OlmMachine.initialize).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, undefined);
     });
@@ -118,16 +125,16 @@ describe("initRustCrypto", () => {
         const testOlmMachine = makeTestOlmMachine() as OlmMachine;
         jest.spyOn(OlmMachine, "initialize").mockResolvedValue(testOlmMachine);
 
-        await initRustCrypto(
+        await initRustCrypto({
             logger,
-            {} as MatrixClient["http"],
-            TEST_USER,
-            TEST_DEVICE_ID,
-            {} as ServerSideSecretStorage,
-            {} as CryptoCallbacks,
-            "storePrefix",
-            "storePassphrase",
-        );
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storePassphrase: "storePassphrase",
+        });
 
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
@@ -294,6 +301,62 @@ describe("RustCrypto", () => {
         expect(mockCrossSigningIdentity.bootstrapCrossSigning).toHaveBeenCalledWith({});
     });
 
+    it("bootstrapSecretStorage creates new backup when requested", async () => {
+        const secretStorageCallbacks = {
+            getSecretStorageKey: async (keys: any, name: string) => {
+                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+            },
+        } as SecretStorageCallbacks;
+        const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+        const outgoingRequestProcessor = {
+            makeOutgoingRequest: jest.fn(),
+        } as unknown as Mocked<OutgoingRequestProcessor>;
+
+        const rustCrypto = await makeTestRustCrypto(
+            new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            }),
+            testData.TEST_USER_ID,
+            undefined,
+            secretStorage,
+        );
+
+        rustCrypto["checkKeyBackupAndEnable"] = async () => {
+            return null;
+        };
+        (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+        const resetKeyBackup = (rustCrypto["resetKeyBackup"] = jest.fn());
+
+        async function createSecretStorageKey() {
+            return {
+                keyInfo: {} as AddSecretStorageKeyOpts,
+                privateKey: new Uint8Array(32),
+            };
+        }
+
+        // create initial secret storage
+        await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+        await rustCrypto.bootstrapSecretStorage({
+            createSecretStorageKey,
+            setupNewSecretStorage: true,
+            setupNewKeyBackup: true,
+        });
+        // check that rustCrypto.resetKeyBackup was called
+        expect(resetKeyBackup.mock.calls).toHaveLength(1);
+
+        // reset secret storage
+        await rustCrypto.bootstrapSecretStorage({
+            createSecretStorageKey,
+            setupNewSecretStorage: true,
+            setupNewKeyBackup: true,
+        });
+        // check that rustCrypto.resetKeyBackup was called again
+        expect(resetKeyBackup.mock.calls).toHaveLength(2);
+    });
+
     it("isSecretStorageReady", async () => {
         const mockSecretStorage = {
             getDefaultKeyId: jest.fn().mockResolvedValue(null),
@@ -421,7 +484,7 @@ describe("RustCrypto", () => {
                 decryptEvent: () =>
                     ({
                         senderCurve25519Key: "1234",
-                    } as IEventDecryptionResult),
+                    }) as IEventDecryptionResult,
             } as unknown as CryptoBackend;
             await event.attemptDecryption(mockCryptoBackend);
 
@@ -461,7 +524,7 @@ describe("RustCrypto", () => {
                 decryptEvent: () =>
                     ({
                         clearEvent: { content: { body: "1234" } },
-                    } as unknown as IEventDecryptionResult),
+                    }) as unknown as IEventDecryptionResult,
             } as unknown as CryptoBackend;
             await encryptedEvent.attemptDecryption(mockCryptoBackend);
             return encryptedEvent;
@@ -739,8 +802,8 @@ describe("RustCrypto", () => {
             // Expect the private key to be an Uint8Array with a length of 32
             expect(recoveryKey.privateKey).toBeInstanceOf(Uint8Array);
             expect(recoveryKey.privateKey.length).toBe(32);
-            // Expect keyInfo to be empty
-            expect(Object.keys(recoveryKey.keyInfo!).length).toBe(0);
+            // Expect passphrase info to be absent
+            expect(recoveryKey.keyInfo?.passphrase).toBeUndefined();
         });
 
         it("should create a recovery key with password", async () => {
@@ -760,11 +823,6 @@ describe("RustCrypto", () => {
     it("should wait for a keys/query before returning devices", async () => {
         jest.useFakeTimers();
 
-        const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-            baseUrl: "http://server/",
-            prefix: "",
-            onlyData: true,
-        });
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
             device_keys: {
@@ -774,7 +832,7 @@ describe("RustCrypto", () => {
             },
         });
 
-        const rustCrypto = await makeTestRustCrypto(mockHttpApi, testData.TEST_USER_ID);
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
 
         // an attempt to fetch the device list should block
         const devicesPromise = rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
@@ -900,12 +958,6 @@ describe("RustCrypto", () => {
             // Return the key backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
-            const mockHttpApi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                baseUrl: "http://server/",
-                prefix: "",
-                onlyData: true,
-            });
-
             const olmMachine = {
                 getIdentity: jest.fn(),
                 // Force the backup to be trusted by the olmMachine
@@ -918,7 +970,7 @@ describe("RustCrypto", () => {
             const rustCrypto = new RustCrypto(
                 logger,
                 olmMachine,
-                mockHttpApi,
+                makeMatrixHttpApi(),
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
@@ -977,6 +1029,15 @@ describe("RustCrypto", () => {
     });
 });
 
+/** Build a MatrixHttpApi instance */
+function makeMatrixHttpApi(): MatrixHttpApi<IHttpOpts & { onlyData: true }> {
+    return new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+        baseUrl: "http://server/",
+        prefix: "",
+        onlyData: true,
+    });
+}
+
 /** build a basic RustCrypto instance for testing
  *
  * just provides default arguments for initRustCrypto()
@@ -988,5 +1049,49 @@ async function makeTestRustCrypto(
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
-    return await initRustCrypto(logger, http, userId, deviceId, secretStorage, cryptoCallbacks, null, undefined);
+    return await initRustCrypto({
+        logger,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        storePrefix: null,
+        storePassphrase: undefined,
+    });
+}
+
+/** emulate account data, storing in memory
+ */
+class DummyAccountDataClient
+    extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap>
+    implements AccountDataClient
+{
+    private storage: Map<string, any> = new Map();
+
+    public constructor() {
+        super();
+    }
+
+    public async getAccountDataFromServer<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+        const ret = this.storage.get(eventType);
+
+        if (eventType) {
+            return ret as T;
+        } else {
+            return null;
+        }
+    }
+
+    public async setAccountData(eventType: string, content: any): Promise<{}> {
+        this.storage.set(eventType, content);
+        this.emit(
+            ClientEvent.AccountData,
+            new MatrixEvent({
+                content,
+                type: eventType,
+            }),
+        );
+        return {};
+    }
 }

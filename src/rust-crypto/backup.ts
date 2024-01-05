@@ -29,12 +29,13 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, immediate } from "../utils";
+import { encodeUri, immediate, logDuration } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
+import { IKeyBackupInfo } from "../crypto/keybackup";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -328,7 +329,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 // Get a batch of room keys to upload
                 let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
                 try {
-                    request = await this.olmMachine.backupRoomKeys();
+                    request = await logDuration(
+                        logger,
+                        "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
+                        async () => {
+                            return await this.olmMachine.backupRoomKeys();
+                        },
+                    );
                 } catch (err) {
                     logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
                 }
@@ -393,23 +400,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns Information object from API or null if there is no active backup.
      */
     public async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
-        try {
-            return await this.http.authedRequest<KeyBackupInfo>(
-                Method.Get,
-                "/room_keys/version",
-                undefined,
-                undefined,
-                {
-                    prefix: ClientPrefix.V3,
-                },
-            );
-        } catch (e) {
-            if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
-                return null;
-            } else {
-                throw e;
-            }
-        }
+        return await requestKeyBackupVersion(this.http);
     }
 
     /**
@@ -558,6 +549,22 @@ export class RustBackupDecryptor implements BackupDecryptor {
      */
     public free(): void {
         this.decryptionKey.free();
+    }
+}
+
+export async function requestKeyBackupVersion(
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+): Promise<IKeyBackupInfo | null> {
+    try {
+        return await http.authedRequest<KeyBackupInfo>(Method.Get, "/room_keys/version", undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    } catch (e) {
+        if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
+            return null;
+        } else {
+            throw e;
+        }
     }
 }
 
