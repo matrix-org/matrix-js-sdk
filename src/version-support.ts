@@ -16,5 +16,8 @@ limitations under the License.
 
 /**
  * The minimum Matrix specification version the js-sdk supports.
+ *
+ * (This means that we require any servers we connect to to declare support for this spec version, so it is important
+ * for it not to be too old, as well as not too new.)
  */
-export const MINIMUM_MATRIX_VERSION = "v1.1";
+export const MINIMUM_MATRIX_VERSION = "v1.5";
