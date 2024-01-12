@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IDeviceKeys } from "../../../src/@types/crypto";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 
@@ -30,6 +29,7 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { OutgoingRequest, OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { IDeviceKeys } from "../../../src/@types/crypto";
 import { EventType, MatrixEvent, MsgType } from "../../../src";
 
 describe("VerificationRequest", () => {
@@ -195,7 +195,7 @@ describe("VerificationRequest", () => {
 
             // create a function to compare the SAS, and then let the verification run
             let otherCallbacks: ShowSasCallbacks | undefined;
-            function compareSas(callbacks: ShowSasCallbacks): void {
+            const compareSas = (callbacks: ShowSasCallbacks): void => {
                 if (otherCallbacks) {
                     const ourDecimal = callbacks.sas.decimal!;
                     const theirDecimal = otherCallbacks.sas.decimal!;
@@ -209,7 +209,7 @@ describe("VerificationRequest", () => {
                 } else {
                     otherCallbacks = callbacks;
                 }
-            }
+            };
             aliceVerifier.on(VerifierEvent.ShowSas, compareSas);
             bobVerifier.on(VerifierEvent.ShowSas, compareSas);
 
@@ -320,7 +320,7 @@ describe("VerificationRequest", () => {
 
             // create a function to compare the SAS, and then let the verification run
             let otherCallbacks: ShowSasCallbacks | undefined;
-            function compareSas(callbacks: ShowSasCallbacks) {
+            const compareSas = (callbacks: ShowSasCallbacks) => {
                 if (otherCallbacks) {
                     const ourDecimal = callbacks.sas.decimal!;
                     const theirDecimal = otherCallbacks.sas.decimal!;
@@ -334,7 +334,7 @@ describe("VerificationRequest", () => {
                 } else {
                     otherCallbacks = callbacks;
                 }
-            }
+            };
             aliceVerifier.on(VerifierEvent.ShowSas, compareSas);
             bobVerifier.on(VerifierEvent.ShowSas, compareSas);
 
@@ -482,7 +482,7 @@ function makeRequestLoop(
                 resp = {
                     device_keys: {},
                 };
-                let body = JSON.parse(request.body);
+                const body = JSON.parse(request.body);
                 const query = body.device_keys;
                 const masterKeys: Record<string, any> = {};
                 const selfSigningKeys: Record<string, any> = {};
@@ -536,8 +536,6 @@ function makeRequestLoop(
     const promise = (async () => {
         while (!stopRequestLoop) {
             const requests = await ourOlmMachine.outgoingRequests();
-            if (requests.length) {
-            }
             for (const request of requests) {
                 await makeOutgoingRequest(request);
             }

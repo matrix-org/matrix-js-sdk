@@ -492,7 +492,6 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
             this.inner = inner;
             inner.registerChangesCallback(this.onChangeCallback!);
             this.onChangeCallback!();
-        } else {
         }
     }
 
