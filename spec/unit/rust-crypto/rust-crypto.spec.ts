@@ -165,7 +165,7 @@ describe("RustCrypto", () => {
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (stage) => {
-                    importTotal = stage.total;
+                    importTotal = stage.total ?? 0;
                 },
             };
             await rustCrypto.importRoomKeys(someRoomKeys, opt);

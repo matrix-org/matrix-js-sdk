@@ -340,6 +340,108 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(afterCache.imported).toStrictEqual(1);
         });
 
+        it("Should import full backup in chunks", async function () {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            aliceClient = await initTestClient();
+
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // just mock this call
+            // @ts-ignore - mock a private method for testing purpose
+            aliceCrypto.importBackedUpRoomKeys = jest.fn();
+
+            await aliceClient.startClient();
+
+            // tell Alice to trust the dummy device that signed the backup
+            await waitForDeviceList();
+            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            const fullBackup: {
+                rooms: {
+                    [roomId: string]: {
+                        [sessionId: string]: any;
+                    };
+                };
+            } = { rooms: {} };
+
+            // we need several rooms with several sessions to test chunking
+            const keysPerRoom = [45, 300, 345, 12, 130];
+            const expectedTotal = keysPerRoom.reduce((a, b) => a + b, 0);
+            for (let i = 0; i < keysPerRoom.length; i++) {
+                const roomId = `!room${i}:example.com`;
+                fullBackup.rooms[roomId] = { sessions: {} };
+                for (let j = 0; j < keysPerRoom[i]; j++) {
+                    const sessionId = `session${j}`;
+                    // put the same fake session data, not important for that tet
+                    fullBackup.rooms[roomId].sessions[sessionId] = testData.CURVE25519_KEY_BACKUP_DATA;
+                }
+            }
+
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+            const check = await aliceCrypto.checkKeyBackupAndEnable();
+
+            // @ts-ignore spying internal method
+            const importSpy = jest.spyOn(aliceCrypto, "importBackedUpRoomKeys");
+
+            const progressCallback = jest.fn();
+            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
+                testData.BACKUP_DECRYPTION_KEY_BASE58,
+                undefined,
+                undefined,
+                check!.backupInfo!,
+                {
+                    progressCallback,
+                },
+            );
+
+            expect(result.imported).toStrictEqual(expectedTotal);
+            // should be called 5 times: 200*4 plus one chunk with the remaining 32
+            expect(importSpy).toHaveBeenCalledTimes(5);
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                // unfortunately there is no proper enum for stages :/
+                // react sdk expect some values though
+                stage: "fetch",
+            });
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: expectedTotal,
+                successes: 200,
+                stage: "load_keys",
+                failures: 0,
+            });
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: expectedTotal,
+                successes: 400,
+                stage: "load_keys",
+                failures: 0,
+            });
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: expectedTotal,
+                successes: 600,
+                stage: "load_keys",
+                failures: 0,
+            });
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: expectedTotal,
+                successes: 800,
+                stage: "load_keys",
+                failures: 0,
+            });
+
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: expectedTotal,
+                successes: 832,
+                stage: "load_keys",
+                failures: 0,
+            });
+        });
+
         it("recover specific session from backup", async function () {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
