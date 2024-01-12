@@ -127,7 +127,7 @@ function makeMockClient(opts: {
             baseUrl: "https://example.com",
             getCrypto() {
                 return {
-                    getUserDeviceInfo([userId]: string[], deviceId: string): Promise<PartialDeviceMap> {
+                    getUserDeviceInfo([userId]: string[], downloadUncached?: boolean): Promise<PartialDeviceMap> {
                         return Promise.resolve(deviceMap);
                     },
                     getCrossSigningKeyId(key: CrossSigningKey): string | null {
