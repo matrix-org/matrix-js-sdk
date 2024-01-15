@@ -4019,6 +4019,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return { total: totalKeyCount, imported: totalImported };
     }
 
+    /**
+     * This method calculates the total number of keys present in the response of a `/room_keys/keys` call.
+     *
+     * @param res - The response from the server containing the keys to be counted.
+     *
+     * @returns The total number of keys in the backup.
+     */
     private getTotalKeyCount(res: IRoomsKeysResponse): number {
         const rooms = res.rooms;
         let totalKeyCount = 0;
@@ -4030,6 +4037,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return totalKeyCount;
     }
 
+    /**
+     * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
+     * It will decrypt the keys in chunks and call the `block` callback for each chunk.
+     *
+     * @param res - The response from the server containing the keys to be decrypted.
+     * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
+     * @param chunkSize - The size of the chunks to be processed at a time.
+     * @param block - A callback function that is called for each chunk of keys.
+     *
+     * @returns A promise that resolves when the decryption is complete.
+     */
     private async handleDecryptionOfAFullBackup(
         res: IRoomsKeysResponse,
         backupDecryptor: BackupDecryptor,
