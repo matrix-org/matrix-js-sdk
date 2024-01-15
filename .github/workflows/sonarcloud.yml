@@ -53,7 +53,7 @@ jobs:
             github.event.workflow_run.conclusion == 'success'
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
-            # This provides an easy link to this workflow_run from the PR before Cypress is done.
+            # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
