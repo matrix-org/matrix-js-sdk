@@ -47,7 +47,8 @@ describe("ContentRepo", function () {
         it("should allow redirects when requested on thumbnail URLs", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32, 32, "scale", false, true)).toEqual(
-                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid?width=32&height=32&method=scale&allow_redirect=true",
+                baseUrl +
+                    "/_matrix/media/v3/thumbnail/server.name/resourceid?width=32&height=32&method=scale&allow_redirect=true",
             );
         });
 
@@ -58,14 +59,18 @@ describe("ContentRepo", function () {
         it("should return a thumbnail URL if a width/height/resize is specified", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32, 64, "crop")).toEqual(
-                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32&height=64&method=crop&allow_redirect=false",
+                baseUrl +
+                    "/_matrix/media/v3/thumbnail/server.name/resourceid" +
+                    "?width=32&height=64&method=crop&allow_redirect=false",
             );
         });
 
         it("should put fragments from mxc:// URIs after any query parameters", function () {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32)).toEqual(
-                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32&allow_redirect=false#automade",
+                baseUrl +
+                    "/_matrix/media/v3/thumbnail/server.name/resourceid" +
+                    "?width=32&allow_redirect=false#automade",
             );
         });
 
