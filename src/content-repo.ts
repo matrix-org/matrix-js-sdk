@@ -37,6 +37,7 @@ export function getHttpUriForMxc(
     height?: number,
     resizeMethod?: string,
     allowDirectLinks = false,
+    allowRedirects = false,
 ): string {
     if (typeof mxc !== "string" || !mxc) {
         return "";
@@ -66,6 +67,9 @@ export function getHttpUriForMxc(
         // thumbnailing API...
         prefix = "/_matrix/media/v3/thumbnail/";
     }
+
+    // We add this after so we don't convert everything to a thumbnail request.
+    params["allow_redirect"] = JSON.stringify(allowRedirects);
 
     const fragmentOffset = serverAndMediaId.indexOf("#");
     let fragment = "";
