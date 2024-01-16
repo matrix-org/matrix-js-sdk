@@ -18,7 +18,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import fetchMock from "fetch-mock-jest";
 
-import { createClient, IndexedDBCryptoStore } from "../../../src";
+import { createClient, CryptoEvent, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
 
 jest.setTimeout(15000);
@@ -124,6 +124,9 @@ describe("MatrixClient.initRustCrypto", () => {
             pickleKey: "+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o",
         });
 
+        const progressListener = jest.fn();
+        matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
+
         await matrixClient.initRustCrypto();
 
         // Do some basic checks on the imported data
@@ -132,7 +135,25 @@ describe("MatrixClient.initRustCrypto", () => {
         expect(deviceKeys.ed25519).toEqual("qK70DEqIXq7T+UU3v/al47Ab4JkMEBLpNrTBMbS5rrw");
 
         expect(await matrixClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual("7");
-    });
+
+        // check the progress callback
+        expect(progressListener.mock.calls.length).toBeGreaterThan(50);
+
+        // The first call should have progress == 0
+        const [firstProgress, totalSteps] = progressListener.mock.calls[0];
+        expect(totalSteps).toBeGreaterThan(3000);
+        expect(firstProgress).toEqual(0);
+
+        for (let i = 1; i < progressListener.mock.calls.length - 1; i++) {
+            const [progress, total] = progressListener.mock.calls[i];
+            expect(total).toEqual(totalSteps);
+            expect(progress).toBeGreaterThan(progressListener.mock.calls[i - 1][0]);
+            expect(progress).toBeLessThanOrEqual(totalSteps);
+        }
+
+        // The final call should have progress == total == -1
+        expect(progressListener).toHaveBeenLastCalledWith(-1, -1);
+    }, 60000);
 });
 
 describe("MatrixClient.clearStores", () => {

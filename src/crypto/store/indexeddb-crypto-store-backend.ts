@@ -812,6 +812,25 @@ export class Backend implements CryptoStore {
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        let result = 0;
+        await this.doTxn("readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            const sessionStore = txn.objectStore(IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS);
+            const countReq = sessionStore.count();
+            countReq.onsuccess = (): void => {
+                result = countReq.result;
+            };
+        });
+        return result;
+    }
+
+    /**
      * Fetch a batch of Megolm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.

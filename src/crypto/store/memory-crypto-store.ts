@@ -336,7 +336,11 @@ export class MemoryCryptoStore implements CryptoStore {
     // Olm Sessions
 
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
-        func(Object.keys(this.sessions).length);
+        let count = 0;
+        for (const deviceSessions of Object.values(this.sessions)) {
+            count += Object.keys(deviceSessions).length;
+        }
+        func(count);
     }
 
     public getEndToEndSession(
@@ -526,6 +530,17 @@ export class MemoryCryptoStore implements CryptoStore {
     ): void {
         const k = senderCurve25519Key + "/" + sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
+    }
+
+    /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        return Object.keys(this.inboundGroupSessions).length;
     }
 
     /**

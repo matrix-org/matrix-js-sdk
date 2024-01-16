@@ -127,7 +127,11 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
         let count = 0;
         for (let i = 0; i < this.store.length; ++i) {
-            if (this.store.key(i)?.startsWith(keyEndToEndSessions(""))) ++count;
+            const key = this.store.key(i);
+            if (key?.startsWith(keyEndToEndSessions(""))) {
+                const sessions = getJsonItem(this.store, key);
+                count += Object.keys(sessions ?? {}).length;
+            }
         }
         func(count);
     }
@@ -349,6 +353,24 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         txn: unknown,
     ): void {
         setJsonItem(this.store, keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId), sessionData);
+    }
+
+    /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        let count = 0;
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                count += 1;
+            }
+        }
+        return count;
     }
 
     /**

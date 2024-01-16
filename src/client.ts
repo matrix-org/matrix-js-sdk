@@ -962,7 +962,8 @@ type CryptoEvents =
     | CryptoEvent.KeysChanged
     | CryptoEvent.Warning
     | CryptoEvent.DevicesUpdated
-    | CryptoEvent.WillUpdateDevices;
+    | CryptoEvent.WillUpdateDevices
+    | CryptoEvent.LegacyCryptoStoreMigrationProgress;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -2330,6 +2331,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             storePassphrase: this.pickleKey,
             legacyCryptoStore: this.cryptoStore,
             legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
+            legacyMigrationProgressListener: (progress, total) => {
+                this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
+            },
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);

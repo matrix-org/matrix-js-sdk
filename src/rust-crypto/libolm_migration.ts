@@ -52,6 +52,13 @@ export async function migrateFromLegacyCrypto(args: {
 
     /** Rust crypto store to migrate data into. */
     storeHandle: RustSdkCryptoJs.StoreHandle;
+
+    /**
+     * A callback which will receive progress updates on migration from `legacyStore`.
+     *
+     * Called with (-1, -1) to mark the end of migration.
+     */
+    legacyMigrationProgressListener?: (progress: number, total: number) => void;
 }): Promise<void> {
     const { logger, legacyStore } = args;
 
@@ -74,6 +81,20 @@ export async function migrateFromLegacyCrypto(args: {
         return;
     }
 
+    const nOlmSessions = await countOlmSessions(logger, legacyStore);
+    const nMegolmSessions = await countMegolmSessions(logger, legacyStore);
+    const totalSteps = 1 + nOlmSessions + nMegolmSessions;
+    logger.info(
+        `Migrating data from legacy crypto store. ${nOlmSessions} olm sessions and ${nMegolmSessions} megolm sessions to migrate.`,
+    );
+
+    let stepsDone = 0;
+    function onProgress(steps: number): void {
+        stepsDone += steps;
+        args.legacyMigrationProgressListener?.(stepsDone, totalSteps);
+    }
+    onProgress(0);
+
     const pickleKey = new TextEncoder().encode(args.legacyPickleKey);
 
     if (migrationState === MigrationState.NOT_STARTED) {
@@ -83,23 +104,30 @@ export async function migrateFromLegacyCrypto(args: {
         migrationState = MigrationState.INITIAL_DATA_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
     }
+    onProgress(1);
 
     if (migrationState === MigrationState.INITIAL_DATA_MIGRATED) {
-        logger.info("Migrating data from legacy crypto store. Step 2: olm sessions");
-        await migrateOlmSessions(logger, legacyStore, pickleKey, args.storeHandle);
+        logger.info(
+            `Migrating data from legacy crypto store. Step 2: olm sessions (${nOlmSessions} sessions to migrate).`,
+        );
+        await migrateOlmSessions(logger, legacyStore, pickleKey, args.storeHandle, onProgress);
 
         migrationState = MigrationState.OLM_SESSIONS_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
     }
 
     if (migrationState === MigrationState.OLM_SESSIONS_MIGRATED) {
-        logger.info("Migrating data from legacy crypto store. Step 3: megolm sessions");
-        await migrateMegolmSessions(logger, legacyStore, pickleKey, args.storeHandle);
+        logger.info(
+            `Migrating data from legacy crypto store. Step 3: megolm sessions (${nMegolmSessions} sessions to migrate).`,
+        );
+        await migrateMegolmSessions(logger, legacyStore, pickleKey, args.storeHandle, onProgress);
 
         migrationState = MigrationState.MEGOLM_SESSIONS_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
     }
 
+    // Migration is done.
+    args.legacyMigrationProgressListener?.(-1, -1);
     logger.info("Migration from legacy crypto store complete");
 }
 
@@ -147,11 +175,26 @@ async function migrateBaseData(
     await RustSdkCryptoJs.Migration.migrateBaseData(migrationData, pickleKey, storeHandle);
 }
 
+async function countOlmSessions(logger: Logger, legacyStore: CryptoStore): Promise<number> {
+    logger.debug("Counting olm sessions to be migrated");
+    let nSessions: number;
+    await legacyStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) =>
+        legacyStore.countEndToEndSessions(txn, (n) => (nSessions = n)),
+    );
+    return nSessions!;
+}
+
+async function countMegolmSessions(logger: Logger, legacyStore: CryptoStore): Promise<number> {
+    logger.debug("Counting megolm sessions to be migrated");
+    return await legacyStore.countEndToEndInboundGroupSessions();
+}
+
 async function migrateOlmSessions(
     logger: Logger,
     legacyStore: CryptoStore,
     pickleKey: Uint8Array,
     storeHandle: RustSdkCryptoJs.StoreHandle,
+    onBatchDone: (batchSize: number) => void,
 ): Promise<void> {
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -170,6 +213,7 @@ async function migrateOlmSessions(
 
         await RustSdkCryptoJs.Migration.migrateOlmSessions(migrationData, pickleKey, storeHandle);
         await legacyStore.deleteEndToEndSessionsBatch(batch);
+        onBatchDone(batch.length);
     }
 }
 
@@ -178,6 +222,7 @@ async function migrateMegolmSessions(
     legacyStore: CryptoStore,
     pickleKey: Uint8Array,
     storeHandle: RustSdkCryptoJs.StoreHandle,
+    onBatchDone: (batchSize: number) => void,
 ): Promise<void> {
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -204,6 +249,7 @@ async function migrateMegolmSessions(
 
         await RustSdkCryptoJs.Migration.migrateMegolmSessions(migrationData, pickleKey, storeHandle);
         await legacyStore.deleteEndToEndInboundGroupSessionsBatch(batch);
+        onBatchDone(batch.length);
     }
 }
 

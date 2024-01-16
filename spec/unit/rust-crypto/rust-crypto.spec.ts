@@ -193,6 +193,10 @@ describe("initRustCrypto", () => {
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
 
+            function legacyMigrationProgressListener(progress: number, total: number): void {
+                logger.log(`migrated ${progress} of ${total}`);
+            }
+
             await initRustCrypto({
                 logger,
                 http: makeMatrixHttpApi(),
@@ -204,6 +208,7 @@ describe("initRustCrypto", () => {
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
                 legacyPickleKey: PICKLE_KEY,
+                legacyMigrationProgressListener,
             });
 
             // Check that the migration functions were correctly called
