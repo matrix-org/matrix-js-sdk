@@ -2084,7 +2084,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadUpdate(thread: Thread): void {
-        this.updateThreadRootEvents(thread, false, true);
+        this.updateThreadRootEvents(thread, false, false);
     }
 
     private onThreadReply(thread: Thread): void {

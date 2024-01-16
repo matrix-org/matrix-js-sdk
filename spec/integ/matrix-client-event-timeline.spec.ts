@@ -1555,7 +1555,7 @@ describe("MatrixClient event timelines", function () {
                 expect(threadIds).toContain(THREAD2_ROOT.event_id);
                 const [allThreads] = timelineSets!;
                 const timeline = allThreads.getLiveTimeline()!;
-                // Test threads are in chronological order
+                // Test threads are in chronological order (first thread should be first because it has a more recent reply)
                 expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD_ROOT.event_id,
                     THREAD2_ROOT.event_id,
