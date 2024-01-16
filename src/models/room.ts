@@ -1979,6 +1979,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         this.on(ThreadEvent.NewReply, this.onThreadReply);
+        this.on(ThreadEvent.Update, this.onThreadUpdate);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
     }
@@ -2080,6 +2081,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 roomState,
             });
         }
+    }
+
+    private onThreadUpdate(thread: Thread): void {
+        this.updateThreadRootEvents(thread, false, true);
     }
 
     private onThreadReply(thread: Thread): void {
@@ -2329,7 +2334,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.lastThread = thread;
         }
 
-        if (this.threadsReady) {
+        // We need to update the thread root events, but the thread may not be ready yet.
+        // If it isn't, it will fire ThreadEvent.Update when it is and we'll call updateThreadRootEvents then.
+        if (this.threadsReady && thread.initialEventsFetched) {
             this.updateThreadRootEvents(thread, toStartOfTimeline, false);
         }
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);

@@ -133,7 +133,13 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     private readonly pendingEventOrdering: PendingEventOrdering;
     private processRootEventPromise?: Promise<void>;
 
+    /**
+     * Whether or not we need to fetch the initial set of events for the thread. We can
+     * only do this if the server has support for it, so if it doesn't we just pretend
+     * that we've already fetched them.
+     */
     public initialEventsFetched = !Thread.hasServerSideSupport;
+
     /**
      * An array of events to add to the timeline once the thread has been initialised
      * with server suppport.
@@ -363,7 +369,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * to the start (and not the end) of the timeline.
      * @param emit - whether to emit the Update event if the thread was updated or not.
      */
-    public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
+    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
         // Modify this event to point at our room's state, and mark its thread
         // as this.
         this.setEventMetadata(event);
