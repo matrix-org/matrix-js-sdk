@@ -21,7 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
-    ISessionExtended,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -358,9 +358,9 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
      *
      * @internal
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<ISessionExtended[] | null> {
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<SessionExtended[] | null> {
         const sessionsNeedingBackup = getJsonItem<string[]>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
-        const result: ISessionExtended[] = [];
+        const result: SessionExtended[] = [];
         for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
             if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {

@@ -21,7 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
-    ISessionExtended,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -535,8 +535,8 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISessionExtended[]> {
-        const result: ISessionExtended[] = [];
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | SessionExtended[]> {
+        const result: SessionExtended[] = [];
         for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
             result.push({
                 senderKey: key.slice(0, 43),

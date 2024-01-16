@@ -21,7 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
-    ISessionExtended,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -816,8 +816,8 @@ export class Backend implements CryptoStore {
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISessionExtended[]> {
-        const result: ISessionExtended[] = [];
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | SessionExtended[]> {
+        const result: SessionExtended[] = [];
         await this.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],

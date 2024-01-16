@@ -25,7 +25,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
-    ISessionExtended,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -611,7 +611,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *
      * @internal
      */
-    public getEndToEndInboundGroupSessionsBatch(): Promise<ISessionExtended[] | null> {
+    public getEndToEndInboundGroupSessionsBatch(): Promise<SessionExtended[] | null> {
         return this.backend!.getEndToEndInboundGroupSessionsBatch();
     }
 
