@@ -23,6 +23,7 @@ export default {
         // Used by jest
         "jest-environment-jsdom",
         "babel-jest",
+        "ts-node",
         // Used by release.sh
         "allchange",
         // Used by `@babel/plugin-transform-runtime`
