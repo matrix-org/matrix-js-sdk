@@ -81,7 +81,6 @@
         "@babel/plugin-transform-runtime": "^7.12.10",
         "@babel/preset-env": "^7.12.11",
         "@babel/preset-typescript": "^7.12.7",
-        "@babel/register": "^7.12.10",
         "@casualbot/jest-sonar-reporter": "2.2.7",
         "@matrix-org/olm": "3.2.15",
         "@types/bs58": "^4.0.1",
