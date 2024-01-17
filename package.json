@@ -19,6 +19,7 @@
         "lint:js-fix": "prettier --log-level=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
+        "lint:knip": "knip",
         "test": "jest",
         "test:watch": "jest --watch",
         "coverage": "yarn test --coverage"
@@ -115,6 +116,7 @@
         "jest-environment-jsdom": "^29.0.0",
         "jest-localstorage-mock": "^2.4.6",
         "jest-mock": "^29.0.0",
+        "knip": "^4.0.1",
         "lint-staged": "^15.0.2",
         "matrix-mock-request": "^2.5.0",
         "prettier": "3.1.1",
