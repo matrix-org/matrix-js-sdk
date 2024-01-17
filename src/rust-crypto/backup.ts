@@ -342,6 +342,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
                     logger.log(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
+                    if (!request) {
+                        // nothing more to upload
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
+                    }
                     return;
                 }
 
@@ -349,13 +353,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     numFailures = 0;
                     if (this.stopped) break;
-                    try {
-                        const keyCount = await this.olmMachine.roomKeyCounts();
-                        const remaining = keyCount.total - keyCount.backedUp;
-                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
-                    } catch (err) {
-                        logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
-                    }
+                    // XXX: Due to performance issues when counting keys, we for now don't emit
+                    // the number of remaining keys to back up (`CryptoEvent.KeyBackupSessionsRemaining`).
+                    // We should re-enable this once the performance issues are fixed.
+                    // see https://github.com/element-hq/element-web/issues/26783#issuecomment-1895318551
+                    //
+                    // try {
+                    //     const keyCount = await this.olmMachine.roomKeyCounts();
+                    //     const remaining = keyCount.total - keyCount.backedUp;
+                    //     this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
+                    // } catch (err) {
+                    //     logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                    // }
                 } catch (err) {
                     numFailures++;
                     logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
