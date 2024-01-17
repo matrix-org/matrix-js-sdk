@@ -56,7 +56,7 @@ jobs:
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: coverage
                   path: |

@@ -28,13 +28,10 @@ jobs:
                 -Dsonar.javascript.lcov.reportPaths=${{ steps.extra_args.outputs.reportPaths }}
                 -Dsonar.testExecutionReportPaths=${{ steps.extra_args.outputs.testExecutionReportPaths }}
         steps:
-            # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-            # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
             - name: 📥 Download artifact
-              uses: dawidd6/action-download-artifact@e7466d1a7587ed14867642c2ca74b5bcc1e19a2d # v3
+              uses: actions/download-artifact@v4
               with:
-                  workflow: tests.yaml
-                  run_id: ${{ github.event.workflow_run.id }}
+                  run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
 
