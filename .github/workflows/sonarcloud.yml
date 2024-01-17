@@ -30,10 +30,19 @@ jobs:
         steps:
             - name: 📥 Download artifact
               uses: actions/download-artifact@v4
+              if: ${{ !inputs.sharded }}
               with:
                   run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
+            - name: 📥 Download sharded artifacts
+              uses: actions/download-artifact@v4
+              if: inputs.sharded
+              with:
+                  run-id: ${{ github.event.workflow_run.id }}
+                  pattern: coverage-*
+                  path: coverage
+                  merge-multiple: true
 
             - id: extra_args
               run: |
