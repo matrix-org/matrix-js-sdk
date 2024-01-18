@@ -28,7 +28,7 @@ import {
     validateWellKnownAuthentication,
 } from "./oidc/validate";
 import { OidcError } from "./oidc/error";
-import { MINIMUM_MATRIX_VERSION } from "./version-support";
+import { SUPPORTED_MATRIX_VERSIONS } from "./version-support";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -51,7 +51,10 @@ export enum AutoDiscoveryError {
     InvalidIs = "Invalid identity server discovery response",
     MissingWellknown = "No .well-known JSON file found",
     InvalidJson = "Invalid JSON",
-    HomeserverTooOld = "The homeserver does not meet the minimum version requirements",
+    UnsupportedHomeserverSpecVersion = "The homeserver does not meet the version requirements",
+
+    /** @deprecated Replaced by `UnsupportedHomeserverSpecVersion` */
+    HomeserverTooOld = UnsupportedHomeserverSpecVersion,
     // TODO: Implement when Sydent supports the `/versions` endpoint - https://github.com/matrix-org/sydent/issues/424
     //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
@@ -112,7 +115,11 @@ export class AutoDiscovery {
 
     public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
 
-    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscoveryError.HomeserverTooOld;
+    public static readonly ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION =
+        AutoDiscoveryError.UnsupportedHomeserverSpecVersion;
+
+    /** @deprecated Replaced by ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION */
+    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
     public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError) as AutoDiscoveryError[];
 
@@ -216,10 +223,19 @@ export class AutoDiscovery {
             return Promise.resolve(clientConfig);
         }
 
-        // Step 3.1: Non-spec check to ensure the server will actually work for us
-        if (!hsVersions.raw!["versions"].includes(MINIMUM_MATRIX_VERSION)) {
-            logger.error("Homeserver does not meet minimum version requirements");
-            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_HOMESERVER_TOO_OLD;
+        // Step 3.1: Non-spec check to ensure the server will actually work for us. We need to check if
+        // any of the versions in `SUPPORTED_MATRIX_VERSIONS` are listed in the /versions response.
+        const hsVersionSet = new Set(hsVersions.raw!["versions"]);
+        let supportedVersionFound = false;
+        for (const version of SUPPORTED_MATRIX_VERSIONS) {
+            if (hsVersionSet.has(version)) {
+                supportedVersionFound = true;
+                break;
+            }
+        }
+        if (!supportedVersionFound) {
+            logger.error("Homeserver does not meet version requirements");
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
             // Supply the base_url to the caller because they may be ignoring liveliness
             // errors, like this one.
