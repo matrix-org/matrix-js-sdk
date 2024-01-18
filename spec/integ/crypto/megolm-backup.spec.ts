@@ -353,7 +353,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             await aliceClient.startClient();
 
-            // tell Alice to trust the dummy device that signed the backup
+            // Tell Alice to trust the dummy device that signed the backup
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
@@ -365,7 +365,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 };
             } = { rooms: {} };
 
-            // we need several rooms with several sessions to test chunking
+            // We need several rooms with several sessions to test chunking
             const keysPerRoom = [45, 300, 345, 12, 130];
             const expectedTotal = keysPerRoom.reduce((a, b) => a + b, 0);
             for (let i = 0; i < keysPerRoom.length; i++) {
@@ -397,12 +397,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             );
 
             expect(result.imported).toStrictEqual(expectedTotal);
-            // should be called 5 times: 200*4 plus one chunk with the remaining 32
+            // Should be called 5 times: 200*4 plus one chunk with the remaining 32
             expect(importSpy).toHaveBeenCalledTimes(5);
 
             expect(progressCallback).toHaveBeenCalledWith({
-                // unfortunately there is no proper enum for stages :/
-                // react sdk expect some values though
                 stage: "fetch",
             });
 
@@ -449,7 +447,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             const aliceCrypto = aliceClient.getCrypto()!;
             await aliceClient.startClient();
 
-            // tell Alice to trust the dummy device that signed the backup
+            // Tell Alice to trust the dummy device that signed the backup
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 

@@ -3949,14 +3949,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 let decryptedKeyCount = 0;
 
                 // Now decrypt and import the keys in chunks
-                // We need to adapt the `progressCallback` to give accurate progress.
                 await this.handleDecryptionOfAFullBackup(
                     res as IRoomsKeysResponse,
                     backupDecryptor,
                     200,
                     async (chunk) => {
                         decryptedKeyCount += chunk.length;
-                        // we have a chunk of decrypted keys, import them
+                        // We have a chunk of decrypted keys: import them
                         try {
                             await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
                                 untrusted,
@@ -4082,17 +4081,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 sessionsForRoom[sessions[0]] = sessions[1];
                 groupChunkCount += 1;
                 if (groupChunkCount >= chunkSize) {
-                    // we have enough chunks to decrypt
+                    // We have enough chunks to decrypt
                     await handleChunkCallback(chunkGroupByRoom);
                     chunkGroupByRoom = new Map();
-                    // there might be remaining keys for that room, so add back an entry for the current room.
+                    // There might be remaining keys for that room, so add back an entry for the current room.
                     chunkGroupByRoom.set(roomId, {});
                     groupChunkCount = 0;
                 }
             }
         }
 
-        // handle remaining chunk if needed
+        // Handle remaining chunk if needed
         if (groupChunkCount > 0) {
             await handleChunkCallback(chunkGroupByRoom);
         }
