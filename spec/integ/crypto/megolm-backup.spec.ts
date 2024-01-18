@@ -375,9 +375,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const aliceCrypto = aliceClient.getCrypto()!;
 
-            // just mock this call
+            const importMockImpl = jest.fn();
             // @ts-ignore - mock a private method for testing purpose
-            aliceCrypto.importBackedUpRoomKeys = jest.fn();
+            aliceCrypto.importBackedUpRoomKeys = importMockImpl;
 
             await aliceClient.startClient();
 
@@ -392,9 +392,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
-            // @ts-ignore spying internal method
-            const importSpy = jest.spyOn(aliceCrypto, "importBackedUpRoomKeys");
-
             const progressCallback = jest.fn();
             const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
                 testData.BACKUP_DECRYPTION_KEY_BASE58,
@@ -408,40 +405,27 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             expect(result.imported).toStrictEqual(expectedTotal);
             // Should be called 5 times: 200*4 plus one chunk with the remaining 32
-            expect(importSpy).toHaveBeenCalledTimes(5);
+            expect(importMockImpl).toHaveBeenCalledTimes(5);
+            for (let i = 0; i < 4; i++) {
+                expect(importMockImpl.mock.calls[i][0].length).toEqual(200);
+            }
+            expect(importMockImpl.mock.calls[4][0].length).toEqual(32);
 
             expect(progressCallback).toHaveBeenCalledWith({
                 stage: "fetch",
             });
 
-            expect(progressCallback).toHaveBeenCalledWith({
-                total: expectedTotal,
-                successes: 200,
-                stage: "load_keys",
-                failures: 0,
-            });
+            // Should be called 4 times and report 200/400/600/800
+            for (let i = 0; i < 4; i++) {
+                expect(progressCallback).toHaveBeenCalledWith({
+                    total: expectedTotal,
+                    successes: (i + 1) * 200,
+                    stage: "load_keys",
+                    failures: 0,
+                });
+            }
 
-            expect(progressCallback).toHaveBeenCalledWith({
-                total: expectedTotal,
-                successes: 400,
-                stage: "load_keys",
-                failures: 0,
-            });
-
-            expect(progressCallback).toHaveBeenCalledWith({
-                total: expectedTotal,
-                successes: 600,
-                stage: "load_keys",
-                failures: 0,
-            });
-
-            expect(progressCallback).toHaveBeenCalledWith({
-                total: expectedTotal,
-                successes: 800,
-                stage: "load_keys",
-                failures: 0,
-            });
-
+            // The last chunk
             expect(progressCallback).toHaveBeenCalledWith({
                 total: expectedTotal,
                 successes: 832,
