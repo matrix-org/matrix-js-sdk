@@ -36,6 +36,7 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 import { IEncryptedPayload } from "../crypto/aes";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
 import { IKeyBackupInfo } from "../crypto/keybackup";
+import { IKeyBackup } from "../crypto/backup";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -323,7 +324,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await sleep(delay);
 
         try {
-            let numFailures = 0; // number of consecutive network failures for exponential backoff
+            // number of consecutive network failures for exponential backoff
+            let numFailures = 0;
+            // `olmMachine.roomKeyCounts()` is very slow on some configurations (see more comments below),
+            // we compute it only once per `backupKeysLoop` if necessary.
+            let remainingToUploadCount: number | null = null;
+            // To avoid computing the key when only a few keys were added (after a sync for example),
+            // we compute the count only when at least two iterations are needed.
+            let isFirstIteration = true;
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
@@ -342,19 +350,36 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
                     logger.log(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
+                    if (!request) {
+                        // nothing more to upload
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
+                    }
                     return;
+                }
+
+                // Keys count performance (`olmMachine.roomKeyCounts()`) can be pretty bad on some configurations (big database in FF).
+                // We detected on some M1 mac that when the object store reach a threshold, the count performances stops growing in O(n) and
+                // suddenly become very slow (40s, 60s or more). Even on other configurations, the count can take several seconds.
+                // This will block other operations on the database, like sending messages
+                // This is a workaround to avoid calling `olmMachine.roomKeyCounts()` too often, and only when necessary.
+                // We don't call it on the first loop because there could be only a few keys to upload, and we don't want to wait for the count.
+                if (!isFirstIteration && remainingToUploadCount === null) {
+                    try {
+                        const keyCount = await this.olmMachine.roomKeyCounts();
+                        remainingToUploadCount = keyCount.total - keyCount.backedUp;
+                    } catch (err) {
+                        logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                    }
                 }
 
                 try {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     numFailures = 0;
                     if (this.stopped) break;
-                    try {
-                        const keyCount = await this.olmMachine.roomKeyCounts();
-                        const remaining = keyCount.total - keyCount.backedUp;
-                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
-                    } catch (err) {
-                        logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                    if (remainingToUploadCount !== null) {
+                        const keysCountInBatch = this.keysCountInBatch(request);
+                        remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, remainingToUploadCount);
                     }
                 } catch (err) {
                     numFailures++;
@@ -388,12 +413,29 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
+                isFirstIteration = false;
             }
         } finally {
             this.backupKeysLoopRunning = false;
         }
     }
 
+    /**
+     * Utility method to count the number of keys in a backup request, in order to update the remaining keys count.
+     * This should be the chunk size of the backup request for all requests but the last, but we don't have access to it
+     * (it's static in the Rust SDK).
+     * @param batch - The backup request to count the keys from.
+     *
+     * @returns The number of keys in the backup request.
+     */
+    private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
+        const parsedBody: IKeyBackup = JSON.parse(batch.body);
+        let count = 0;
+        for (const entry of Object.entries(parsedBody.rooms)) {
+            count += Object.keys(entry[1].sessions).length;
+        }
+        return count;
+    }
     /**
      * Get information about the current key backup from the server
      *
