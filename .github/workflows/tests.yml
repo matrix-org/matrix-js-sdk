@@ -58,7 +58,7 @@ jobs:
               if: env.ENABLE_COVERAGE == 'true'
               uses: actions/upload-artifact@v4
               with:
-                  name: coverage-${{ matrix.specs }}-${{ matrix.node == '*' && 'latest' || matrix.node }}
+                  name: coverage-${{ matrix.specs }}-${{ matrix.node == 'lts/*' && 'lts' || matrix.node }}
                   path: |
                       coverage
                       !coverage/lcov-report
