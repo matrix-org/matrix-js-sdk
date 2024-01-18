@@ -31,7 +31,7 @@ import {
     syncPromise,
 } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
-import { KeyBackupInfo } from "../../../src/crypto-api/keybackup";
+import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
@@ -340,6 +340,34 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(afterCache.imported).toStrictEqual(1);
         });
 
+        /**
+         * Creates a mock backup response of a GET `room_keys/keys` with a given number of keys per room.
+         * @param keysPerRoom The number of keys per room
+         */
+        function createBackupDownloadResponse(keysPerRoom: number[]) {
+            const response: {
+                rooms: {
+                    [roomId: string]: {
+                        sessions: {
+                            [sessionId: string]: KeyBackupSession;
+                        };
+                    };
+                };
+            } = { rooms: {} };
+
+            const expectedTotal = keysPerRoom.reduce((a, b) => a + b, 0);
+            for (let i = 0; i < keysPerRoom.length; i++) {
+                const roomId = `!room${i}:example.com`;
+                response.rooms[roomId] = { sessions: {} };
+                for (let j = 0; j < keysPerRoom[i]; j++) {
+                    const sessionId = `session${j}`;
+                    // Put the same fake session data, not important for that test
+                    response.rooms[roomId].sessions[sessionId] = testData.CURVE25519_KEY_BACKUP_DATA;
+                }
+            }
+            return { response, expectedTotal };
+        }
+
         it("Should import full backup in chunks", async function () {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
@@ -357,28 +385,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
-            const fullBackup: {
-                rooms: {
-                    [roomId: string]: {
-                        [sessionId: string]: any;
-                    };
-                };
-            } = { rooms: {} };
-
             // We need several rooms with several sessions to test chunking
-            const keysPerRoom = [45, 300, 345, 12, 130];
-            const expectedTotal = keysPerRoom.reduce((a, b) => a + b, 0);
-            for (let i = 0; i < keysPerRoom.length; i++) {
-                const roomId = `!room${i}:example.com`;
-                fullBackup.rooms[roomId] = { sessions: {} };
-                for (let j = 0; j < keysPerRoom[i]; j++) {
-                    const sessionId = `session${j}`;
-                    // put the same fake session data, not important for that tet
-                    fullBackup.rooms[roomId].sessions[sessionId] = testData.CURVE25519_KEY_BACKUP_DATA;
-                }
-            }
+            const { response, expectedTotal } = createBackupDownloadResponse([45, 300, 345, 12, 130]);
 
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", response);
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
