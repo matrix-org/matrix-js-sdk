@@ -4076,9 +4076,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             chunkGroupByRoom.set(roomId, {});
 
-            for (const sessions of Object.entries(roomData.sessions)) {
+            for (const [sessionId, session] of Object.entries(roomData.sessions)) {
                 const sessionsForRoom = chunkGroupByRoom.get(roomId)!;
-                sessionsForRoom[sessions[0]] = sessions[1];
+                sessionsForRoom[sessionId] = session;
                 groupChunkCount += 1;
                 if (groupChunkCount >= chunkSize) {
                     // We have enough chunks to decrypt
