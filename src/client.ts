@@ -4028,8 +4028,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private getTotalKeyCount(res: IRoomsKeysResponse): number {
         const rooms = res.rooms;
         let totalKeyCount = 0;
-        for (const entry of Object.entries(rooms)) {
-            const roomData = entry[1];
+        for (const roomData of Object.values(rooms)) {
             if (!roomData.sessions) continue;
             totalKeyCount += Object.keys(roomData.sessions).length;
         }
