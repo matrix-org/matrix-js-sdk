@@ -1,0 +1,156 @@
+import { Mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
+
+import { RustBackupManager } from "../../../src/rust-crypto/backup";
+import * as RustSdkCryptoJs from "../../../../matrix-rust-sdk-crypto-wasm";
+import { KeysBackupRequest, OlmMachine, SignatureVerification } from "../../../../matrix-rust-sdk-crypto-wasm";
+import { CryptoEvent, HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
+import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import * as testData from "../../test-utils/test-data";
+import * as TestData from "../../test-utils/test-data";
+import { IKeyBackup } from "../../../src/crypto/backup";
+import { IKeyBackupSession } from "../../../src/crypto/keybackup";
+import { defer } from "../../../src/utils";
+
+describe("PerSessionKeyBackupDownloader", () => {
+    /** The backup manager under test */
+    let rustBackupManager: RustBackupManager;
+
+    let mockOlmMachine: Mocked<OlmMachine>;
+
+    let outgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
+
+    const httpAPi = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+        baseUrl: "http://server/",
+        prefix: "",
+        onlyData: true,
+    });
+
+    let idGenerator = 0;
+    function mockBackupRequest(keyCount: number): KeysBackupRequest {
+        const requestBody: IKeyBackup = {
+            rooms: {
+                "!room1:server": {
+                    sessions: {},
+                },
+            },
+        };
+        for (let i = 0; i < keyCount; i++) {
+            requestBody.rooms["!room1:server"].sessions["session" + i] = {} as IKeyBackupSession;
+        }
+        return {
+            id: "id" + idGenerator++,
+            body: JSON.stringify(requestBody),
+        } as unknown as Mocked<KeysBackupRequest>;
+    }
+
+    beforeEach(async () => {
+        jest.useFakeTimers();
+        idGenerator = 0;
+
+        mockOlmMachine = {
+            getBackupKeys: jest.fn().mockResolvedValue({
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+                decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
+            } as unknown as RustSdkCryptoJs.BackupKeys),
+            backupRoomKeys: jest.fn(),
+            isBackupEnabled: jest.fn().mockResolvedValue(true),
+            enableBackupV1: jest.fn(),
+            verifyBackup: jest.fn().mockResolvedValue({
+                trusted: jest.fn().mockResolvedValue(true),
+            } as unknown as SignatureVerification),
+            roomKeyCounts: jest.fn(),
+        } as unknown as Mocked<OlmMachine>;
+
+        outgoingRequestProcessor = {
+            makeOutgoingRequest: jest.fn(),
+        } as unknown as Mocked<OutgoingRequestProcessor>;
+
+        rustBackupManager = new RustBackupManager(mockOlmMachine, httpAPi, outgoingRequestProcessor);
+
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+    });
+
+    it("Should call expensive roomKeyCounts only once per loop", async () => {
+        const lastKeysCalled = defer();
+        const remainingEmitted: number[] = [];
+
+        const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
+            rustBackupManager.on(CryptoEvent.KeyBackupSessionsRemaining, (count) => {
+                remainingEmitted.push(count);
+                if (count == 0) {
+                    resolve();
+                }
+            });
+        });
+
+        // We want several batch of keys to check that we don't call expensive room key count several times
+        mockOlmMachine.backupRoomKeys
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(100))
+            .mockResolvedValueOnce(mockBackupRequest(2))
+            .mockImplementation(async () => {
+                lastKeysCalled.resolve();
+                return null;
+            });
+
+        mockOlmMachine.roomKeyCounts.mockResolvedValue({
+            total: 602,
+            // first iteration don't call count, it will in second after 200 keys have been saved
+            backedUp: 200,
+        });
+
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+        await jest.runAllTimersAsync();
+
+        await lastKeysCalled.promise;
+        await zeroRemainingWasEmitted;
+
+        expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(7);
+        expect(mockOlmMachine.roomKeyCounts).toHaveBeenCalledTimes(1);
+
+        // check event emission
+        expect(remainingEmitted[0]).toEqual(402);
+        expect(remainingEmitted[1]).toEqual(302);
+        expect(remainingEmitted[2]).toEqual(202);
+        expect(remainingEmitted[3]).toEqual(102);
+        expect(remainingEmitted[4]).toEqual(2);
+        expect(remainingEmitted[5]).toEqual(0);
+    });
+
+    it("Should not call expensive roomKeyCounts for small chunks", async () => {
+        const lastKeysCalled = defer();
+
+        const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
+            rustBackupManager.on(CryptoEvent.KeyBackupSessionsRemaining, (count) => {
+                if (count == 0) {
+                    resolve();
+                }
+            });
+        });
+
+        // We want several batch of keys to check that we don't call expensive room key count several times
+        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockImplementation(async () => {
+            lastKeysCalled.resolve();
+            return null;
+        });
+
+        mockOlmMachine.roomKeyCounts.mockResolvedValue({
+            total: 2,
+            backedUp: 0,
+        });
+
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+        await jest.runAllTimersAsync();
+
+        await lastKeysCalled.promise;
+        await zeroRemainingWasEmitted;
+
+        expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
+        expect(mockOlmMachine.roomKeyCounts).toHaveBeenCalledTimes(0);
+    });
+});
