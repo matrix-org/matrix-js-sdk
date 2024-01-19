@@ -356,10 +356,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     return;
                 }
 
-                // Keys count performance (`olmMachine.roomKeyCounts()`) can be pretty bad on some configurations (big database in FF).
-                // We detected on some M1 mac that when the object store reach a threshold, the count performances stops growing in O(n) and
-                // suddenly become very slow (40s, 60s or more). Even on other configurations, the count can take several seconds.
-                // This will block other operations on the database, like sending messages
+                // Key count performance (`olmMachine.roomKeyCounts()`) can be pretty bad on some configurations.
+                // In particular, we detected on some M1 macs that when the object store reaches a threshold, the count
+                // performance stops growing in O(n) and suddenly becomes very slow (40s, 60s or more). 
+                // Even on other configurations, the count can take several seconds.
+                // This will block other operations on the database, like sending messages.
+                // 
                 // This is a workaround to avoid calling `olmMachine.roomKeyCounts()` too often, and only when necessary.
                 // We don't call it on the first loop because there could be only a few keys to upload, and we don't want to wait for the count.
                 if (!isFirstIteration && remainingToUploadCount === null) {
