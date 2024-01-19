@@ -5,6 +5,8 @@ on:
         secrets:
             SONAR_TOKEN:
                 required: true
+            ELEMENT_BOT_TOKEN:
+                required: true
         inputs:
             sharded:
                 type: boolean
@@ -39,6 +41,7 @@ jobs:
               uses: actions/download-artifact@v4
               if: inputs.sharded
               with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   pattern: coverage-*
                   path: coverage
