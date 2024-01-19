@@ -410,7 +410,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             // wait for that and then continue?
                             const waitTime = err.data.retry_after_ms;
                             if (waitTime > 0) {
-                                sleep(waitTime);
+                                await sleep(waitTime);
                                 continue;
                             } // else go to the normal backoff
                         }
