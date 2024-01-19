@@ -3898,6 +3898,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let totalKeyCount = 0;
+        let totalFailures = 0;
         let totalImported = 0;
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
@@ -3946,33 +3947,32 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 // Get the total count as a first pass
                 totalKeyCount = this.getTotalKeyCount(res as IRoomsKeysResponse);
-                let decryptedKeyCount = 0;
-
                 // Now decrypt and import the keys in chunks
                 await this.handleDecryptionOfAFullBackup(
                     res as IRoomsKeysResponse,
                     backupDecryptor,
                     200,
                     async (chunk) => {
-                        decryptedKeyCount += chunk.length;
                         // We have a chunk of decrypted keys: import them
                         try {
                             await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
                                 untrusted,
                             });
                             totalImported += chunk.length;
-                            if (progressCallback) {
-                                progressCallback({
-                                    total: totalKeyCount,
-                                    successes: decryptedKeyCount,
-                                    stage: "load_keys",
-                                    failures: 0,
-                                });
-                            }
                         } catch (e) {
+                            totalFailures += chunk.length;
                             // We failed to import some keys, but we should still try to import the rest?
                             // Log the error and continue
                             logger.error("Error importing keys from backup", e);
+                        }
+
+                        if (progressCallback) {
+                            progressCallback({
+                                total: totalKeyCount,
+                                successes: totalImported,
+                                stage: "load_keys",
+                                failures: totalFailures,
+                            });
                         }
                     },
                 );
