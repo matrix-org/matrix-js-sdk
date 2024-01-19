@@ -1,7 +1,6 @@
 import { Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
-import { RustBackupManager } from "../../../src/rust-crypto/backup";
 import * as RustSdkCryptoJs from "../../../../matrix-rust-sdk-crypto-wasm";
 import { KeysBackupRequest, OlmMachine, SignatureVerification } from "../../../../matrix-rust-sdk-crypto-wasm";
 import { CryptoEvent, HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
@@ -11,6 +10,7 @@ import * as TestData from "../../test-utils/test-data";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { defer } from "../../../src/utils";
+import { RustBackupManager } from "../../../src/rust-crypto/backup";
 
 describe("PerSessionKeyBackupDownloader", () => {
     /** The backup manager under test */
@@ -69,6 +69,11 @@ describe("PerSessionKeyBackupDownloader", () => {
         rustBackupManager = new RustBackupManager(mockOlmMachine, httpAPi, outgoingRequestProcessor);
 
         fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+    });
+
+    afterEach(() => {
+        fetchMock.reset();
+        jest.useRealTimers();
     });
 
     it("Should call expensive roomKeyCounts only once per loop", async () => {
