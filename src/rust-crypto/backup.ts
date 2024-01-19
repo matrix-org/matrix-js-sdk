@@ -364,6 +364,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     // Key count performance (`olmMachine.roomKeyCounts()`) can be pretty bad on some configurations.
                     // In particular, we detected on some M1 macs that when the object store reaches a threshold, the count
                     // performance stops growing in O(n) and suddenly becomes very slow (40s, 60s or more).
+                    // For reference, the performance drop occurs around 300-400k keys on the platforms where this issue is observed.
                     // Even on other configurations, the count can take several seconds.
                     // This will block other operations on the database, like sending messages.
                     //
