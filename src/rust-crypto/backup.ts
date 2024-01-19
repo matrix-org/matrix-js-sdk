@@ -377,6 +377,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     if (this.stopped) break;
                     if (remainingToUploadCount !== null) {
                         const keysCountInBatch = this.keysCountInBatch(request);
+                        // The `remainingToUploadCount` is computed only once for the current backupKeysLoop. But new
+                        // keys could be added during the current loop (after a sync for example).
+                        // So the count can get out of sync with the real number of remaining keys to upload.
+                        // Depending on the number of new keys imported and the time to complete the loop,
+                        // this could result in multiple events being emitted with a remaining key count of 0.
                         remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
                         this.emit(CryptoEvent.KeyBackupSessionsRemaining, remainingToUploadCount);
                     }
