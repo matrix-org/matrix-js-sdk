@@ -441,7 +441,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             aliceCrypto.importBackedUpRoomKeys = jest
                 .fn()
                 .mockImplementationOnce(() => {
-                    // fail to import fist chunk
+                    // Fail to import first chunk
                     throw new Error("test error");
                 })
                 // Ok for other chunks
