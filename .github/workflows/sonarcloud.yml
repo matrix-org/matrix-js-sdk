@@ -44,6 +44,7 @@ jobs:
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
               with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
