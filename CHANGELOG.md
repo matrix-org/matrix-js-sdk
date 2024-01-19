@@ -1,3 +1,10 @@
+Changes in [31.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.1.0) (2024-01-19)
+==================================================================================================
+## ✨ Features
+
+* Broaden spec version support ([#4016](https://github.com/matrix-org/matrix-js-sdk/pull/4016)). Contributed by @RiotRobot.
+
+
 Changes in [31.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.0.0) (2024-01-16)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
