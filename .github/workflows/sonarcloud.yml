@@ -17,19 +17,22 @@ on:
                 required: false
                 description: "Extra args to pass to SonarCloud"
 jobs:
-    # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
-    prepare:
-        name: Prepare
+    sonarqube:
+        runs-on: ubuntu-latest
         if: |
             github.event.workflow_run.conclusion == 'success' &&
-            github.event.workflow_run.event != 'merge_group' &&
-            inputs.sharded
-        runs-on: ubuntu-latest
-        outputs:
-            extra_args: |
-                -Dsonar.javascript.lcov.reportPaths=${{ steps.extra_args.outputs.reportPaths }}
-                -Dsonar.testExecutionReportPaths=${{ steps.extra_args.outputs.testExecutionReportPaths }}
+            github.event.workflow_run.event != 'merge_group'
         steps:
+            # We create the status here and then update it to success/failure in the `report` stage
+            # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
+            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+              with:
+                  authToken: ${{ secrets.GITHUB_TOKEN }}
+                  state: pending
+                  context: ${{ github.workflow }} / SonarCloud (${{ github.event.workflow_run.event }} => ${{ github.event_name }})
+                  sha: ${{ github.event.workflow_run.head_sha }}
+                  target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
             - name: 📥 Download artifact
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
@@ -54,23 +57,6 @@ jobs:
                   reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',' | sed 's/,$//g')
                   echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
 
-    sonarqube:
-        runs-on: ubuntu-latest
-        needs: prepare
-        if: |
-            always() && !failure() && !cancelled() &&
-            github.event.workflow_run.conclusion == 'success'
-        steps:
-            # We create the status here and then update it to success/failure in the `report` stage
-            # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
-            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
-              with:
-                  authToken: ${{ secrets.GITHUB_TOKEN }}
-                  state: pending
-                  context: ${{ github.workflow }} / SonarCloud (${{ github.event.workflow_run.event }} => ${{ github.event_name }})
-                  sha: ${{ github.event.workflow_run.head_sha }}
-                  target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
               uses: matrix-org/sonarcloud-workflow-action@v2.7
@@ -83,10 +69,10 @@ jobs:
                   branch: ${{ github.event.workflow_run.head_branch }}
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
-                  coverage_run_id: ${{ github.event.workflow_run.id }}
-                  coverage_workflow_name: tests.yml
-                  coverage_extract_path: coverage
-                  extra_args: ${{ inputs.extra_args }} ${{ needs.prepare.outputs.extra_args }}
+                  extra_args: |
+                      ${{ inputs.extra_args }}
+                      -Dsonar.javascript.lcov.reportPaths=${{ steps.extra_args.outputs.reportPaths }}
+                      -Dsonar.testExecutionReportPaths=${{ steps.extra_args.outputs.testExecutionReportPaths }}
 
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               if: always()
