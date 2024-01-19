@@ -430,8 +430,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
         const parsedBody: IKeyBackup = JSON.parse(batch.body);
         let count = 0;
-        for (const entry of Object.entries(parsedBody.rooms)) {
-            count += Object.keys(entry[1].sessions).length;
+        for (const { sessions } of Object.values(parsedBody.rooms)) {
+            count += Object.keys(sessions).length;
         }
         return count;
     }
