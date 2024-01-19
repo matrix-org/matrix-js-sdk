@@ -33,6 +33,13 @@ jobs:
                   sha: ${{ github.event.workflow_run.head_sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+            - name: "🧮 Checkout code"
+              uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+              with:
+                  repository: ${{ github.event.workflow_run.head_repository.full_name }}
+                  ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
+                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
             - name: 📥 Download artifact
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
@@ -63,6 +70,7 @@ jobs:
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
+                  skip_checkout: true
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
                   version_cmd: "cat package.json | jq -r .version"
