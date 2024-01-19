@@ -1,8 +1,7 @@
 import { Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import * as RustSdkCryptoJs from "../../../../matrix-rust-sdk-crypto-wasm";
-import { KeysBackupRequest, OlmMachine, SignatureVerification } from "../../../../matrix-rust-sdk-crypto-wasm";
 import { CryptoEvent, HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import * as testData from "../../test-utils/test-data";
@@ -16,7 +15,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     /** The backup manager under test */
     let rustBackupManager: RustBackupManager;
 
-    let mockOlmMachine: Mocked<OlmMachine>;
+    let mockOlmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
 
     let outgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
 
@@ -27,7 +26,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     });
 
     let idGenerator = 0;
-    function mockBackupRequest(keyCount: number): KeysBackupRequest {
+    function mockBackupRequest(keyCount: number): RustSdkCryptoJs.KeysBackupRequest {
         const requestBody: IKeyBackup = {
             rooms: {
                 "!room1:server": {
@@ -41,7 +40,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         return {
             id: "id" + idGenerator++,
             body: JSON.stringify(requestBody),
-        } as unknown as Mocked<KeysBackupRequest>;
+        } as unknown as Mocked<RustSdkCryptoJs.KeysBackupRequest>;
     }
 
     beforeEach(async () => {
@@ -58,9 +57,9 @@ describe("PerSessionKeyBackupDownloader", () => {
             enableBackupV1: jest.fn(),
             verifyBackup: jest.fn().mockResolvedValue({
                 trusted: jest.fn().mockResolvedValue(true),
-            } as unknown as SignatureVerification),
+            } as unknown as RustSdkCryptoJs.SignatureVerification),
             roomKeyCounts: jest.fn(),
-        } as unknown as Mocked<OlmMachine>;
+        } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         outgoingRequestProcessor = {
             makeOutgoingRequest: jest.fn(),
