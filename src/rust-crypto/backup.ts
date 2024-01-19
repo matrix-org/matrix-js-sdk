@@ -326,8 +326,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         try {
             // number of consecutive network failures for exponential backoff
             let numFailures = 0;
-            // `olmMachine.roomKeyCounts()` is very slow on some configurations (see more comments below),
-            // we compute it only once per `backupKeysLoop` if necessary.
+            // The number of keys left to back up. (Populated lazily: see more comments below.)
             let remainingToUploadCount: number | null = null;
             // To avoid computing the key when only a few keys were added (after a sync for example),
             // we compute the count only when at least two iterations are needed.
