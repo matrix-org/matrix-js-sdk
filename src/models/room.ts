@@ -915,7 +915,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     public getAvatarFallbackMember(): RoomMember | undefined {
-        const memberCount = this.getInvitedAndJoinedMemberCount();
+        const memberCount = this.getInvitedAndJoinedMemberCount() - this.getInvitedAndJoinedFunctionalMemberCount();
         if (memberCount > 2) {
             return;
         }
@@ -1700,11 +1700,38 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Returns the number of joined non-functional members in this room
+     * This method caches the result.
+     * This is a wrapper around the method of the same name in roomState, returning
+     * its result for the room's current state.
+     * @returns The number of non-functional members in this room whose membership is 'join'
+     */
+    public getJoinedFunctionalMemberCount(): number {
+        return this.currentState.getJoinedFunctionalMemberCount();
+    }
+
+    /**
+     * Returns the number of non-functional invited members in this room
+     * @returns The number of non-functional members in this room whose membership is 'invite'
+     */
+    public getInvitedFunctionalMemberCount(): number {
+        return this.currentState.getInvitedFunctionalMemberCount();
+    }
+
+    /**
      * Returns the number of invited + joined members in this room
      * @returns The number of members in this room whose membership is 'invite' or 'join'
      */
     public getInvitedAndJoinedMemberCount(): number {
         return this.getInvitedMemberCount() + this.getJoinedMemberCount();
+    }
+
+    /**
+     * Returns the number of invited + joined non-functional members in this room
+     * @returns The number of non-functional members in this room whose membership is 'invite' or 'join'
+     */
+    public getInvitedAndJoinedFunctionalMemberCount(): number {
+        return this.getInvitedFunctionalMemberCount() + this.getJoinedFunctionalMemberCount();
     }
 
     /**
