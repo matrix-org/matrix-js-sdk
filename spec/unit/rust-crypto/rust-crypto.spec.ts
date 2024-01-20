@@ -846,6 +846,33 @@ describe("RustCrypto", () => {
         rustCrypto.stop();
     });
 
+    it("should emit events on device changes", async () => {
+        jest.useFakeTimers();
+
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
+        const willUpdateCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
+        const devicesUpdatedCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
+
+        rustCrypto.onSyncCompleted({});
+
+        // wait for the devices to be updated
+        await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+        expect(willUpdateCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
+        expect(devicesUpdatedCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
+        rustCrypto.stop();
+    });
+
     describe("requestDeviceVerification", () => {
         it("throws an error if the device is unknown", async () => {
             const rustCrypto = await makeTestRustCrypto();
