@@ -586,9 +586,9 @@ export class DeviceVerificationStatus {
  */
 export interface ImportRoomKeyProgressData {
     stage: string; // TODO: Enum
-    successes: number;
-    failures: number;
-    total: number;
+    successes?: number;
+    failures?: number;
+    total?: number;
 }
 
 /**
