@@ -10,7 +10,7 @@ import { IKeyBackup } from "../../../src/crypto/backup";
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
 import { RustBackupManager } from "../../../src/rust-crypto/backup";
 
-describe("Import keys from backup", () => {
+describe("Upload keys to backup", () => {
     /** The backup manager under test */
     let rustBackupManager: RustBackupManager;
 
