@@ -365,8 +365,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 );
                 await this.outgoingRequestProcessor.makeOutgoingRequest(request);
             }
-            // rust layer will take ownership of rustTrackedUser and drops it from the JS side.
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
+            userIdentity?.free();
             return userIdentity !== undefined;
         } else if (downloadUncached) {
             // Download the cross signing keys and check if the master key is available
