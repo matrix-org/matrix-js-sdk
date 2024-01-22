@@ -980,7 +980,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // that this function is only called once (unless loading the members
         // fails), since loadMembersIfNeeded always returns this.membersPromise
         // if set, which will be the result of the first (successful) call.
-        if (rawMembersEvents === null || (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
+        if (rawMembersEvents === null || this.hasEncryptionStateEvent()) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
@@ -1275,9 +1275,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * error will be thrown.
      *
      * @returns the result
+     *
+     * @deprecated Not supported under rust crypto. Instead, call {@link Room.getEncryptionTargetMembers},
+     * {@link CryptoApi.getUserDeviceInfo}, and {@link CryptoApi.getDeviceVerificationStatus}.
      */
     public async hasUnverifiedDevices(): Promise<boolean> {
-        if (!this.client.isRoomEncrypted(this.roomId)) {
+        if (!this.hasEncryptionStateEvent()) {
             return false;
         }
         const e2eMembers = await this.getEncryptionTargetMembers();
@@ -2565,7 +2568,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 .filter((event) => {
                     // Filter out the unencrypted messages if the room is encrypted
                     const isEventEncrypted = event.type === EventType.RoomMessageEncrypted;
-                    const isRoomEncrypted = this.client.isRoomEncrypted(this.roomId);
+                    const isRoomEncrypted = this.hasEncryptionStateEvent();
                     return isEventEncrypted || !isRoomEncrypted;
                 });
 
@@ -3170,7 +3173,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public maySendMessage(): boolean {
         return (
             this.getMyMembership() === "join" &&
-            (this.client.isRoomEncrypted(this.roomId)
+            (this.hasEncryptionStateEvent()
                 ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
                 : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId))
         );
@@ -3671,6 +3674,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
         return compareEventOrdering(this, leftEventId, rightEventId);
+    }
+
+    /**
+     * Return true if this room has an `m.room.encryption` state event.
+     *
+     * If this returns `true`, events sent to this room should be encrypted (and `MatrixClient.sendEvent` and friends
+     * will encrypt outgoing events).
+     */
+    public hasEncryptionStateEvent(): boolean {
+        return Boolean(
+            this.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents(EventType.RoomEncryption, ""),
+        );
     }
 }
 
