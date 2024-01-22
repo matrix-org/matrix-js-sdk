@@ -29,7 +29,7 @@ import { logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { CryptoEvent, IMegolmSessionData } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, immediate, logDuration } from "../utils";
+import { encodeUri, logDuration } from "../utils";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { sleep } from "../utils";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend";
@@ -128,7 +128,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Handles a backup secret received event and store it if it matches the current backup version.
      *
-     * @param secret - The secret as received from a `m.secert.send` event for secret `m.megolm_backup.v1`.
+     * @param secret - The secret as received from a `m.secret.send` event for secret `m.megolm_backup.v1`.
      * @returns true if the secret is valid and has been stored, false otherwise.
      */
     public async handleBackupSecretReceived(secret: string): Promise<boolean> {
@@ -141,7 +141,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         if (!backupCheck?.backupInfo?.version || !backupCheck.trustInfo.trusted) {
             // There is no server-side key backup, or the backup is not signed by a trusted cross-signing key or trusted own device.
             // This decryption key is useless to us.
-            logger.warn("Received backup decryption key, but there is no trusted server-side key backup");
+            logger.warn(
+                "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
+            );
             return false;
         }
 
@@ -149,7 +151,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
             const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(backupCheck.backupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
-                logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
+                logger.warn(
+                    `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
+                );
                 // just ignore the secret
                 return false;
             }
@@ -534,9 +538,6 @@ export class RustBackupDecryptor implements BackupDecryptor {
                 );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
-
-                // there might be lots of sessions, so don't hog the event loop
-                await immediate();
             } catch (e) {
                 logger.log("Failed to decrypt megolm session from backup", e, sessionData);
             }
