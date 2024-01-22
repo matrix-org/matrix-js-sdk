@@ -104,7 +104,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         mockOlmMachine.roomKeyCounts.mockResolvedValue({
             total: 602,
-            // first iteration don't call count, it will in second after 200 keys have been saved
+            // First iteration won't call roomKeyCounts(); it will be called on the second iteration after 200 keys have been saved.
             backedUp: 200,
         });
 
