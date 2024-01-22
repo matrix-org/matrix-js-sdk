@@ -1460,7 +1460,7 @@ describe("Room", function () {
                 it("should reset the unread count when our non-synthetic receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
                     room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    room.timeline = [event1, event2];
+                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1479,7 +1479,7 @@ describe("Room", function () {
                 it("should not reset the unread count when someone else's receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
                     room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    room.timeline = [event1, event2];
+                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1498,7 +1498,7 @@ describe("Room", function () {
                 it("should not reset the unread count when our non-synthetic receipt points to an earlier event", () => {
                     // Given a room with 2 events, and an unread count set.
                     room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    room.timeline = [event1, event2];
+                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1517,7 +1517,7 @@ describe("Room", function () {
                 it("should not reset the unread count when our a synthetic receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
                     room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    room.timeline = [event1, event2];
+                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:

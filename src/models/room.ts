@@ -382,13 +382,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public summary: RoomSummary | null = null;
     /**
-     * The live event timeline for this room, with the oldest event at index 0.
-     *
-     * @deprecated Present for backwards compatibility.
-     *             Use getLiveTimeline().getEvents() instead
-     */
-    public timeline!: MatrixEvent[];
-    /**
      * oldState The state of the room at the time of the oldest event in the live timeline.
      *
      * @deprecated Present for backwards compatibility.
@@ -791,6 +784,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getLiveTimeline(): EventTimeline {
         return this.getUnfilteredTimelineSet().getLiveTimeline();
+    }
+
+    /**
+     * The live event timeline for this room, with the oldest event at index 0.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
+     */
+    public get timeline(): MatrixEvent[] {
+        return this.getLiveTimeline().getEvents();
     }
 
     /**
@@ -1221,11 +1224,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const previousOldState = this.oldState;
         const previousCurrentState = this.currentState;
 
-        // maintain this.timeline as a reference to the live timeline,
-        // and this.oldState and this.currentState as references to the
+        // maintain this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
-        this.timeline = this.getLiveTimeline().getEvents();
         this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
         this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
