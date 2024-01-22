@@ -8,10 +8,9 @@ import * as testData from "../../test-utils/test-data";
 import * as TestData from "../../test-utils/test-data";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import { IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { defer } from "../../../src/utils";
 import { RustBackupManager } from "../../../src/rust-crypto/backup";
 
-describe("PerSessionKeyBackupDownloader", () => {
+describe("Import keys from backup", () => {
     /** The backup manager under test */
     let rustBackupManager: RustBackupManager;
 
@@ -73,10 +72,10 @@ describe("PerSessionKeyBackupDownloader", () => {
     afterEach(() => {
         fetchMock.reset();
         jest.useRealTimers();
+        jest.resetAllMocks();
     });
 
     it("Should call expensive roomKeyCounts only once per loop", async () => {
-        const lastKeysCalled = defer();
         const remainingEmitted: number[] = [];
 
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
@@ -97,10 +96,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(2))
-            .mockImplementation(async () => {
-                lastKeysCalled.resolve();
-                return null;
-            });
+            .mockResolvedValue(null);
 
         mockOlmMachine.roomKeyCounts.mockResolvedValue({
             total: 602,
@@ -111,7 +107,6 @@ describe("PerSessionKeyBackupDownloader", () => {
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();
 
-        await lastKeysCalled.promise;
         await zeroRemainingWasEmitted;
 
         expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(7);
@@ -126,9 +121,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         expect(remainingEmitted[5]).toEqual(0);
     });
 
-    it("Should not call expensive roomKeyCounts for small chunks", async () => {
-        const lastKeysCalled = defer();
-
+    it("Should not call expensive roomKeyCounts when only one iteration is needed", async () => {
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
             rustBackupManager.on(CryptoEvent.KeyBackupSessionsRemaining, (count) => {
                 if (count == 0) {
@@ -137,21 +130,12 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
         });
 
-        // We want several batch of keys to check that we don't call expensive room key count several times
-        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockImplementation(async () => {
-            lastKeysCalled.resolve();
-            return null;
-        });
-
-        mockOlmMachine.roomKeyCounts.mockResolvedValue({
-            total: 2,
-            backedUp: 0,
-        });
+        // Only returns 2 keys on the first call, then none.
+        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(null);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();
 
-        await lastKeysCalled.promise;
         await zeroRemainingWasEmitted;
 
         expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
