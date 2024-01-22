@@ -131,7 +131,7 @@ async function initOlmMachine(
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.init_from_store(
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.initFromStore(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
