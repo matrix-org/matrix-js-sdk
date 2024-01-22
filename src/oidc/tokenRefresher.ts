@@ -83,7 +83,7 @@ export class OidcTokenRefresher {
                 scope,
                 redirect_uri: redirectUri,
                 authority: config.metadata.issuer,
-                stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+                stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.localStorage }),
             });
         } catch (error) {
             logger.error("Failed to initialise OIDC client.", error);

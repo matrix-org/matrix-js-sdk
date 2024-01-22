@@ -157,7 +157,7 @@ export const generateOidcAuthorizationUrl = async ({
         response_mode: "query",
         response_type: "code",
         scope,
-        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.localStorage }),
     });
     const userState: UserState = { homeserverUrl, nonce, identityServerUrl };
     const request = await oidcClient.createSigninRequest({
@@ -225,7 +225,7 @@ export const completeAuthorizationCodeGrant = async (
     try {
         const response = new SigninResponse(reconstructedUrl.searchParams);
 
-        const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
+        const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.localStorage });
 
         // retrieve the state we put in storage at the start of oidc auth flow
         const stateString = await stateStore.get(response.state!);
