@@ -258,6 +258,7 @@ export class RoomEncryptor {
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
             const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
                 new RoomId(this.room.roomId),
+                // safe to pass without cloning, as it's not reused here (before or after)
                 userList,
                 rustEncryptionSettings,
             );
