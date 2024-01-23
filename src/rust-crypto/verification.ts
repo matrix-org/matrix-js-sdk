@@ -663,11 +663,11 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      *    or times out.
      */
     public async verify(): Promise<void> {
-        this.started = true;
         const req: undefined | OutgoingRequest = this.inner.accept();
         if (req) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req);
         }
+        this.started = true;
         await this.completionPromise;
     }
 
@@ -675,7 +675,9 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     protected onChange(): void {
         if (this.started) {
             // if the verification was already started, but the inner verifier
-            // got changed, we may need to re-accept
+            // got changed, we may need to re-accept.  If we already accepted,
+            // this.inner.accept will return `undefined`, so it is safe to try
+            // again
             const req: undefined | OutgoingRequest = this.inner.accept();
             if (req) {
                 this.outgoingRequestProcessor.makeOutgoingRequest(req);
