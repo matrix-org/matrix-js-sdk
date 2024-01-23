@@ -100,7 +100,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -114,7 +114,7 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase");
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("suppresses the storePassphrase if storePrefix is unset", async () => {
@@ -122,7 +122,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -136,7 +136,7 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -144,7 +144,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -189,7 +189,7 @@ describe("initRustCrypto", () => {
             jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
 
             const testOlmMachine = makeTestOlmMachine();
-            jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
 
