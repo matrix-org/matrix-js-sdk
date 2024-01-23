@@ -97,7 +97,10 @@ describe("KeyClaimManager", () => {
         await keyClaimManager.ensureSessionsForUsers(new LogSpan(logger, "test"), [u1, u2]);
 
         // check that all the calls were made
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u1, u2]);
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith = olmMachine.getMissingSessions.mock.calls[0][0].map((u) => u.toString());
+        expect(calledWith).toEqual([u1.toString(), u2.toString()]);
+
         expect(fetchMock).toHaveFetched("https://example.com/_matrix/client/v3/keys/claim", {
             method: "POST",
             body: { k1: "v1" },
@@ -135,7 +138,10 @@ describe("KeyClaimManager", () => {
 
         // at this point, there should have been a single call to getMissingSessions, and a single fetch; and neither
         // call to ensureSessionsAsUsers should have completed
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u1]);
+        // check that all the calls were made
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith = olmMachine.getMissingSessions.mock.calls[0][0].map((u) => u.toString());
+        expect(calledWith).toEqual([u1.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(req1Resolved).toBe(false);
@@ -147,7 +153,9 @@ describe("KeyClaimManager", () => {
         resolveMarkRequestAsSentCallback = await markRequestAsSentPromise;
 
         // the first request should now have completed, and we should have more calls and fetches
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u2]);
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith2 = olmMachine.getMissingSessions.mock.calls[1][0].map((u) => u.toString());
+        expect(calledWith2).toEqual([u2.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(2);
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(req1Resolved).toBe(true);

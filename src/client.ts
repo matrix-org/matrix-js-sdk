@@ -209,7 +209,7 @@ import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
-import { CryptoBackend } from "./common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
@@ -962,7 +962,8 @@ type CryptoEvents =
     | CryptoEvent.KeysChanged
     | CryptoEvent.Warning
     | CryptoEvent.DevicesUpdated
-    | CryptoEvent.WillUpdateDevices;
+    | CryptoEvent.WillUpdateDevices
+    | CryptoEvent.LegacyCryptoStoreMigrationProgress;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -2328,7 +2329,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             cryptoCallbacks: this.cryptoCallbacks,
             storePrefix: useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
             storePassphrase: this.pickleKey,
+            legacyCryptoStore: this.cryptoStore,
+            legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
+            legacyMigrationProgressListener: (progress, total) => {
+                this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
+            },
         });
+
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;
@@ -3898,7 +3905,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let totalKeyCount = 0;
-        let keys: IMegolmSessionData[] = [];
+        let totalFailures = 0;
+        let totalImported = 0;
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
@@ -3934,25 +3942,61 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 { prefix: ClientPrefix.V3 },
             );
 
-            if ((res as IRoomsKeysResponse).rooms) {
-                const rooms = (res as IRoomsKeysResponse).rooms;
-                for (const [roomId, roomData] of Object.entries(rooms)) {
-                    if (!roomData.sessions) continue;
+            // We have finished fetching the backup, go to next step
+            if (progressCallback) {
+                progressCallback({
+                    stage: "load_keys",
+                });
+            }
 
-                    totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = await backupDecryptor.decryptSessions(roomData.sessions);
-                    for (const k of roomKeys) {
-                        k.room_id = roomId;
-                        keys.push(k);
-                    }
-                }
+            if ((res as IRoomsKeysResponse).rooms) {
+                // We have a full backup here, it can get quite big, so we need to decrypt and import it in chunks.
+
+                // Get the total count as a first pass
+                totalKeyCount = this.getTotalKeyCount(res as IRoomsKeysResponse);
+                // Now decrypt and import the keys in chunks
+                await this.handleDecryptionOfAFullBackup(
+                    res as IRoomsKeysResponse,
+                    backupDecryptor,
+                    200,
+                    async (chunk) => {
+                        // We have a chunk of decrypted keys: import them
+                        try {
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
+                                untrusted,
+                            });
+                            totalImported += chunk.length;
+                        } catch (e) {
+                            totalFailures += chunk.length;
+                            // We failed to import some keys, but we should still try to import the rest?
+                            // Log the error and continue
+                            logger.error("Error importing keys from backup", e);
+                        }
+
+                        if (progressCallback) {
+                            progressCallback({
+                                total: totalKeyCount,
+                                successes: totalImported,
+                                stage: "load_keys",
+                                failures: totalFailures,
+                            });
+                        }
+                    },
+                );
             } else if ((res as IRoomKeysResponse).sessions) {
+                // For now we don't chunk for a single room backup, but we could in the future.
+                // Currently it is not used by the application.
                 const sessions = (res as IRoomKeysResponse).sessions;
                 totalKeyCount = Object.keys(sessions).length;
-                keys = await backupDecryptor.decryptSessions(sessions);
+                const keys = await backupDecryptor.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
+                await this.cryptoBackend.importBackedUpRoomKeys(keys, {
+                    progressCallback,
+                    untrusted,
+                });
+                totalImported = keys.length;
             } else {
                 totalKeyCount = 1;
                 try {
@@ -3961,7 +4005,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     });
                     key.room_id = targetRoomId!;
                     key.session_id = targetSessionId!;
-                    keys.push(key);
+
+                    await this.cryptoBackend.importBackedUpRoomKeys([key], {
+                        progressCallback,
+                        untrusted,
+                    });
+                    totalImported = 1;
                 } catch (e) {
                     this.logger.debug("Failed to decrypt megolm session from backup", e);
                 }
@@ -3970,15 +4019,88 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
-            progressCallback,
-            untrusted,
-        });
-
         /// in case entering the passphrase would add a new signature?
         await this.cryptoBackend.checkKeyBackupAndEnable();
 
-        return { total: totalKeyCount, imported: keys.length };
+        return { total: totalKeyCount, imported: totalImported };
+    }
+
+    /**
+     * This method calculates the total number of keys present in the response of a `/room_keys/keys` call.
+     *
+     * @param res - The response from the server containing the keys to be counted.
+     *
+     * @returns The total number of keys in the backup.
+     */
+    private getTotalKeyCount(res: IRoomsKeysResponse): number {
+        const rooms = res.rooms;
+        let totalKeyCount = 0;
+        for (const roomData of Object.values(rooms)) {
+            if (!roomData.sessions) continue;
+            totalKeyCount += Object.keys(roomData.sessions).length;
+        }
+        return totalKeyCount;
+    }
+
+    /**
+     * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
+     * It will decrypt the keys in chunks and call the `block` callback for each chunk.
+     *
+     * @param res - The response from the server containing the keys to be decrypted.
+     * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
+     * @param chunkSize - The size of the chunks to be processed at a time.
+     * @param block - A callback function that is called for each chunk of keys.
+     *
+     * @returns A promise that resolves when the decryption is complete.
+     */
+    private async handleDecryptionOfAFullBackup(
+        res: IRoomsKeysResponse,
+        backupDecryptor: BackupDecryptor,
+        chunkSize: number,
+        block: (chunk: IMegolmSessionData[]) => Promise<void>,
+    ): Promise<void> {
+        const rooms = (res as IRoomsKeysResponse).rooms;
+
+        let groupChunkCount = 0;
+        let chunkGroupByRoom: Map<string, IKeyBackupRoomSessions> = new Map();
+
+        const handleChunkCallback = async (roomChunks: Map<string, IKeyBackupRoomSessions>): Promise<void> => {
+            const currentChunk: IMegolmSessionData[] = [];
+            for (const roomId of roomChunks.keys()) {
+                const decryptedSessions = await backupDecryptor.decryptSessions(roomChunks.get(roomId)!);
+                for (const sessionId in decryptedSessions) {
+                    const k = decryptedSessions[sessionId];
+                    k.room_id = roomId;
+                    currentChunk.push(k);
+                }
+            }
+            await block(currentChunk);
+        };
+
+        for (const [roomId, roomData] of Object.entries(rooms)) {
+            if (!roomData.sessions) continue;
+
+            chunkGroupByRoom.set(roomId, {});
+
+            for (const [sessionId, session] of Object.entries(roomData.sessions)) {
+                const sessionsForRoom = chunkGroupByRoom.get(roomId)!;
+                sessionsForRoom[sessionId] = session;
+                groupChunkCount += 1;
+                if (groupChunkCount >= chunkSize) {
+                    // We have enough chunks to decrypt
+                    await handleChunkCallback(chunkGroupByRoom);
+                    chunkGroupByRoom = new Map();
+                    // There might be remaining keys for that room, so add back an entry for the current room.
+                    chunkGroupByRoom.set(roomId, {});
+                    groupChunkCount = 0;
+                }
+            }
+        }
+
+        // Handle remaining chunk if needed
+        if (groupChunkCount > 0) {
+            await handleChunkCallback(chunkGroupByRoom);
+        }
     }
 
     public deleteKeysFromBackup(roomId: undefined, sessionId: undefined, version?: string): Promise<void>;
