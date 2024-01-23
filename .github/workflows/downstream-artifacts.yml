@@ -5,12 +5,8 @@ on:
 
     pull_request: {}
 
-    # For now at least, we don't run this or the cypress-tests against pushes
+    # For now at least, we don't run this or the downstream-end-to-end-tests against pushes
     # to develop or master.
-    #
-    # Note that if we later choose to do so, we'll need to find a way to stop
-    # the results in Cypress Cloud from clobbering those from the 'develop'
-    # branch of matrix-react-sdk.
     #
     #push:
     #    branches: [develop, master]

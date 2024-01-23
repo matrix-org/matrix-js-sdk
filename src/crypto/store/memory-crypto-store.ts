@@ -21,6 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -335,7 +336,11 @@ export class MemoryCryptoStore implements CryptoStore {
     // Olm Sessions
 
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
-        func(Object.keys(this.sessions).length);
+        let count = 0;
+        for (const deviceSessions of Object.values(this.sessions)) {
+            count += Object.keys(deviceSessions).length;
+        }
+        func(count);
     }
 
     public getEndToEndSession(
@@ -528,19 +533,31 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        return Object.keys(this.inboundGroupSessions).length;
+    }
+
+    /**
      * Fetch a batch of Megolm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | ISession[]> {
-        const result: ISession[] = [];
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<null | SessionExtended[]> {
+        const result: SessionExtended[] = [];
         for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
             result.push({
                 senderKey: key.slice(0, 43),
                 sessionId: key.slice(44),
                 sessionData: session,
+                needsBackup: key in this.sessionsNeedingBackup,
             });
             if (result.length >= SESSION_BATCH_SIZE) {
                 return result;

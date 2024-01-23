@@ -259,6 +259,15 @@ export enum CryptoEvent {
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
+
+    /**
+     * Fires when data is being migrated from legacy crypto to rust crypto.
+     *
+     * The payload is a pair `(progress, total)`, where `progress` is the number of steps completed so far, and
+     * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
+     * `progress === total === -1`.
+     */
+    LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
 }
 
 export type CryptoEventHandlerMap = {
@@ -368,6 +377,8 @@ export type CryptoEventHandlerMap = {
      */
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+
+    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {

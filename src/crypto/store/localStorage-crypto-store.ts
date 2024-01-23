@@ -21,6 +21,7 @@ import {
     IDeviceData,
     IProblem,
     ISession,
+    SessionExtended,
     ISessionInfo,
     IWithheld,
     MigrationState,
@@ -126,7 +127,11 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
         let count = 0;
         for (let i = 0; i < this.store.length; ++i) {
-            if (this.store.key(i)?.startsWith(keyEndToEndSessions(""))) ++count;
+            const key = this.store.key(i);
+            if (key?.startsWith(keyEndToEndSessions(""))) {
+                const sessions = getJsonItem(this.store, key);
+                count += Object.keys(sessions ?? {}).length;
+            }
         }
         func(count);
     }
@@ -351,26 +356,48 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
     }
 
     /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * Implementation of {@link CryptoStore.countEndToEndInboundGroupSessions}.
+     *
+     * @internal
+     */
+    public async countEndToEndInboundGroupSessions(): Promise<number> {
+        let count = 0;
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Fetch a batch of Megolm sessions from the database.
      *
      * Implementation of {@link CryptoStore.getEndToEndInboundGroupSessionsBatch}.
      *
      * @internal
      */
-    public async getEndToEndInboundGroupSessionsBatch(): Promise<ISession[] | null> {
-        const result: ISession[] = [];
+    public async getEndToEndInboundGroupSessionsBatch(): Promise<SessionExtended[] | null> {
+        const sessionsNeedingBackup = getJsonItem<string[]>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        const result: SessionExtended[] = [];
         for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
             if (key?.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                const key2 = key.slice(KEY_INBOUND_SESSION_PREFIX.length);
+
                 // we can't use split, as the components we are trying to split out
                 // might themselves contain '/' characters. We rely on the
                 // senderKey being a (32-byte) curve25519 key, base64-encoded
                 // (hence 43 characters long).
 
                 result.push({
-                    senderKey: key.slice(KEY_INBOUND_SESSION_PREFIX.length, KEY_INBOUND_SESSION_PREFIX.length + 43),
-                    sessionId: key.slice(KEY_INBOUND_SESSION_PREFIX.length + 44),
+                    senderKey: key2.slice(0, 43),
+                    sessionId: key2.slice(44),
                     sessionData: getJsonItem(this.store, key)!,
+                    needsBackup: key2 in sessionsNeedingBackup,
                 });
 
                 if (result.length >= SESSION_BATCH_SIZE) {
