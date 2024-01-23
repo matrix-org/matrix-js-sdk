@@ -398,7 +398,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
     describe("crossSignDevice", () => {
         beforeEach(async () => {
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // make sure that there is another device which we can sign
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
