@@ -1003,6 +1003,7 @@ describe("RustCrypto", () => {
     });
 
     it("should wait for a keys/query before returning devices", async () => {
+        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
         jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });

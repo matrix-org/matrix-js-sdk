@@ -1063,7 +1063,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // We need to fake the timers to advance the time, but the wasm bindings rely on a working `queueMicrotask`
+            // We need to fake the timers to advance the time, but the wasm bindings of matrix-sdk-crypto rely on a
+            // working `queueMicrotask`
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
@@ -2189,6 +2190,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("key upload request", () => {
         beforeEach(() => {
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
@@ -2390,6 +2392,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         it("Get devices from tracked users", async () => {
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -2745,6 +2748,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         describe("Manage Key Backup", () => {
             beforeEach(async () => {
+                // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
                 jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
             });
 

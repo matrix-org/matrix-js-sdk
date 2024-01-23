@@ -129,6 +129,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     let e2eKeyResponder: E2EKeyResponder;
 
     beforeEach(async () => {
+        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
         jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         // anything that we don't have a specific matcher for silently returns a 404
