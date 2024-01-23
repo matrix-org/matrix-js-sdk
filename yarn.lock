@@ -1674,10 +1674,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@matrix-org/matrix-sdk-crypto-wasm@^4.0.0":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-4.0.0.tgz#b33bae9c418c5516d0dbce29662c6db803003626"
-  integrity sha512-a883HchJViPo6ukM0fEDmBgvMI6lWEujqAjMZgwaKEYNZTPgezN5PQvSNz2d+b96/R1y4QOC71zXM1yNylXA6Q==
+"@matrix-org/matrix-sdk-crypto-wasm@^4.0.1":
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-4.0.1.tgz#b1d3848a6adc120622e5225045330d253273b117"
+  integrity sha512-0B4QQ9kop8AocmQDcOfROCQ6QyGZeogpsvTYfEB9ZIBtndCCwy/C3mkxzJD6+gEo1bJ4TdYnblhN7hEQlAG50g==
 
 "@matrix-org/olm@3.2.15":
   version "3.2.15"
