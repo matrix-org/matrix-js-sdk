@@ -205,7 +205,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     public async importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         const keysByRoom: Map<RustSdkCryptoJs.RoomId, Map<string, IMegolmSessionData>> = new Map();
+        let invalid = 0;
         for (const key of keys) {
+            if (typeof key.room_id != "string" || typeof key.session_id != "string") {
+                // if key.room_id or key.session_id are invalid, the wasm
+                // bindings will fail when decoding keysByRoom
+                invalid++;
+                const importOpt: ImportRoomKeyProgressData = {
+                    total: keys.length,
+                    successes: 0,
+                    stage: "load_keys",
+                    failures: invalid,
+                };
+                opts?.progressCallback?.(importOpt);
+                continue;
+            }
             const roomId = new RustSdkCryptoJs.RoomId(key.room_id);
             if (!keysByRoom.has(roomId)) {
                 keysByRoom.set(roomId, new Map());
@@ -214,12 +228,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         await this.olmMachine.importBackedUpRoomKeys(
             keysByRoom,
-            (progress: BigInt, total: BigInt, failures?: BigInt): void => {
+            (progress: BigInt, total: BigInt, failures: BigInt): void => {
                 const importOpt: ImportRoomKeyProgressData = {
-                    total: Number(total),
+                    // since we didn't include the invalid keys when calling
+                    // importBackedUpRoomKeys, we need to add them to the total
+                    total: Number(total) + invalid,
                     successes: Number(progress),
                     stage: "load_keys",
-                    failures: failures == undefined ? 0 : Number(failures),
+                    failures: Number(failures) + invalid,
                 };
                 opts?.progressCallback?.(importOpt);
             },
