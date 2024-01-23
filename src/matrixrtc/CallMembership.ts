@@ -27,7 +27,8 @@ export interface CallMembershipData {
     scope: CallScope;
     device_id: string;
     created_ts?: number;
-    expires: number;
+    expires?: number;
+    expire_ts?: number;
     foci_active?: Focus[];
     membershipID: string;
 }
@@ -41,7 +42,16 @@ export class CallMembership {
         private parentEvent: MatrixEvent,
         private data: CallMembershipData,
     ) {
-        if (typeof data.expires !== "number") throw new Error("Malformed membership: expires must be numeric");
+        if (data.expires && typeof data.expires !== "number") {
+            throw new Error("Malformed membership: expires must be numeric");
+        }
+        if (data.expire_ts && typeof data.expire_ts !== "number") {
+            throw new Error("Malformed membership: expire_ts must be numeric");
+        }
+        if (!(data.expires || data.expire_ts)) {
+            throw new Error("Malformed membership: expire_ts or expires must be present");
+        }
+
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");
         if (typeof data.scope !== "string") throw new Error("Malformed membership event: scope must be string");
@@ -77,16 +87,27 @@ export class CallMembership {
     }
 
     public getAbsoluteExpiry(): number {
-        return this.createdTs() + this.data.expires;
+        if (this.data.expires) {
+            return this.createdTs() + this.data.expires;
+        } else {
+            // We know it exists because we check this in the constructor.
+            return this.data.expire_ts!;
+        }
     }
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number {
-        const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
+        if (this.data.expire_ts) {
+            // With expire_ts we cannot convert to local time.
+            // TODO: Check the server timestamp and compute a diff to local time.
+            return this.data.expire_ts;
+        } else {
+            const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
 
-        const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
+            const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
 
-        return localCreationTs + this.data.expires;
+            return localCreationTs + this.data.expires!;
+        }
     }
 
     public getMsUntilExpiry(): number {
