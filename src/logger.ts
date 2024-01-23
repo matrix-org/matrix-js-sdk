@@ -29,7 +29,7 @@ export interface Logger extends BaseLogger {
 }
 
 /** The basic interface for a logger which doesn't support children */
-interface BaseLogger {
+export interface BaseLogger {
     /**
      * Output trace message to the logger, with stack trace.
      *
@@ -156,7 +156,10 @@ extendLogger(logger);
 export class LogSpan implements BaseLogger {
     private readonly name;
 
-    public constructor(private readonly parent: BaseLogger, name: string) {
+    public constructor(
+        private readonly parent: BaseLogger,
+        name: string,
+    ) {
         this.name = name + ":";
     }
 

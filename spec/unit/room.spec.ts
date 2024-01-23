@@ -3315,7 +3315,7 @@ describe("Room", function () {
                                     return event1 === `eventId${i}` ? 1 : -1;
                                 },
                                 findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
-                            } as unknown as EventTimelineSet);
+                            }) as unknown as EventTimelineSet;
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
                     }
@@ -3328,7 +3328,7 @@ describe("Room", function () {
                                 ({
                                     compareEventOrdering: () => null,
                                     findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
-                                } as unknown as EventTimelineSet);
+                                }) as unknown as EventTimelineSet;
                             room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                                 if (receiptType === ReceiptType.ReadPrivate) {
                                     return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as WrappedReceipt;
@@ -3348,7 +3348,7 @@ describe("Room", function () {
                             ({
                                 compareEventOrdering: () => null,
                                 findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
-                            } as unknown as EventTimelineSet);
+                            }) as unknown as EventTimelineSet;
                         room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                             if (receiptType === ReceiptType.Read) {
                                 return { eventId: "eventId2", data: { ts: 1 } } as WrappedReceipt;
@@ -3366,7 +3366,7 @@ describe("Room", function () {
                             ({
                                 compareEventOrdering: () => null,
                                 findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
-                            } as unknown as EventTimelineSet);
+                            }) as unknown as EventTimelineSet;
                     });
 
                     it("should give precedence to m.read.private", () => {

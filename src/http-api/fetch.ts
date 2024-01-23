@@ -33,8 +33,8 @@ interface TypedResponse<T> extends Response {
 export type ResponseType<T, O extends IHttpOpts> = O extends undefined
     ? T
     : O extends { onlyData: true }
-    ? T
-    : TypedResponse<T>;
+      ? T
+      : TypedResponse<T>;
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();

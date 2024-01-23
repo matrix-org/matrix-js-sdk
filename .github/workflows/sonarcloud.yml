@@ -5,7 +5,13 @@ on:
         secrets:
             SONAR_TOKEN:
                 required: true
+            ELEMENT_BOT_TOKEN:
+                required: true
         inputs:
+            sharded:
+                type: boolean
+                required: false
+                description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
             extra_args:
                 type: string
                 required: false
@@ -13,10 +19,12 @@ on:
 jobs:
     sonarqube:
         runs-on: ubuntu-latest
-        if: github.event.workflow_run.conclusion == 'success'
+        if: |
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event != 'merge_group'
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
-            # This provides an easy link to this workflow_run from the PR before Cypress is done.
+            # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
@@ -25,22 +33,55 @@ jobs:
                   sha: ${{ github.event.workflow_run.head_sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+            - name: "🧮 Checkout code"
+              uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+              with:
+                  repository: ${{ github.event.workflow_run.head_repository.full_name }}
+                  ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
+                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+            - name: 📥 Download artifact
+              uses: actions/download-artifact@v4
+              if: ${{ !inputs.sharded }}
+              with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  run-id: ${{ github.event.workflow_run.id }}
+                  name: coverage
+                  path: coverage
+            - name: 📥 Download sharded artifacts
+              uses: actions/download-artifact@v4
+              if: inputs.sharded
+              with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  run-id: ${{ github.event.workflow_run.id }}
+                  pattern: coverage-*
+                  path: coverage
+                  merge-multiple: true
+
+            - id: extra_args
+              run: |
+                  coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',' | sed 's/,$//g')
+                  echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
+                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',' | sed 's/,$//g')
+                  echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
+
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
               uses: matrix-org/sonarcloud-workflow-action@v2.7
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
+                  skip_checkout: true
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
                   version_cmd: "cat package.json | jq -r .version"
                   branch: ${{ github.event.workflow_run.head_branch }}
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
-                  coverage_run_id: ${{ github.event.workflow_run.id }}
-                  coverage_workflow_name: tests.yml
-                  coverage_extract_path: coverage
-                  extra_args: ${{ inputs.extra_args }}
+                  extra_args: |
+                      ${{ inputs.extra_args }}
+                      -Dsonar.javascript.lcov.reportPaths=${{ steps.extra_args.outputs.reportPaths }}
+                      -Dsonar.testExecutionReportPaths=${{ steps.extra_args.outputs.testExecutionReportPaths }}
 
             - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               if: always()

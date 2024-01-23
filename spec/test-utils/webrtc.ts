@@ -269,7 +269,11 @@ export class MockRTCRtpTransceiver {
 }
 
 export class MockMediaStreamTrack {
-    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) {}
+    constructor(
+        public readonly id: string,
+        public readonly kind: "audio" | "video",
+        public enabled = true,
+    ) {}
 
     public stop = jest.fn<void, []>();
 
@@ -306,7 +310,10 @@ export class MockMediaStreamTrack {
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
 // implementation
 export class MockMediaStream {
-    constructor(public id: string, private tracks: MockMediaStreamTrack[] = []) {}
+    constructor(
+        public id: string,
+        private tracks: MockMediaStreamTrack[] = [],
+    ) {}
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -435,7 +442,11 @@ type EmittedEventMap = CallEventHandlerEventHandlerMap &
 export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
     public mediaHandler = new MockMediaHandler();
 
-    constructor(public userId: string, public deviceId: string, public sessionId: string) {
+    constructor(
+        public userId: string,
+        public deviceId: string,
+        public sessionId: string,
+    ) {
         super();
     }
 
@@ -502,7 +513,10 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 }
 
 export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
-    constructor(public roomId: string, public groupCallId?: string) {
+    constructor(
+        public roomId: string,
+        public groupCallId?: string,
+    ) {
         super();
     }
 
@@ -550,7 +564,11 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 }
 
 export class MockCallFeed {
-    constructor(public userId: string, public deviceId: string | undefined, public stream: MockMediaStream) {}
+    constructor(
+        public userId: string,
+        public deviceId: string | undefined,
+        public stream: MockMediaStream,
+    ) {}
 
     public measureVolumeActivity(val: boolean) {}
     public dispose() {}

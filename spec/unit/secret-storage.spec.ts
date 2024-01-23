@@ -33,7 +33,9 @@ describe("ServerSideSecretStorageImpl", function () {
         it("should allow storing a default key", async function () {
             const accountDataAdapter = mockAccountDataClient();
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
-            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2");
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {
+                key: new Uint8Array(32),
+            });
 
             // it should have made up a 32-character key id
             expect(result.keyId.length).toEqual(32);
@@ -46,7 +48,13 @@ describe("ServerSideSecretStorageImpl", function () {
         it("should allow storing a key with an explicit id", async function () {
             const accountDataAdapter = mockAccountDataClient();
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
-            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {}, "myKeyId");
+            const result = await secretStorage.addKey(
+                "m.secret_storage.v1.aes-hmac-sha2",
+                {
+                    key: new Uint8Array(32),
+                },
+                "myKeyId",
+            );
 
             // it should have made up a 32-character key id
             expect(result.keyId).toEqual("myKeyId");
@@ -59,7 +67,10 @@ describe("ServerSideSecretStorageImpl", function () {
         it("should allow storing a key with a name", async function () {
             const accountDataAdapter = mockAccountDataClient();
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
-            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", { name: "mykey" });
+            const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {
+                name: "mykey",
+                key: new Uint8Array(32),
+            });
 
             expect(result.keyInfo.name).toEqual("mykey");
 
@@ -80,6 +91,7 @@ describe("ServerSideSecretStorageImpl", function () {
             };
             const result = await secretStorage.addKey("m.secret_storage.v1.aes-hmac-sha2", {
                 passphrase,
+                key: new Uint8Array(32),
             });
 
             expect(result.keyInfo.passphrase).toEqual(passphrase);
@@ -93,7 +105,9 @@ describe("ServerSideSecretStorageImpl", function () {
         it("should complain about invalid algorithm", async function () {
             const accountDataAdapter = mockAccountDataClient();
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
-            await expect(() => secretStorage.addKey("bad_alg")).rejects.toThrow("Unknown key algorithm");
+            await expect(() => secretStorage.addKey("bad_alg", { key: new Uint8Array(32) })).rejects.toThrow(
+                "Unknown key algorithm",
+            );
         });
     });
 

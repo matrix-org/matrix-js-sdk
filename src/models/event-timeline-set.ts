@@ -839,7 +839,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         const data: IRoomTimelineData = {
             timeline: timeline,
-            liveEvent: timeline == this.liveTimeline,
+            // The purpose of this method is inserting events in the middle of the
+            // timeline, so the events are, by definition, not live (whether or not
+            // we're adding them to the live timeline).
+            liveEvent: false,
         };
         this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }
@@ -1000,9 +1003,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         if (!shouldLiveInRoom && !shouldLiveInThread) {
             logger.warn(
-                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${
-                    this.room?.roomId
-                } eventId=${event.getId()} threadId=${event.threadRootId}`,
+                `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${this.room
+                    ?.roomId} eventId=${event.getId()} threadId=${event.threadRootId}`,
             );
         }
 

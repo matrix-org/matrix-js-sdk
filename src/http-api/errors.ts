@@ -30,7 +30,10 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @param httpStatus - The HTTP response status code.
  */
 export class HTTPError extends Error {
-    public constructor(msg: string, public readonly httpStatus?: number) {
+    public constructor(
+        msg: string,
+        public readonly httpStatus?: number,
+    ) {
         super(msg);
     }
 }

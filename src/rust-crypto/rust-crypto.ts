@@ -24,12 +24,12 @@ import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { Logger } from "../logger";
-import { ClientPrefix, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { logger, Logger } from "../logger";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
-import { encodeUri, MapWithDefault } from "../utils";
+import { logDuration, MapWithDefault } from "../utils";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -44,11 +44,9 @@ import {
     EventShieldColour,
     EventShieldReason,
     GeneratedSecretStorageKey,
-    ImportRoomKeyProgressData,
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    KeyBackupSession,
     OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
@@ -56,7 +54,7 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
 import { Device, DeviceMap } from "../models/device";
-import { AddSecretStorageKeyOpts, SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
 import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
@@ -66,7 +64,7 @@ import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentif
 import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupDecryptor, RustBackupManager } from "./backup";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
 import { TypedReEmitter } from "../ReEmitter";
 import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
@@ -74,6 +72,7 @@ import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
+import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -81,8 +80,6 @@ interface ISignableObject {
     signatures?: ISignatures;
     unsigned?: object;
 }
-
-const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -105,7 +102,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly backupManager: RustBackupManager;
     private outgoingRequestsManager: OutgoingRequestsManager;
 
-    private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
+    private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
 
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
@@ -143,9 +140,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         );
 
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
-        this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+
+        this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
+            this.logger,
+            this.olmMachine,
+            this.http,
+            this.backupManager,
+        );
+
+        this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
+
         this.reemitter.reEmit(this.backupManager, [
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
@@ -157,75 +163,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
-    }
-
-    /**
-     * Starts an attempt to retrieve a session from a key backup, if enough time
-     * has elapsed since the last check for this session id.
-     *
-     * If a backup is found, it is decrypted and imported.
-     *
-     * @param targetRoomId - ID of the room that the session is used in.
-     * @param targetSessionId - ID of the session for which to check backup.
-     */
-    public startQueryKeyBackupRateLimited(targetRoomId: string, targetSessionId: string): void {
-        const now = new Date().getTime();
-        const lastCheck = this.sessionLastCheckAttemptedTime[targetSessionId];
-        if (!lastCheck || now - lastCheck > KEY_BACKUP_CHECK_RATE_LIMIT) {
-            this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
-            this.queryKeyBackup(targetRoomId, targetSessionId).catch((e) => {
-                this.logger.error(`Unhandled error while checking key backup for session ${targetSessionId}`, e);
-            });
-        } else {
-            const lastCheckStr = new Date(lastCheck).toISOString();
-            this.logger.debug(
-                `Not checking key backup for session ${targetSessionId} (last checked at ${lastCheckStr})`,
-            );
-        }
-    }
-
-    /**
-     * Helper for {@link RustCrypto#startQueryKeyBackupRateLimited}.
-     *
-     * Requests the backup and imports it. Doesn't do any rate-limiting.
-     *
-     * @param targetRoomId - ID of the room that the session is used in.
-     * @param targetSessionId - ID of the session for which to check backup.
-     */
-    private async queryKeyBackup(targetRoomId: string, targetSessionId: string): Promise<void> {
-        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-        if (!backupKeys.decryptionKey) {
-            this.logger.debug(`Not checking key backup for session ${targetSessionId} (no decryption key)`);
-            return;
-        }
-
-        this.logger.debug(`Checking key backup for session ${targetSessionId}`);
-
-        const version = backupKeys.backupVersion;
-        const path = encodeUri("/room_keys/keys/$roomId/$sessionId", {
-            $roomId: targetRoomId,
-            $sessionId: targetSessionId,
-        });
-
-        let res: KeyBackupSession;
-        try {
-            res = await this.http.authedRequest<KeyBackupSession>(Method.Get, path, { version }, undefined, {
-                prefix: ClientPrefix.V3,
-            });
-        } catch (e) {
-            this.logger.info(`No luck requesting key backup for session ${targetSessionId}: ${e}`);
-            return;
-        }
-
-        if (this.stopped) return;
-
-        const backupDecryptor = new RustBackupDecryptor(backupKeys.decryptionKey);
-        const sessionsToImport: Record<string, KeyBackupSession> = { [targetSessionId]: res };
-        const keys = await backupDecryptor.decryptSessions(sessionsToImport);
-        for (const k of keys) {
-            k.room_id = targetRoomId;
-        }
-        await this.importRoomKeys(keys);
     }
 
     /**
@@ -268,6 +205,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager.stop();
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
+        this.perSessionBackupDownloader.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -377,18 +315,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
      */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
-        const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
-            this.olmMachine.userId,
-            this.olmMachine.deviceId,
-        );
-        // could be undefined if there is no such algorithm for that device.
-        if (device.curve25519Key && device.ed25519Key) {
-            return {
-                ed25519: device.ed25519Key.toBase64(),
-                curve25519: device.curve25519Key.toBase64(),
-            };
-        }
-        throw new Error("Device keys not found");
+        const keys = this.olmMachine.identityKeys;
+        return { ed25519: keys.ed25519.toBase64(), curve25519: keys.curve25519.toBase64() };
     }
 
     public prepareToEncrypt(room: Room): void {
@@ -409,17 +337,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
-        // TODO when backup support will be added we would need to expose the `from_backup` flag in the bindings
-        const jsonKeys = JSON.stringify(keys);
-        await this.olmMachine.importRoomKeys(jsonKeys, (progress: BigInt, total: BigInt) => {
-            const importOpt: ImportRoomKeyProgressData = {
-                total: Number(total),
-                successes: Number(progress),
-                stage: "load_keys",
-                failures: 0,
-            };
-            opts?.progressCallback?.(importOpt);
-        });
+        return await this.backupManager.importRoomKeys(keys, opts);
     }
 
     /**
@@ -441,7 +359,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
                  * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
                  */
-                const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
+                const request = this.olmMachine.queryKeysForUsers(
+                    // clone as rust layer will take ownership and it's reused later
+                    [rustTrackedUser.clone()],
+                );
                 await this.outgoingRequestProcessor.makeOutgoingRequest(request);
             }
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
@@ -804,10 +725,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
+        }
 
-            if (setupNewKeyBackup) {
-                await this.resetKeyBackup();
-            }
+        if (setupNewKeyBackup) {
+            await this.resetKeyBackup();
         }
     }
 
@@ -820,15 +741,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param secretStorageKey - The secret storage key to add in the secret storage.
      */
     private async addSecretStorageKeyToSecretStorage(secretStorageKey: GeneratedSecretStorageKey): Promise<void> {
-        // keyInfo is required to continue
-        if (!secretStorageKey.keyInfo) {
-            throw new Error("missing keyInfo field in the secret storage key");
-        }
-
-        const secretStorageKeyObject = await this.secretStorage.addKey(
-            SECRET_STORAGE_ALGORITHM_V1_AES,
-            secretStorageKey.keyInfo,
-        );
+        const secretStorageKeyObject = await this.secretStorage.addKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
+            passphrase: secretStorageKey.keyInfo?.passphrase,
+            name: secretStorageKey.keyInfo?.name,
+            key: secretStorageKey.privateKey,
+        });
 
         await this.secretStorage.setDefaultKeyId(secretStorageKeyObject.keyId);
 
@@ -889,30 +806,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#createRecoveryKeyFromPassphrase}
      */
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
-        let key: Uint8Array;
-
-        const keyInfo: AddSecretStorageKeyOpts = {};
         if (password) {
             // Generate the key from the passphrase
             const derivation = await keyFromPassphrase(password);
-            keyInfo.passphrase = {
-                algorithm: "m.pbkdf2",
-                iterations: derivation.iterations,
-                salt: derivation.salt,
+            return {
+                keyInfo: {
+                    passphrase: {
+                        algorithm: "m.pbkdf2",
+                        iterations: derivation.iterations,
+                        salt: derivation.salt,
+                    },
+                },
+                privateKey: derivation.key,
+                encodedPrivateKey: encodeRecoveryKey(derivation.key),
             };
-            key = derivation.key;
         } else {
             // Using the navigator crypto API to generate the private key
-            key = new Uint8Array(32);
+            const key = new Uint8Array(32);
             crypto.getRandomValues(key);
+            return {
+                privateKey: key,
+                encodedPrivateKey: encodeRecoveryKey(key),
+            };
         }
-
-        const encodedPrivateKey = encodeRecoveryKey(key);
-        return {
-            keyInfo,
-            encodedPrivateKey,
-            privateKey: key,
-        };
     }
 
     /**
@@ -1262,7 +1178,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error(`getBackupDecryptor key mismatch error`);
         }
 
-        return new RustBackupDecryptor(backupDecryptionKey);
+        return this.backupManager.createBackupDecryptor(backupDecryptionKey);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public async importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        return await this.backupManager.importBackedUpRoomKeys(keys, opts);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1290,12 +1213,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         unusedFallbackKeys?: Set<string>;
         devices?: RustSdkCryptoJs.DeviceLists;
     }): Promise<IToDeviceEvent[]> {
-        const result = await this.olmMachine.receiveSyncChanges(
-            events ? JSON.stringify(events) : "[]",
-            devices,
-            oneTimeKeysCounts,
-            unusedFallbackKeys,
-        );
+        const result = await logDuration(logger, "receiveSyncChanges", async () => {
+            return await this.olmMachine.receiveSyncChanges(
+                events ? JSON.stringify(events) : "[]",
+                devices,
+                oneTimeKeysCounts,
+                unusedFallbackKeys,
+            );
+        });
 
         // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
         return JSON.parse(result);
@@ -1661,7 +1586,7 @@ class EventDecryptor {
     public constructor(
         private readonly logger: Logger,
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        private readonly crypto: RustCrypto,
+        private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader,
     ) {}
 
     public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
@@ -1702,7 +1627,7 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        this.crypto.startQueryKeyBackupRateLimited(
+                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
                             event.getRoomId()!,
                             event.getWireContent().session_id!,
                         );
@@ -1716,7 +1641,7 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        this.crypto.startQueryKeyBackupRateLimited(
+                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
                             event.getRoomId()!,
                             event.getWireContent().session_id!,
                         );

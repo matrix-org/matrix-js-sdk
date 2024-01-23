@@ -137,12 +137,15 @@ export class VerificationBase<
         if (this.transactionTimeoutTimer !== null) {
             clearTimeout(this.transactionTimeoutTimer);
         }
-        this.transactionTimeoutTimer = setTimeout(() => {
-            if (!this._done && !this.cancelled) {
-                logger.info("Triggering verification timeout");
-                this.cancel(timeoutException);
-            }
-        }, 10 * 60 * 1000); // 10 minutes
+        this.transactionTimeoutTimer = setTimeout(
+            () => {
+                if (!this._done && !this.cancelled) {
+                    logger.info("Triggering verification timeout");
+                    this.cancel(timeoutException);
+                }
+            },
+            10 * 60 * 1000,
+        ); // 10 minutes
     }
 
     private endTimer(): void {

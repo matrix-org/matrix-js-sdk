@@ -149,8 +149,12 @@ export type IAuthDict = AuthDict;
 export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-    public constructor(m: string, public readonly required_stages: string[], public readonly flows: UIAFlow[]) {
+    public constructor(
+        m: string,
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+        public readonly required_stages: string[],
+        public readonly flows: UIAFlow[],
+    ) {
         super(m);
     }
 }

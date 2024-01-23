@@ -186,7 +186,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
         refresh_token: response.refresh_token,
         access_token: response.access_token,
         token_type: "Bearer",
-    } as BearerTokenResponse);
+    }) as BearerTokenResponse;
 
 /**
  * @experimental

@@ -64,7 +64,7 @@ import {
     IUploadKeySignaturesResponse,
     MatrixClient,
 } from "../client";
-import type { IRoomEncryption, RoomList } from "./RoomList";
+import { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
@@ -259,6 +259,15 @@ export enum CryptoEvent {
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
+
+    /**
+     * Fires when data is being migrated from legacy crypto to rust crypto.
+     *
+     * The payload is a pair `(progress, total)`, where `progress` is the number of steps completed so far, and
+     * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
+     * `progress === total === -1`.
+     */
+    LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
 }
 
 export type CryptoEventHandlerMap = {
@@ -368,6 +377,8 @@ export type CryptoEventHandlerMap = {
      */
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+
+    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
@@ -385,6 +396,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: LegacySecretStorage;
 
+    private readonly roomList: RoomList;
     private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
@@ -473,10 +485,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         private readonly deviceId: string,
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
-        private readonly roomList: RoomList,
         verificationMethods: Array<VerificationMethod | (typeof VerificationBase & { NAME: string })>,
     ) {
         super();
+
+        logger.debug("Crypto: initialising roomlist...");
+        this.roomList = new RoomList(cryptoStore);
+
         this.reEmitter = new TypedReEmitter(this);
 
         if (verificationMethods) {
@@ -626,6 +641,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // (this is important for key backups & things)
         this.deviceList.startTrackingDeviceList(this.userId);
 
+        logger.debug("Crypto: initialising roomlist...");
+        await this.roomList.init();
+
         logger.log("Crypto: checking for key backup...");
         this.backupManager.checkAndStart();
     }
@@ -701,25 +719,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const keyInfo: Partial<IRecoveryKey["keyInfo"]> = {};
             if (password) {
                 const derivation = await keyFromPassphrase(password);
-                keyInfo.passphrase = {
-                    algorithm: "m.pbkdf2",
-                    iterations: derivation.iterations,
-                    salt: derivation.salt,
+
+                decryption.init_with_private_key(derivation.key);
+                const privateKey = decryption.get_private_key();
+                return {
+                    keyInfo: {
+                        passphrase: {
+                            algorithm: "m.pbkdf2",
+                            iterations: derivation.iterations,
+                            salt: derivation.salt,
+                        },
+                    },
+                    privateKey: privateKey,
+                    encodedPrivateKey: encodeRecoveryKey(privateKey),
                 };
-                keyInfo.pubkey = decryption.init_with_private_key(derivation.key);
             } else {
-                keyInfo.pubkey = decryption.generate_key();
+                decryption.generate_key();
+                const privateKey = decryption.get_private_key();
+                return {
+                    privateKey: privateKey,
+                    encodedPrivateKey: encodeRecoveryKey(privateKey),
+                };
             }
-            const privateKey = decryption.get_private_key();
-            const encodedPrivateKey = encodeRecoveryKey(privateKey);
-            return {
-                keyInfo: keyInfo as IRecoveryKey["keyInfo"],
-                encodedPrivateKey,
-                privateKey,
-            };
         } finally {
             decryption?.free();
         }
@@ -961,7 +984,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     // TODO this does not resolve with what it says it does
     public async bootstrapSecretStorage({
-        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({} as IRecoveryKey),
+        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({}) as IRecoveryKey,
         keyBackupInfo,
         setupNewKeyBackup,
         setupNewSecretStorage,
@@ -979,17 +1002,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts: AddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
-            if (privateKey) {
-                opts.key = privateKey;
-            }
-
+        const createSSSS = async (opts: AddSecretStorageKeyOpts): Promise<string> => {
             const { keyId, keyInfo } = await secretStorage.addKey(SECRET_STORAGE_ALGORITHM_V1_AES, opts);
 
-            if (privateKey) {
-                // make the private key available to encrypt 4S secrets
-                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-            }
+            // make the private key available to encrypt 4S secrets
+            builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, opts.key);
 
             await secretStorage.setDefaultKeyId(keyId);
             return keyId;
@@ -1053,8 +1070,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo = {} as AddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
-            newKeyId = await createSSSS(keyInfo, privateKey);
+            const { keyInfo, privateKey } = await createSecretStorageKey();
+            newKeyId = await createSSSS({ passphrase: keyInfo?.passphrase, key: privateKey, name: keyInfo?.name });
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
             logger.log("Secret storage does not exist, using key backup key");
@@ -1064,7 +1081,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const backupKey = (await this.getSessionBackupPrivateKey()) || (await getKeyBackupPassphrase?.());
 
             // create a new SSSS key and use the backup key as the new SSSS key
-            const opts = {} as AddSecretStorageKeyOpts;
+            const opts = { key: backupKey } as AddSecretStorageKeyOpts;
 
             if (keyBackupInfo.auth_data.private_key_salt && keyBackupInfo.auth_data.private_key_iterations) {
                 // FIXME: ???
@@ -1076,7 +1093,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 };
             }
 
-            newKeyId = await createSSSS(opts, backupKey);
+            newKeyId = await createSSSS(opts);
 
             // store the backup key in secret storage
             await secretStorage.store("m.megolm_backup.v1", encodeBase64(backupKey!), [newKeyId]);
@@ -1211,6 +1228,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
+        await this.backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
@@ -1897,6 +1915,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public importBackedUpRoomKeys(keys: IMegolmSessionData[], opts: ImportRoomKeysOpts = {}): Promise<void> {
+        opts.source = "backup";
+        return this.importRoomKeys(keys, opts);
+    }
+
+    /**
      * Store a set of keys as our own, trusted, cross-signing keys.
      *
      * @param keys - The new trusted set of keys
@@ -2228,10 +2254,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const res = await this.baseApis.uploadKeysRequest(requestBody);
 
         if (fallbackJson) {
-            this.fallbackCleanup = setTimeout(() => {
-                delete this.fallbackCleanup;
-                this.olmDevice.forgetOldFallbackKey();
-            }, 60 * 60 * 1000);
+            this.fallbackCleanup = setTimeout(
+                () => {
+                    delete this.fallbackCleanup;
+                    this.olmDevice.forgetOldFallbackKey();
+                },
+                60 * 60 * 1000,
+            );
         }
 
         await this.olmDevice.markKeysAsPublished();
@@ -4234,6 +4263,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
         obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
+    }
+
+    /**
+     * @returns true if the room with the supplied ID is encrypted. False if the
+     * room is not encrypted, or is unknown to us.
+     */
+    public isRoomEncrypted(roomId: string): boolean {
+        return this.roomList.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * @returns information about the encryption on the room with the supplied
+     * ID, or null if the room is not encrypted or unknown to us.
+     */
+    public getRoomEncryption(roomId: string): IRoomEncryption | null {
+        return this.roomList.getRoomEncryption(roomId);
     }
 }
 

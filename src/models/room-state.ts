@@ -187,7 +187,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
      */
-    public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
+    public constructor(
+        public readonly roomId: string,
+        private oobMemberFlags = { status: OobStatus.NotStarted },
+    ) {
         super();
         this.updateModifiedTime();
     }
@@ -778,7 +781,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // The user may have been the sender, but they can't redact their own message
         // if redactions are blocked.
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
-        if (mxEvent.getSender() === userId) return canRedact;
+
+        if (!canRedact) return false;
+        if (mxEvent.getSender() === userId) return true;
 
         return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }

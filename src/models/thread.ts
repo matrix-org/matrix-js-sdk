@@ -133,14 +133,24 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     private readonly pendingEventOrdering: PendingEventOrdering;
     private processRootEventPromise?: Promise<void>;
 
+    /**
+     * Whether or not we need to fetch the initial set of events for the thread. We can
+     * only do this if the server has support for it, so if it doesn't we just pretend
+     * that we've already fetched them.
+     */
     public initialEventsFetched = !Thread.hasServerSideSupport;
+
     /**
      * An array of events to add to the timeline once the thread has been initialised
      * with server suppport.
      */
     public replayEvents: MatrixEvent[] | null = [];
 
-    public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
+    public constructor(
+        public readonly id: string,
+        public rootEvent: MatrixEvent | undefined,
+        opts: IThreadOpts,
+    ) {
         super();
 
         // each Event in the thread adds a reemitter, so we could hit the listener limit.
@@ -359,7 +369,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * to the start (and not the end) of the timeline.
      * @param emit - whether to emit the Update event if the thread was updated or not.
      */
-    public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
+    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
         // Modify this event to point at our room's state, and mark its thread
         // as this.
         this.setEventMetadata(event);
@@ -378,56 +388,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
-            // If this event is not a direct member of the thread, but is a
-            // reference to something that is, then we have two cases:
-
-            if (!this.initialEventsFetched) {
-                // Case 1: we haven't yet fetched events from the server. In
-                // this case, when we do, the events we get back might only be
-                // the first-order ones, so this event (which is second-order -
-                // a reference to something directly in the thread) needs to be
-                // kept so we can replay it when the first-order ones turn up.
-
-                /**
-                 * A thread can be fully discovered via a single sync response
-                 * And when that's the case we still ask the server to do an initialisation
-                 * as it's the safest to ensure we have everything.
-                 * However when we are in that scenario we might loose annotation or edits
-                 *
-                 * This fix keeps a reference to those events and replay them once the thread
-                 * has been initialised properly.
-                 */
-                this.replayEvents?.push(event);
-            } else {
-                // Case 2: this is happening later, and we have a timeline. In
-                // this case, these events might be out-of order.
-                //
-                // Specifically, if the server doesn't support recursion, so we
-                // only get these events through sync, they might be coming
-                // later than the first-order ones, so we insert them based on
-                // timestamp (despite the problems with this documented in
-                // #3325).
-                //
-                // If the server does support recursion, we should have got all
-                // the interspersed events from the server when we fetched the
-                // initial events, so if they are coming via sync they should be
-                // the latest ones, so we can add them as normal.
-                //
-                // (Note that both insertEventIntoTimeline and addEventToTimeline
-                // do nothing if we have seen this event before.)
-
-                const recursionSupport =
-                    this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
-
-                if (recursionSupport === ServerSupport.Unsupported) {
-                    this.insertEventIntoTimeline(event);
-                } else {
-                    this.addEventToTimeline(event, toStartOfTimeline);
-                }
-            }
-            // Apply annotations and replace relations to the relations of the timeline only
-            this.timelineSet.relations?.aggregateParentEvent(event);
-            this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
+            this.addRelatedThreadEvent(event, toStartOfTimeline);
             return;
         } else if (this.initialEventsFetched) {
             // If initial events have not been fetched, we are OK to throw away
@@ -462,6 +423,59 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.emit(ThreadEvent.NewReply, this, event);
             this.updateThreadMetadata();
         }
+    }
+
+    private addRelatedThreadEvent(event: MatrixEvent, toStartOfTimeline: boolean): void {
+        // If this event is not a direct member of the thread, but is a
+        // reference to something that is, then we have two cases:
+
+        if (!this.initialEventsFetched) {
+            // Case 1: we haven't yet fetched events from the server. In
+            // this case, when we do, the events we get back might only be
+            // the first-order ones, so this event (which is second-order -
+            // a reference to something directly in the thread) needs to be
+            // kept so we can replay it when the first-order ones turn up.
+
+            /**
+             * A thread can be fully discovered via a single sync response
+             * And when that's the case we still ask the server to do an initialisation
+             * as it's the safest to ensure we have everything.
+             * However when we are in that scenario we might loose annotation or edits
+             *
+             * This fix keeps a reference to those events and replay them once the thread
+             * has been initialised properly.
+             */
+            this.replayEvents?.push(event);
+        } else {
+            // Case 2: this is happening later, and we have a timeline. In
+            // this case, these events might be out-of order.
+            //
+            // Specifically, if the server doesn't support recursion, so we
+            // only get these events through sync, they might be coming
+            // later than the first-order ones, so we insert them based on
+            // timestamp (despite the problems with this documented in
+            // #3325).
+            //
+            // If the server does support recursion, we should have got all
+            // the interspersed events from the server when we fetched the
+            // initial events, so if they are coming via sync they should be
+            // the latest ones, so we can add them as normal.
+            //
+            // (Note that both insertEventIntoTimeline and addEventToTimeline
+            // do nothing if we have seen this event before.)
+
+            const recursionSupport =
+                this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
+
+            if (recursionSupport === ServerSupport.Unsupported) {
+                this.insertEventIntoTimeline(event);
+            } else {
+                this.addEventToTimeline(event, toStartOfTimeline);
+            }
+        }
+        // Apply annotations and replace relations to the relations of the timeline only
+        this.timelineSet.relations?.aggregateParentEvent(event);
+        this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
     }
 
     public async processEvent(event: Optional<MatrixEvent>): Promise<void> {
@@ -609,7 +623,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 } else {
                     await this.client.paginateEventTimeline(this.liveTimeline, {
                         backwards: true,
-                        limit: Math.max(1, this.length),
                     });
                 }
                 for (const event of this.replayEvents!) {
