@@ -15,12 +15,15 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
 import { Logger } from "../logger";
+import { CryptoStore } from "../crypto/store/base";
+import { migrateFromLegacyCrypto } from "./libolm_migration";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -63,6 +66,19 @@ export async function initRustCrypto(args: {
      * will be unencrypted.
      */
     storePassphrase?: string;
+
+    /** If defined, we will check if any data needs migrating from this store to the rust store. */
+    legacyCryptoStore?: CryptoStore;
+
+    /** The pickle key for `legacyCryptoStore` */
+    legacyPickleKey?: string;
+
+    /**
+     * A callback which will receive progress updates on migration from `legacyCryptoStore`.
+     *
+     * Called with (-1, -1) to mark the end of migration.
+     */
+    legacyMigrationProgressListener?: (progress: number, total: number) => void;
 }): Promise<RustCrypto> {
     const { logger } = args;
 
@@ -73,6 +89,21 @@ export async function initRustCrypto(args: {
     // enable tracing in the rust-sdk
     new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
 
+    logger.debug("Opening Rust CryptoStore");
+    const storeHandle: StoreHandle = await StoreHandle.open(
+        args.storePrefix ?? undefined,
+        (args.storePrefix && args.storePassphrase) ?? undefined,
+    );
+
+    if (args.legacyCryptoStore) {
+        // We have a legacy crypto store, which we may need to migrate from.
+        await migrateFromLegacyCrypto({
+            legacyStore: args.legacyCryptoStore,
+            storeHandle,
+            ...args,
+        });
+    }
+
     const rustCrypto = await initOlmMachine(
         logger,
         args.http,
@@ -80,9 +111,10 @@ export async function initRustCrypto(args: {
         args.deviceId,
         args.secretStorage,
         args.cryptoCallbacks,
-        args.storePrefix,
-        args.storePassphrase,
+        storeHandle,
     );
+
+    storeHandle.free();
 
     logger.debug("Completed rust crypto-sdk setup");
     return rustCrypto;
@@ -95,15 +127,14 @@ async function initOlmMachine(
     deviceId: string,
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
-    storePrefix: string | null,
-    storePassphrase: string | undefined,
+    storeHandle: StoreHandle,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(
+
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.initFromStore(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
-        storePrefix ?? undefined,
-        (storePrefix && storePassphrase) ?? undefined,
+        storeHandle,
     );
 
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.

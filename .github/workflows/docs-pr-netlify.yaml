@@ -11,13 +11,11 @@ jobs:
         if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
         runs-on: ubuntu-latest
         steps:
-            # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
-            # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
             - name: 📥 Download artifact
-              uses: dawidd6/action-download-artifact@e7466d1a7587ed14867642c2ca74b5bcc1e19a2d # v3
+              uses: actions/download-artifact@v4
               with:
-                  workflow: static_analysis.yml
-                  run_id: ${{ github.event.workflow_run.id }}
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  run-id: ${{ github.event.workflow_run.id }}
                   name: docs
                   path: docs
 

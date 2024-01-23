@@ -359,7 +359,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                 /* make sure we have an *up-to-date* idea of the user's cross-signing keys. This is important, because if we
                  * return "false" here, we will end up generating new cross-signing keys and replacing the existing ones.
                  */
-                const request = this.olmMachine.queryKeysForUsers([rustTrackedUser]);
+                const request = this.olmMachine.queryKeysForUsers(
+                    // clone as rust layer will take ownership and it's reused later
+                    [rustTrackedUser.clone()],
+                );
                 await this.outgoingRequestProcessor.makeOutgoingRequest(request);
             }
             const userIdentity = await this.olmMachine.getIdentity(rustTrackedUser);
