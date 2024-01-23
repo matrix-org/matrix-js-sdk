@@ -75,6 +75,12 @@ import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/b
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
 
+beforeAll(async () => {
+    // Load the WASM upfront, before any of the tests. This can take some time, and doing it here means that it gets
+    // a separate timeout.
+    await RustSdkCryptoJs.initAsync();
+}, 15000);
+
 afterEach(() => {
     fetchMock.reset();
     jest.restoreAllMocks();
@@ -997,7 +1003,7 @@ describe("RustCrypto", () => {
     });
 
     it("should wait for a keys/query before returning devices", async () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
