@@ -4821,28 +4821,37 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
+        // If the room is unknown, we cannot encrypt for it
+        if (!room) return;
+
+        if (!this.shouldEncryptEventForRoom(event, room)) return;
+
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
+            // The client has opted to allow sending messages to encrypted
+            // rooms even if the room is encrypted, and we haven't set up
+            // crypto. This is useful for users of matrix-org/pantalaimon
+            return;
+        }
+
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
+        }
+
+        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        await this.cryptoBackend.encryptEvent(event, room);
+    }
+
+    /**
+     * Determine whether a given event should be encrypted when we send it to the given room.
+     *
+     * This takes into account event type and room configuration.
+     */
+    private shouldEncryptEventForRoom(event: MatrixEvent, room: Room): boolean {
         if (event.isEncrypted()) {
             // this event has already been encrypted; this happens if the
             // encryption step succeeded, but the send step failed on the first
             // attempt.
-            return;
-        }
-
-        if (event.isRedaction()) {
-            // Redactions do not support encryption in the spec at this time,
-            // whilst it mostly worked in some clients, it wasn't compliant.
-            return;
-        }
-
-        if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
-            return;
-        }
-
-        if (!this.cryptoBackend && this.usingExternalCrypto) {
-            // The client has opted to allow sending messages to encrypted
-            // rooms even if the room is encrypted, and we haven't setup
-            // crypto. This is useful for users of matrix-org/pantalaimon
-            return;
+            return false;
         }
 
         if (event.getType() === EventType.Reaction) {
@@ -4856,15 +4865,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // The reaction key / content / emoji value does warrant encrypting, but
             // this will be handled separately by encrypting just this value.
             // See https://github.com/matrix-org/matrix-doc/pull/1849#pullrequestreview-248763642
-            return;
+            return false;
         }
 
-        if (!this.cryptoBackend) {
-            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
+        if (event.isRedaction()) {
+            // Redactions do not support encryption in the spec at this time.
+            // Whilst it mostly worked in some clients, it wasn't compliant.
+            return false;
         }
 
-        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
-        await this.cryptoBackend.encryptEvent(event, room);
+        return this.isRoomEncrypted(event.getRoomId()!);
     }
 
     /**
