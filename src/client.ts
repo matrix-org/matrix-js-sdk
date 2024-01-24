@@ -1305,7 +1305,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
     protected sessionId: string;
-    protected pendingEventEncryption = new Map<string, Promise<void>>();
+
+    /** IDs of events which are currently being encrypted.
+     *
+     * This is part of the cancellation mechanism: if the event is no longer listed here when encryption completes,
+     * that tells us that it has been cancelled, and we should not send it.
+     */
+    private eventsBeingEncrypted = new Set<string>();
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
@@ -4448,9 +4454,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("cannot cancel an event with status " + event.status);
         }
 
-        // if the event is currently being encrypted then
+        // If the event is currently being encrypted then remove it from the pending list, to indicate that it should
+        // not be sent.
         if (event.status === EventStatus.ENCRYPTING) {
-            this.pendingEventEncryption.delete(event.getId()!);
+            this.eventsBeingEncrypted.delete(event.getId()!);
         } else if (this.scheduler && event.status === EventStatus.QUEUED) {
             // tell the scheduler to forget about it, if it's queued
             this.scheduler.removeEventFromQueue(event);
@@ -4759,10 +4766,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
                 if (!encryptionPromise) return null; // doesn't need encryption
 
-                this.pendingEventEncryption.set(event.getId()!, encryptionPromise);
+                this.eventsBeingEncrypted.add(event.getId()!);
                 this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
                 return encryptionPromise.then(() => {
-                    if (!this.pendingEventEncryption.has(event.getId()!)) {
+                    if (!this.eventsBeingEncrypted.delete(event.getId()!)) {
                         // cancelled via MatrixClient::cancelPendingEvent
                         cancelled = true;
                         return;
