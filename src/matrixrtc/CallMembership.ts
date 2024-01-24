@@ -42,14 +42,18 @@ export class CallMembership {
         private parentEvent: MatrixEvent,
         private data: CallMembershipData,
     ) {
-        if (data.expires && typeof data.expires !== "number") {
-            throw new Error("Malformed membership: expires must be numeric");
-        }
-        if (data.expires_ts && typeof data.expires_ts !== "number") {
-            throw new Error("Malformed membership: expires_ts must be numeric");
-        }
         if (!(data.expires || data.expires_ts)) {
             throw new Error("Malformed membership: expires_ts or expires must be present");
+        }
+        if (data.expires) {
+            if (typeof data.expires !== "number") {
+                throw new Error("Malformed membership: expires must be numeric");
+            }
+        }
+        if (data.expires_ts) {
+            if (typeof data.expires_ts !== "number") {
+                throw new Error("Malformed membership: expires_ts must be numeric");
+            }
         }
 
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
