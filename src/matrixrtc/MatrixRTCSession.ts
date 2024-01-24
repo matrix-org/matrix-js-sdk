@@ -624,6 +624,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         };
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
+        if (m.created_ts) m.expire_ts = m.created_ts + (m.expires ?? 0);
+        else m.expire_ts = Date.now() + (m.expires ?? 0);
 
         return m;
     }
