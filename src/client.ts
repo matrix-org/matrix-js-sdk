@@ -4764,17 +4764,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return Promise.resolve()
             .then(() => {
                 const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
-                if (!encryptionPromise) return null; // doesn't need encryption
 
                 this.eventsBeingEncrypted.add(event.getId()!);
-                this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
                 return encryptionPromise.then(() => {
                     if (!this.eventsBeingEncrypted.delete(event.getId()!)) {
                         // cancelled via MatrixClient::cancelPendingEvent
                         cancelled = true;
                         return;
                     }
-                    this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+                    // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
+                    // to put it back.
+                    if (event.status === EventStatus.ENCRYPTING) {
+                        this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+                    }
                 });
             })
             .then(() => {
@@ -4823,29 +4825,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
     }
 
-    private encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> | null {
+    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
         if (event.isEncrypted()) {
             // this event has already been encrypted; this happens if the
             // encryption step succeeded, but the send step failed on the first
             // attempt.
-            return null;
+            return;
         }
 
         if (event.isRedaction()) {
             // Redactions do not support encryption in the spec at this time,
             // whilst it mostly worked in some clients, it wasn't compliant.
-            return null;
+            return;
         }
 
         if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
-            return null;
+            return;
         }
 
         if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
             // rooms even if the room is encrypted, and we haven't setup
             // crypto. This is useful for users of matrix-org/pantalaimon
-            return null;
+            return;
         }
 
         if (event.getType() === EventType.Reaction) {
@@ -4859,14 +4861,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // The reaction key / content / emoji value does warrant encrypting, but
             // this will be handled separately by encrypting just this value.
             // See https://github.com/matrix-org/matrix-doc/pull/1849#pullrequestreview-248763642
-            return null;
+            return;
         }
 
         if (!this.cryptoBackend) {
             throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        return this.cryptoBackend.encryptEvent(event, room);
+        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        await this.cryptoBackend.encryptEvent(event, room);
     }
 
     /**
