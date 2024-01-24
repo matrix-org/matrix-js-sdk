@@ -233,12 +233,6 @@ export class MSC3906Rendezvous {
             throw new Error("Crypto not available on client");
         }
 
-        const userId = this.client.getUserId();
-
-        if (!userId) {
-            throw new Error("No user ID set");
-        }
-
         let deviceInfo = await this.getOwnDevice(this.newDeviceId);
 
         if (!deviceInfo) {
@@ -256,10 +250,7 @@ export class MSC3906Rendezvous {
     }
 
     private async getOwnDevice(deviceId: string): Promise<Device | undefined> {
-        const userId = this.client.getUserId();
-        if (!userId) {
-            return undefined;
-        }
+        const userId = this.client.getUserId()!;
         const ownDeviceInfo = await this.client.getCrypto()!.getUserDeviceInfo([userId]);
         return ownDeviceInfo.get(userId)?.get(deviceId);
     }
