@@ -4874,7 +4874,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return false;
         }
 
-        return this.isRoomEncrypted(event.getRoomId()!);
+        // If the room has an m.room.encryption event, we should encrypt.
+        if (room.hasEncryptionStateEvent()) return true;
+
+        // If we have a crypto impl, and *it* thinks we should encrypt, then we should.
+        if (this.crypto?.isRoomEncrypted(room.roomId)) return true;
+
+        // Otherwise, no need to encrypt.
+        return false;
     }
 
     /**
