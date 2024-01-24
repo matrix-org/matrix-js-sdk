@@ -216,7 +216,6 @@ export class MSC3906Rendezvous {
     /**
      * Verify the device and cross-sign it.
      * @param timeout - time in milliseconds to wait for device to come online
-     * @returns the new device info if the device was verified
      */
     public async verifyNewDeviceOnExistingDevice(timeout = 10 * 1000): Promise<void> {
         if (!this.newDeviceId) {
