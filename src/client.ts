@@ -4756,73 +4756,68 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
      * @returns returns a promise which resolves with the result of the send request
      */
-    protected encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
-        let cancelled = false;
-        // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
-        // so that we can handle synchronous and asynchronous exceptions with the
-        // same code path.
-        return Promise.resolve()
-            .then(() => {
-                const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
+    protected async encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
+        try {
+            let cancelled: boolean;
+            this.eventsBeingEncrypted.add(event.getId()!);
+            try {
+                await this.encryptEventIfNeeded(event, room ?? undefined);
+            } finally {
+                cancelled = !this.eventsBeingEncrypted.delete(event.getId()!);
+            }
 
-                this.eventsBeingEncrypted.add(event.getId()!);
-                return encryptionPromise.then(() => {
-                    if (!this.eventsBeingEncrypted.delete(event.getId()!)) {
-                        // cancelled via MatrixClient::cancelPendingEvent
-                        cancelled = true;
-                        return;
-                    }
-                    // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
-                    // to put it back.
-                    if (event.status === EventStatus.ENCRYPTING) {
-                        this.updatePendingEventStatus(room, event, EventStatus.SENDING);
-                    }
-                });
-            })
-            .then(() => {
-                if (cancelled) return {} as ISendEventResponse;
-                let promise: Promise<ISendEventResponse> | null = null;
-                if (this.scheduler) {
-                    // if this returns a promise then the scheduler has control now and will
-                    // resolve/reject when it is done. Internally, the scheduler will invoke
-                    // processFn which is set to this._sendEventHttpRequest so the same code
-                    // path is executed regardless.
-                    promise = this.scheduler.queueEvent(event);
-                    if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
-                        // event is processed FIFO so if the length is 2 or more we know
-                        // this event is stuck behind an earlier event.
-                        this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
-                    }
-                }
+            if (cancelled) {
+                // cancelled via MatrixClient::cancelPendingEvent
+                return {} as ISendEventResponse;
+            }
 
-                if (!promise) {
-                    promise = this.sendEventHttpRequest(event);
-                    if (room) {
-                        promise = promise.then((res) => {
-                            room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
-                            return res;
-                        });
-                    }
-                }
+            // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
+            // to put it back.
+            if (event.status === EventStatus.ENCRYPTING) {
+                this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+            }
 
-                return promise;
-            })
-            .catch((err) => {
-                this.logger.error("Error sending event", err.stack || err);
-                try {
-                    // set the error on the event before we update the status:
-                    // updating the status emits the event, so the state should be
-                    // consistent at that point.
-                    event.error = err;
-                    this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
-                } catch (e) {
-                    this.logger.error("Exception in error handler!", (<Error>e).stack || err);
+            let promise: Promise<ISendEventResponse> | null = null;
+            if (this.scheduler) {
+                // if this returns a promise then the scheduler has control now and will
+                // resolve/reject when it is done. Internally, the scheduler will invoke
+                // processFn which is set to this._sendEventHttpRequest so the same code
+                // path is executed regardless.
+                promise = this.scheduler.queueEvent(event);
+                if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
+                    // event is processed FIFO so if the length is 2 or more we know
+                    // this event is stuck behind an earlier event.
+                    this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
                 }
-                if (err instanceof MatrixError) {
-                    err.event = event;
+            }
+
+            if (!promise) {
+                promise = this.sendEventHttpRequest(event);
+                if (room) {
+                    promise = promise.then((res) => {
+                        room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
+                        return res;
+                    });
                 }
-                throw err;
-            });
+            }
+
+            return await promise;
+        } catch (err) {
+            this.logger.error("Error sending event", err);
+            try {
+                // set the error on the event before we update the status:
+                // updating the status emits the event, so the state should be
+                // consistent at that point.
+                event.error = <MatrixError>err;
+                this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            } catch (e) {
+                this.logger.error("Exception in error handler!", e);
+            }
+            if (err instanceof MatrixError) {
+                err.event = event;
+            }
+            throw err;
+        }
     }
 
     private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
