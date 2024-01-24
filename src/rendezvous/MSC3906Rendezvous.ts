@@ -179,10 +179,7 @@ export class MSC3906Rendezvous {
     }
 
     private async verifyAndCrossSignDevice(deviceInfo: Device): Promise<void> {
-        const crypto = this.client.getCrypto();
-        if (!crypto) {
-            throw new Error("Crypto not available on client");
-        }
+        const crypto = this.client.getCrypto()!;
 
         if (!this.newDeviceId) {
             throw new Error("No new device ID set");
@@ -195,11 +192,8 @@ export class MSC3906Rendezvous {
             );
         }
 
-        const userId = this.client.getUserId();
+        const userId = this.client.getUserId()!;
 
-        if (!userId) {
-            throw new Error("No user ID set");
-        }
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
         await crypto.setDeviceVerified(userId, this.newDeviceId, true);
@@ -207,14 +201,14 @@ export class MSC3906Rendezvous {
 
         const masterPublicKey = (await crypto.getCrossSigningKeyId(CrossSigningKey.Master)) ?? undefined;
 
-        const ourDeviceId = this.client.getDeviceId();
-        const ourDevice = ourDeviceId ? await this.getOwnDevice(ourDeviceId) : undefined;
+        const ourDeviceId = this.client.getDeviceId()!;
+        const ourDeviceKey = (await this.client.getCrypto()!.getOwnDeviceKeys()).ed25519;
 
         await this.send({
             type: PayloadType.Finish,
             outcome: Outcome.Verified,
-            verifying_device_id: ourDevice?.deviceId,
-            verifying_device_key: ourDevice?.getFingerprint(),
+            verifying_device_id: ourDeviceId,
+            verifying_device_key: ourDeviceKey,
             master_key: masterPublicKey,
         });
     }
@@ -266,7 +260,8 @@ export class MSC3906Rendezvous {
         if (!userId) {
             return undefined;
         }
-        return (await this.client.getCrypto()?.getUserDeviceInfo([userId], true))?.get(userId)?.get(deviceId);
+        const ownDeviceInfo = await this.client.getCrypto()!.getUserDeviceInfo([userId]);
+        return ownDeviceInfo.get(userId)?.get(deviceId);
     }
 
     public async cancel(reason: RendezvousFailureReason): Promise<void> {

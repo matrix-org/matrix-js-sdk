@@ -31,7 +31,7 @@ import {
 import { DummyTransport } from "./DummyTransport";
 import { decodeBase64 } from "../../../src/base64";
 import { logger } from "../../../src/logger";
-import { CrossSigningKey } from "../../../src/crypto-api";
+import { CrossSigningKey, OwnDeviceKeys } from "../../../src/crypto-api";
 
 type UserID = string;
 type DeviceID = string;
@@ -40,12 +40,12 @@ type PartialUserDevices = Map<DeviceID, Partial<Device>>;
 type PartialDeviceMap = Map<UserID, PartialUserDevices>;
 type SimpleDeviceMap = Record<UserID, Record<DeviceID, Fingerprint>>;
 
-function mockDevice(userId: UserID, deviceId: DeviceID, fingerprint: Fingerprint): Partial<Device> {
+function mockDevice(userId: UserID, deviceId: DeviceID, fingerprint: Fingerprint): Device {
     return {
         deviceId,
         userId,
         getFingerprint: () => fingerprint,
-    };
+    } as unknown as Device;
 }
 
 function mockDeviceMap(
@@ -96,6 +96,15 @@ function makeMockClient(opts: {
     const deviceMap = mockDeviceMap(opts.userId, opts.deviceId, opts.deviceKey, opts.devices);
     return [
         {
+            doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
+                if (feature === "org.matrix.msc3886") {
+                    return opts.msc3886Enabled;
+                } else if (feature === "org.matrix.msc3882") {
+                    return opts.getLoginTokenEnabled;
+                } else {
+                    return false;
+                }
+            }),
             getVersions() {
                 return {
                     unstable_features: {
@@ -138,6 +147,12 @@ function makeMockClient(opts: {
                     },
                     crossSignDevice(deviceId: string): Promise<void> {
                         return Promise.resolve();
+                    },
+                    getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+                        return Promise.resolve({
+                            ed25519: opts.deviceKey!,
+                            curve25519: "aaaa",
+                        });
                     },
                 };
             },
@@ -666,7 +681,7 @@ describe("Rendezvous", function () {
         const { aliceRz, deviceMap } = await completeLogin(devices);
         // device appears before the timeout
         setTimeout(() => {
-            deviceMap.get(userId)?.set("BOB", mockDevice(userId, "BOB", "bbbb"));
+            deviceMap.get(userId)!.set("BOB", mockDevice(userId, "BOB", "bbbb"));
         }, 1000);
         await aliceRz.verifyNewDeviceOnExistingDevice(2000);
     });
@@ -676,7 +691,7 @@ describe("Rendezvous", function () {
         const { aliceRz, deviceMap } = await completeLogin(devices);
         // device appears after the timeout
         setTimeout(() => {
-            deviceMap.get(userId)?.set("BOB", mockDevice(userId, "BOB", "bbbb"));
+            deviceMap.get(userId)!.set("BOB", mockDevice(userId, "BOB", "bbbb"));
         }, 1500);
         await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
