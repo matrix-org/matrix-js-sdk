@@ -167,6 +167,21 @@ describe("initRustCrypto", () => {
     });
 
     describe("libolm migration", () => {
+        let mockStore: RustSdkCryptoJs.StoreHandle;
+
+        beforeEach(() => {
+            // Stub out a bunch of stuff in the Rust library
+            mockStore = { free: jest.fn() } as unknown as StoreHandle;
+            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
+            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
+
+            const testOlmMachine = makeTestOlmMachine();
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        });
+
         it("migrates data from a legacy crypto store", async () => {
             const PICKLE_KEY = "pickle1234";
             const legacyStore = new MemoryCryptoStore();
@@ -185,17 +200,6 @@ describe("initRustCrypto", () => {
             createSessions(legacyStore, nDevices, nSessionsPerDevice);
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
-
-            // Stub out a bunch of stuff in the Rust library
-            const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
-
-            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
-
-            const testOlmMachine = makeTestOlmMachine();
-            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
 
@@ -275,10 +279,57 @@ describe("initRustCrypto", () => {
                     expect(session.senderKey).toEqual(pad43(`device${i}`));
                     expect(session.pickle).toEqual("sessionPickle");
                     expect(session.roomId!.toString()).toEqual("!room:id");
+                    expect(session.senderSigningKey).toEqual("sender_signing_key");
+
                     // only one of the sessions needs backing up
                     expect(session.backedUp).toEqual(i !== 5 || j !== 5);
                 }
             }
+        }, 10000);
+
+        it("handles megolm sessions with no `keysClaimed`", async () => {
+            const legacyStore = new MemoryCryptoStore();
+            legacyStore.storeAccount({}, "not a real account");
+
+            legacyStore.storeEndToEndInboundGroupSession(
+                pad43(`device1`),
+                `session1`,
+                {
+                    forwardingCurve25519KeyChain: [],
+                    room_id: "!room:id",
+                    session: "sessionPickle",
+                },
+                undefined,
+            );
+
+            const PICKLE_KEY = "pickle1234";
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+            });
+
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledTimes(1);
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledWith(
+                expect.any(Array),
+                new Uint8Array(Buffer.from(PICKLE_KEY)),
+                mockStore,
+            );
+            const megolmSessions: PickledInboundGroupSession[] = mocked(Migration.migrateMegolmSessions).mock
+                .calls[0][0];
+            expect(megolmSessions.length).toEqual(1);
+            const session = megolmSessions[0];
+            expect(session.senderKey).toEqual(pad43(`device1`));
+            expect(session.pickle).toEqual("sessionPickle");
+            expect(session.roomId!.toString()).toEqual("!room:id");
+            expect(session.senderSigningKey).toBe(undefined);
         }, 10000);
 
         async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
