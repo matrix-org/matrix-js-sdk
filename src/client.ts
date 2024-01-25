@@ -1445,7 +1445,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // correctly handle notification counts on encrypted rooms.
         // This fixes https://github.com/vector-im/element-web/issues/9421
         this.on(RoomEvent.Receipt, (event, room) => {
-            if (room && this.isRoomEncrypted(room.roomId)) {
+            if (room?.hasEncryptionStateEvent()) {
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
                 const isSelf =
@@ -3268,8 +3268,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // if there is an 'm.room.encryption' event in this room, it should be
         // encrypted (independently of whether we actually support encryption)
-        const ev = room.currentState.getStateEvents(EventType.RoomEncryption, "");
-        if (ev) {
+        if (room.hasEncryptionStateEvent()) {
             return true;
         }
 
@@ -4875,7 +4874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
     ): EventType | string | null | undefined {
         if (eventType === EventType.Reaction) return eventType;
-        return this.isRoomEncrypted(roomId) ? EventType.RoomMessageEncrypted : eventType;
+        return this.getRoom(roomId)?.hasEncryptionStateEvent() ? EventType.RoomMessageEncrypted : eventType;
     }
 
     protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus): void {

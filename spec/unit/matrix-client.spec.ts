@@ -1450,23 +1450,7 @@ describe("MatrixClient", function () {
         const mockRoom = {
             getMyMembership: () => "join",
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomCreate) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({
-                            content: {
-                                [RoomCreateTypeField]: RoomType.Space,
-                            },
-                        });
-                    } else if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
 
         let event: MatrixEvent;
