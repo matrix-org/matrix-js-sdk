@@ -85,7 +85,8 @@ import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
-jest.useFakeTimers();
+// But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
@@ -1287,7 +1288,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1311,7 +1312,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1336,7 +1337,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1357,7 +1358,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
