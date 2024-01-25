@@ -1309,8 +1309,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 const track = stream.getTracks().find((track) => track.kind === "video");
 
-                const sender = this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))
-                    ?.sender;
+                const sender = this.transceivers.get(
+                    getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"),
+                )?.sender;
 
                 sender?.replaceTrack(track ?? null);
 
@@ -1326,8 +1327,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         } else {
             const track = this.localUsermediaStream?.getTracks().find((track) => track.kind === "video");
-            const sender = this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))
-                ?.sender;
+            const sender = this.transceivers.get(
+                getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"),
+            )?.sender;
             sender?.replaceTrack(track ?? null);
 
             this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream!);
