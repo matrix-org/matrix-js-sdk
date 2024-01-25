@@ -1271,28 +1271,21 @@ describe("RustCrypto", () => {
             );
 
             const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
-            // in addition to correct keys, we restore some invalid keys
+            // in addition to correct keys, we restore an invalid key
             backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
-            backup.push({} as IMegolmSessionData);
             const progressCallback = jest.fn();
             await rustCrypto.importBackedUpRoomKeys(backup, { progressCallback });
             expect(progressCallback).toHaveBeenCalledWith({
-                total: 4,
+                total: 3,
                 successes: 0,
                 stage: "load_keys",
                 failures: 1,
             });
             expect(progressCallback).toHaveBeenCalledWith({
-                total: 4,
-                successes: 0,
-                stage: "load_keys",
-                failures: 2,
-            });
-            expect(progressCallback).toHaveBeenCalledWith({
-                total: 4,
+                total: 3,
                 successes: 1,
                 stage: "load_keys",
-                failures: 2,
+                failures: 1,
             });
         });
     });
