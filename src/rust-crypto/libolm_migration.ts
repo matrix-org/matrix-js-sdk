@@ -232,11 +232,13 @@ async function migrateMegolmSessions(
         logger.debug(`Migrating batch of ${batch.length} megolm sessions`);
         const migrationData: RustSdkCryptoJs.PickledInboundGroupSession[] = [];
         for (const session of batch) {
+            const sessionData = session.sessionData!;
+
             const pickledSession = new RustSdkCryptoJs.PickledInboundGroupSession();
-            pickledSession.pickle = session.sessionData!.session;
-            pickledSession.roomId = new RustSdkCryptoJs.RoomId(session.sessionData!.room_id);
+            pickledSession.pickle = sessionData.session;
+            pickledSession.roomId = new RustSdkCryptoJs.RoomId(sessionData.room_id);
             pickledSession.senderKey = session.senderKey;
-            pickledSession.senderSigningKey = session.sessionData!.keysClaimed["ed25519"];
+            pickledSession.senderSigningKey = sessionData.keysClaimed?.["ed25519"];
             pickledSession.backedUp = !session.needsBackup;
 
             // Not sure if we can reliably distinguish imported vs not-imported sessions in the libolm database.

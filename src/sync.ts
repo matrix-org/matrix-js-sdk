@@ -1760,11 +1760,11 @@ export class SyncApi {
         return events?.find((e) => e.getType() === EventType.RoomEncryption && e.getStateKey() === "");
     }
 
-    // When processing the sync response we cannot rely on MatrixClient::isRoomEncrypted before we actually
+    // When processing the sync response we cannot rely on Room.hasEncryptionStateEvent we actually
     // inject the events into the room object, so we have to inspect the events themselves.
     private isRoomEncrypted(room: Room, stateEventList: MatrixEvent[], timelineEventList?: MatrixEvent[]): boolean {
         return (
-            this.client.isRoomEncrypted(room.roomId) ||
+            room.hasEncryptionStateEvent() ||
             !!this.findEncryptionEvent(stateEventList) ||
             !!this.findEncryptionEvent(timelineEventList)
         );

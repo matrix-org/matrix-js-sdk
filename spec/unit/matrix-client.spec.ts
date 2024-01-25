@@ -55,6 +55,7 @@ import {
     RuleId,
     IPushRule,
     ConditionKind,
+    getHttpUriForMxc,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
@@ -367,6 +368,21 @@ describe("MatrixClient", function () {
             return new Promise(() => {});
         });
         client.stopClient();
+    });
+
+    describe("mxcUrlToHttp", () => {
+        it("should call getHttpUriForMxc", () => {
+            const mxc = "mxc://server/example";
+            expect(client.mxcUrlToHttp(mxc)).toBe(getHttpUriForMxc(client.baseUrl, mxc));
+            expect(client.mxcUrlToHttp(mxc, 32)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32));
+            expect(client.mxcUrlToHttp(mxc, 32, 46)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32, 46));
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale")).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale"),
+            );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true),
+            );
+        });
     });
 
     describe("timestampToEvent", () => {
@@ -1434,23 +1450,7 @@ describe("MatrixClient", function () {
         const mockRoom = {
             getMyMembership: () => "join",
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomCreate) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({
-                            content: {
-                                [RoomCreateTypeField]: RoomType.Space,
-                            },
-                        });
-                    } else if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
 
         let event: MatrixEvent;
