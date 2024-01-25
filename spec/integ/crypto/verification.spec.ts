@@ -744,6 +744,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             expect(toDeviceMessage.code).toEqual("m.user");
             expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(request.cancellationCode).toEqual("m.user");
+            expect(request.cancellingUserId).toEqual("@alice:localhost");
         });
 
         it("can cancel during the SAS phase", async () => {
