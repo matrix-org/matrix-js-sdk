@@ -37,6 +37,21 @@ describe("ContentRepo", function () {
             );
         });
 
+        it("should allow redirects when requested on download URLs", function () {
+            const mxcUri = "mxc://server.name/resourceid";
+            expect(getHttpUriForMxc(baseUrl, mxcUri, undefined, undefined, undefined, false, true)).toEqual(
+                baseUrl + "/_matrix/media/v3/download/server.name/resourceid?allow_redirect=true",
+            );
+        });
+
+        it("should allow redirects when requested on thumbnail URLs", function () {
+            const mxcUri = "mxc://server.name/resourceid";
+            expect(getHttpUriForMxc(baseUrl, mxcUri, 32, 32, "scale", false, true)).toEqual(
+                baseUrl +
+                    "/_matrix/media/v3/thumbnail/server.name/resourceid?width=32&height=32&method=scale&allow_redirect=true",
+            );
+        });
+
         it("should return the empty string for null input", function () {
             expect(getHttpUriForMxc(null as any, "")).toEqual("");
         });
