@@ -455,7 +455,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     VerifierEvent | VerificationRequestEvent,
     VerifierEventHandlerMap & VerificationRequestEventHandlerMap
 > {
-    /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
+    /** A deferred which completes when the verification completes (or rejects when it is cancelled/fails) */
     protected readonly completionDeferred: IDeferred<void>;
 
     public constructor(
