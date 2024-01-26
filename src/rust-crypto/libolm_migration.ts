@@ -245,10 +245,28 @@ async function migrateMegolmSessions(
             pickledSession.senderSigningKey = sessionData.keysClaimed?.["ed25519"];
             pickledSession.backedUp = !session.needsBackup;
 
-            // Not sure if we can reliably distinguish imported vs not-imported sessions in the libolm database.
-            // For now at least, let's be conservative and say that all the sessions are imported (which means that
-            // the Rust SDK treats them as less secure).
-            pickledSession.imported = true;
+            // The rust `imported` flag is used to indicate the authenticity link of a megolm session to the
+            // owner of that session (the one who created it). If `imported` is true, then we have
+            // no cryptographic proof that the session is owned by the claimed device's `senderKey`.
+            // Only megolm keys received directly from the sender as an encrypted `m.room_key` to-device
+            // message have `imported` flag set to false. Any other way to get the megolm key (e.g. from a m.forwarded_room_key,
+            // from backup, from file) should have the imported flag set to true.
+            // Messages encrypted with such keys will have a gray shield in the UI (Authenticity of this message cannot
+            // be guaranteed).
+
+            // We don't just want to mark all sessions as `imported=true` during migration because users will suddenly
+            // see all messages with a gray shield.
+
+            // In legacy the flag to indicate safety of this link is `InboundGroupSessionData.untrusted`
+            // - For created outbound megolm sessions, `untrusted` is `undefined`
+            // - For `m.room_key` events, `untrusted` is `undefined`
+            // - For `m.forwarded_room_key` events, `untrusted` is `true`
+            // - For megolm sessions imported from backup, `untrusted` is `true` (for asymmetric Backup)
+            // - For megolm sessions from file, untrusted is `undefined`.
+
+            // The main difference is in legacy vs rust, is that for rust keys imported from a file are not authenticated.
+            // It's fine as this migration is only a one-time thing anyhow.
+            pickledSession.imported = sessionData.untrusted === true;
 
             migrationData.push(pickledSession);
         }
