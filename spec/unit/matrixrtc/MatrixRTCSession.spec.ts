@@ -214,8 +214,8 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends a membership event when joining a call", () => {
-            sess!.joinRoomSession([mockFocus]);
             jest.useFakeTimers();
+            sess!.joinRoomSession([mockFocus]);
             expect(client.sendStateEvent).toHaveBeenCalledWith(
                 mockRoom!.roomId,
                 EventType.GroupCallMemberPrefix,
