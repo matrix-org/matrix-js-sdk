@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,13 @@ import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
+import { IRoomEncryption } from "../crypto/RoomList";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
+ *
+ * This migrates the base account data, and olm and megolm sessions. It does *not* migrate the room list, which should
+ * happen after an `OlmMachine` is created, via {@link migrateRoomSettingsFromLegacyCrypto}.
  *
  * @param args - Arguments object.
  */
@@ -76,8 +80,8 @@ export async function migrateFromLegacyCrypto(args: {
     await legacyStore.startup();
     let migrationState = await legacyStore.getMigrationState();
 
-    if (migrationState === MigrationState.MEGOLM_SESSIONS_MIGRATED) {
-        // All migration is done.
+    if (migrationState >= MigrationState.MEGOLM_SESSIONS_MIGRATED) {
+        // All migration is done for now. The room list comes later, once we have an OlmMachine.
         return;
     }
 
@@ -253,6 +257,72 @@ async function migrateMegolmSessions(
         await legacyStore.deleteEndToEndInboundGroupSessionsBatch(batch);
         onBatchDone(batch.length);
     }
+}
+
+/**
+ * Determine if any room settings need migrating from the legacy store, and do so.
+ *
+ * @param args - Arguments object.
+ */
+export async function migrateRoomSettingsFromLegacyCrypto({
+    logger,
+    legacyStore,
+    olmMachine,
+}: {
+    /** A `Logger` instance that will be used for debug output. */
+    logger: Logger;
+
+    /** Store to migrate data from. */
+    legacyStore: CryptoStore;
+
+    /** OlmMachine to store the new data on. */
+    olmMachine: RustSdkCryptoJs.OlmMachine;
+}): Promise<void> {
+    if (!(await legacyStore.containsData())) {
+        // This store was never used. Nothing to migrate.
+        return;
+    }
+
+    const migrationState = await legacyStore.getMigrationState();
+
+    if (migrationState >= MigrationState.ROOM_SETTINGS_MIGRATED) {
+        // We've already migrated the room settings.
+        return;
+    }
+
+    let rooms: Record<string, IRoomEncryption> = {};
+
+    await legacyStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
+        legacyStore.getEndToEndRooms(txn, (result) => {
+            rooms = result;
+        });
+    });
+
+    logger.debug(`Migrating ${Object.keys(rooms).length} sets of room settings`);
+    for (const [roomId, legacySettings] of Object.entries(rooms)) {
+        try {
+            const rustSettings = new RustSdkCryptoJs.RoomSettings();
+
+            if (legacySettings.algorithm !== "m.megolm.v1.aes-sha2") {
+                logger.warn(`Room ${roomId}: ignoring room with invalid algorithm ${legacySettings.algorithm}`);
+                continue;
+            }
+            rustSettings.algorithm = RustSdkCryptoJs.EncryptionAlgorithm.MegolmV1AesSha2;
+            rustSettings.sessionRotationPeriodMs = legacySettings.rotation_period_ms;
+            rustSettings.sessionRotationPeriodMessages = legacySettings.rotation_period_msgs;
+            await olmMachine.setRoomSettings(new RustSdkCryptoJs.RoomId(roomId), rustSettings);
+
+            // We don't attempt to clear out the settings from the old store, or record where we've gotten up to,
+            // which means that if the app gets restarted while we're in the middle of this migration, we'll start
+            // again from scratch. So be it. Given that legacy crypto loads the whole room list into memory on startup
+            // anyway, we know it can't be that big.
+        } catch (e) {
+            logger.warn(`Room ${roomId}: ignoring settings ${JSON.stringify(legacySettings)} which caused error ${e}`);
+        }
+    }
+
+    logger.debug(`Completed room settings migration`);
+    await legacyStore.setMigrationState(MigrationState.ROOM_SETTINGS_MIGRATED);
 }
 
 async function getAndDecryptCachedSecretKey(
