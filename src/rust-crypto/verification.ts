@@ -679,7 +679,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public async verify(): Promise<void> {
         this.accepted = true;
         try {
-            await sendAccept();
+            await this.sendAccept();
         } catch (e) {
             this.accepted = false;
             throw e;
@@ -738,7 +738,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
         if (this.accepted) {
             // if the verification was already accepted, but the inner verifier
             // got changed, will need to re-accept
-            await sendAccept();
+            this.sendAccept();
         }
     }
 
