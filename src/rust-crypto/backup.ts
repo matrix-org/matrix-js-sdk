@@ -216,8 +216,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             keysByRoom,
             (progress: BigInt, total: BigInt, failures: BigInt): void => {
                 const importOpt: ImportRoomKeyProgressData = {
-                    // since we didn't include the invalid keys when calling
-                    // importBackedUpRoomKeys, we need to add them to the total
                     total: Number(total),
                     successes: Number(progress),
                     stage: "load_keys",
