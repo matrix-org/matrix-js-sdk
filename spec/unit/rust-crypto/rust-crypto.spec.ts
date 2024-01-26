@@ -704,8 +704,8 @@ describe("RustCrypto", () => {
 
             const outgoingRequestProcessor = {} as unknown as OutgoingRequestProcessor;
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
-            const outgoingRequestsProcessor = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
-            rustCrypto["outgoingRequestsManager"] = outgoingRequestsProcessor;
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
 
             // The second time we do a /keys/upload, the `device_keys` property
             // should be absent from the request body
@@ -743,8 +743,8 @@ describe("RustCrypto", () => {
                     olmMachine.markRequestAsSent(request.id, request.type, JSON.stringify(resp));
                 }
             });
-            await outgoingRequestsProcessor.doProcessOutgoingRequests();
-            await outgoingRequestsProcessor.doProcessOutgoingRequests();
+            await outgoingRequestsManager.doProcessOutgoingRequests();
+            await outgoingRequestsManager.doProcessOutgoingRequests();
 
             expect(deviceKeysAbsent).toBe(true);
         });
