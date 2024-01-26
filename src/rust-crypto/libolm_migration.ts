@@ -278,10 +278,15 @@ export async function migrateRoomSettingsFromLegacyCrypto({
     /** OlmMachine to store the new data on. */
     olmMachine: RustSdkCryptoJs.OlmMachine;
 }): Promise<void> {
+    if (!(await legacyStore.containsData())) {
+        // This store was never used. Nothing to migrate.
+        return;
+    }
+
     const migrationState = await legacyStore.getMigrationState();
 
     if (migrationState >= MigrationState.ROOM_SETTINGS_MIGRATED) {
-        // We've already migratd the room settings.
+        // We've already migrated the room settings.
         return;
     }
 
