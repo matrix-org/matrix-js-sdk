@@ -54,6 +54,18 @@ export interface CryptoApi {
     getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
+     * Check if we believe the given room to be encrypted.
+     *
+     * This method returns true if the room has been configured with encryption. The setting is persistent, so that
+     * even if the encryption event is removed from the room state, it still returns true. This helps to guard against
+     * a downgrade attack wherein a server admin attempts to remove encryption.
+     *
+     * @returns `true` if the room with the supplied ID is encrypted. `false` if the room is not encrypted, or is unknown to
+     * us.
+     */
+    isEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
@@ -189,7 +201,7 @@ export interface CryptoApi {
      * Cross-signing a device indicates, to our other devices and to other users, that we have verified that it really
      * belongs to us.
      *
-     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}.
+     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}).
      *
      * *Note*: Do not call this unless you have verified, somehow, that the device is genuine!
      *

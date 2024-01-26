@@ -312,6 +312,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
+     */
+    public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        const roomSettings: RustSdkCryptoJs.RoomSettings | undefined = await this.olmMachine.getRoomSettings(
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
+        return Boolean(roomSettings?.algorithm);
+    }
+
+    /**
      * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
      */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
