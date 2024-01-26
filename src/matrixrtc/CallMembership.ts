@@ -94,7 +94,7 @@ export class CallMembership {
         if (this.data.expires) {
             return this.createdTs() + this.data.expires;
         } else {
-            // We know it exists because we check this in the constructor.
+            // We know it exists because we checked for this in the constructor.
             return this.data.expires_ts!;
         }
     }
