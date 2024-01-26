@@ -65,7 +65,7 @@ import {
     PolicyScope,
 } from "../../src/models/invites-ignorer";
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
-import { QueryDict } from "../../src/utils";
+import { defer, QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
@@ -1453,6 +1453,8 @@ describe("MatrixClient", function () {
             hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
 
+        let mockCrypto: Mocked<Crypto>;
+
         let event: MatrixEvent;
         beforeEach(async () => {
             event = new MatrixEvent({
@@ -1467,11 +1469,12 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = client["cryptoBackend"] = {
-                // mock crypto
-                encryptEvent: () => new Promise(() => {}),
+            mockCrypto = {
+                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
+                encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Crypto;
+            } as unknown as Mocked<Crypto>;
+            client.crypto = client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -1488,11 +1491,20 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
+            const encryptEventDefer = defer();
+            mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
+
+            const statusPromise = testUtils.emitPromise(event, "Event.status");
             // @ts-ignore protected method access
-            client.encryptAndSendEvent(mockRoom, event);
-            await testUtils.emitPromise(event, "Event.status");
+            const encryptAndSendPromise = client.encryptAndSendEvent(mockRoom, event);
+            await statusPromise;
             expect(event.status).toBe(EventStatus.ENCRYPTING);
             client.cancelPendingEvent(event);
+            assertCancelled();
+
+            // now let the encryption complete, and check that the message is not sent.
+            encryptEventDefer.resolve();
+            await encryptAndSendPromise;
             assertCancelled();
         });
 

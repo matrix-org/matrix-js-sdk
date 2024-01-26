@@ -4274,6 +4274,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
+     */
+    public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        return this.isRoomEncrypted(roomId);
+    }
+
+    /**
      * @returns information about the encryption on the room with the supplied
      * ID, or null if the room is not encrypted or unknown to us.
      */
