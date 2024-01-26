@@ -34,6 +34,7 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixEvent } from "../models/event";
 import { EventType, MsgType } from "../@types/event";
+import { defer, IDeferred } from "../utils";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -455,8 +456,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     VerifierEventHandlerMap & VerificationRequestEventHandlerMap
 > {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
-    protected readonly completionPromise: Promise<void>;
-    protected onChangeCallback!: () => Promise<void>;
+    protected readonly completionDeferred: IDeferred<void>;
 
     public constructor(
         protected inner: InnerType,
@@ -464,29 +464,29 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     ) {
         super();
 
-        this.completionPromise = new Promise<void>((resolve, reject) => {
-            this.onChangeCallback = async (): Promise<void> => {
-                this.onChange();
-
-                if (this.inner.isDone()) {
-                    resolve(undefined);
-                } else if (this.inner.isCancelled()) {
-                    const cancelInfo = this.inner.cancelInfo()!;
-                    reject(
-                        new Error(
-                            `Verification cancelled by ${
-                                cancelInfo.cancelledbyUs() ? "us" : "them"
-                            } with code ${cancelInfo.cancelCode()}: ${cancelInfo.reason()}`,
-                        ),
-                    );
-                }
-
-                this.emit(VerificationRequestEvent.Change);
-            };
-            inner.registerChangesCallback(this.onChangeCallback);
-        });
+        this.completionDeferred = defer();
+        inner.registerChangesCallback(async () => { await this.onChangeCallback() });
         // stop the runtime complaining if nobody catches a failure
-        this.completionPromise.catch(() => null);
+        this.completionDeferred.promise.catch(() => null);
+    }
+
+    protected async onChangeCallback(): Promise<void> {
+        this.onChange();
+
+        if (this.inner.isDone()) {
+            this.completionDeferred.resolve(undefined);
+        } else if (this.inner.isCancelled()) {
+            const cancelInfo = this.inner.cancelInfo()!;
+            this.completionDeferred.reject(
+                new Error(
+                    `Verification cancelled by ${
+                        cancelInfo.cancelledbyUs() ? "us" : "them"
+                     } with code ${cancelInfo.cancelCode()}: ${cancelInfo.reason()}`,
+                ),
+            );
+        }
+
+        this.emit(VerificationRequestEvent.Change);
     }
 
     /**
@@ -579,7 +579,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
             this.emit(VerifierEvent.ShowReciprocateQr, this.callbacks);
         }
         // Nothing to do here but wait.
-        await this.completionPromise;
+        await this.completionDeferred.promise;
     }
 
     /**
@@ -657,7 +657,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      */
     public async verify(): Promise<void> {
         await this.sendAccept();
-        await this.completionPromise;
+        await this.completionDeferred.promise;
     }
 
     /**
@@ -733,7 +733,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public replaceInner(inner: RustSdkCryptoJs.Sas): void {
         if (this.inner != inner) {
             this.inner = inner;
-            inner.registerChangesCallback(this.onChangeCallback);
+            inner.registerChangesCallback(async () => { await this.onChangeCallback() });
             // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
             // the tie breaker.  So we need to re-accept their verification.
             this.sendAccept();
