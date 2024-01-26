@@ -466,15 +466,19 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
 
         this.completionDeferred = defer();
         inner.registerChangesCallback(async () => {
-            await this.onChangeCallback();
+            this.onChange();
         });
         // stop the runtime complaining if nobody catches a failure
         this.completionDeferred.promise.catch(() => null);
     }
 
-    protected async onChangeCallback(): Promise<void> {
-        this.onChange();
-
+    /**
+     * Hook which is called when the underlying rust class notifies us that there has been a change.
+     *
+     * Can be overridden by subclasses to see if we can notify the application about an update. The overriding method
+     * must call `super.onChange()`.
+     */
+    protected onChange(): void {
         if (this.inner.isDone()) {
             this.completionDeferred.resolve(undefined);
         } else if (this.inner.isCancelled()) {
@@ -490,13 +494,6 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
 
         this.emit(VerificationRequestEvent.Change);
     }
-
-    /**
-     * Hook which is called when the underlying rust class notifies us that there has been a change.
-     *
-     * Can be overridden by subclasses to see if we can notify the application about an update.
-     */
-    protected onChange(): void {}
 
     /**
      * Returns true if the verification has been cancelled, either by us or the other side.
@@ -558,6 +555,8 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
     }
 
     protected onChange(): void {
+        super.onChange();
+
         // if the other side has scanned our QR code and sent us a "reciprocate" message, it is now time for the
         // application to prompt the user to confirm their side.
         if (this.callbacks === null && this.inner.hasBeenScanned()) {
@@ -674,6 +673,8 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
 
     /** if we can now show the callbacks, do so */
     protected onChange(): void {
+        super.onChange();
+
         if (this.callbacks === null) {
             const emoji = this.inner.emoji();
             const decimal = this.inner.decimals();
@@ -736,12 +737,12 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
         if (this.inner != inner) {
             this.inner = inner;
             inner.registerChangesCallback(async () => {
-                await this.onChangeCallback();
+                this.onChange();
             });
             // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
             // the tie breaker.  So we need to re-accept their verification.
             this.sendAccept();
-            this.onChangeCallback();
+            this.onChange();
         }
     }
 }
