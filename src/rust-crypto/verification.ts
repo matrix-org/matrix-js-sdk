@@ -678,11 +678,23 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      */
     public async verify(): Promise<void> {
         this.accepted = true;
+        try {
+            await sendAccept();
+        } catch (e) {
+            this.accepted = false;
+            throw e;
+        }
+        await this.completionPromise;
+    }
+
+    /**
+     * Send the accept event, if it hasn't already been sent
+     */
+    private async sendAccept(): Promise<void> {
         const req: undefined | OutgoingRequest = this.inner.accept();
         if (req) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req);
         }
-        await this.completionPromise;
     }
 
     /** if we can now show the callbacks, do so */
@@ -725,13 +737,8 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public onSetInner(): void {
         if (this.accepted) {
             // if the verification was already accepted, but the inner verifier
-            // got changed, we may need to re-accept.  If we already accepted,
-            // this.inner.accept will return `undefined`, so it is safe to try
-            // again
-            const req: undefined | OutgoingRequest = this.inner.accept();
-            if (req) {
-                this.outgoingRequestProcessor.makeOutgoingRequest(req);
-            }
+            // got changed, will need to re-accept
+            await sendAccept();
         }
     }
 
