@@ -3251,6 +3251,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomId - The room ID to enable encryption in.
      * @param config - The encryption config for the room.
      * @returns A promise that will resolve when encryption is set up.
+     *
+     * @deprecated Not supported for Rust Cryptography. To enable encryption in a room, send an `m.room.encryption`
+     * state event.
      */
     public setRoomEncryption(roomId: string, config: IRoomEncryption): Promise<void> {
         if (!this.crypto) {
@@ -3263,6 +3266,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Whether encryption is enabled for a room.
      * @param roomId - the room id to query.
      * @returns whether encryption is enabled.
+     *
+     * @deprecated Not correctly supported for Rust Cryptography. Use {@link CryptoApi.isEncryptionEnabledInRoom} and/or
+     *    {@link Room.hasEncryptionStateEvent}.
      */
     public isRoomEncrypted(roomId: string): boolean {
         const room = this.getRoom(roomId);
@@ -4824,7 +4830,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If the room is unknown, we cannot encrypt for it
         if (!room) return;
 
-        if (!this.shouldEncryptEventForRoom(event, room)) return;
+        if (!(await this.shouldEncryptEventForRoom(event, room))) return;
 
         if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
@@ -4846,7 +4852,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This takes into account event type and room configuration.
      */
-    private shouldEncryptEventForRoom(event: MatrixEvent, room: Room): boolean {
+    private async shouldEncryptEventForRoom(event: MatrixEvent, room: Room): Promise<boolean> {
         if (event.isEncrypted()) {
             // this event has already been encrypted; this happens if the
             // encryption step succeeded, but the send step failed on the first
@@ -4878,7 +4884,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (room.hasEncryptionStateEvent()) return true;
 
         // If we have a crypto impl, and *it* thinks we should encrypt, then we should.
-        if (this.crypto?.isRoomEncrypted(room.roomId)) return true;
+        if (await this.cryptoBackend?.isEncryptionEnabledInRoom(room.roomId)) return true;
 
         // Otherwise, no need to encrypt.
         return false;

@@ -1469,8 +1469,8 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-
             mockCrypto = {
+                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
                 encryptEvent: jest.fn(),
                 stop: jest.fn(),
             } as unknown as Mocked<Crypto>;
