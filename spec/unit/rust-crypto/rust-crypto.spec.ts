@@ -46,7 +46,7 @@ import {
 } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
-import { IEventDecryptionResult } from "../../../src/@types/crypto";
+import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import {
     AccountDataClient,
@@ -1258,6 +1258,34 @@ describe("RustCrypto", () => {
                         },
                     },
                 },
+            });
+        });
+
+        it("ignores invalid keys when restoring from backup", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            await olmMachine.enableBackupV1(
+                (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
+            // in addition to correct keys, we restore an invalid key
+            backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
+            const progressCallback = jest.fn();
+            await rustCrypto.importBackedUpRoomKeys(backup, { progressCallback });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 0,
+                stage: "load_keys",
+                failures: 1,
+            });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 1,
+                stage: "load_keys",
+                failures: 1,
             });
         });
     });
