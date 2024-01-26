@@ -657,7 +657,6 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
 /** A Verifier instance which is used if we are exchanging emojis */
 export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implements Verifier {
     private callbacks: ShowSasCallbacks | null = null;
-    private accepted: boolean = false;
 
     public constructor(
         inner: RustSdkCryptoJs.Sas,
@@ -677,18 +676,12 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      *    or times out.
      */
     public async verify(): Promise<void> {
-        this.accepted = true;
-        try {
-            await this.sendAccept();
-        } catch (e) {
-            this.accepted = false;
-            throw e;
-        }
+        await this.sendAccept();
         await this.completionPromise;
     }
 
     /**
-     * Send the accept event, if it hasn't already been sent
+     * Send the accept or start event, if it hasn't already been sent
      */
     private async sendAccept(): Promise<void> {
         const req: undefined | OutgoingRequest = this.inner.accept();
@@ -735,11 +728,9 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     }
 
     public onSetInner(): void {
-        if (this.accepted) {
-            // if the verification was already accepted, but the inner verifier
-            // got changed, will need to re-accept
-            this.sendAccept();
-        }
+        // setInner will only get called if we started the verification at the same time as the other side, and we lost
+        // the tie breaker.  So we need to re-accept their verification.
+        this.sendAccept();
     }
 
     /**
