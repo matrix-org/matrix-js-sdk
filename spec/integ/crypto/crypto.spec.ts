@@ -230,9 +230,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} to catch the uploaded keys */
     let keyReceiver: E2EKeyReceiver;
 
-    /** an object which intercepts `/keys/query` requests on the test homeserver */
-    let keyResponder: E2EKeyResponder;
-
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: ISyncResponder;
 
@@ -701,7 +698,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("prepareToEncrypt", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -732,7 +729,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -760,7 +757,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("We should start a new megolm session after forceDiscardSession", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2070,7 +2067,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("Sending an event initiates a member list sync", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2093,7 +2090,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("loading the membership list inhibits a later load", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2903,7 +2900,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
 
-            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            const keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
             keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
