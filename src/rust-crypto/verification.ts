@@ -76,14 +76,15 @@ export class RustVerificationRequest
         const onChange = async (): Promise<void> => {
             const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
 
+            // Set the _verifier object (wrapping the rust `Verification` as a js-sdk Verifier) if:
+            // - we now have a `Verification` where we lacked one before
+            // - we have transitioned from QR to SAS
+            // - we are verifying with SAS, but we need to replace our verifier with a new one because both parties
+            //   tried to start verification at the same time, and we lost the tie breaking
             if (verification instanceof RustSdkCryptoJs.Sas) {
                 if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
-                    // If we now have a `Verification` where we lacked one before, or we have transitioned from QR to SAS,
-                    // wrap the new rust Verification as a js-sdk Verifier.
                     this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
                 } else if (this._verifier instanceof RustSASVerifier) {
-                    // We may get a new rust `Verification` if both parties try to start the verification at the same time,
-                    // but we lose the tie breaking.
                     this._verifier.setInner(verification);
                 }
             } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
@@ -455,7 +456,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
 > {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
     protected readonly completionPromise: Promise<void>;
-    private onChangeCallback: (() => Promise<void>) | undefined = undefined;
+    private onChangeCallback!: () => Promise<void>;
 
     public constructor(
         protected inner: InnerType,
@@ -464,7 +465,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
         super();
 
         this.completionPromise = new Promise<void>((resolve, reject) => {
-            const onChange = (this.onChangeCallback = async (): Promise<void> => {
+            this.onChangeCallback = async (): Promise<void> => {
                 this.onChange();
 
                 if (this.inner.isDone()) {
@@ -481,17 +482,24 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
                 }
 
                 this.emit(VerificationRequestEvent.Change);
-            });
-            inner.registerChangesCallback(onChange);
+            };
+            inner.registerChangesCallback(this.onChangeCallback);
         });
         // stop the runtime complaining if nobody catches a failure
         this.completionPromise.catch(() => null);
     }
 
+    /**
+     * Replace the inner Rust verifier with a different one.
+     *
+     * @param inner - the new Rust verifier
+     * @internal
+     */
     public setInner(inner: InnerType): void {
         if (this.inner != inner) {
             this.inner = inner;
             inner.registerChangesCallback(this.onChangeCallback!);
+            this.onSetInner();
             this.onChangeCallback!();
         }
     }
@@ -502,6 +510,11 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
      * Can be overridden by subclasses to see if we can notify the application about an update.
      */
     protected onChange(): void {}
+
+    /**
+     * Hook which is called when the underlying rust class is changed by calling `setInner`.
+     */
+    protected onSetInner(): void {}
 
     /**
      * Returns true if the verification has been cancelled, either by us or the other side.
@@ -644,7 +657,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
 /** A Verifier instance which is used if we are exchanging emojis */
 export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implements Verifier {
     private callbacks: ShowSasCallbacks | null = null;
-    private started: boolean = false;
+    private accepted: boolean = false;
 
     public constructor(
         inner: RustSdkCryptoJs.Sas,
@@ -664,26 +677,16 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      *    or times out.
      */
     public async verify(): Promise<void> {
+        this.accepted = true;
         const req: undefined | OutgoingRequest = this.inner.accept();
         if (req) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req);
         }
-        this.started = true;
         await this.completionPromise;
     }
 
     /** if we can now show the callbacks, do so */
     protected onChange(): void {
-        if (this.started) {
-            // if the verification was already started, but the inner verifier
-            // got changed, we may need to re-accept.  If we already accepted,
-            // this.inner.accept will return `undefined`, so it is safe to try
-            // again
-            const req: undefined | OutgoingRequest = this.inner.accept();
-            if (req) {
-                this.outgoingRequestProcessor.makeOutgoingRequest(req);
-            }
-        }
         if (this.callbacks === null) {
             const emoji = this.inner.emoji();
             const decimal = this.inner.decimals();
@@ -716,6 +719,19 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
                 },
             };
             this.emit(VerifierEvent.ShowSas, this.callbacks);
+        }
+    }
+
+    public onSetInner(): void {
+        if (this.accepted) {
+            // if the verification was already accepted, but the inner verifier
+            // got changed, we may need to re-accept.  If we already accepted,
+            // this.inner.accept will return `undefined`, so it is safe to try
+            // again
+            const req: undefined | OutgoingRequest = this.inner.accept();
+            if (req) {
+                this.outgoingRequestProcessor.makeOutgoingRequest(req);
+            }
         }
     }
 
