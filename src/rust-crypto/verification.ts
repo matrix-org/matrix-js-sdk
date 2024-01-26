@@ -85,7 +85,7 @@ export class RustVerificationRequest
                 if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
                     this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
                 } else if (this._verifier instanceof RustSASVerifier) {
-                    this._verifier.setInner(verification);
+                    this._verifier.replaceInner(verification);
                 }
             } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
                 this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
@@ -456,7 +456,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
 > {
     /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
     protected readonly completionPromise: Promise<void>;
-    private onChangeCallback!: () => Promise<void>;
+    protected onChangeCallback!: () => Promise<void>;
 
     public constructor(
         protected inner: InnerType,
@@ -490,31 +490,11 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     }
 
     /**
-     * Replace the inner Rust verifier with a different one.
-     *
-     * @param inner - the new Rust verifier
-     * @internal
-     */
-    public setInner(inner: InnerType): void {
-        if (this.inner != inner) {
-            this.inner = inner;
-            inner.registerChangesCallback(this.onChangeCallback);
-            this.onSetInner();
-            this.onChangeCallback();
-        }
-    }
-
-    /**
      * Hook which is called when the underlying rust class notifies us that there has been a change.
      *
      * Can be overridden by subclasses to see if we can notify the application about an update.
      */
     protected onChange(): void {}
-
-    /**
-     * Hook which is called when the underlying rust class is changed by calling `setInner`.
-     */
-    protected onSetInner(): void {}
 
     /**
      * Returns true if the verification has been cancelled, either by us or the other side.
@@ -727,12 +707,6 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
         }
     }
 
-    public onSetInner(): void {
-        // setInner will only get called if we started the verification at the same time as the other side, and we lost
-        // the tie breaker.  So we need to re-accept their verification.
-        this.sendAccept();
-    }
-
     /**
      * Calculate an appropriate VerificationPhase for a VerificationRequest where this is the verifier.
      */
@@ -748,6 +722,23 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      */
     public getShowSasCallbacks(): ShowSasCallbacks | null {
         return this.callbacks;
+    }
+
+    /**
+     * Replace the inner Rust verifier with a different one.
+     *
+     * @param inner - the new Rust verifier
+     * @internal
+     */
+    public replaceInner(inner: RustSdkCryptoJs.Sas): void {
+        if (this.inner != inner) {
+            this.inner = inner;
+            inner.registerChangesCallback(this.onChangeCallback);
+            // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
+            // the tie breaker.  So we need to re-accept their verification.
+            this.sendAccept();
+            this.onChangeCallback();
+        }
     }
 }
 
