@@ -465,7 +465,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
         super();
 
         this.completionDeferred = defer();
-        inner.registerChangesCallback(async () => { await this.onChangeCallback() });
+        inner.registerChangesCallback(async () => { await this.onChangeCallback(); });
         // stop the runtime complaining if nobody catches a failure
         this.completionDeferred.promise.catch(() => null);
     }
@@ -733,7 +733,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public replaceInner(inner: RustSdkCryptoJs.Sas): void {
         if (this.inner != inner) {
             this.inner = inner;
-            inner.registerChangesCallback(async () => { await this.onChangeCallback() });
+            inner.registerChangesCallback(async () => { await this.onChangeCallback(); });
             // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
             // the tie breaker.  So we need to re-accept their verification.
             this.sendAccept();
