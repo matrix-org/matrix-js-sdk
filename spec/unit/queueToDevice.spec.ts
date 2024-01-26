@@ -265,6 +265,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
         });
         const mockRoom = {
             updatePendingEvent: jest.fn(),
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(false),
         } as unknown as Room;
         client.resendEvent(dummyEvent, mockRoom);
 

@@ -350,7 +350,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * most recent error associated with sending the event, if any
      * @privateRemarks
-     * Should be read-only
+     * Should be read-only. May not be a MatrixError.
      */
     public error: MatrixError | null = null;
     /**
