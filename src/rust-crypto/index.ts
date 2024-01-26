@@ -23,7 +23,7 @@ import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
 import { Logger } from "../logger";
 import { CryptoStore } from "../crypto/store/base";
-import { migrateFromLegacyCrypto } from "./libolm_migration";
+import { migrateFromLegacyCrypto, migrateRoomSettingsFromLegacyCrypto } from "./libolm_migration";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -112,6 +112,7 @@ export async function initRustCrypto(args: {
         args.secretStorage,
         args.cryptoCallbacks,
         storeHandle,
+        args.legacyCryptoStore,
     );
 
     storeHandle.free();
@@ -128,6 +129,7 @@ async function initOlmMachine(
     secretStorage: ServerSideSecretStorage,
     cryptoCallbacks: ICryptoCallbacks,
     storeHandle: StoreHandle,
+    legacyCryptoStore?: CryptoStore,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
@@ -136,6 +138,15 @@ async function initOlmMachine(
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
     );
+
+    // A final migration step, now that we have an OlmMachine.
+    if (legacyCryptoStore) {
+        await migrateRoomSettingsFromLegacyCrypto({
+            logger,
+            legacyStore: legacyCryptoStore,
+            olmMachine,
+        });
+    }
 
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.
     olmMachine.roomKeyRequestsEnabled = false;

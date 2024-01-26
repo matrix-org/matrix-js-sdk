@@ -325,6 +325,9 @@ export enum MigrationState {
 
     /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
     MEGOLM_SESSIONS_MIGRATED,
+
+    /** MEGOLM_SESSIONS_MIGRATED, and in addition, we have migrated all the room settings. */
+    ROOM_SETTINGS_MIGRATED,
 }
 
 /**
