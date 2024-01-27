@@ -15,9 +15,10 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { Emoji, QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
+    GeneratedSas,
     ShowQrCodeCallbacks,
     ShowSasCallbacks,
     VerificationPhase,
@@ -57,11 +58,13 @@ export class RustVerificationRequest
     /**
      * Construct a new RustVerificationRequest to wrap the rust-level `VerificationRequest`.
      *
-     * @param inner - VerificationRequest from the Rust SDK
-     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests
-     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called
+     * @param olmMachine - The `OlmMachine` from the underlying rust crypto sdk.
+     * @param inner - VerificationRequest from the Rust SDK.
+     * @param outgoingRequestProcessor - `OutgoingRequestProcessor` to use for making outgoing HTTP requests.
+     * @param supportedVerificationMethods - Verification methods to use when `accept()` is called.
      */
     public constructor(
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
         private readonly inner: RustSdkCryptoJs.VerificationRequest,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly supportedVerificationMethods: string[],
@@ -133,6 +136,15 @@ export class RustVerificationRequest
     /** For verifications via to-device messages: the ID of the other device. Otherwise, undefined. */
     public get otherDeviceId(): string | undefined {
         return this.inner.otherDeviceId?.toString();
+    }
+
+    /** Get the other device involved in the verification, if it is known */
+    private async getOtherDevice(): Promise<undefined | RustSdkCryptoJs.Device> {
+        const otherDeviceId = this.inner.otherDeviceId;
+        if (!otherDeviceId) {
+            return undefined;
+        }
+        return await this.olmMachine.getDevice(this.inner.otherUserId, otherDeviceId, 5);
     }
 
     /** True if the other party in this request is one of this user's own devices. */
@@ -322,6 +334,11 @@ export class RustVerificationRequest
             throw new Error(`Unsupported verification method ${method}`);
         }
 
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("startVerification(): other device is unknown");
+        }
+
         const res:
             | [RustSdkCryptoJs.Sas, RustSdkCryptoJs.RoomMessageRequest | RustSdkCryptoJs.ToDeviceRequest]
             | undefined = await this.inner.startSas();
@@ -392,6 +409,11 @@ export class RustVerificationRequest
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
     public async generateQRCode(): Promise<Buffer | undefined> {
+        // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
+        if (!(await this.getOtherDevice())) {
+            throw new Error("generateQRCode(): other device is unknown");
+        }
+
         const innerVerifier: RustSdkCryptoJs.Qr | undefined = await this.inner.generateQrCode();
         // If we are unable to generate a QRCode, we return undefined
         if (!innerVerifier) return;
@@ -404,7 +426,7 @@ export class RustVerificationRequest
      * this verification.
      */
     public get cancellationCode(): string | null {
-        throw new Error("not implemented");
+        return this.inner.cancelInfo?.cancelCode() ?? null;
     }
 
     /**
@@ -413,7 +435,14 @@ export class RustVerificationRequest
      * Only defined when phase is Cancelled
      */
     public get cancellingUserId(): string | undefined {
-        throw new Error("not implemented");
+        const cancelInfo = this.inner.cancelInfo;
+        if (!cancelInfo) {
+            return undefined;
+        } else if (cancelInfo.cancelledbyUs()) {
+            return this.olmMachine.userId.toString();
+        } else {
+            return this.inner.otherUserId.toString();
+        }
     }
 }
 
@@ -638,18 +667,23 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     /** if we can now show the callbacks, do so */
     protected onChange(): void {
         if (this.callbacks === null) {
-            const emoji: Array<Emoji> | undefined = this.inner.emoji();
-            const decimal = this.inner.decimals() as [number, number, number] | undefined;
+            const emoji = this.inner.emoji();
+            const decimal = this.inner.decimals();
 
             if (emoji === undefined && decimal === undefined) {
                 return;
             }
 
+            const sas: GeneratedSas = {};
+            if (emoji) {
+                sas.emoji = emoji.map((e) => [e.symbol, e.description]);
+            }
+            if (decimal) {
+                sas.decimal = [decimal[0], decimal[1], decimal[2]];
+            }
+
             this.callbacks = {
-                sas: {
-                    decimal: decimal,
-                    emoji: emoji?.map((e) => [e.symbol, e.description]),
-                },
+                sas,
                 confirm: async (): Promise<void> => {
                     const requests: Array<OutgoingRequest> = await this.inner.confirm();
                     for (const m of requests) {

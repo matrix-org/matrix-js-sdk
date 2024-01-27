@@ -25,6 +25,7 @@ import { Optional } from "matrix-events-sdk";
 import { IEvent, MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
+import { BaseLogger } from "./logger";
 
 const interns = new Map<string, string>();
 
@@ -385,6 +386,23 @@ export function sleep<T>(ms: number, value?: T): Promise<T> {
     return new Promise((resolve) => {
         setTimeout(resolve, ms, value);
     });
+}
+
+/**
+ * Utility to log the duration of a promise.
+ *
+ * @param logger - The logger to log to.
+ * @param name - The name of the operation.
+ * @param block - The block to execute.
+ */
+export async function logDuration<T>(logger: BaseLogger, name: string, block: () => Promise<T>): Promise<T> {
+    const start = Date.now();
+    try {
+        return await block();
+    } finally {
+        const end = Date.now();
+        logger.debug(`[Perf]: ${name} took ${end - start}ms`);
+    }
 }
 
 /**

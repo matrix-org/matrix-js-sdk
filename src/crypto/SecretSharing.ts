@@ -38,7 +38,10 @@ interface ISecretRequestInternal {
 export class SecretSharing {
     private requests = new Map<string, ISecretRequestInternal>();
 
-    public constructor(private readonly baseApis: MatrixClient, private readonly cryptoCallbacks: ICryptoCallbacks) {}
+    public constructor(
+        private readonly baseApis: MatrixClient,
+        private readonly cryptoCallbacks: ICryptoCallbacks,
+    ) {}
 
     /**
      * Request a secret from another device

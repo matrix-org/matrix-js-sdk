@@ -177,11 +177,23 @@ interface IKeyRequestRecipient {
 }
 
 export interface IDecryptOptions {
-    // Emits "event.decrypted" if set to true
+    /** Whether to emit {@link MatrixEventEvent.Decrypted} events on successful decryption. Defaults to true.
+     */
     emit?: boolean;
-    // True if this is a retry (enables more logging)
+
+    /**
+     * True if this is a retry, after receiving an update to the session key. (Enables more logging.)
+     *
+     * This is only intended for use within the js-sdk.
+     *
+     * @internal
+     */
     isRetry?: boolean;
-    // whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key
+
+    /**
+     * Whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key.
+     * Defaults to `false`.
+     */
     forceRedecryptIfUntrusted?: boolean;
 }
 
@@ -338,7 +350,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * most recent error associated with sending the event, if any
      * @privateRemarks
-     * Should be read-only
+     * Should be read-only. May not be a MatrixError.
      */
     public error: MatrixError | null = null;
     /**
@@ -392,7 +404,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         });
 
         this.txnId = event.txn_id;
-        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
+        // The localTimestamp is calculated using the age.
+        // Some events lack an `age` property, either because they are EDUs such as typing events,
+        // or due to server-side bugs such as https://github.com/matrix-org/synapse/issues/8429.
+        // The fallback in these cases will be to use the origin_server_ts.
+        // For EDUs, the origin_server_ts also is not defined so we use Date.now().
+        const age = this.getAge();
+        this.localTimestamp = age !== undefined ? Date.now() - age : this.getTs() ?? Date.now();
         this.reEmitter = new TypedReEmitter(this);
     }
 
@@ -1193,22 +1211,41 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             }
         }
 
-        // If the redacted event was in a thread
-        if (room && this.threadRootId && this.threadRootId !== this.getId()) {
-            // Remove it from its thread
-            this.thread?.timelineSet.removeEvent(this.getId()!);
-            this.setThread(undefined);
-
-            // And insert it into the main timeline
-            const timeline = room.getLiveTimeline();
-            // We use insertEventIntoTimeline to insert it in timestamp order,
-            // because we don't know where it should go (until we have MSC4033).
-            timeline
-                .getTimelineSet()
-                .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
+        // If the redacted event was in a thread (but not thread root), move it
+        // to the main timeline. This will change if MSC3389 is merged.
+        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
+            this.moveAllRelatedToMainTimeline(room);
+            redactionEvent.moveToMainTimeline(room);
         }
 
         this.invalidateExtensibleEvent();
+    }
+
+    private moveAllRelatedToMainTimeline(room: Room): void {
+        const thread = this.thread;
+        this.moveToMainTimeline(room);
+
+        // If we dont have access to the thread, we can only move this
+        // event, not things related to it.
+        if (thread) {
+            for (const event of thread.events) {
+                if (event.getRelation()?.event_id === this.getId()) {
+                    event.moveAllRelatedToMainTimeline(room);
+                }
+            }
+        }
+    }
+
+    private moveToMainTimeline(room: Room): void {
+        // Remove it from its thread
+        this.thread?.timelineSet.removeEvent(this.getId()!);
+        this.setThread(undefined);
+
+        // And insert it into the main timeline
+        const timeline = room.getLiveTimeline();
+        // We use insertEventIntoTimeline to insert it in timestamp order,
+        // because we don't know where it should go (until we have MSC4033).
+        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
     }
 
     /**

@@ -23,7 +23,7 @@ import { Room } from "../models/room";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
-import { ISavedSync, IStore } from "./index";
+import { ISavedSync, IStore, UserCreator } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
@@ -115,6 +115,13 @@ export class StubStore implements IStore {
      */
     public scrollback(room: Room, limit: number): MatrixEvent[] {
         return [];
+    }
+
+    /**
+     * No-op.
+     */
+    public setUserCreator(creator: UserCreator): void {
+        return;
     }
 
     /**

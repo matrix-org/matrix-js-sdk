@@ -14,7 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, EventTimeline, MatrixClient } from "../../../src";
+import {
+    ClientEvent,
+    EventTimeline,
+    EventType,
+    IRoomTimelineData,
+    MatrixClient,
+    MatrixEvent,
+    RoomEvent,
+} from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
@@ -77,5 +85,27 @@ describe("MatrixRTCSessionManager", () => {
         client.emit(RoomStateEvent.Events, membEvent, roomState, null);
 
         expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
+    });
+
+    it("Calls onCallEncryption on encryption keys event", () => {
+        const room1 = makeMockRoom([membershipTemplate]);
+        jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+        jest.spyOn(client, "getRoom").mockReturnValue(room1);
+
+        client.emit(ClientEvent.Room, room1);
+        const onCallEncryptionMock = jest.fn();
+        client.matrixRTC.getRoomSession(room1).onCallEncryption = onCallEncryptionMock;
+
+        const timelineEvent = {
+            getType: jest.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
+            getContent: jest.fn().mockReturnValue({}),
+            getSender: jest.fn().mockReturnValue("@mock:user.example"),
+            getRoomId: jest.fn().mockReturnValue("!room:id"),
+            sender: {
+                userId: "@mock:user.example",
+            },
+        } as unknown as MatrixEvent;
+        client.emit(RoomEvent.Timeline, timelineEvent, undefined, undefined, false, {} as IRoomTimelineData);
+        expect(onCallEncryptionMock).toHaveBeenCalled();
     });
 });

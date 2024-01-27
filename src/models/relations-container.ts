@@ -26,7 +26,10 @@ export class RelationsContainer {
     // this.relations.get(parentEventId).get(relationType).get(relationEventType)
     private relations = new Map<string, Map<RelationType | string, Map<EventType | string, Relations>>>();
 
-    public constructor(private readonly client: MatrixClient, private readonly room?: Room) {}
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly room?: Room,
+    ) {}
 
     /**
      * Get a collection of child events to a given event in this timeline set.

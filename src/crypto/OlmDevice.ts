@@ -64,7 +64,7 @@ export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
     /** pickled Olm.InboundGroupSession */
     session: string;
-    keysClaimed: Record<string, string>;
+    keysClaimed?: Record<string, string>;
     /** Devices involved in forwarding this session to us (normally empty). */
     forwardingCurve25519KeyChain: string[];
     /** whether this session is untrusted. */

@@ -133,7 +133,6 @@ export class GroupCallEventHandler {
             break;
         }
 
-        logger.debug(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
         this.getRoomDeferred(room.roomId).resolve!();
     }
 

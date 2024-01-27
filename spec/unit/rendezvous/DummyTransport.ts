@@ -32,7 +32,10 @@ export class DummyTransport<D extends RendezvousTransportDetails, T> implements 
     ready = false;
     cancelled = false;
 
-    constructor(private name: string, private mockDetails: D) {}
+    constructor(
+        private name: string,
+        private mockDetails: D,
+    ) {}
     onCancelled?: RendezvousFailureListener;
 
     details(): Promise<RendezvousTransportDetails> {

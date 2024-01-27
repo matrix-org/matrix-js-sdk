@@ -140,7 +140,10 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @param roomId - The room ID of the member.
      * @param userId - The user ID of the member.
      */
-    public constructor(public readonly roomId: string, public readonly userId: string) {
+    public constructor(
+        public readonly roomId: string,
+        public readonly userId: string,
+    ) {
         super();
 
         this.name = userId;

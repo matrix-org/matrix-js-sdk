@@ -1,3 +1,118 @@
+Changes in [31.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.1.0) (2024-01-19)
+==================================================================================================
+## ✨ Features
+
+* Broaden spec version support ([#4016](https://github.com/matrix-org/matrix-js-sdk/pull/4016)). Contributed by @RiotRobot.
+
+
+Changes in [31.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.0.0) (2024-01-16)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Bump minimum spec version to v1.5 ([#3970](https://github.com/matrix-org/matrix-js-sdk/pull/3970)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Bump minimum spec version to v1.5 ([#3970](https://github.com/matrix-org/matrix-js-sdk/pull/3970)). Contributed by @richvdh.
+* Send authenticated /versions request ([#3968](https://github.com/matrix-org/matrix-js-sdk/pull/3968)). Contributed by @dbkr.
+
+## 🐛 Bug Fixes
+
+* Revert "Bump matrix-sdk-crypto-wasm to 3.6.0" ([#3991](https://github.com/matrix-org/matrix-js-sdk/pull/3991)). Contributed by @andybalaam.
+* #22606 Fix "Remove" button  to users without "m.room.redaction" ([#3981](https://github.com/matrix-org/matrix-js-sdk/pull/3981)). Contributed by @rashmitpankhania.
+* ElementR: Ensure Encryption order per room ([#3973](https://github.com/matrix-org/matrix-js-sdk/pull/3973)). Contributed by @BillCarsonFr.
+* Element-R: fix `bootstrapSecretStorage` not resetting key backup when requested ([#3976](https://github.com/matrix-org/matrix-js-sdk/pull/3976)). Contributed by @uhoreg.
+
+
+Changes in [30.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.3.0) (2023-12-19)
+==================================================================================================
+## ✨ Features
+
+* Element-R: disable sending room key requests ([#3939](https://github.com/matrix-org/matrix-js-sdk/pull/3939)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix notifications appearing for old events ([#3946](https://github.com/matrix-org/matrix-js-sdk/pull/3946)). Contributed by @dbkr.
+* Don't back up keys that we got from backup ([#3934](https://github.com/matrix-org/matrix-js-sdk/pull/3934)). Contributed by @uhoreg.
+* Fix upload with empty Content-Type ([#3918](https://github.com/matrix-org/matrix-js-sdk/pull/3918)). Contributed by @JakubOnderka.
+* Prevent phantom notifications from events not in a room's timeline ([#3942](https://github.com/matrix-org/matrix-js-sdk/pull/3942)). Contributed by @dbkr.
+
+
+Changes in [30.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.2.0) (2023-12-05)
+==================================================================================================
+## ✨ Features
+
+* Only await key query after lazy members resolved ([#3902](https://github.com/matrix-org/matrix-js-sdk/pull/3902)). Contributed by @BillCarsonFr.
+
+## 🐛 Bug Fixes
+
+* Rewrite receipt-handling code ([#3901](https://github.com/matrix-org/matrix-js-sdk/pull/3901)). Contributed by @andybalaam.
+* Explicitly free some Rust-side objects ([#3911](https://github.com/matrix-org/matrix-js-sdk/pull/3911)). Contributed by @richvdh.
+* Fix type for TimestampToEventResponse.origin\_server\_ts ([#3906](https://github.com/matrix-org/matrix-js-sdk/pull/3906)). Contributed by @Half-Shot.
+
+
+Changes in [30.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.1.0) (2023-11-21)
+==================================================================================================
+## ✨ Features
+
+* Rotate per-participant keys when a member leaves ([#3833](https://github.com/matrix-org/matrix-js-sdk/pull/3833)). Contributed by @dbkr.
+* Add E2EE for embedded mode of Element Call ([#3667](https://github.com/matrix-org/matrix-js-sdk/pull/3667)). Contributed by @SimonBrandner.
+
+## 🐛 Bug Fixes
+
+* Shorten TimelineWindow when an event is removed ([#3862](https://github.com/matrix-org/matrix-js-sdk/pull/3862)). Contributed by @andybalaam.
+* Ignore receipts pointing at missing or invalid events ([#3817](https://github.com/matrix-org/matrix-js-sdk/pull/3817)). Contributed by @andybalaam.
+* Fix members being loaded from server on initial sync (defeating lazy loading) ([#3830](https://github.com/matrix-org/matrix-js-sdk/pull/3830)). Contributed by @BillCarsonFr.
+
+
+Changes in [30.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.1) (2023-11-13)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Ensure `setUserCreator` is called when a store is assigned ([\#3867](https://github.com/matrix-org/matrix-js-sdk/pull/3867)). Fixes vector-im/element-web#26520. Contributed by @MidhunSureshR.
+
+Changes in [30.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30.0.0) (2023-11-07)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Refactor & make base64 functions browser-safe ([\#3818](https://github.com/matrix-org/matrix-js-sdk/pull/3818)).
+ * `IndexedDBStore.startup()` must be called after using it on `sdk.createClient` now.
+
+## 🦖 Deprecations
+ * Deprecate `MatrixEvent.toJSON` ([\#3801](https://github.com/matrix-org/matrix-js-sdk/pull/3801)).
+
+## ✨ Features
+ * Element-R: Add the git sha of the binding crate to `CryptoApi#getVersion` ([\#3838](https://github.com/matrix-org/matrix-js-sdk/pull/3838)). Contributed by @florianduros.
+ * Element-R: Wire up `globalBlacklistUnverifiedDevices` field to rust crypto encryption settings ([\#3790](https://github.com/matrix-org/matrix-js-sdk/pull/3790)). Fixes vector-im/element-web#26315. Contributed by @florianduros.
+ * Element-R: Wire up room rotation ([\#3807](https://github.com/matrix-org/matrix-js-sdk/pull/3807)). Fixes vector-im/element-web#26318. Contributed by @florianduros.
+ * Element-R: Add current version of the rust-sdk and vodozemac ([\#3825](https://github.com/matrix-org/matrix-js-sdk/pull/3825)). Contributed by @florianduros.
+ * Element-R: Wire up room history visibility ([\#3805](https://github.com/matrix-org/matrix-js-sdk/pull/3805)). Fixes vector-im/element-web#26319. Contributed by @florianduros.
+ * Element-R: log when we send to-device messages ([\#3810](https://github.com/matrix-org/matrix-js-sdk/pull/3810)).
+
+## 🐛 Bug Fixes
+ * Fix reemitter not being correctly wired on user objects created in storage classes ([\#3796](https://github.com/matrix-org/matrix-js-sdk/pull/3796)). Contributed by @MidhunSureshR.
+ * Element-R: silence log errors when viewing a pending event ([\#3824](https://github.com/matrix-org/matrix-js-sdk/pull/3824)).
+ * Don't emit a closed event if the indexeddb is closed by Element ([\#3832](https://github.com/matrix-org/matrix-js-sdk/pull/3832)). Fixes vector-im/element-web#25941. Contributed by @dhenneke.
+ * Element-R: silence log errors when viewing a decryption failure ([\#3821](https://github.com/matrix-org/matrix-js-sdk/pull/3821)).
+
+Changes in [29.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.1.0) (2023-10-24)
+==================================================================================================
+
+## ✨ Features
+ * OIDC: refresh tokens ([\#3764](https://github.com/matrix-org/matrix-js-sdk/pull/3764)). Contributed by @kerryarchibald.
+ * OIDC: add `prompt` param to auth url creation ([\#3794](https://github.com/matrix-org/matrix-js-sdk/pull/3794)). Contributed by @kerryarchibald.
+ * Allow applications to specify their own logger instance ([\#3792](https://github.com/matrix-org/matrix-js-sdk/pull/3792)). Fixes #1899.
+ * Export AutoDiscoveryError and fix type of ALL_ERRORS ([\#3768](https://github.com/matrix-org/matrix-js-sdk/pull/3768)).
+
+## 🐛 Bug Fixes
+ * Fix sending call member events on leave ([\#3799](https://github.com/matrix-org/matrix-js-sdk/pull/3799)). Fixes vector-im/element-call#1763.
+ * Don't use event.sender in CallMembership ([\#3793](https://github.com/matrix-org/matrix-js-sdk/pull/3793)).
+ * Element-R: Don't mark QR code verification as done until it's done ([\#3791](https://github.com/matrix-org/matrix-js-sdk/pull/3791)). Fixes vector-im/element-web#26293.
+ * Element-R: Connect device to key backup when crypto is created ([\#3784](https://github.com/matrix-org/matrix-js-sdk/pull/3784)). Fixes vector-im/element-web#26316. Contributed by @florianduros.
+ * Element-R: Avoid errors in `VerificationRequest.generateQRCode` when QR code is unavailable ([\#3779](https://github.com/matrix-org/matrix-js-sdk/pull/3779)). Fixes vector-im/element-web#26300. Contributed by @florianduros.
+ * ElementR: Check key backup when user identity changes ([\#3760](https://github.com/matrix-org/matrix-js-sdk/pull/3760)). Fixes vector-im/element-web#26244. Contributed by @florianduros.
+ * Element-R: emit `VerificationRequestReceived` on incoming request ([\#3762](https://github.com/matrix-org/matrix-js-sdk/pull/3762)). Fixes vector-im/element-web#26245.
+
 Changes in [29.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v29.0.0) (2023-10-10)
 ==================================================================================================
 

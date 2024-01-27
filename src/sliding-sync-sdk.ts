@@ -114,7 +114,10 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(private readonly client: MatrixClient, private readonly cryptoCallbacks?: SyncCryptoCallbacks) {}
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
+    ) {}
 
     public name(): string {
         return "to_device";
@@ -612,7 +615,7 @@ export class SlidingSyncSdk {
             }
         }
 
-        const encrypted = this.client.isRoomEncrypted(room.roomId);
+        const encrypted = room.hasEncryptionStateEvent();
         // we do this first so it's correct when any of the events fire
         if (roomData.notification_count != null) {
             room.setUnreadNotificationCount(NotificationCountType.Total, roomData.notification_count);
