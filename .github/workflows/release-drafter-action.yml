@@ -1,4 +1,4 @@
-name: Release Make
+name: Draft Release
 on:
     workflow_call:
         secrets:
@@ -11,19 +11,22 @@ on:
             GPG_PRIVATE_KEY:
                 required: false
         inputs:
+            version-bump:
+                description: The scale of the version bump required for semver compatibility [automatic|patch|minor|major]
+                required: true
+                type: string
             final:
                 description: Make final release
                 required: true
                 default: false
                 type: boolean
-            npm:
-                description: Publish to npm
-                type: boolean
-                default: false
+            previous-version:
+                description: What release to use as a base for release note purposes, defaults to the latest stable release.
+                required: false
+                type: string
             dependencies:
                 description: |
                     List of dependencies to update in `npm-dep=version` format.
-                    `version` can be `"current"` to leave it at the current version.
                 type: string
                 required: false
             include-changes:
@@ -44,9 +47,14 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+            yarn-pack:
+                description: Whether to run `yarn pack` as a dry-run
+                type: boolean
+                required: false
+                default: false
+concurrency: release-drafter-action
 jobs:
-    release:
-        name: Release
+    draft:
         runs-on: ubuntu-latest
         environment: Release
         steps:
@@ -58,15 +66,6 @@ jobs:
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
                   passphrase: ${{ secrets.GPG_PASSPHRASE }}
                   fingerprint: ${{ inputs.gpg-fingerprint }}
-
-            - name: Get draft release
-              id: release
-              uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
-              env:
-                  GITHUB_TOKEN: ${{ github.token }}
-              with:
-                  draft: true
-                  latest: true
 
             - uses: actions/checkout@v4
               with:
@@ -84,6 +83,82 @@ jobs:
                       .github/actions
                       scripts/release
 
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+
+            - name: Install dependencies
+              run: "yarn install --frozen-lockfile"
+
+            - name: Update dependencies
+              id: update-dependencies
+              if: inputs.dependencies
+              run: |
+                  UPDATED=()
+                  FOOTER="\n# Dependencies\n"
+                  while IFS= read -r DEPENDENCY; do
+                      [ -z "$DEPENDENCY" ] && continue
+                      IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
+
+                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
+                      echo "Current $PACKAGE version is $CURRENT_VERSION"
+
+                      if [ "$CURRENT_VERSION" == "null" ]
+                      then
+                          echo "Unable to find $PACKAGE in package.json"
+                          exit 1
+                      fi
+
+                      FOOTER+="$PACKAGE - $UPDATE_VERSION\n"
+                      if [ "$UPDATE_VERSION" == "$CURRENT_VERSION" ]
+                      then
+                          echo "Not updating dependency $PACKAGE"
+                          continue
+                      fi
+
+                      echo "Upgrading $PACKAGE to $UPDATE_VERSION..."
+                      yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
+                      git add -u
+                      git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
+                      UPDATED+=("$PACKAGE")
+                  done <<< "$DEPENDENCIES"
+
+                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
+                  echo "updated=$JSON" >> $GITHUB_OUTPUT
+
+                  echo "footer=$FOOTER" >> $GITHUB_OUTPUT
+              env:
+                  DEPENDENCIES: ${{ inputs.dependencies }}
+
+            - name: Prevent develop dependencies
+              if: inputs.dependencies
+              run: |
+                  ret=0
+                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+                  if [ "$ret" -eq 0 ]; then
+                      echo "package.json contains develop dependencies. Refusing to release."
+                      exit 1
+                  fi
+
+            - id: version-bump
+              name: Set version bump
+              if: inputs.version-bump != 'automatic'
+              run: |
+                  echo "increment=$INCREMENT" >> $GITHUB_OUTPUT
+              env:
+                  INCREMENT: ${{ inputs.final == false && 'pre' || '' }}${{ inputs.version-bump }}
+
+            - id: draft-release
+              name: Upsert draft release
+              uses: t3chguy/release-drafter@5c9fa24ff11c92da228955d89081246110c8117c
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  disable-autolabeler: true
+                  previous-version: ${{ inputs.previous-version }}
+                  version-key-increment: ${{ steps.version-bump.outputs.increment }}
+                  footer: ${{ steps.update-dependencies.outputs.footer }}
+
             - name: Prepare variables
               id: prepare
               run: |
@@ -97,13 +172,17 @@ jobs:
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
-              env:
-                  BODY: ${{ steps.release.outputs.body }}
-                  VERSION: ${{ steps.release.outputs.tag_name }}
 
-            - name: Finalise version
-              if: inputs.final
-              run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
+                  echo "package=$(cat package.json | jq -r .name)" >> $GITHUB_OUTPUT
+                  echo "version-changed=$(cat package.json | jq -r .version)" >> $GITHUB_OUTPUT
+              env:
+                  BODY: ${{ steps.draft-release.outputs.body }}
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
+
+            - name: Set up git
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
 
             - name: Check version number not in use
               uses: actions/github-script@v7
@@ -120,64 +199,6 @@ jobs:
                         // This is fine, we expect there to not be any release with this version yet
                       });
 
-            - name: Set up git
-              run: |
-                  git config --global user.email "releases@riot.im"
-                  git config --global user.name "RiotRobot"
-
-            - uses: actions/setup-node@v4
-              with:
-                  cache: "yarn"
-
-            - name: Install dependencies
-              run: "yarn install --frozen-lockfile"
-
-            - name: Update dependencies
-              id: update-dependencies
-              if: inputs.dependencies
-              run: |
-                  UPDATED=()
-                  while IFS= read -r DEPENDENCY; do
-                      [ -z "$DEPENDENCY" ] && continue
-                      IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
-
-                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
-                      echo "Current $PACKAGE version is $CURRENT_VERSION"
-
-                      if [ "$CURRENT_VERSION" == "null" ]
-                      then
-                          echo "Unable to find $PACKAGE in package.json"
-                          exit 1
-                      fi
-
-                      if [ "$UPDATE_VERSION" == "current" ] || [ "$UPDATE_VERSION" == "$CURRENT_VERSION" ]
-                      then
-                          echo "Not updating dependency $PACKAGE"
-                          continue
-                      fi
-
-                      echo "Upgrading $PACKAGE to $UPDATE_VERSION..."
-                      yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
-                      git add -u
-                      git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
-                      UPDATED+=("$PACKAGE")
-                  done <<< "$DEPENDENCIES"
-
-                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
-                  echo "updated=$JSON" >> $GITHUB_OUTPUT
-              env:
-                  DEPENDENCIES: ${{ inputs.dependencies }}
-
-            - name: Prevent develop dependencies
-              if: inputs.dependencies
-              run: |
-                  ret=0
-                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-                  if [ "$ret" -eq 0 ]; then
-                      echo "package.json contains develop dependencies. Refusing to release."
-                      exit
-                  fi
-
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
 
@@ -187,7 +208,7 @@ jobs:
                   (!inputs.dependencies || contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes))
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   DEPENDENCY: ${{ inputs.include-changes }}
               with:
                   retries: 3
@@ -226,7 +247,10 @@ jobs:
                   git add package.json
 
             - name: Commit changes
-              run: git commit -m "$VERSION"
+              run: |
+                  if [[ `git status --porcelain -uno` ]]; then
+                      git commit -m "$VERSION"
+                  fi
 
             - name: Build assets
               if: steps.prepare.outputs.has-dist-script == '1'
@@ -237,8 +261,19 @@ jobs:
               uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
                   asset-path: ${{ inputs.asset-path }}
+
+            - name: Yarn pack
+              if: inputs.yarn-pack
+              run: yarn pack
+
+            - name: Stash yarn pack output
+              if: inputs.yarn-pack
+              uses: actions/upload-artifact@v4
+              with:
+                  name: yarn-pack
+                  path: ${{ steps.prepare.outputs.package }}-${{ steps.draft-release.outputs.tag_name }}.tgz
 
             - name: Create signed tag
               if: inputs.gpg-fingerprint
@@ -252,7 +287,7 @@ jobs:
               uses: ./.action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
 
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
@@ -273,7 +308,7 @@ jobs:
               if: inputs.expected-asset-count
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
               with:
                   retries: 3
@@ -291,63 +326,27 @@ jobs:
                           core.setFailed(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
                       }
 
-            - name: Merge to master
-              if: inputs.final
-              run: |
-                  git checkout master
-                  git merge -X theirs staging
-                  git push origin master
-
-            - name: Publish release
+            - name: Repoint draft release at signed tag
+              if: inputs.gpg-fingerprint
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
-                  FINAL: ${{ inputs.final }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
               with:
                   retries: 3
                   github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   script: |
-                      const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, FINAL } = process.env;
+                      const { RELEASE_ID: release_id, VERSION } = process.env;
                       const { owner, repo } = context.repo;
 
-                      const opts = {
+                      github.rest.repos.updateRelease({
                           owner,
                           repo,
                           release_id,
                           tag_name: VERSION,
-                          name: VERSION,
-                          draft: false,
-                          body: RELEASE_NOTES,
-                      };
+                      });
 
-                      if (FINAL == "true") {
-                          opts.prerelease = false;
-                          opts.make_latest = true;
-                      }
-
-                      github.rest.repos.updateRelease(opts);
-
-    npm:
-        name: Publish to npm
-        needs: release
-        if: inputs.npm
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
-        secrets:
-            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-    update-labels:
-        name: Advance release blocker labels
-        needs: release
-        runs-on: ubuntu-latest
-        steps:
-            - id: repository
-              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
-
-            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
-              with:
-                  owner: ${{ github.repository_owner }}
-                  repo: ${{ steps.repository.outputs.REPO }}
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  filter-labels: X-Upcoming-Release-Blocker
-                  remove-labels: X-Upcoming-Release-Blocker
-                  add-labels: X-Release-Blocker
+            - name: Print summary
+              run: |
+                  echo "[Draft release created]($URL)" >> $GITHUB_STEP_SUMMARY
+              env:
+                  URL: ${{ steps.draft-release.outputs.html_url }}

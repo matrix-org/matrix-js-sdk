@@ -1,0 +1,48 @@
+name: Post Release Process
+on:
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
+concurrency: ${{ github.workflow }}
+jobs:
+    merge-master:
+        if: github.event.release.prerelease == false
+        name: Merge staging -> master
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Set up git
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+
+            - name: Merge to master
+              if: inputs.final
+              run: |
+                  git checkout master
+                  git merge -X theirs staging
+                  git push origin master
+
+    update-labels:
+        name: Advance release blocker labels
+        runs-on: ubuntu-latest
+        # TODO: skip this for hotfix releases
+        if: github.event.release.prerelease == false
+        steps:
+            - id: repository
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
+
+            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+              with:
+                  owner: ${{ github.repository_owner }}
+                  repo: ${{ steps.repository.outputs.REPO }}
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  filter-labels: X-Upcoming-Release-Blocker
+                  remove-labels: X-Upcoming-Release-Blocker
+                  add-labels: X-Release-Blocker

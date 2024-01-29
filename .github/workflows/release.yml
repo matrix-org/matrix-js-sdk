@@ -1,38 +1,24 @@
-name: Release Process
+name: Post Release Process
 on:
-    workflow_dispatch:
-        inputs:
-            mode:
-                description: What type of release
-                required: true
-                default: rc
-                type: choice
-                options:
-                    - rc
-                    - final
-            docs:
-                description: Publish docs
-                required: true
-                type: boolean
-                default: true
-            npm:
-                description: Publish to npm
-                required: true
-                type: boolean
-                default: true
+    release:
+        types: [published]
 concurrency: ${{ github.workflow }}
 jobs:
     release:
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
-        secrets: inherit
-        with:
-            final: ${{ inputs.mode == 'final' }}
-            npm: ${{ inputs.npm }}
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-action.yml@develop
+        secrets:
+            ELEMENT_BOT_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
+
+    npm:
+        name: Publish to npm
+        needs: release
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     docs:
         name: Publish Documentation
         needs: release
-        if: inputs.docs
         runs-on: ubuntu-latest
         steps:
             - name: 🧮 Checkout code
