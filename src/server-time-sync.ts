@@ -23,13 +23,17 @@ let serverToLocalTimeOffset: number | undefined = undefined;
  * using: tryComputeTimeSyncWithEvent or computeTimeSyncWithRequest.
  */
 const getServerToLocalTimeOffset = (): number => {
-    if (!serverToLocalTimeOffset) {
+    if (serverToLocalTimeOffset === undefined) {
         logger.warn("Server time offset not computed yet, using 0");
         serverToLocalTimeOffset = 0;
     }
-    if (!serverToLocalTimeOffset) throw new Error("Failed to compute time sync");
 
     return serverToLocalTimeOffset;
+
+    // TODO: actually use the cached server to local time offset.
+    // This needs adjustments to the tests and some thinking about when to actually call
+    // tryComputeTimeSyncWithEvent.
+    return 0;
 };
 /**
  * This uses a matrix event with an age property to compute the time offset.
@@ -39,10 +43,13 @@ const getServerToLocalTimeOffset = (): number => {
  * @returns true if the time offset computation was successful, false otherwise
  */
 export const tryComputeTimeSyncWithEvent = (event: MatrixEvent): boolean => {
-    const serverTimeNow = event.getTs() + event.getLocalAge();
-    serverToLocalTimeOffset = serverTimeNow - Date.now();
+    if (event.getAge() !== undefined) {
+        const serverTimeNow = event.getTs() + event.getLocalAge();
+        serverToLocalTimeOffset = serverTimeNow - Date.now();
+        return true;
+    }
 
-    return true;
+    return false;
 };
 
 /**

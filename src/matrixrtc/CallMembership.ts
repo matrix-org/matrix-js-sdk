@@ -104,7 +104,7 @@ export class CallMembership {
     public getLocalExpiry(): number {
         ServeTimeSync.tryComputeTimeSyncWithEvent(this.parentEvent);
         if (this.data.expires) {
-            return ServeTimeSync.serverTsToLocalTs(this.createdTs()) + this.data.expires!;
+            return ServeTimeSync.serverTsToLocalTs(this.createdTs() + this.data.expires!);
         } else {
             // We know it exists because we checked for this in the constructor.
             return ServeTimeSync.serverTsToLocalTs(this.data.expires_ts!);
