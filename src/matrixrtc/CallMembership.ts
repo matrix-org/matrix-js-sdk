@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../matrix";
+import * as ServeTimeSync from "../server-time-sync";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -27,7 +28,8 @@ export interface CallMembershipData {
     scope: CallScope;
     device_id: string;
     created_ts?: number;
-    expires: number;
+    expires?: number;
+    expires_ts?: number;
     foci_active?: Focus[];
     membershipID: string;
 }
@@ -41,7 +43,20 @@ export class CallMembership {
         private parentEvent: MatrixEvent,
         private data: CallMembershipData,
     ) {
-        if (typeof data.expires !== "number") throw new Error("Malformed membership: expires must be numeric");
+        if (!(data.expires || data.expires_ts)) {
+            throw new Error("Malformed membership: expires_ts or expires must be present");
+        }
+        if (data.expires) {
+            if (typeof data.expires !== "number") {
+                throw new Error("Malformed membership: expires must be numeric");
+            }
+        }
+        if (data.expires_ts) {
+            if (typeof data.expires_ts !== "number") {
+                throw new Error("Malformed membership: expires_ts must be numeric");
+            }
+        }
+
         if (typeof data.device_id !== "string") throw new Error("Malformed membership event: device_id must be string");
         if (typeof data.call_id !== "string") throw new Error("Malformed membership event: call_id must be string");
         if (typeof data.scope !== "string") throw new Error("Malformed membership event: scope must be string");
@@ -77,16 +92,23 @@ export class CallMembership {
     }
 
     public getAbsoluteExpiry(): number {
-        return this.createdTs() + this.data.expires;
+        if (this.data.expires) {
+            return this.createdTs() + this.data.expires;
+        } else {
+            // We know it exists because we checked for this in the constructor.
+            return this.data.expires_ts!;
+        }
     }
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number {
-        const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
-
-        const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
-
-        return localCreationTs + this.data.expires;
+        ServeTimeSync.tryComputeTimeSyncWithEvent(this.parentEvent);
+        if (this.data.expires) {
+            return ServeTimeSync.serverTsToLocalTs(this.createdTs() + this.data.expires!);
+        } else {
+            // We know it exists because we checked for this in the constructor.
+            return ServeTimeSync.serverTsToLocalTs(this.data.expires_ts!);
+        }
     }
 
     public getMsUntilExpiry(): number {
