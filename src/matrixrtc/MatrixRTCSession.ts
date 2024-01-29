@@ -26,6 +26,7 @@ import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
+import * as ServerTimeSync from "../server-time-sync";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -625,8 +626,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
         if (m.created_ts) m.expires_ts = m.created_ts + (m.expires ?? 0);
-        // TODO: Date.now() should be the origin_server_ts (now).
-        else m.expires_ts = Date.now() + (m.expires ?? 0);
+        else m.expires_ts = ServerTimeSync.getServerTimeNow() + (m.expires ?? 0);
 
         return m;
     }

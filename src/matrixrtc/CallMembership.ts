@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../matrix";
+import * as ServeTimeSync from "../server-time-sync";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -101,16 +102,12 @@ export class CallMembership {
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number {
-        if (this.data.expires_ts) {
-            // With expires_ts we cannot convert to local time.
-            // TODO: Check the server timestamp and compute a diff to local time.
-            return this.data.expires_ts;
+        ServeTimeSync.tryComputeTimeSyncWithEvent(this.parentEvent);
+        if (this.data.expires) {
+            return ServeTimeSync.serverTsToLocalTs(this.createdTs()) + this.data.expires!;
         } else {
-            const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
-
-            const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
-
-            return localCreationTs + this.data.expires!;
+            // We know it exists because we checked for this in the constructor.
+            return ServeTimeSync.serverTsToLocalTs(this.data.expires_ts!);
         }
     }
 
