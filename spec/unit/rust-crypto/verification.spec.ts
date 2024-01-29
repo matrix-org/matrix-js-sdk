@@ -432,19 +432,17 @@ async function initOlmMachineAndKeys(
         '{"one_time_key_counts":{"signed_curve25519":100}}',
     );
     const crossSigningSignatures = JSON.parse(uploadSignaturesRequest.body);
-    if (crossSigningSignatures[userId] && crossSigningSignatures[userId][deviceId]) {
-        for (const [keyId, signature] of Object.entries(
-            crossSigningSignatures[userId][deviceId]["signatures"][userId],
-        )) {
-            deviceKeys["signatures"][userId][keyId] = signature;
-        }
+    for (const [keyId, signature] of Object.entries(crossSigningSignatures[userId][deviceId]["signatures"][userId])) {
+        deviceKeys["signatures"][userId][keyId] = signature;
     }
     const crossSigningKeys = JSON.parse(uploadSigningKeysRequest.body);
     // note: the upload signatures request and upload signing keys requests
-    // don't need to me marked as sent in the Olm machine
+    // don't need to be marked as sent in the Olm machine
 
     return [olmMachine, deviceKeys, crossSigningKeys];
 }
+
+type CustomRequestHandler = (request: OutgoingRequest | RustSdkCryptoJs.UploadSigningKeysRequest) => Promise<any>;
 
 /** Loop for handling outgoing requests from an Olm machine.
  *
@@ -462,9 +460,7 @@ function makeRequestLoop(
     theirOlmMachine: RustSdkCryptoJs.OlmMachine,
     theirDeviceKeys: IDeviceKeys,
     theirCrossSigningKeys: CrossSigningKeys,
-    customHandler:
-        | ((request: OutgoingRequest | RustSdkCryptoJs.UploadSigningKeysRequest) => Promise<any>)
-        | undefined = undefined,
+    customHandler?: CustomRequestHandler,
 ) {
     let stopRequestLoop = false;
     const ourUserId = ourOlmMachine.userId.toString();
@@ -472,81 +468,85 @@ function makeRequestLoop(
     const theirUserId = theirOlmMachine.userId.toString();
     const theirDeviceId = theirOlmMachine.deviceId.toString();
 
+    function defaultHandler(request: OutgoingRequest | RustSdkCryptoJs.UploadSigningKeysRequest): any {
+        if (request instanceof RustSdkCryptoJs.KeysQueryRequest) {
+            const resp: Record<string, any> = {
+                device_keys: {},
+            };
+            const body = JSON.parse(request.body);
+            const query = body.device_keys;
+            const masterKeys: Record<string, any> = {};
+            const selfSigningKeys: Record<string, any> = {};
+            if (ourUserId in query) {
+                resp.device_keys[ourUserId] = { [ourDeviceId]: ourDeviceKeys };
+                masterKeys[ourUserId] = ourCrossSigningKeys.master_key;
+                selfSigningKeys[ourUserId] = ourCrossSigningKeys.self_signing_key;
+                resp.user_signing_keys = {
+                    [ourUserId]: ourCrossSigningKeys.user_signing_key,
+                };
+            }
+            if (theirUserId in query) {
+                resp.device_keys[theirUserId] = {
+                    [theirDeviceId]: theirDeviceKeys,
+                };
+                masterKeys[theirUserId] = theirCrossSigningKeys.master_key;
+                selfSigningKeys[theirUserId] = theirCrossSigningKeys.self_signing_key;
+            }
+            if (Object.keys(masterKeys).length) {
+                resp.master_keys = masterKeys;
+            }
+            if (Object.keys(selfSigningKeys).length) {
+                resp.self_signing_keys = selfSigningKeys;
+            }
+            return resp;
+        } else if (request instanceof RustSdkCryptoJs.RoomMessageRequest) {
+            theirOlmMachine.receiveVerificationEvent(
+                JSON.stringify({
+                    type: request.event_type,
+                    sender: ourUserId,
+                    event_id: "$" + request.event_type,
+                    content: JSON.parse(request.body),
+                    origin_server_ts: Date.now(),
+                    unsigned: {
+                        age: 0,
+                    },
+                }),
+                new RustSdkCryptoJs.RoomId(request.room_id),
+            );
+            return { event_id: "$" + request.event_type };
+        } else if (request instanceof RustSdkCryptoJs.SignatureUploadRequest) {
+            // this only gets called at the end after the verification
+            // succeeds, so we don't actually have to do anything.
+            return { failures: {} };
+        }
+        return {};
+    }
+
     async function makeOutgoingRequest(
         request: OutgoingRequest | RustSdkCryptoJs.UploadSigningKeysRequest,
     ): Promise<any> {
-        let resp: any = customHandler && (await customHandler(request));
-        if (resp == undefined) {
-            resp = {};
-            if (request instanceof RustSdkCryptoJs.KeysQueryRequest) {
-                resp = {
-                    device_keys: {},
-                };
-                const body = JSON.parse(request.body);
-                const query = body.device_keys;
-                const masterKeys: Record<string, any> = {};
-                const selfSigningKeys: Record<string, any> = {};
-                if (ourUserId in query) {
-                    resp.device_keys[ourUserId] = { [ourDeviceId]: ourDeviceKeys };
-                    masterKeys[ourUserId] = ourCrossSigningKeys.master_key;
-                    selfSigningKeys[ourUserId] = ourCrossSigningKeys.self_signing_key;
-                    resp.user_signing_keys = {
-                        [ourUserId]: ourCrossSigningKeys.user_signing_key,
-                    };
-                }
-                if (theirUserId in query) {
-                    resp.device_keys[theirUserId] = {
-                        [theirDeviceId]: theirDeviceKeys,
-                    };
-                    masterKeys[theirUserId] = theirCrossSigningKeys.master_key;
-                    selfSigningKeys[theirUserId] = theirCrossSigningKeys.self_signing_key;
-                }
-                if (Object.keys(masterKeys).length) {
-                    resp.master_keys = masterKeys;
-                }
-                if (Object.keys(selfSigningKeys).length) {
-                    resp.self_signing_keys = selfSigningKeys;
-                }
-            } else if (request instanceof RustSdkCryptoJs.RoomMessageRequest) {
-                resp = { event_id: "$" + request.event_type };
-                theirOlmMachine.receiveVerificationEvent(
-                    JSON.stringify({
-                        type: request.event_type,
-                        sender: ourUserId,
-                        event_id: "$" + request.event_type,
-                        content: JSON.parse(request.body),
-                        origin_server_ts: Date.now(),
-                        unsigned: {
-                            age: 0,
-                        },
-                    }),
-                    new RustSdkCryptoJs.RoomId(request.room_id),
-                );
-            } else if (request instanceof RustSdkCryptoJs.SignatureUploadRequest) {
-                // this only gets called at the end after the verification
-                // succeeds, so we don't actually have to do anything.
-                resp = { failures: {} };
-            }
-        }
+        const resp = (await customHandler?.(request)) ?? defaultHandler(request);
         if (!(request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) && request.id) {
             await ourOlmMachine.markRequestAsSent(request.id!, request.type, JSON.stringify(resp));
         }
     }
 
-    const promise = (async () => {
+    async function runLoop() {
         while (!stopRequestLoop) {
             const requests = await ourOlmMachine.outgoingRequests();
             for (const request of requests) {
                 await makeOutgoingRequest(request);
             }
         }
-    })();
+    }
+
+    const loopCompletedPromise = runLoop();
 
     return {
         makeOutgoingRequest,
         stop: async () => {
             stopRequestLoop = true;
-            await promise;
+            await loopCompletedPromise;
         },
     };
 }
