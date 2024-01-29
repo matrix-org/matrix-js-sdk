@@ -101,16 +101,16 @@ export class CallMembership {
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number {
-        if (this.data.expires_ts) {
-            // With expires_ts we cannot convert to local time.
-            // TODO: Check the server timestamp and compute a diff to local time.
-            return this.data.expires_ts;
-        } else {
+        if (this.data.expires) {
             const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
 
             const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
 
-            return localCreationTs + this.data.expires!;
+            return localCreationTs + this.data.expires;
+        } else {
+            // With expires_ts we cannot convert to local time.
+            // TODO: Check the server timestamp and compute a diff to local time.
+            return this.data.expires_ts!;
         }
     }
 
