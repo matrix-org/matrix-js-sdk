@@ -26,24 +26,38 @@ async function getRelease(github, dependency) {
 
 const HEADING_PREFIX = "## ";
 
+const categories = [
+    "🔒 SECURITY FIXES",
+    "🚨 BREAKING CHANGESd",
+    "🦖 Deprecations",
+    "✨ Features",
+    "🐛 Bug Fixes",
+    "🧰 Maintenance",
+];
+
+const parseReleaseNotes = (body, sections) => {
+    let heading = null;
+    for (const line of body.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith(HEADING_PREFIX)) {
+            heading = trimmed.slice(HEADING_PREFIX.length);
+            if (!categories.includes(heading)) heading = null;
+            continue;
+        }
+        if (heading && trimmed) {
+            sections[heading].push(trimmed);
+        }
+    }
+};
+
 const main = async ({ github, releaseId, dependencies }) => {
     const { GITHUB_REPOSITORY } = process.env;
     const [owner, repo] = GITHUB_REPOSITORY.split("/");
 
-    const sections = new Map();
-    let heading = null;
+    const sections = Object.fromEntries(categories.map((cat) => [cat, []]));
     for (const dependency of dependencies) {
         const release = await getRelease(github, dependency);
-        for (const line of release.body.split("\n")) {
-            if (line.startsWith(HEADING_PREFIX)) {
-                heading = line.trim();
-                sections.set(heading, []);
-                continue;
-            }
-            if (heading && line) {
-                sections.get(heading).push(line.trim());
-            }
-        }
+        parseReleaseNotes(release.body, sections);
     }
 
     const { data: release } = await github.rest.repos.getRelease({
@@ -52,36 +66,22 @@ const main = async ({ github, releaseId, dependencies }) => {
         release_id: releaseId,
     });
 
-    const headings = ["🚨 BREAKING CHANGES", "🦖 Deprecations", "✨ Features", "🐛 Bug Fixes", "🧰 Maintenance"].map(
-        (h) => HEADING_PREFIX + h,
-    );
+    const intro = release.body.split(HEADING_PREFIX, 2)[0].trim();
 
-    heading = null;
-    const output = [];
-    for (const line of [...release.body.split("\n"), null]) {
-        if (line === null || line.startsWith(HEADING_PREFIX)) {
-            // If we have a heading, and it's not the first in the list of pending headings, output the section.
-            // If we're processing the last line (null) then output all remaining sections.
-            while (headings.length > 0 && (line === null || (heading && headings[0] !== heading))) {
-                const heading = headings.shift();
-                if (sections.has(heading)) {
-                    output.push(heading);
-                    output.push(...sections.get(heading));
-                }
-            }
-
-            if (heading && sections.has(heading)) {
-                const lastIsBlank = !output.at(-1)?.trim();
-                if (lastIsBlank) output.pop();
-                output.push(...sections.get(heading));
-                if (lastIsBlank) output.push("");
-            }
-            heading = line;
-        }
-        output.push(line);
+    let output = "";
+    if (intro) {
+        output = intro + "\n\n";
     }
 
-    return output.join("\n");
+    for (const section in sections) {
+        const lines = sections[section];
+        if (!lines.length) continue;
+        output += HEADING_PREFIX + section + "\n\n";
+        output += lines.join("\n");
+        output += "\n\n";
+    }
+
+    return output;
 };
 
 // This is just for testing locally

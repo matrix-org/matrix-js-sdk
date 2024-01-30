@@ -95,7 +95,7 @@ jobs:
               if: inputs.dependencies
               run: |
                   UPDATED=()
-                  FOOTER="\n# Dependencies\n"
+                  FOOTER="\n## Dependencies\n"
                   while IFS= read -r DEPENDENCY; do
                       [ -z "$DEPENDENCY" ] && continue
                       IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
@@ -222,6 +222,13 @@ jobs:
                           dependencies: [DEPENDENCY.replace("$VERSION", VERSION)],
                       });
                       core.exportVariable("RELEASE_NOTES", notes);
+
+                      await github.rest.repos.updateRelease({
+                          owner,
+                          repo,
+                          release_id: releaseId,
+                          body: notes,
+                      });
 
             - name: Add to CHANGELOG.md
               if: inputs.final
