@@ -249,7 +249,7 @@ export class MSC3906Rendezvous {
     }
 
     private async getOwnDevice(deviceId: string): Promise<Device | undefined> {
-        const userId = this.client.getUserId()!;
+        const userId = this.client.getSafeUserId();
         const ownDeviceInfo = await this.client.getCrypto()!.getUserDeviceInfo([userId]);
         return ownDeviceInfo.get(userId)?.get(deviceId);
     }
