@@ -36,8 +36,6 @@ import { CrossSigningKey, OwnDeviceKeys } from "../../../src/crypto-api";
 type UserID = string;
 type DeviceID = string;
 type Fingerprint = string;
-type PartialUserDevices = Map<DeviceID, Partial<Device>>;
-type PartialDeviceMap = Map<UserID, PartialUserDevices>;
 type SimpleDeviceMap = Record<UserID, Record<DeviceID, Fingerprint>>;
 
 function mockDevice(userId: UserID, deviceId: DeviceID, fingerprint: Fingerprint): Device {
@@ -53,10 +51,10 @@ function mockDeviceMap(
     deviceId: DeviceID,
     deviceKey?: Fingerprint,
     otherDevices: SimpleDeviceMap = {},
-): PartialDeviceMap {
-    const deviceMap: PartialDeviceMap = new Map();
+): Map<string, Map<string, Device>> {
+    const deviceMap: Map<string, Map<string, Device>> = new Map();
 
-    const myDevices: PartialUserDevices = new Map();
+    const myDevices: Map<string, Device> = new Map();
     if (deviceKey) {
         myDevices.set(deviceId, mockDevice(userId, deviceId, deviceKey));
     }
@@ -92,7 +90,7 @@ function makeMockClient(opts: {
         known: boolean,
     ) => void;
     crossSigningIds?: Partial<Record<CrossSigningKey, string>>;
-}): [MatrixClient, PartialDeviceMap] {
+}): [MatrixClient, Map<string, Map<string, Device>>] {
     const deviceMap = mockDeviceMap(opts.userId, opts.deviceId, opts.deviceKey, opts.devices);
     return [
         {
@@ -127,16 +125,19 @@ function makeMockClient(opts: {
             getUserId() {
                 return opts.userId;
             },
+            getSafeUserId() {
+                return opts.userId;
+            },
             getDeviceId() {
                 return opts.deviceId;
-            },
-            getDeviceEd25519Key() {
-                return opts.deviceKey;
             },
             baseUrl: "https://example.com",
             getCrypto() {
                 return {
-                    getUserDeviceInfo([userId]: string[], downloadUncached?: boolean): Promise<PartialDeviceMap> {
+                    getUserDeviceInfo(
+                        [userId]: string[],
+                        downloadUncached?: boolean,
+                    ): Promise<Map<string, Map<string, Device>>> {
                         return Promise.resolve(deviceMap);
                     },
                     getCrossSigningKeyId(key: CrossSigningKey): string | null {
@@ -643,7 +644,6 @@ describe("Rendezvous", function () {
             aliceRz,
             bobTransport,
             bobEcdh,
-            devices,
             deviceMap,
         };
     }

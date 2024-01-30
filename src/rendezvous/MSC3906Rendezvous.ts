@@ -192,7 +192,7 @@ export class MSC3906Rendezvous {
             );
         }
 
-        const userId = this.client.getUserId()!;
+        const userId = this.client.getSafeUserId();
 
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
@@ -202,7 +202,7 @@ export class MSC3906Rendezvous {
         const masterPublicKey = (await crypto.getCrossSigningKeyId(CrossSigningKey.Master)) ?? undefined;
 
         const ourDeviceId = this.client.getDeviceId()!;
-        const ourDeviceKey = (await this.client.getCrypto()!.getOwnDeviceKeys()).ed25519;
+        const ourDeviceKey = (await crypto.getOwnDeviceKeys()).ed25519;
 
         await this.send({
             type: PayloadType.Finish,
