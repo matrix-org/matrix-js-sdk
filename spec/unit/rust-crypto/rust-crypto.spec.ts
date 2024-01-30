@@ -94,6 +94,7 @@ describe("initRustCrypto", () => {
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
+            registerDevicesUpdatedCallback: jest.fn(),
             outgoingRequests: jest.fn(),
             isBackupEnabled: jest.fn().mockResolvedValue(false),
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
