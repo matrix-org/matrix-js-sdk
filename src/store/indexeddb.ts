@@ -90,10 +90,10 @@ export class IndexedDBStore extends MemoryStore {
      * ```
      * let opts = { indexedDB: window.indexedDB, localStorage: window.localStorage };
      * let store = new IndexedDBStore(opts);
-     * await store.startup(); // load from indexed db
      * let client = sdk.createClient({
      *     store: store,
      * });
+     * await store.startup(); // load from indexed db, must be called after createClient
      * client.startClient();
      * client.on("sync", function(state, prevState, data) {
      *     if (state === "PREPARED") {
@@ -140,7 +140,9 @@ export class IndexedDBStore extends MemoryStore {
                 logger.log(`IndexedDBStore.startup: processing presence events`);
                 userPresenceEvents.forEach(([userId, rawEvent]) => {
                     if (!this.createUser) {
-                        throw new Error("createUser is undefined, it should be set with setUserCreator()!");
+                        throw new Error(
+                            "`IndexedDBStore.startup` must be called after assigning it to the client, not before!",
+                        );
                     }
                     const u = this.createUser(userId);
                     if (rawEvent) {

@@ -55,6 +55,7 @@ import {
     RuleId,
     IPushRule,
     ConditionKind,
+    getHttpUriForMxc,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
@@ -64,7 +65,7 @@ import {
     PolicyScope,
 } from "../../src/models/invites-ignorer";
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
-import { QueryDict } from "../../src/utils";
+import { defer, QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
@@ -367,6 +368,21 @@ describe("MatrixClient", function () {
             return new Promise(() => {});
         });
         client.stopClient();
+    });
+
+    describe("mxcUrlToHttp", () => {
+        it("should call getHttpUriForMxc", () => {
+            const mxc = "mxc://server/example";
+            expect(client.mxcUrlToHttp(mxc)).toBe(getHttpUriForMxc(client.baseUrl, mxc));
+            expect(client.mxcUrlToHttp(mxc, 32)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32));
+            expect(client.mxcUrlToHttp(mxc, 32, 46)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32, 46));
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale")).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale"),
+            );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true),
+            );
+        });
     });
 
     describe("timestampToEvent", () => {
@@ -1434,24 +1450,10 @@ describe("MatrixClient", function () {
         const mockRoom = {
             getMyMembership: () => "join",
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomCreate) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({
-                            content: {
-                                [RoomCreateTypeField]: RoomType.Space,
-                            },
-                        });
-                    } else if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
+
+        let mockCrypto: Mocked<Crypto>;
 
         let event: MatrixEvent;
         beforeEach(async () => {
@@ -1467,11 +1469,12 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = client["cryptoBackend"] = {
-                // mock crypto
-                encryptEvent: () => new Promise(() => {}),
+            mockCrypto = {
+                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
+                encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Crypto;
+            } as unknown as Mocked<Crypto>;
+            client.crypto = client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -1488,11 +1491,20 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
+            const encryptEventDefer = defer();
+            mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
+
+            const statusPromise = testUtils.emitPromise(event, "Event.status");
             // @ts-ignore protected method access
-            client.encryptAndSendEvent(mockRoom, event);
-            await testUtils.emitPromise(event, "Event.status");
+            const encryptAndSendPromise = client.encryptAndSendEvent(mockRoom, event);
+            await statusPromise;
             expect(event.status).toBe(EventStatus.ENCRYPTING);
             client.cancelPendingEvent(event);
+            assertCancelled();
+
+            // now let the encryption complete, and check that the message is not sent.
+            encryptEventDefer.resolve();
+            await encryptAndSendPromise;
             assertCancelled();
         });
 

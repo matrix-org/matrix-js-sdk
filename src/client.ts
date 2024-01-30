@@ -209,7 +209,7 @@ import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
-import { CryptoBackend } from "./common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
@@ -962,7 +962,8 @@ type CryptoEvents =
     | CryptoEvent.KeysChanged
     | CryptoEvent.Warning
     | CryptoEvent.DevicesUpdated
-    | CryptoEvent.WillUpdateDevices;
+    | CryptoEvent.WillUpdateDevices
+    | CryptoEvent.LegacyCryptoStoreMigrationProgress;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -1304,7 +1305,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
     protected sessionId: string;
-    protected pendingEventEncryption = new Map<string, Promise<void>>();
+
+    /** IDs of events which are currently being encrypted.
+     *
+     * This is part of the cancellation mechanism: if the event is no longer listed here when encryption completes,
+     * that tells us that it has been cancelled, and we should not send it.
+     */
+    private eventsBeingEncrypted = new Set<string>();
 
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
@@ -1444,7 +1451,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // correctly handle notification counts on encrypted rooms.
         // This fixes https://github.com/vector-im/element-web/issues/9421
         this.on(RoomEvent.Receipt, (event, room) => {
-            if (room && this.isRoomEncrypted(room.roomId)) {
+            if (room?.hasEncryptionStateEvent()) {
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
                 const isSelf =
@@ -2328,7 +2335,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             cryptoCallbacks: this.cryptoCallbacks,
             storePrefix: useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
             storePassphrase: this.pickleKey,
+            legacyCryptoStore: this.cryptoStore,
+            legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
+            legacyMigrationProgressListener: (progress, total) => {
+                this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
+            },
         });
+
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
 
         this.cryptoBackend = rustCrypto;
@@ -3241,6 +3254,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomId - The room ID to enable encryption in.
      * @param config - The encryption config for the room.
      * @returns A promise that will resolve when encryption is set up.
+     *
+     * @deprecated Not supported for Rust Cryptography. To enable encryption in a room, send an `m.room.encryption`
+     * state event.
      */
     public setRoomEncryption(roomId: string, config: IRoomEncryption): Promise<void> {
         if (!this.crypto) {
@@ -3253,6 +3269,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Whether encryption is enabled for a room.
      * @param roomId - the room id to query.
      * @returns whether encryption is enabled.
+     *
+     * @deprecated Not correctly supported for Rust Cryptography. Use {@link CryptoApi.isEncryptionEnabledInRoom} and/or
+     *    {@link Room.hasEncryptionStateEvent}.
      */
     public isRoomEncrypted(roomId: string): boolean {
         const room = this.getRoom(roomId);
@@ -3264,8 +3283,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // if there is an 'm.room.encryption' event in this room, it should be
         // encrypted (independently of whether we actually support encryption)
-        const ev = room.currentState.getStateEvents(EventType.RoomEncryption, "");
-        if (ev) {
+        if (room.hasEncryptionStateEvent()) {
             return true;
         }
 
@@ -3901,7 +3919,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let totalKeyCount = 0;
-        let keys: IMegolmSessionData[] = [];
+        let totalFailures = 0;
+        let totalImported = 0;
 
         const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
@@ -3937,25 +3956,61 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 { prefix: ClientPrefix.V3 },
             );
 
-            if ((res as IRoomsKeysResponse).rooms) {
-                const rooms = (res as IRoomsKeysResponse).rooms;
-                for (const [roomId, roomData] of Object.entries(rooms)) {
-                    if (!roomData.sessions) continue;
+            // We have finished fetching the backup, go to next step
+            if (progressCallback) {
+                progressCallback({
+                    stage: "load_keys",
+                });
+            }
 
-                    totalKeyCount += Object.keys(roomData.sessions).length;
-                    const roomKeys = await backupDecryptor.decryptSessions(roomData.sessions);
-                    for (const k of roomKeys) {
-                        k.room_id = roomId;
-                        keys.push(k);
-                    }
-                }
+            if ((res as IRoomsKeysResponse).rooms) {
+                // We have a full backup here, it can get quite big, so we need to decrypt and import it in chunks.
+
+                // Get the total count as a first pass
+                totalKeyCount = this.getTotalKeyCount(res as IRoomsKeysResponse);
+                // Now decrypt and import the keys in chunks
+                await this.handleDecryptionOfAFullBackup(
+                    res as IRoomsKeysResponse,
+                    backupDecryptor,
+                    200,
+                    async (chunk) => {
+                        // We have a chunk of decrypted keys: import them
+                        try {
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
+                                untrusted,
+                            });
+                            totalImported += chunk.length;
+                        } catch (e) {
+                            totalFailures += chunk.length;
+                            // We failed to import some keys, but we should still try to import the rest?
+                            // Log the error and continue
+                            logger.error("Error importing keys from backup", e);
+                        }
+
+                        if (progressCallback) {
+                            progressCallback({
+                                total: totalKeyCount,
+                                successes: totalImported,
+                                stage: "load_keys",
+                                failures: totalFailures,
+                            });
+                        }
+                    },
+                );
             } else if ((res as IRoomKeysResponse).sessions) {
+                // For now we don't chunk for a single room backup, but we could in the future.
+                // Currently it is not used by the application.
                 const sessions = (res as IRoomKeysResponse).sessions;
                 totalKeyCount = Object.keys(sessions).length;
-                keys = await backupDecryptor.decryptSessions(sessions);
+                const keys = await backupDecryptor.decryptSessions(sessions);
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
+                await this.cryptoBackend.importBackedUpRoomKeys(keys, {
+                    progressCallback,
+                    untrusted,
+                });
+                totalImported = keys.length;
             } else {
                 totalKeyCount = 1;
                 try {
@@ -3964,7 +4019,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     });
                     key.room_id = targetRoomId!;
                     key.session_id = targetSessionId!;
-                    keys.push(key);
+
+                    await this.cryptoBackend.importBackedUpRoomKeys([key], {
+                        progressCallback,
+                        untrusted,
+                    });
+                    totalImported = 1;
                 } catch (e) {
                     this.logger.debug("Failed to decrypt megolm session from backup", e);
                 }
@@ -3973,15 +4033,88 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             backupDecryptor.free();
         }
 
-        await this.cryptoBackend.importBackedUpRoomKeys(keys, {
-            progressCallback,
-            untrusted,
-        });
-
         /// in case entering the passphrase would add a new signature?
         await this.cryptoBackend.checkKeyBackupAndEnable();
 
-        return { total: totalKeyCount, imported: keys.length };
+        return { total: totalKeyCount, imported: totalImported };
+    }
+
+    /**
+     * This method calculates the total number of keys present in the response of a `/room_keys/keys` call.
+     *
+     * @param res - The response from the server containing the keys to be counted.
+     *
+     * @returns The total number of keys in the backup.
+     */
+    private getTotalKeyCount(res: IRoomsKeysResponse): number {
+        const rooms = res.rooms;
+        let totalKeyCount = 0;
+        for (const roomData of Object.values(rooms)) {
+            if (!roomData.sessions) continue;
+            totalKeyCount += Object.keys(roomData.sessions).length;
+        }
+        return totalKeyCount;
+    }
+
+    /**
+     * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
+     * It will decrypt the keys in chunks and call the `block` callback for each chunk.
+     *
+     * @param res - The response from the server containing the keys to be decrypted.
+     * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
+     * @param chunkSize - The size of the chunks to be processed at a time.
+     * @param block - A callback function that is called for each chunk of keys.
+     *
+     * @returns A promise that resolves when the decryption is complete.
+     */
+    private async handleDecryptionOfAFullBackup(
+        res: IRoomsKeysResponse,
+        backupDecryptor: BackupDecryptor,
+        chunkSize: number,
+        block: (chunk: IMegolmSessionData[]) => Promise<void>,
+    ): Promise<void> {
+        const rooms = (res as IRoomsKeysResponse).rooms;
+
+        let groupChunkCount = 0;
+        let chunkGroupByRoom: Map<string, IKeyBackupRoomSessions> = new Map();
+
+        const handleChunkCallback = async (roomChunks: Map<string, IKeyBackupRoomSessions>): Promise<void> => {
+            const currentChunk: IMegolmSessionData[] = [];
+            for (const roomId of roomChunks.keys()) {
+                const decryptedSessions = await backupDecryptor.decryptSessions(roomChunks.get(roomId)!);
+                for (const sessionId in decryptedSessions) {
+                    const k = decryptedSessions[sessionId];
+                    k.room_id = roomId;
+                    currentChunk.push(k);
+                }
+            }
+            await block(currentChunk);
+        };
+
+        for (const [roomId, roomData] of Object.entries(rooms)) {
+            if (!roomData.sessions) continue;
+
+            chunkGroupByRoom.set(roomId, {});
+
+            for (const [sessionId, session] of Object.entries(roomData.sessions)) {
+                const sessionsForRoom = chunkGroupByRoom.get(roomId)!;
+                sessionsForRoom[sessionId] = session;
+                groupChunkCount += 1;
+                if (groupChunkCount >= chunkSize) {
+                    // We have enough chunks to decrypt
+                    await handleChunkCallback(chunkGroupByRoom);
+                    chunkGroupByRoom = new Map();
+                    // There might be remaining keys for that room, so add back an entry for the current room.
+                    chunkGroupByRoom.set(roomId, {});
+                    groupChunkCount = 0;
+                }
+            }
+        }
+
+        // Handle remaining chunk if needed
+        if (groupChunkCount > 0) {
+            await handleChunkCallback(chunkGroupByRoom);
+        }
     }
 
     public deleteKeysFromBackup(roomId: undefined, sessionId: undefined, version?: string): Promise<void>;
@@ -4330,9 +4463,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("cannot cancel an event with status " + event.status);
         }
 
-        // if the event is currently being encrypted then
+        // If the event is currently being encrypted then remove it from the pending list, to indicate that it should
+        // not be sent.
         if (event.status === EventStatus.ENCRYPTING) {
-            this.pendingEventEncryption.delete(event.getId()!);
+            this.eventsBeingEncrypted.delete(event.getId()!);
         } else if (this.scheduler && event.status === EventStatus.QUEUED) {
             // tell the scheduler to forget about it, if it's queued
             this.scheduler.removeEventFromQueue(event);
@@ -4631,96 +4765,102 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
      * @returns returns a promise which resolves with the result of the send request
      */
-    protected encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
-        let cancelled = false;
-        // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
-        // so that we can handle synchronous and asynchronous exceptions with the
-        // same code path.
-        return Promise.resolve()
-            .then(() => {
-                const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
-                if (!encryptionPromise) return null; // doesn't need encryption
+    protected async encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
+        try {
+            let cancelled: boolean;
+            this.eventsBeingEncrypted.add(event.getId()!);
+            try {
+                await this.encryptEventIfNeeded(event, room ?? undefined);
+            } finally {
+                cancelled = !this.eventsBeingEncrypted.delete(event.getId()!);
+            }
 
-                this.pendingEventEncryption.set(event.getId()!, encryptionPromise);
-                this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
-                return encryptionPromise.then(() => {
-                    if (!this.pendingEventEncryption.has(event.getId()!)) {
-                        // cancelled via MatrixClient::cancelPendingEvent
-                        cancelled = true;
-                        return;
-                    }
-                    this.updatePendingEventStatus(room, event, EventStatus.SENDING);
-                });
-            })
-            .then(() => {
-                if (cancelled) return {} as ISendEventResponse;
-                let promise: Promise<ISendEventResponse> | null = null;
-                if (this.scheduler) {
-                    // if this returns a promise then the scheduler has control now and will
-                    // resolve/reject when it is done. Internally, the scheduler will invoke
-                    // processFn which is set to this._sendEventHttpRequest so the same code
-                    // path is executed regardless.
-                    promise = this.scheduler.queueEvent(event);
-                    if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
-                        // event is processed FIFO so if the length is 2 or more we know
-                        // this event is stuck behind an earlier event.
-                        this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
-                    }
-                }
+            if (cancelled) {
+                // cancelled via MatrixClient::cancelPendingEvent
+                return {} as ISendEventResponse;
+            }
 
-                if (!promise) {
-                    promise = this.sendEventHttpRequest(event);
-                    if (room) {
-                        promise = promise.then((res) => {
-                            room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
-                            return res;
-                        });
-                    }
-                }
+            // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
+            // to put it back.
+            if (event.status === EventStatus.ENCRYPTING) {
+                this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+            }
 
-                return promise;
-            })
-            .catch((err) => {
-                this.logger.error("Error sending event", err.stack || err);
-                try {
-                    // set the error on the event before we update the status:
-                    // updating the status emits the event, so the state should be
-                    // consistent at that point.
-                    event.error = err;
-                    this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
-                } catch (e) {
-                    this.logger.error("Exception in error handler!", (<Error>e).stack || err);
+            let promise: Promise<ISendEventResponse> | null = null;
+            if (this.scheduler) {
+                // if this returns a promise then the scheduler has control now and will
+                // resolve/reject when it is done. Internally, the scheduler will invoke
+                // processFn which is set to this._sendEventHttpRequest so the same code
+                // path is executed regardless.
+                promise = this.scheduler.queueEvent(event);
+                if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
+                    // event is processed FIFO so if the length is 2 or more we know
+                    // this event is stuck behind an earlier event.
+                    this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
                 }
-                if (err instanceof MatrixError) {
-                    err.event = event;
+            }
+
+            if (!promise) {
+                promise = this.sendEventHttpRequest(event);
+                if (room) {
+                    promise = promise.then((res) => {
+                        room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
+                        return res;
+                    });
                 }
-                throw err;
-            });
+            }
+
+            return await promise;
+        } catch (err) {
+            this.logger.error("Error sending event", err);
+            try {
+                // set the error on the event before we update the status:
+                // updating the status emits the event, so the state should be
+                // consistent at that point.
+                event.error = <MatrixError>err;
+                this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            } catch (e) {
+                this.logger.error("Exception in error handler!", e);
+            }
+            if (err instanceof MatrixError) {
+                err.event = event;
+            }
+            throw err;
+        }
     }
 
-    private encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> | null {
+    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
+        // If the room is unknown, we cannot encrypt for it
+        if (!room) return;
+
+        if (!(await this.shouldEncryptEventForRoom(event, room))) return;
+
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
+            // The client has opted to allow sending messages to encrypted
+            // rooms even if the room is encrypted, and we haven't set up
+            // crypto. This is useful for users of matrix-org/pantalaimon
+            return;
+        }
+
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
+        }
+
+        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        await this.cryptoBackend.encryptEvent(event, room);
+    }
+
+    /**
+     * Determine whether a given event should be encrypted when we send it to the given room.
+     *
+     * This takes into account event type and room configuration.
+     */
+    private async shouldEncryptEventForRoom(event: MatrixEvent, room: Room): Promise<boolean> {
         if (event.isEncrypted()) {
             // this event has already been encrypted; this happens if the
             // encryption step succeeded, but the send step failed on the first
             // attempt.
-            return null;
-        }
-
-        if (event.isRedaction()) {
-            // Redactions do not support encryption in the spec at this time,
-            // whilst it mostly worked in some clients, it wasn't compliant.
-            return null;
-        }
-
-        if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
-            return null;
-        }
-
-        if (!this.cryptoBackend && this.usingExternalCrypto) {
-            // The client has opted to allow sending messages to encrypted
-            // rooms even if the room is encrypted, and we haven't setup
-            // crypto. This is useful for users of matrix-org/pantalaimon
-            return null;
+            return false;
         }
 
         if (event.getType() === EventType.Reaction) {
@@ -4734,14 +4874,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // The reaction key / content / emoji value does warrant encrypting, but
             // this will be handled separately by encrypting just this value.
             // See https://github.com/matrix-org/matrix-doc/pull/1849#pullrequestreview-248763642
-            return null;
+            return false;
         }
 
-        if (!this.cryptoBackend) {
-            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
+        if (event.isRedaction()) {
+            // Redactions do not support encryption in the spec at this time.
+            // Whilst it mostly worked in some clients, it wasn't compliant.
+            return false;
         }
 
-        return this.cryptoBackend.encryptEvent(event, room);
+        // If the room has an m.room.encryption event, we should encrypt.
+        if (room.hasEncryptionStateEvent()) return true;
+
+        // If we have a crypto impl, and *it* thinks we should encrypt, then we should.
+        if (await this.cryptoBackend?.isEncryptionEnabledInRoom(room.roomId)) return true;
+
+        // Otherwise, no need to encrypt.
+        return false;
     }
 
     /**
@@ -4756,7 +4905,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
     ): EventType | string | null | undefined {
         if (eventType === EventType.Reaction) return eventType;
-        return this.isRoomEncrypted(roomId) ? EventType.RoomMessageEncrypted : eventType;
+        return this.getRoom(roomId)?.hasEncryptionStateEvent() ? EventType.RoomMessageEncrypted : eventType;
     }
 
     protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus): void {
@@ -5686,6 +5835,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param allowDirectLinks - If true, return any non-mxc URLs
      * directly. Fetching such URLs will leak information about the user to
      * anyone they share a room with. If false, will return null for such URLs.
+     * @param allowRedirects - If true, the caller supports the URL being 307 or
+     * 308 redirected to another resource upon request. If false, redirects
+     * are not expected.
      * @returns the avatar URL or null.
      */
     public mxcUrlToHttp(
@@ -5694,8 +5846,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         height?: number,
         resizeMethod?: string,
         allowDirectLinks?: boolean,
+        allowRedirects?: boolean,
     ): string | null {
-        return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks);
+        return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks, allowRedirects);
     }
 
     /**

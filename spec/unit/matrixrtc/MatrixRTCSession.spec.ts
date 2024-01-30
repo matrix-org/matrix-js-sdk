@@ -214,8 +214,8 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends a membership event when joining a call", () => {
+            jest.useFakeTimers();
             sess!.joinRoomSession([mockFocus]);
-
             expect(client.sendStateEvent).toHaveBeenCalledWith(
                 mockRoom!.roomId,
                 EventType.GroupCallMemberPrefix,
@@ -227,6 +227,7 @@ describe("MatrixRTCSession", () => {
                             call_id: "",
                             device_id: "AAAAAAA",
                             expires: 3600000,
+                            expires_ts: Date.now() + 3600000,
                             foci_active: [{ type: "mock" }],
                             membershipID: expect.stringMatching(".*"),
                         },
@@ -234,6 +235,7 @@ describe("MatrixRTCSession", () => {
                 },
                 "@alice:example.org",
             );
+            jest.useRealTimers();
         });
 
         it("does nothing if join called when already joined", () => {
@@ -291,6 +293,7 @@ describe("MatrixRTCSession", () => {
                                 call_id: "",
                                 device_id: "AAAAAAA",
                                 expires: 3600000 * 2,
+                                expires_ts: 1000 + 3600000 * 2,
                                 foci_active: [{ type: "mock" }],
                                 created_ts: 1000,
                                 membershipID: expect.stringMatching(".*"),
@@ -510,7 +513,7 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-    it("Does not emits if no membership changes", () => {
+    it("Does not emit if no membership changes", () => {
         const mockRoom = makeMockRoom([membershipTemplate]);
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 
@@ -591,6 +594,7 @@ describe("MatrixRTCSession", () => {
                             call_id: "",
                             device_id: "AAAAAAA",
                             expires: 3600000,
+                            expires_ts: Date.now() + 3600000,
                             foci_active: [mockFocus],
                             membershipID: expect.stringMatching(".*"),
                         },
@@ -605,7 +609,7 @@ describe("MatrixRTCSession", () => {
 
     it("fills in created_ts for other memberships on update", () => {
         client.sendStateEvent = jest.fn();
-
+        jest.useFakeTimers();
         const mockRoom = makeMockRoom([
             Object.assign({}, membershipTemplate, {
                 device_id: "OTHERDEVICE",
@@ -635,6 +639,7 @@ describe("MatrixRTCSession", () => {
                         call_id: "",
                         device_id: "AAAAAAA",
                         expires: 3600000,
+                        expires_ts: Date.now() + 3600000,
                         foci_active: [mockFocus],
                         membershipID: expect.stringMatching(".*"),
                     },
@@ -642,6 +647,7 @@ describe("MatrixRTCSession", () => {
             },
             "@alice:example.org",
         );
+        jest.useRealTimers();
     });
 
     it("collects keys from encryption events", () => {

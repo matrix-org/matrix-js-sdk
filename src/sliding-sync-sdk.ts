@@ -615,7 +615,7 @@ export class SlidingSyncSdk {
             }
         }
 
-        const encrypted = this.client.isRoomEncrypted(room.roomId);
+        const encrypted = room.hasEncryptionStateEvent();
         // we do this first so it's correct when any of the events fire
         if (roomData.notification_count != null) {
             room.setUnreadNotificationCount(NotificationCountType.Total, roomData.notification_count);

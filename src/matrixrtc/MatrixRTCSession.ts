@@ -133,7 +133,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
             if (eventMemberships === undefined) {
-                logger.warn(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
+                logger.debug(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
                 continue;
             }
             if (!Array.isArray(eventMemberships)) {
@@ -624,6 +624,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         };
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
+        if (m.created_ts) m.expires_ts = m.created_ts + (m.expires ?? 0);
+        // TODO: Date.now() should be the origin_server_ts (now).
+        else m.expires_ts = Date.now() + (m.expires ?? 0);
 
         return m;
     }

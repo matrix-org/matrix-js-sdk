@@ -79,7 +79,7 @@ export abstract class ReadReceipt<
     private receiptCacheByEventId: ReceiptCache = new Map();
 
     public abstract getUnfilteredTimelineSet(): EventTimelineSet;
-    public abstract timeline: MatrixEvent[];
+    public abstract get timeline(): MatrixEvent[];
 
     /**
      * Gets the latest receipt for a given user in the room

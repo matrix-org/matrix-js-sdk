@@ -15,9 +15,10 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { Emoji, QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
+    GeneratedSas,
     ShowQrCodeCallbacks,
     ShowSasCallbacks,
     VerificationPhase,
@@ -425,7 +426,7 @@ export class RustVerificationRequest
      * this verification.
      */
     public get cancellationCode(): string | null {
-        throw new Error("not implemented");
+        return this.inner.cancelInfo?.cancelCode() ?? null;
     }
 
     /**
@@ -434,7 +435,14 @@ export class RustVerificationRequest
      * Only defined when phase is Cancelled
      */
     public get cancellingUserId(): string | undefined {
-        throw new Error("not implemented");
+        const cancelInfo = this.inner.cancelInfo;
+        if (!cancelInfo) {
+            return undefined;
+        } else if (cancelInfo.cancelledbyUs()) {
+            return this.olmMachine.userId.toString();
+        } else {
+            return this.inner.otherUserId.toString();
+        }
     }
 }
 
@@ -659,18 +667,23 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     /** if we can now show the callbacks, do so */
     protected onChange(): void {
         if (this.callbacks === null) {
-            const emoji: Array<Emoji> | undefined = this.inner.emoji();
-            const decimal = this.inner.decimals() as [number, number, number] | undefined;
+            const emoji = this.inner.emoji();
+            const decimal = this.inner.decimals();
 
             if (emoji === undefined && decimal === undefined) {
                 return;
             }
 
+            const sas: GeneratedSas = {};
+            if (emoji) {
+                sas.emoji = emoji.map((e) => [e.symbol, e.description]);
+            }
+            if (decimal) {
+                sas.decimal = [decimal[0], decimal[1], decimal[2]];
+            }
+
             this.callbacks = {
-                sas: {
-                    decimal: decimal,
-                    emoji: emoji?.map((e) => [e.symbol, e.description]),
-                },
+                sas,
                 confirm: async (): Promise<void> => {
                     const requests: Array<OutgoingRequest> = await this.inner.confirm();
                     for (const m of requests) {

@@ -28,6 +28,9 @@ import { encodeParams } from "./utils";
  * directly. Fetching such URLs will leak information about the user to
  * anyone they share a room with. If false, will return the emptry string
  * for such URLs.
+ * @param allowRedirects - If true, the caller supports the URL being 307 or
+ * 308 redirected to another resource upon request. If false, redirects
+ * are not expected.
  * @returns The complete URL to the content.
  */
 export function getHttpUriForMxc(
@@ -37,6 +40,7 @@ export function getHttpUriForMxc(
     height?: number,
     resizeMethod?: string,
     allowDirectLinks = false,
+    allowRedirects?: boolean,
 ): string {
     if (typeof mxc !== "string" || !mxc) {
         return "";
@@ -65,6 +69,11 @@ export function getHttpUriForMxc(
         // these are thumbnailing params so they probably want the
         // thumbnailing API...
         prefix = "/_matrix/media/v3/thumbnail/";
+    }
+
+    if (typeof allowRedirects === "boolean") {
+        // We add this after, so we don't convert everything to a thumbnail request.
+        params["allow_redirect"] = JSON.stringify(allowRedirects);
     }
 
     const fragmentOffset = serverAndMediaId.indexOf("#");

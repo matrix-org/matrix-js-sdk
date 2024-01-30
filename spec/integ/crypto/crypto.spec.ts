@@ -29,6 +29,7 @@ import {
     getSyncResponse,
     InitCrypto,
     mkEventCustom,
+    mkMembershipCustom,
     syncPromise,
 } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
@@ -38,6 +39,7 @@ import {
     BOB_TEST_USER_ID,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
+    TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
@@ -230,9 +232,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} to catch the uploaded keys */
     let keyReceiver: E2EKeyReceiver;
 
-    /** an object which intercepts `/keys/query` requests on the test homeserver */
-    let keyResponder: E2EKeyResponder;
-
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: ISyncResponder;
 
@@ -368,6 +367,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 accessToken: "akjgkrgjs",
                 deviceId: "xzcvb",
                 cryptoCallbacks: createCryptoCallbacks(),
+                logger: logger.getChild("aliceClient"),
             });
 
             /* set up listeners for /keys/upload and /sync */
@@ -701,7 +701,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("prepareToEncrypt", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -732,7 +732,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -760,7 +760,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("We should start a new megolm session after forceDiscardSession", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -1063,8 +1063,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // We need to fake the timers to advance the time
-            jest.useFakeTimers();
+            // We need to fake the timers to advance the time, but the wasm bindings of matrix-sdk-crypto rely on a
+            // working `queueMicrotask`
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -2069,7 +2070,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("Sending an event initiates a member list sync", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2092,7 +2093,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("loading the membership list inhibits a later load", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2189,7 +2190,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("key upload request", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
         afterEach(() => {
@@ -2389,8 +2391,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(devicesInfo.get(user)?.size).toBeFalsy();
         });
 
-        it("Get devices from tacked users", async () => {
-            jest.useFakeTimers();
+        it("Get devices from tracked users", async () => {
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -2745,7 +2748,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         describe("Manage Key Backup", () => {
             beforeEach(async () => {
-                jest.useFakeTimers();
+                // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+                jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
             });
 
             afterEach(() => {
@@ -2899,7 +2903,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
 
-            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            const keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
             keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
@@ -2934,5 +2938,181 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
         });
+    });
+
+    /** Guards against downgrade attacks from servers hiding or manipulating the crypto settings. */
+    describe("Persistent encryption settings", () => {
+        let persistentStoreClient: MatrixClient;
+        let client2: MatrixClient;
+
+        beforeEach(async () => {
+            const homeserverurl = "https://alice-server.com";
+            const userId = "@alice:localhost";
+
+            const keyResponder = new E2EKeyResponder(homeserverurl);
+            keyResponder.addKeyReceiver(userId, keyReceiver);
+
+            // For legacy crypto, these tests only work properly with a proper (indexeddb-based) CryptoStore, so
+            // rather than using the existing `aliceClient`, create a new client. Once we drop legacy crypto, we can
+            // just use `aliceClient` here.
+            persistentStoreClient = await makeNewClient(homeserverurl, userId, "persistentStoreClient");
+            await persistentStoreClient.startClient({});
+        });
+
+        afterEach(async () => {
+            persistentStoreClient.stopClient();
+            client2?.stopClient();
+        });
+
+        test("Sending a message in a room where the server is hiding the state event does not send a plaintext event", async () => {
+            // Alice is in an encrypted room
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2" });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessage()]);
+
+            // We now replace the client, and allow the new one to resync, *without* the encryption event.
+            client2 = await replaceClient(persistentStoreClient);
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([]));
+            await client2.startClient({});
+            await syncPromise(client2);
+            logger.log(client2.getUserId() + ": restarted");
+
+            await expectSendMessageToFail(client2);
+        });
+
+        test("Changes to the rotation period should be ignored", async () => {
+            // Alice is in an encrypted room, where the rotation period is set to 2 messages
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            const [, msg1Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test1"),
+                expectEncryptedSendMessage(),
+            ]);
+
+            // Replace the state with one which bumps the rotation period. This should be ignored, though it's not
+            // clear that is correct behaviour (see https://github.com/element-hq/element-meta/issues/69)
+            const encryptionState2 = mkEncryptionEvent({
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 100,
+            });
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "1",
+                rooms: { join: { [TEST_ROOM_ID]: { timeline: { events: [encryptionState2], prev_batch: "" } } } },
+            });
+            await syncPromise(persistentStoreClient);
+
+            // Send two more messages. The first should use the same megolm session as the first; the second should
+            // use a different one.
+            const [, msg2Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test2"),
+                expectEncryptedSendMessage(),
+            ]);
+            expect(msg2Content.session_id).toEqual(msg1Content.session_id);
+            const [, msg3Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test3"),
+                expectEncryptedSendMessage(),
+            ]);
+            expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
+        });
+
+        test("Changes to the rotation period should be ignored after a client restart", async () => {
+            // Alice is in an encrypted room, where the rotation period is set to 2 messages
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessage()]);
+
+            // We now replace the client, and allow the new one to resync with a *different* encryption event.
+            client2 = await replaceClient(persistentStoreClient);
+            const encryptionState2 = mkEncryptionEvent({
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 100,
+            });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState2]));
+            await client2.startClient({});
+            await syncPromise(client2);
+            logger.log(client2.getUserId() + ": restarted");
+
+            // Now send another message, which should (for now) be rejected.
+            await expectSendMessageToFail(client2);
+        });
+
+        /** Shut down `oldClient`, and build a new MatrixClient for the same user. */
+        async function replaceClient(oldClient: MatrixClient) {
+            oldClient.stopClient();
+            syncResponder.sendOrQueueSyncResponse({}); // flush pending request from old client
+            return makeNewClient(oldClient.getHomeserverUrl(), oldClient.getSafeUserId(), "client2");
+        }
+
+        async function makeNewClient(
+            homeserverUrl: string,
+            userId: string,
+            loggerPrefix: string,
+        ): Promise<MatrixClient> {
+            const client = createClient({
+                baseUrl: homeserverUrl,
+                userId: userId,
+                accessToken: "akjgkrgjs",
+                deviceId: "xzcvb",
+                cryptoCallbacks: createCryptoCallbacks(),
+                logger: logger.getChild(loggerPrefix),
+
+                // For legacy crypto, these tests only work with a proper persistent cryptoStore.
+                cryptoStore: new IndexedDBCryptoStore(indexedDB, "test"),
+            });
+            await initCrypto(client);
+            mockInitialApiRequests(client.getHomeserverUrl());
+            return client;
+        }
+
+        function mkEncryptionEvent(content: Object) {
+            return mkEventCustom({
+                sender: persistentStoreClient.getSafeUserId(),
+                type: "m.room.encryption",
+                state_key: "",
+                content: content,
+            });
+        }
+
+        /** Sync response which includes `TEST_ROOM_ID`, where alice is a member
+         *
+         * @param stateEvents - Additional state events for the test room
+         */
+        function getSyncResponseWithState(stateEvents: Array<Object>) {
+            const roomResponse = {
+                state: {
+                    events: [
+                        mkMembershipCustom({ membership: "join", sender: persistentStoreClient.getSafeUserId() }),
+                        ...stateEvents,
+                    ],
+                },
+                timeline: {
+                    events: [],
+                    prev_batch: "",
+                },
+            };
+
+            return {
+                next_batch: "1",
+                rooms: { join: { [TEST_ROOM_ID]: roomResponse } },
+            };
+        }
+
+        /** Send a message with the given client, and check that it is not sent in plaintext */
+        async function expectSendMessageToFail(aliceClient2: MatrixClient) {
+            // The precise failure mode here is somewhat up for debate (https://github.com/element-hq/element-meta/issues/69).
+            // For now, the attempt to send is rejected with an exception. The text is different between old and new stacks.
+            await expect(aliceClient2.sendTextMessage(ROOM_ID, "test")).rejects.toThrow(
+                /unconfigured room !room:id|Room !room:id was previously configured to use encryption/,
+            );
+        }
     });
 });
