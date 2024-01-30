@@ -136,6 +136,8 @@ describe("MatrixClient.initRustCrypto", () => {
 
         expect(await matrixClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual("7");
 
+        expect(await matrixClient.getCrypto()!.isEncryptionEnabledInRoom("!CWLUCoEWXSFyTCOtfL:matrix.org")).toBe(true);
+
         // check the progress callback
         expect(progressListener.mock.calls.length).toBeGreaterThan(50);
 

@@ -84,7 +84,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet: EventTimelineSet;
-    public timeline: MatrixEvent[] = [];
 
     private _currentUserParticipated = false;
 
@@ -323,7 +322,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 fromCache: false,
                 roomState: this.roomState,
             });
-            this.timeline = this.events;
         }
     }
 
@@ -350,9 +348,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             return;
         }
         this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
-
-        // As far as we know, timeline should always be the same as events
-        this.timeline = this.events;
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -483,7 +478,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
         }
-        this.timeline = this.events;
     }
 
     /**
@@ -725,6 +719,16 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public get replyToEvent(): Optional<MatrixEvent> {
         return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
+    }
+
+    /**
+     * The live event timeline for this thread.
+     * @deprecated Present for backwards compatibility.
+     *             Use this.events instead
+     * @returns The live event timeline for this thread.
+     */
+    public get timeline(): MatrixEvent[] {
+        return this.events;
     }
 
     public get events(): MatrixEvent[] {

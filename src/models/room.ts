@@ -382,13 +382,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public summary: RoomSummary | null = null;
     /**
-     * The live event timeline for this room, with the oldest event at index 0.
-     *
-     * @deprecated Present for backwards compatibility.
-     *             Use getLiveTimeline().getEvents() instead
-     */
-    public timeline!: MatrixEvent[];
-    /**
      * oldState The state of the room at the time of the oldest event in the live timeline.
      *
      * @deprecated Present for backwards compatibility.
@@ -794,6 +787,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * The live event timeline for this room, with the oldest event at index 0.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
+     */
+    public get timeline(): MatrixEvent[] {
+        return this.getLiveTimeline().getEvents();
+    }
+
+    /**
      * Get the timestamp of the last message in the room
      *
      * @returns the timestamp of the last message in the room
@@ -980,7 +983,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // that this function is only called once (unless loading the members
         // fails), since loadMembersIfNeeded always returns this.membersPromise
         // if set, which will be the result of the first (successful) call.
-        if (rawMembersEvents === null || (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
+        if (rawMembersEvents === null || this.hasEncryptionStateEvent()) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
@@ -1221,11 +1224,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const previousOldState = this.oldState;
         const previousCurrentState = this.currentState;
 
-        // maintain this.timeline as a reference to the live timeline,
-        // and this.oldState and this.currentState as references to the
+        // maintain this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
-        this.timeline = this.getLiveTimeline().getEvents();
         this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
         this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
@@ -1275,9 +1276,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * error will be thrown.
      *
      * @returns the result
+     *
+     * @deprecated Not supported under rust crypto. Instead, call {@link Room.getEncryptionTargetMembers},
+     * {@link CryptoApi.getUserDeviceInfo}, and {@link CryptoApi.getDeviceVerificationStatus}.
      */
     public async hasUnverifiedDevices(): Promise<boolean> {
-        if (!this.client.isRoomEncrypted(this.roomId)) {
+        if (!this.hasEncryptionStateEvent()) {
             return false;
         }
         const e2eMembers = await this.getEncryptionTargetMembers();
@@ -2565,7 +2569,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 .filter((event) => {
                     // Filter out the unencrypted messages if the room is encrypted
                     const isEventEncrypted = event.type === EventType.RoomMessageEncrypted;
-                    const isRoomEncrypted = this.client.isRoomEncrypted(this.roomId);
+                    const isRoomEncrypted = this.hasEncryptionStateEvent();
                     return isEventEncrypted || !isRoomEncrypted;
                 });
 
@@ -3170,7 +3174,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public maySendMessage(): boolean {
         return (
             this.getMyMembership() === "join" &&
-            (this.client.isRoomEncrypted(this.roomId)
+            (this.hasEncryptionStateEvent()
                 ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
                 : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId))
         );
@@ -3671,6 +3675,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
         return compareEventOrdering(this, leftEventId, rightEventId);
+    }
+
+    /**
+     * Return true if this room has an `m.room.encryption` state event.
+     *
+     * If this returns `true`, events sent to this room should be encrypted (and `MatrixClient.sendEvent` and friends
+     * will encrypt outgoing events).
+     */
+    public hasEncryptionStateEvent(): boolean {
+        return Boolean(
+            this.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents(EventType.RoomEncryption, ""),
+        );
     }
 }
 

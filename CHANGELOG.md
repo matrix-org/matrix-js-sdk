@@ -76,6 +76,7 @@ Changes in [30.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v30
 
 ## 🚨 BREAKING CHANGES
  * Refactor & make base64 functions browser-safe ([\#3818](https://github.com/matrix-org/matrix-js-sdk/pull/3818)).
+ * `IndexedDBStore.startup()` must be called after using it on `sdk.createClient` now.
 
 ## 🦖 Deprecations
  * Deprecate `MatrixEvent.toJSON` ([\#3801](https://github.com/matrix-org/matrix-js-sdk/pull/3801)).

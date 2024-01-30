@@ -88,7 +88,8 @@ export class RoomEncryptor {
      */
     public onCryptoEvent(config: IContent): void {
         if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
-            this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
+            // This should currently be unreachable, since the Rust SDK will reject any attempts to change config.
+            throw new Error("Cannot reconfigure an active RoomEncryptor");
         }
     }
 

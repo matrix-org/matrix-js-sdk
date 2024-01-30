@@ -312,6 +312,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
+     */
+    public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        const roomSettings: RustSdkCryptoJs.RoomSettings | undefined = await this.olmMachine.getRoomSettings(
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
+        return Boolean(roomSettings?.algorithm);
+    }
+
+    /**
      * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
      */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
@@ -1285,7 +1295,27 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
         const config = event.getContent();
+        const settings = new RustSdkCryptoJs.RoomSettings();
 
+        if (config.algorithm === "m.megolm.v1.aes-sha2") {
+            settings.algorithm = RustSdkCryptoJs.EncryptionAlgorithm.MegolmV1AesSha2;
+        } else {
+            // Among other situations, this happens if the crypto state event is redacted.
+            this.logger.warn(`Room ${room.roomId}: ignoring crypto event with invalid algorithm ${config.algorithm}`);
+            return;
+        }
+
+        try {
+            settings.sessionRotationPeriodMs = config.rotation_period_ms;
+            settings.sessionRotationPeriodMessages = config.rotation_period_msgs;
+            await this.olmMachine.setRoomSettings(new RustSdkCryptoJs.RoomId(room.roomId), settings);
+        } catch (e) {
+            this.logger.warn(`Room ${room.roomId}: ignoring crypto event which caused error: ${e}`);
+            return;
+        }
+
+        // If we got this far, the SDK found the event acceptable.
+        // We need to either create or update the active RoomEncryptor.
         const existingEncryptor = this.roomEncryptors[room.roomId];
         if (existingEncryptor) {
             existingEncryptor.onCryptoEvent(config);

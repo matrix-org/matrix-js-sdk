@@ -212,15 +212,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             }
             keysByRoom.get(roomId)!.set(key.session_id, key);
         }
-        await this.olmMachine.importBackedUpRoomKeys(keysByRoom, (progress: BigInt, total: BigInt): void => {
-            const importOpt: ImportRoomKeyProgressData = {
-                total: Number(total),
-                successes: Number(progress),
-                stage: "load_keys",
-                failures: 0,
-            };
-            opts?.progressCallback?.(importOpt);
-        });
+        await this.olmMachine.importBackedUpRoomKeys(
+            keysByRoom,
+            (progress: BigInt, total: BigInt, failures: BigInt): void => {
+                const importOpt: ImportRoomKeyProgressData = {
+                    total: Number(total),
+                    successes: Number(progress),
+                    stage: "load_keys",
+                    failures: Number(failures),
+                };
+                opts?.progressCallback?.(importOpt);
+            },
+        );
     }
 
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
