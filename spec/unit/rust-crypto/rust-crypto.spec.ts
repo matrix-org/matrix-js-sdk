@@ -1134,7 +1134,7 @@ describe("RustCrypto", () => {
     });
 
     it("should emit events on device changes", async () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
