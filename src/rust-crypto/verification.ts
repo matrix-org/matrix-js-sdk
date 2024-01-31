@@ -34,6 +34,7 @@ import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProc
 import { TypedReEmitter } from "../ReEmitter";
 import { MatrixEvent } from "../models/event";
 import { EventType, MsgType } from "../@types/event";
+import { defer, IDeferred } from "../utils";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -76,11 +77,16 @@ export class RustVerificationRequest
         const onChange = async (): Promise<void> => {
             const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
 
-            // If we now have a `Verification` where we lacked one before, or we have transitioned from QR to SAS,
-            // wrap the new rust Verification as a js-sdk Verifier.
+            // Set the _verifier object (wrapping the rust `Verification` as a js-sdk Verifier) if:
+            // - we now have a `Verification` where we lacked one before
+            // - we have transitioned from QR to SAS
+            // - we are verifying with SAS, but we need to replace our verifier with a new one because both parties
+            //   tried to start verification at the same time, and we lost the tie breaking
             if (verification instanceof RustSdkCryptoJs.Sas) {
                 if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
                     this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
+                } else if (this._verifier instanceof RustSASVerifier) {
+                    this._verifier.replaceInner(verification);
                 }
             } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
                 this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
@@ -456,46 +462,45 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     VerifierEvent | VerificationRequestEvent,
     VerifierEventHandlerMap & VerificationRequestEventHandlerMap
 > {
-    /** A promise which completes when the verification completes (or rejects when it is cancelled/fails) */
-    protected readonly completionPromise: Promise<void>;
+    /** A deferred which completes when the verification completes (or rejects when it is cancelled/fails) */
+    protected readonly completionDeferred: IDeferred<void>;
 
     public constructor(
-        protected readonly inner: InnerType,
+        protected inner: InnerType,
         protected readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
 
-        this.completionPromise = new Promise<void>((resolve, reject) => {
-            const onChange = async (): Promise<void> => {
-                this.onChange();
-
-                if (this.inner.isDone()) {
-                    resolve(undefined);
-                } else if (this.inner.isCancelled()) {
-                    const cancelInfo = this.inner.cancelInfo()!;
-                    reject(
-                        new Error(
-                            `Verification cancelled by ${
-                                cancelInfo.cancelledbyUs() ? "us" : "them"
-                            } with code ${cancelInfo.cancelCode()}: ${cancelInfo.reason()}`,
-                        ),
-                    );
-                }
-
-                this.emit(VerificationRequestEvent.Change);
-            };
-            inner.registerChangesCallback(onChange);
+        this.completionDeferred = defer();
+        inner.registerChangesCallback(async () => {
+            this.onChange();
         });
         // stop the runtime complaining if nobody catches a failure
-        this.completionPromise.catch(() => null);
+        this.completionDeferred.promise.catch(() => null);
     }
 
     /**
      * Hook which is called when the underlying rust class notifies us that there has been a change.
      *
-     * Can be overridden by subclasses to see if we can notify the application about an update.
+     * Can be overridden by subclasses to see if we can notify the application about an update. The overriding method
+     * must call `super.onChange()`.
      */
-    protected onChange(): void {}
+    protected onChange(): void {
+        if (this.inner.isDone()) {
+            this.completionDeferred.resolve(undefined);
+        } else if (this.inner.isCancelled()) {
+            const cancelInfo = this.inner.cancelInfo()!;
+            this.completionDeferred.reject(
+                new Error(
+                    `Verification cancelled by ${
+                        cancelInfo.cancelledbyUs() ? "us" : "them"
+                    } with code ${cancelInfo.cancelCode()}: ${cancelInfo.reason()}`,
+                ),
+            );
+        }
+
+        this.emit(VerificationRequestEvent.Change);
+    }
 
     /**
      * Returns true if the verification has been cancelled, either by us or the other side.
@@ -565,6 +570,8 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
                 cancel: () => this.cancel(),
             };
         }
+
+        super.onChange();
     }
 
     /**
@@ -580,7 +587,7 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
             this.emit(VerifierEvent.ShowReciprocateQr, this.callbacks);
         }
         // Nothing to do here but wait.
-        await this.completionPromise;
+        await this.completionDeferred.promise;
     }
 
     /**
@@ -657,15 +664,24 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      *    or times out.
      */
     public async verify(): Promise<void> {
+        await this.sendAccept();
+        await this.completionDeferred.promise;
+    }
+
+    /**
+     * Send the accept or start event, if it hasn't already been sent
+     */
+    private async sendAccept(): Promise<void> {
         const req: undefined | OutgoingRequest = this.inner.accept();
         if (req) {
             await this.outgoingRequestProcessor.makeOutgoingRequest(req);
         }
-        await this.completionPromise;
     }
 
     /** if we can now show the callbacks, do so */
     protected onChange(): void {
+        super.onChange();
+
         if (this.callbacks === null) {
             const emoji = this.inner.emoji();
             const decimal = this.inner.decimals();
@@ -716,6 +732,25 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
      */
     public getShowSasCallbacks(): ShowSasCallbacks | null {
         return this.callbacks;
+    }
+
+    /**
+     * Replace the inner Rust verifier with a different one.
+     *
+     * @param inner - the new Rust verifier
+     * @internal
+     */
+    public replaceInner(inner: RustSdkCryptoJs.Sas): void {
+        if (this.inner != inner) {
+            this.inner = inner;
+            inner.registerChangesCallback(async () => {
+                this.onChange();
+            });
+            // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
+            // the tie breaker.  So we need to re-accept their verification.
+            this.sendAccept();
+            this.onChange();
+        }
     }
 }
 
