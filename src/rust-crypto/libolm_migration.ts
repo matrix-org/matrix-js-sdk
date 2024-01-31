@@ -245,27 +245,45 @@ async function migrateMegolmSessions(
             pickledSession.senderSigningKey = sessionData.keysClaimed?.["ed25519"];
             pickledSession.backedUp = !session.needsBackup;
 
-            // The rust `imported` flag is used to indicate the authenticity link of a megolm session to the
-            // owner of that session (the one who created it). If `imported` is true, then we have
-            // no cryptographic proof that the session is owned by the claimed device's `senderKey`.
-            // Only megolm keys received directly from the sender as an encrypted `m.room_key` to-device
-            // message have `imported` flag set to false. Any other way to get the megolm key (e.g. from a m.forwarded_room_key,
-            // from backup, from file) should have the imported flag set to true.
-            // Messages encrypted with such keys will have a gray shield in the UI (Authenticity of this message cannot
-            // be guaranteed).
-
-            // We don't just want to mark all sessions as `imported=true` during migration because users will suddenly
-            // see all messages with a gray shield.
-
-            // In legacy the flag to indicate safety of this link is `InboundGroupSessionData.untrusted`
-            // - For created outbound megolm sessions, `untrusted` is `undefined`
-            // - For `m.room_key` events, `untrusted` is `undefined`
-            // - For `m.forwarded_room_key` events, `untrusted` is `true`
-            // - For megolm sessions imported from backup, `untrusted` is `true` (for asymmetric Backup)
-            // - For megolm sessions from file, untrusted is `undefined`.
-
-            // The main difference is in legacy vs rust, is that for rust keys imported from a file are not authenticated.
-            // It's fine as this migration is only a one-time thing anyhow.
+            // The Rust SDK `imported` flag is used to indicate the authenticity status of a Megolm
+            // session, which tells us whether we can reliably tell which Olm device is the owner
+            // (creator) of the session.
+            //
+            // If `imported` is true, then we have no cryptographic proof that the session is owned
+            // by the device with the identity key `senderKey`.
+            //
+            // Only Megolm sessions received directly from the owning device via an encrypted
+            // `m.room_key` to-device message should have `imported` flag set to false. Megolm
+            // sessions received by any other currently available means (i.e. from a
+            // `m.forwarded_room_key`, from v1 asymmetric server-side key backup, imported from a
+            // file, etc) should have the `imported` flag set to true.
+            //
+            // Messages encrypted with such Megolm sessions will have a grey shield in the UI
+            // ("Authenticity of this message cannot be guaranteed").
+            //
+            // However, we don't want to bluntly mark all sessions as `imported` during migration
+            // because users will suddenly start seeing all their historic messages decorated with a
+            // grey shield, which would be seen as a non-actionable regression.
+            //
+            // In the legacy crypto stack, the flag encoding similar information was called
+            // `InboundGroupSessionData.untrusted`. The value of this flag was set as follows:
+            //
+            // - For outbound Megolm sessions created by our own device, `untrusted` is `undefined`.
+            // - For Megolm sessions received via a `m.room_key` to-device message, `untrusted` is
+            //   `undefined`.
+            // - For Megolm sessions received via a `m.forwarded_room_key` to-device message,
+            //   `untrusted` is `true`.
+            // - For Megolm sessions imported from a (v1 asymmetric / "legacy") server-side key
+            //   backup, `untrusted` is `true`.
+            // - For Megolm sessions imported from a file, untrusted is `undefined`.
+            //
+            // The main difference between the legacy crypto stack and the Rust crypto stack is that
+            // the Rust stack considers sessions imported from a file as `imported` (not
+            // authenticated). This is because the Megolm session export file format does not
+            // encode this authenticity information.
+            //
+            // Given this migration is only a one-time thing, we make a concession to accept the
+            // loss of information in this case, to avoid degrading UX in a non-actionable way.
             pickledSession.imported = sessionData.untrusted === true;
 
             migrationData.push(pickledSession);
