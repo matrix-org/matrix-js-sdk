@@ -1,3 +1,17 @@
+Changes in [31.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.2.0) (2024-01-31)
+==================================================================================================
+## ✨ Features
+
+* Emit events during migration from libolm ([#3982](https://github.com/matrix-org/matrix-js-sdk/pull/3982)). Contributed by @richvdh.
+* Support for migration from from libolm ([#3978](https://github.com/matrix-org/matrix-js-sdk/pull/3978)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* ElementR | backup: call expensive `roomKeyCounts` less often ([#4015](https://github.com/matrix-org/matrix-js-sdk/pull/4015)). Contributed by @BillCarsonFr.
+* Decrypt and Import full backups in chunk with progress ([#4005](https://github.com/matrix-org/matrix-js-sdk/pull/4005)). Contributed by @BillCarsonFr.
+* Fix new threads not appearing. ([#4009](https://github.com/matrix-org/matrix-js-sdk/pull/4009)). Contributed by @dbkr.
+
+
 Changes in [31.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.1.0) (2024-01-19)
 ==================================================================================================
 ## ✨ Features
