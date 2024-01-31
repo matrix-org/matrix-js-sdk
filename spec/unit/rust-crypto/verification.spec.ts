@@ -220,7 +220,7 @@ describe("VerificationRequest", () => {
         }
     });
 
-    it("can handle simultaneous starts", async () => {
+    it("can handle simultaneous starts in SAS", async () => {
         const aliceUserId = "@alice:example.org";
         const aliceDeviceId = "ABCDEFG";
         const bobUserId = "@bob:example.org";
@@ -337,6 +337,112 @@ describe("VerificationRequest", () => {
             };
             aliceVerifier.on(VerifierEvent.ShowSas, compareSas);
             bobVerifier.on(VerifierEvent.ShowSas, compareSas);
+
+            await Promise.all([aliceVerifier.verify(), await bobVerifier.verify()]);
+        } finally {
+            await aliceRequestLoop.stop();
+            await bobRequestLoop.stop();
+        }
+    });
+
+    it("can verify by QR code", async() => {
+        const aliceUserId = "@alice:example.org";
+        const aliceDeviceId = "ABCDEFG";
+        const bobUserId = "@bob:example.org";
+        const bobDeviceId = "HIJKLMN";
+        const [aliceOlmMachine, aliceDeviceKeys, aliceCrossSigningKeys] = await initOlmMachineAndKeys(
+            aliceUserId,
+            aliceDeviceId,
+        );
+        const [bobOlmMachine, bobDeviceKeys, bobCrossSigningKeys] = await initOlmMachineAndKeys(bobUserId, bobDeviceId);
+
+        const aliceRequestLoop = makeRequestLoop(
+            aliceOlmMachine,
+            aliceDeviceKeys,
+            aliceCrossSigningKeys,
+            bobOlmMachine,
+            bobDeviceKeys,
+            bobCrossSigningKeys,
+        );
+        const bobRequestLoop = makeRequestLoop(
+            bobOlmMachine,
+            bobDeviceKeys,
+            bobCrossSigningKeys,
+            aliceOlmMachine,
+            aliceDeviceKeys,
+            aliceCrossSigningKeys,
+        );
+
+        try {
+            await aliceOlmMachine.updateTrackedUsers([new RustSdkCryptoJs.UserId(bobUserId)]);
+            await bobOlmMachine.updateTrackedUsers([new RustSdkCryptoJs.UserId(aliceUserId)]);
+
+            // Alice requests verification
+            const bobUserIdentity = await aliceOlmMachine.getIdentity(new RustSdkCryptoJs.UserId(bobUserId));
+
+            const roomId = new RustSdkCryptoJs.RoomId("!roomId:example.org");
+            const methods = [
+                verificationMethodIdentifierToMethod("m.reciprocate.v1"),
+                verificationMethodIdentifierToMethod("m.qr_code.show.v1"),
+            ];
+            const innerVerificationRequest = await bobUserIdentity.requestVerification(
+                roomId,
+                new RustSdkCryptoJs.EventId("$m.key.verification.request"),
+                methods,
+            );
+            const aliceVerificationRequest = new RustVerificationRequest(
+                aliceOlmMachine,
+                innerVerificationRequest,
+                aliceRequestLoop as unknown as OutgoingRequestProcessor,
+                ["m.reciprocate.v1", "m.qr_code.show.v1"],
+            );
+
+            const verificationRequestContent = JSON.parse(await bobUserIdentity.verificationRequestContent(methods));
+            await bobOlmMachine.receiveVerificationEvent(
+                JSON.stringify({
+                    type: "m.room.message",
+                    sender: aliceUserId,
+                    event_id: "$m.key.verification.request",
+                    content: verificationRequestContent,
+                    origin_server_ts: Date.now(),
+                    unsigned: {
+                        age: 0,
+                    },
+                }),
+                roomId,
+            );
+
+            // Bob accepts
+            const bobInnerVerificationRequest = bobOlmMachine.getVerificationRequest(
+                new RustSdkCryptoJs.UserId(aliceUserId),
+                "$m.key.verification.request",
+            )!;
+            const bobVerificationRequest = new RustVerificationRequest(
+                bobOlmMachine,
+                bobInnerVerificationRequest,
+                bobRequestLoop as unknown as OutgoingRequestProcessor,
+                ["m.reciprocate.v1", "m.qr_code.show.v1", "m.qr_code.scan.v1"],
+            );
+
+            await bobVerificationRequest.accept();
+
+            // Bob scans
+            const qrCode = await aliceVerificationRequest.generateQRCode();
+
+            const aliceVerifierPromise: Promise<Verifier> = new Promise((resolve, reject) => {
+                aliceVerificationRequest.on(VerificationRequestEvent.Change, () => {
+                    const verifier = aliceVerificationRequest.verifier;
+                    if (verifier) {
+                        resolve(verifier);
+                    }
+                });
+            });
+            const bobVerifier = await bobVerificationRequest.scanQRCode(qrCode);
+
+            const aliceVerifier = await aliceVerifierPromise;
+            aliceVerifier.on(VerifierEvent.ShowReciprocateQr, (showQrCodeCallbacks) => {
+                showQrCodeCallbacks.confirm();
+            });
 
             await Promise.all([aliceVerifier.verify(), await bobVerifier.verify()]);
         } finally {

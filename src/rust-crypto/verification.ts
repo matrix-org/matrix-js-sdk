@@ -555,8 +555,6 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
     }
 
     protected onChange(): void {
-        super.onChange();
-
         // if the other side has scanned our QR code and sent us a "reciprocate" message, it is now time for the
         // application to prompt the user to confirm their side.
         if (this.callbacks === null && this.inner.hasBeenScanned()) {
@@ -565,6 +563,8 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
                 cancel: () => this.cancel(),
             };
         }
+
+        super.onChange();
     }
 
     /**
