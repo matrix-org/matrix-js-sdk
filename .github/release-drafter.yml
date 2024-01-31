@@ -29,3 +29,5 @@ template: |
 prerelease: true
 prerelease-identifier: rc
 include-pre-releases: false
+stable-ref: master
+staging-ref: staging

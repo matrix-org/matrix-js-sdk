@@ -20,12 +20,6 @@ on:
                 description: Publish to npm
                 type: boolean
                 default: false
-            dependencies:
-                description: |
-                    List of dependencies to update in `npm-dep=version` format.
-                    `version` can be `"current"` to leave it at the current version.
-                type: string
-                required: false
             include-changes:
                 description: Project to include changelog entries from in this release.
                 type: string
@@ -88,17 +82,11 @@ jobs:
               id: prepare
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
-                  {
-                      echo "RELEASE_NOTES<<EOF"
-                      echo "$BODY"
-                      echo "EOF"
-                  } >> $GITHUB_ENV
 
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
               env:
-                  BODY: ${{ steps.release.outputs.body }}
                   VERSION: ${{ steps.release.outputs.tag_name }}
 
             - name: Finalise version
@@ -132,75 +120,22 @@ jobs:
             - name: Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: Update dependencies
-              id: update-dependencies
-              if: inputs.dependencies
-              run: |
-                  UPDATED=()
-                  while IFS= read -r DEPENDENCY; do
-                      [ -z "$DEPENDENCY" ] && continue
-                      IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
-
-                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
-                      echo "Current $PACKAGE version is $CURRENT_VERSION"
-
-                      if [ "$CURRENT_VERSION" == "null" ]
-                      then
-                          echo "Unable to find $PACKAGE in package.json"
-                          exit 1
-                      fi
-
-                      if [ "$UPDATE_VERSION" == "current" ] || [ "$UPDATE_VERSION" == "$CURRENT_VERSION" ]
-                      then
-                          echo "Not updating dependency $PACKAGE"
-                          continue
-                      fi
-
-                      echo "Upgrading $PACKAGE to $UPDATE_VERSION..."
-                      yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
-                      git add -u
-                      git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
-                      UPDATED+=("$PACKAGE")
-                  done <<< "$DEPENDENCIES"
-
-                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
-                  echo "updated=$JSON" >> $GITHUB_OUTPUT
-              env:
-                  DEPENDENCIES: ${{ inputs.dependencies }}
-
-            - name: Prevent develop dependencies
-              if: inputs.dependencies
+            - name: Handle develop dependencies
               run: |
                   ret=0
-                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-                  if [ "$ret" -eq 0 ]; then
-                      echo "package.json contains develop dependencies. Refusing to release."
-                      exit
-                  fi
+                  cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
+                      IFS=" "
+                      PACKAGE=${dep[0]}
+                      VERSION=${dep[1]}
+
+                      echo "::warning title=Develop dependency found::$DEPENDENCY will be kept at $VERSION"
+                      yarn upgrade "$PACKAGE@$VERSION" --exact
+                      git add -u
+                      git commit -m "Keep $PACKAGE at $VERSION"
+                  done
 
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
-
-            - name: Ingest upstream changes
-              if: |
-                  inputs.include-changes &&
-                  (!inputs.dependencies || contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes))
-              uses: actions/github-script@v7
-              env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
-                  DEPENDENCY: ${{ inputs.include-changes }}
-              with:
-                  retries: 3
-                  script: |
-                      const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
-                      const { owner, repo } = context.repo;
-                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
-                      const notes = await script({
-                          github,
-                          releaseId,
-                          dependencies: [DEPENDENCY.replace("$VERSION", VERSION)],
-                      });
-                      core.exportVariable("RELEASE_NOTES", notes);
 
             - name: Add to CHANGELOG.md
               if: inputs.final
@@ -219,6 +154,8 @@ jobs:
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
                   git add CHANGELOG.md
+              env:
+                  RELEASE_NOTES: ${{ steps.release.outputs.body }}
 
             - name: Run pre-release script to update package.json fields
               run: |
