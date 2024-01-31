@@ -345,7 +345,7 @@ describe("VerificationRequest", () => {
         }
     });
 
-    it("can verify by QR code", async() => {
+    it("can verify by QR code", async () => {
         const aliceUserId = "@alice:example.org";
         const aliceDeviceId = "ABCDEFG";
         const bobUserId = "@bob:example.org";
@@ -437,7 +437,7 @@ describe("VerificationRequest", () => {
                     }
                 });
             });
-            const bobVerifier = await bobVerificationRequest.scanQRCode(qrCode);
+            const bobVerifier = await bobVerificationRequest.scanQRCode(qrCode!);
 
             const aliceVerifier = await aliceVerifierPromise;
             aliceVerifier.on(VerifierEvent.ShowReciprocateQr, (showQrCodeCallbacks) => {
