@@ -94,6 +94,7 @@ describe("initRustCrypto", () => {
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
+            registerDevicesUpdatedCallback: jest.fn(),
             outgoingRequests: jest.fn(),
             isBackupEnabled: jest.fn().mockResolvedValue(false),
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
@@ -1129,6 +1130,33 @@ describe("RustCrypto", () => {
         const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
         expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
         expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
+    });
+
+    it("should emit events on device changes", async () => {
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
+        const willUpdateCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
+        const devicesUpdatedCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
+
+        rustCrypto.onSyncCompleted({});
+
+        // wait for the devices to be updated
+        await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+        expect(willUpdateCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
+        expect(devicesUpdatedCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
         rustCrypto.stop();
     });
 
