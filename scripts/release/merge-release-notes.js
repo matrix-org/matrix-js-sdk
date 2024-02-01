@@ -2,6 +2,31 @@
 
 const fs = require("fs");
 
+// Dependency can be the name of an entry in package.json, in which case the owner, repo & version will be looked up in its own package.json
+// Or it can be a string in the form owner/repo@tag
+// Or it can be a tuple of dependency, from version, to version, in which case a list of releases in that range (to inclusive) will be returned
+async function getReleases(github, dependency) {
+    if (Array.isArray(dependency)) {
+        const [dep, fromVersion, toVersion] = dependency;
+        const upstreamPackageJson = getDependencyPackageJson(dep);
+        const [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
+
+        const response = await github.rest.repos.listReleases({
+            owner,
+            repo,
+            per_page: 100,
+        });
+        const releases = response.data.filter((release) => !release.draft && !release.prerelease);
+
+        const fromVersionIndex = releases.findIndex((release) => release.tag_name === `v${fromVersion}`);
+        const toVersionIndex = releases.findIndex((release) => release.tag_name === `v${toVersion}`);
+
+        return releases.slice(toVersionIndex, fromVersionIndex);
+    }
+
+    return [await getRelease(github, dependency)];
+}
+
 async function getRelease(github, dependency) {
     let owner;
     let repo;
@@ -11,7 +36,7 @@ async function getRelease(github, dependency) {
         repo = dependency.split("/")[1].split("@")[0];
         tag = dependency.split("@")[1];
     } else {
-        const upstreamPackageJson = JSON.parse(fs.readFileSync(`./node_modules/${dependency}/package.json`, "utf8"));
+        const upstreamPackageJson = getDependencyPackageJson(dependency);
         [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
         tag = `v${upstreamPackageJson.version}`;
     }
@@ -22,6 +47,10 @@ async function getRelease(github, dependency) {
         tag,
     });
     return response.data;
+}
+
+function getDependencyPackageJson(dependency) {
+    return JSON.parse(fs.readFileSync(`./node_modules/${dependency}/package.json`, "utf8"));
 }
 
 const HEADING_PREFIX = "## ";
@@ -56,8 +85,10 @@ const main = async ({ github, releaseId, dependencies }) => {
 
     const sections = Object.fromEntries(categories.map((cat) => [cat, []]));
     for (const dependency of dependencies) {
-        const release = await getRelease(github, dependency);
-        parseReleaseNotes(release.body, sections);
+        const releases = await getReleases(github, dependency);
+        for (const release of releases) {
+            parseReleaseNotes(release.body, sections);
+        }
     }
 
     const { data: release } = await github.rest.repos.getRelease({
