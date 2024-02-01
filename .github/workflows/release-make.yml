@@ -20,6 +20,10 @@ on:
                 description: Publish to npm
                 type: boolean
                 default: false
+            downstreams:
+                description: List of github projects (owner/repo) which should have their dependency bumped to the newly released version (in JSON string array string syntax)
+                type: string
+                required: false
             include-changes:
                 description: Project to include changelog entries from in this release.
                 type: string
@@ -288,3 +292,31 @@ jobs:
                   filter-labels: X-Upcoming-Release-Blocker
                   remove-labels: X-Upcoming-Release-Blocker
                   add-labels: X-Release-Blocker
+
+    bump-downstreams:
+        name: Update npm dependency in downstream projects
+        needs: npm
+        runs-on: ubuntu-latest
+        if: inputs.downstreams
+        strategy:
+            matrix:
+                repo: ${{ fromJSON(inputs.downstreams) }}
+        steps:
+            - name: Checkout Element Desktop
+              uses: actions/checkout@v4
+              if: inputs.element-desktop
+              with:
+                  repository: ${{ matrix.repo }}
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+
+            - name: Bump dependency
+              env:
+                  DEPENDENCY: ${{ needs.npm.outputs.id }}
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  yarn upgrade "$DEPENDENCY" --exact
+                  git add package.json yarn.lock
+                  git commit -am"Upgrade dependency to $DEPENDENCY"
+                  git push origin staging

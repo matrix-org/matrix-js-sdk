@@ -8,6 +8,8 @@ jobs:
     npm:
         name: Publish to npm
         runs-on: ubuntu-latest
+        outputs:
+            id: ${{ steps.npm-publish.outputs.id }}
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4
