@@ -158,6 +158,7 @@ async function initOlmMachine(
     await olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
         rustCrypto.onUserIdentityUpdated(userId),
     );
+    await olmMachine.registerDevicesUpdatedCallback((userIds: string[]) => rustCrypto.onDevicesUpdated(userIds));
 
     // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
     // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.

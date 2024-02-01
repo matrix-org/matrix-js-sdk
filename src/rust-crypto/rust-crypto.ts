@@ -1441,7 +1441,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Callback for `OlmMachine.registerUserIdentityUpdatedCallback`
      *
      * Called by the rust-sdk whenever there is an update to any user's cross-signing status. We re-check their trust
-     * status and emit a `UserTrustStatusChanged` event.
+     * status and emit a `UserTrustStatusChanged` event, as well as a `KeysChanged` if it is our own identity that changed.
      *
      * @param userId - the user with the updated identity
      */
@@ -1452,8 +1452,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // If our own user identity has changed, we may now trust the key backup where we did not before.
         // So, re-check the key backup status and enable it if available.
         if (userId.toString() === this.userId) {
+            this.emit(CryptoEvent.KeysChanged, {});
             await this.checkKeyBackupAndEnable();
         }
+    }
+
+    /**
+     * Callback for `OlmMachine.registerDevicesUpdatedCallback`
+     *
+     * Called when users' devices have updated. Emits `WillUpdateDevices` and `DevicesUpdated`. In the JavaScript
+     * crypto backend, these events are called at separate times, with `WillUpdateDevices` being emitted just before
+     * the devices are saved, and `DevicesUpdated` being emitted just after. But the OlmMachine only gives us
+     * one event, so we emit both events here.
+     *
+     * @param userIds - an array of user IDs of users whose devices have updated.
+     */
+    public async onDevicesUpdated(userIds: string[]): Promise<void> {
+        this.emit(CryptoEvent.WillUpdateDevices, userIds, false);
+        this.emit(CryptoEvent.DevicesUpdated, userIds, false);
     }
 
     /**
@@ -1828,6 +1844,9 @@ function rustEncryptionInfoToJsEncryptionInfo(
 type RustCryptoEvents =
     | CryptoEvent.VerificationRequestReceived
     | CryptoEvent.UserTrustStatusChanged
+    | CryptoEvent.KeysChanged
+    | CryptoEvent.WillUpdateDevices
+    | CryptoEvent.DevicesUpdated
     | RustBackupCryptoEvents;
 
 type RustCryptoEventMap = {
@@ -1842,4 +1861,31 @@ type RustCryptoEventMap = {
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
 
     [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
+    /**
+     * Fires when the user's cross-signing keys have changed or cross-signing
+     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
+     * with the user ID of the logged in user to check if cross-signing is
+     * enabled on the account. If enabled, it can test whether the current key
+     * is trusted using with checkUserTrust with the user ID of the logged
+     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
+     * the trust in the account key.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * @experimental
+     */
+    [CryptoEvent.KeysChanged]: (data: {}) => void;
+    /**
+     * Fires whenever the stored devices for a user will be updated
+     * @param users - A list of user IDs that will be updated
+     * @param initialFetch - If true, the store is empty (apart
+     *     from our own device) and is being seeded.
+     */
+    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    /**
+     * Fires whenever the stored devices for a user have changed
+     * @param users - A list of user IDs that were updated
+     * @param initialFetch - If true, the store was empty (apart
+     *     from our own device) and has been seeded.
+     */
+    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
 } & RustBackupCryptoEventMap;
