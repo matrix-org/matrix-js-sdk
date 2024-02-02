@@ -11,7 +11,7 @@ async function getReleases(github, dependency) {
         const upstreamPackageJson = getDependencyPackageJson(dep);
         const [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
 
-        const response = await github.request("GET /repos/{owner}/{repo}/releases?per_page={per_page}", {
+        const response = await github.rest.repos.listReleases({
             owner,
             repo,
             per_page: 100,
