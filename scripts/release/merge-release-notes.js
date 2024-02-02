@@ -83,6 +83,8 @@ const main = async ({ github, releaseId, dependencies }) => {
     const { GITHUB_REPOSITORY } = process.env;
     const [owner, repo] = GITHUB_REPOSITORY.split("/");
 
+    console.log("@@", { releaseId, dependencies, owner, repo });
+
     const sections = Object.fromEntries(categories.map((cat) => [cat, []]));
     for (const dependency of dependencies) {
         const releases = await getReleases(github, dependency);
@@ -126,7 +128,7 @@ if (require.main === module) {
         process.exit(1);
     }
     const [releaseId, ...dependencies] = process.argv.slice(2);
-    main({ github, releaseId, dependencies }).then((output) => {
+    main({ github, releaseId, dependencies: ["matrix-react-sdk"] }).then((output) => {
         // eslint-disable-next-line no-console
         console.log(output);
     });
