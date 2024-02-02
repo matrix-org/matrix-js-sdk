@@ -60,7 +60,14 @@ jobs:
                       if (DEPENDENCY.includes("/")) {
                           deps.push(DEPENDENCY.replace("$VERSION", VERSION))
                       } else {
-                          const fromVersion = JSON.parse(await exec.exec("git show origin/master:package.json")).dependencies[DEPENDENCY];
+                          let fromVersionJsonStr = "";
+                          await exec.exec("git show origin/master:package.json", {
+                              stdout: (data) => {
+                                  fromVersionJsonStr += data.toString();
+                              },
+                          });
+                          
+                          const fromVersion = JSON.parse(fromVersionJsonStr).dependencies[DEPENDENCY];
                           const toVersion = require("./package.json").dependencies[DEPENDENCY];
 
                           if (toVersion.endsWith("#develop")) {
