@@ -313,9 +313,7 @@ jobs:
             matrix:
                 repo: ${{ fromJSON(inputs.downstreams) }}
         steps:
-            - name: Checkout Element Desktop
-              uses: actions/checkout@v4
-              if: inputs.element-desktop
+            - uses: actions/checkout@v4
               with:
                   repository: ${{ matrix.repo }}
                   ref: staging
