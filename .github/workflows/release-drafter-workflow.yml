@@ -77,6 +77,8 @@ jobs:
                               releaseId,
                               dependencies: deps,
                           });
+                          console.log("Notes:");
+                          console.log(notes);
 
                           await github.rest.repos.updateRelease({
                               owner,
