@@ -27,7 +27,7 @@ exclude-contributors:
     - "RiotRobot"
 template: |
     $CHANGES
-no-changes-template: ""
+#no-changes-template: ""
 prerelease: true
 prerelease-identifier: rc
 include-pre-releases: false
