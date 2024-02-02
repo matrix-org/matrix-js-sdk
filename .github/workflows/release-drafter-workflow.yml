@@ -46,6 +46,7 @@ jobs:
               if: inputs.include-changes
               uses: actions/github-script@v7
               env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.release.outputs.id }}
                   DEPENDENCY: ${{ inputs.include-changes }}
                   VERSION: ${{ steps.draft-release.outputs.tag_name }}
