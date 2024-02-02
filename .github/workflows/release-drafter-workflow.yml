@@ -60,7 +60,7 @@ jobs:
                       if (DEPENDENCY.includes("/")) {
                           deps.push(DEPENDENCY.replace("$VERSION", VERSION))
                       } else {
-                          const fromVersion = JSON.parse((await github.request(`https://raw.githubusercontent.com/${context.repo}/master/package.json`)).data).dependencies[DEPENDENCY];
+                          const fromVersion = JSON.parse((await github.request(`https://raw.githubusercontent.com/${owner}/${repo}/master/package.json`)).data).dependencies[DEPENDENCY];
                           const toVersion = require("./package.json").dependencies[DEPENDENCY];
 
                           if (toVersion.endsWith("#develop")) {
