@@ -58,7 +58,7 @@ jobs:
                   fingerprint: ${{ inputs.gpg-fingerprint }}
 
             - name: Get draft release
-              id: release
+              id: draft-release
               uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
               env:
                   GITHUB_TOKEN: ${{ github.token }}
@@ -91,7 +91,7 @@ jobs:
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
               env:
-                  VERSION: ${{ steps.release.outputs.tag_name }}
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
 
             - name: Finalise version
               if: inputs.final
@@ -159,7 +159,7 @@ jobs:
                   rm CHANGELOG.md.old
                   git add CHANGELOG.md
               env:
-                  RELEASE_NOTES: ${{ steps.release.outputs.body }}
+                  RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
 
             - name: Run pre-release script to update package.json fields
               run: |
@@ -178,7 +178,7 @@ jobs:
               uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
                   asset-path: ${{ inputs.asset-path }}
 
             - name: Create signed tag
@@ -193,7 +193,7 @@ jobs:
               uses: ./.action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
 
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
@@ -214,7 +214,7 @@ jobs:
               if: inputs.expected-asset-count
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
               with:
                   retries: 3
@@ -242,7 +242,7 @@ jobs:
             - name: Publish release
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   FINAL: ${{ inputs.final }}
               with:
                   retries: 3
