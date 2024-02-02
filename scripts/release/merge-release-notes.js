@@ -16,7 +16,10 @@ async function getReleases(github, dependency) {
             repo,
             per_page: 100,
         });
-        const releases = response.data.filter((release) => !release.draft && !release.prerelease);
+        // Only include non-draft & non-prerelease releases, unless the to-release is a pre-release, include that one
+        const releases = response.data.filter(
+            (release) => !release.draft && (!release.prerelease || release.tag_name === `v${toVersion}`),
+        );
 
         const fromVersionIndex = releases.findIndex((release) => release.tag_name === `v${fromVersion}`);
         const toVersionIndex = releases.findIndex((release) => release.tag_name === `v${toVersion}`);
@@ -82,8 +85,6 @@ const parseReleaseNotes = (body, sections) => {
 const main = async ({ github, releaseId, dependencies }) => {
     const { GITHUB_REPOSITORY } = process.env;
     const [owner, repo] = GITHUB_REPOSITORY.split("/");
-
-    console.log("@@", { releaseId, dependencies, owner, repo });
 
     const sections = Object.fromEntries(categories.map((cat) => [cat, []]));
     for (const dependency of dependencies) {
