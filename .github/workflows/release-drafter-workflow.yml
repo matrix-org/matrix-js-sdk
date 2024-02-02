@@ -44,7 +44,7 @@ jobs:
 
             - name: Ingest upstream changes
               if: inputs.include-changes
-              uses: actions/github-script@v7
+              uses: actions/github-script@v6
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.release.outputs.id }}
