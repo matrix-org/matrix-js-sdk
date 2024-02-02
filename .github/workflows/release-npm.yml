@@ -4,6 +4,10 @@ on:
         secrets:
             NPM_TOKEN:
                 required: true
+        outputs:
+            id:
+                description: "The npm package@version string we published"
+                value: ${{ jobs.npm.outputs.id }}
 jobs:
     npm:
         name: Publish to npm
