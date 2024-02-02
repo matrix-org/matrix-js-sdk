@@ -83,5 +83,6 @@ jobs:
                               repo,
                               release_id: releaseId,
                               body: notes,
+                              tag_name: VERSION,
                           });
                       }
