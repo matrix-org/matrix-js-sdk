@@ -1,9 +1,6 @@
 name: Release Drafter
 on:
     workflow_call:
-        secrets:
-            ELEMENT_BOT_TOKEN:
-                required: true
         inputs:
             include-changes:
                 description: Project to include changelog entries from in this release.
@@ -49,11 +46,11 @@ jobs:
               if: inputs.include-changes
               uses: actions/github-script@v7
               env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.release.outputs.id }}
                   DEPENDENCY: ${{ inputs.include-changes }}
                   VERSION: ${{ steps.draft-release.outputs.tag_name }}
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   retries: 3
                   script: |
                       const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
