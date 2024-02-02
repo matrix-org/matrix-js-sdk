@@ -61,7 +61,7 @@ jobs:
                           deps.push(DEPENDENCY.replace("$VERSION", VERSION))
                       } else {
                           let fromVersionJsonStr = "";
-                          await exec.exec("git show origin/master:package.json", {
+                          await exec.exec("git", ["show", "origin/master:package.json"], {
                               stdout: (data) => {
                                   fromVersionJsonStr += data.toString();
                               },
