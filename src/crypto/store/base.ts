@@ -307,6 +307,13 @@ export interface ParkedSharedHistory {
 }
 
 /**
+ * Keys for the `account` object store to store the migration state.
+ * Values are defined in `MigrationState`.
+ * @internal
+ */
+export const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
+
+/**
  * A record of which steps have been completed in the libolm to Rust Crypto migration.
  *
  * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
