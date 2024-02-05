@@ -33,6 +33,7 @@ import {
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
+    ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -67,10 +68,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Utility to check if a legacy crypto store exists and has not been migrated.
      * Returns true if the store exists and has not been migrated, false otherwise.
      */
-    public static existsAndIsNotMigrated(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
+    public static existsAndIsNotMigrated(indexedDb: IDBFactory, dbName: string): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
             let exists = true;
-            const openDBRequest = indexedDB.open(dbName);
+            const openDBRequest = indexedDb.open(dbName);
             openDBRequest.onupgradeneeded = (): void => {
                 // Since we did not provide an explicit version when opening, this event
                 // should only fire if the DB did not exist before at any version.
@@ -86,12 +87,12 @@ export class IndexedDBCryptoStore implements CryptoStore {
                     // actually take a while to complete in some browsers, so don't wait for
                     // it. This won't block future open calls that a store might issue next to
                     // properly set up the DB.
-                    indexedDB.deleteDatabase(dbName);
+                    indexedDb.deleteDatabase(dbName);
                     resolve(false);
                 } else {
                     const tx = db.transaction([IndexedDBCryptoStore.STORE_ACCOUNT], "readonly");
                     const objectStore = tx.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
-                    const getReq = objectStore.get("migrationState");
+                    const getReq = objectStore.get(ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
 
                     getReq.onsuccess = (): void => {
                         const migrationState = getReq.result ?? MigrationState.NOT_STARTED;
