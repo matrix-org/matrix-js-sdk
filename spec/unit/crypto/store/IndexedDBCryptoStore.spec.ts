@@ -20,6 +20,11 @@ import { MigrationState } from "../../../../src/crypto/store/base";
 
 describe("IndexedDBCryptoStore", () => {
     describe("Test `existsAndIsNotMigrated`", () => {
+        beforeEach(async () => {
+            // eslint-disable-next-line no-global-assign
+            indexedDB = new IDBFactory();
+        });
+
         it("Should be true if there is a legacy database", async () => {
             // should detect a store that is not migrated
             const store = new IndexedDBCryptoStore(global.indexedDB, "tests");
