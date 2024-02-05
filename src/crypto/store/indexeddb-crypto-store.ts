@@ -63,6 +63,52 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return IndexedDBHelpers.exists(indexedDB, dbName);
     }
 
+    /**
+     * Utility to check if a legacy crypto store exists and has not been migrated.
+     * Returns true if the store exists and has not been migrated, false otherwise.
+     */
+    public static existsAndIsNotMigrated(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
+        return new Promise<boolean>((resolve, reject) => {
+            let exists = true;
+            const openDBRequest = indexedDB.open(dbName);
+            openDBRequest.onupgradeneeded = (): void => {
+                // Since we did not provide an explicit version when opening, this event
+                // should only fire if the DB did not exist before at any version.
+                exists = false;
+            };
+            openDBRequest.onblocked = (): void => reject(openDBRequest.error);
+            openDBRequest.onsuccess = (): void => {
+                const db = openDBRequest.result;
+                if (!exists) {
+                    db.close();
+                    // The DB did not exist before, but has been created as part of this
+                    // existence check. Delete it now to restore previous state. Delete can
+                    // actually take a while to complete in some browsers, so don't wait for
+                    // it. This won't block future open calls that a store might issue next to
+                    // properly set up the DB.
+                    indexedDB.deleteDatabase(dbName);
+                    resolve(false);
+                } else {
+                    const tx = db.transaction([IndexedDBCryptoStore.STORE_ACCOUNT], "readonly");
+                    const objectStore = tx.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+                    const getReq = objectStore.get("migrationState");
+
+                    getReq.onsuccess = (): void => {
+                        const migrationState = getReq.result ?? MigrationState.NOT_STARTED;
+                        resolve(migrationState === MigrationState.NOT_STARTED);
+                    };
+
+                    getReq.onerror = (): void => {
+                        reject(getReq.error);
+                    };
+
+                    db.close();
+                }
+            };
+            openDBRequest.onerror = (): void => reject(openDBRequest.error);
+        });
+    }
+
     private backendPromise?: Promise<CryptoStore>;
     private backend?: CryptoStore;
 
