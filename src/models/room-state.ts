@@ -222,9 +222,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Returns the number of joined non-functional members in this room
-     * This method caches the result.
-     * @returns The number of non-functional members in this room whose membership is 'join'
+     * Returns the number of joined functional members in this room
+     * @returns The number of functional members in this room whose membership is 'join'
      */
     public getJoinedFunctionalMemberCount(): number {
         return this.getFunctionalMembers().reduce((count, m) => {
@@ -249,8 +248,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Returns the number of invited members in this room
-     * @returns The number of members in this room whose membership is 'invite'
+     * Returns the number of invited functional members in this room
+     * @returns The number of functional members in this room whose membership is 'invite'
      */
     public getInvitedFunctionalMemberCount(): number {
         return this.getFunctionalMembers().reduce((count, m) => {
