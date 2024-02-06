@@ -30,6 +30,7 @@ import {
     ParkedSharedHistory,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
+    ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -39,9 +40,6 @@ import { InboundGroupSessionData } from "../OlmDevice";
 import { IndexedDBCryptoStore } from "./indexeddb-crypto-store";
 
 const PROFILE_TRANSACTIONS = false;
-
-/* Keys for the `account` object store */
-const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
