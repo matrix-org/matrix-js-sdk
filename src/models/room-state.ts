@@ -25,7 +25,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
-import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event"
+import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -227,8 +227,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public getJoinedFunctionalMemberCount(): number {
         return this.getFunctionalMembers().reduce((count, m) => {
-                return this.getMembers().find((member) => member.userId === m)?.membership === "join" ? count + 1 : count;
-            }, 0);
+            return this.getMembers().find((member) => member.userId === m)?.membership === "join" ? count + 1 : count;
+        }, 0);
     }
 
     /**
@@ -253,8 +253,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public getInvitedFunctionalMemberCount(): number {
         return this.getFunctionalMembers().reduce((count, m) => {
-                return this.getMembers().find((member) => member.userId === m)?.membership === "invite" ? count + 1 : count;
-            }, 0);
+            return this.getMembers().find((member) => member.userId === m)?.membership === "invite" ? count + 1 : count;
+        }, 0);
     }
 
     /**
