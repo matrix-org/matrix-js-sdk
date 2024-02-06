@@ -97,6 +97,17 @@ export interface CryptoApi {
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
 
     /**
+     * Get a JSON list containing all of the room keys
+     *
+     * This should be encrypted before returning it to the user.
+     *
+     * @returns a promise which resolves to a JSON string
+     *    encoding a list of session export objects,
+     *    each of which is an IMegolmSessionData
+     */
+    exportRoomKeysAsJson(): Promise<string>;
+
+    /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
@@ -104,6 +115,17 @@ export interface CryptoApi {
      * @returns a promise which resolves once the keys have been imported
      */
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
+
+    /**
+     * Import a JSON string encoding a list of room keys previously
+     * exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export
+     *    objects, each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
      * Check if the given user has published cross-signing keys.
@@ -593,7 +615,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys} or
+ * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
@@ -604,7 +627,8 @@ export interface ImportRoomKeyProgressData {
 }
 
 /**
- * Options object for {@link CryptoApi#importRoomKeys}.
+ * Options object for {@link CryptoApi#importRoomKeys} and
+ * {@link CryptoApi#importRoomKeysAsJson}.
  */
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */

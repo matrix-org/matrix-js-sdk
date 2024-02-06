@@ -346,8 +346,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return JSON.parse(raw);
     }
 
+    public async exportRoomKeysAsJson(): Promise<string> {
+        return await this.olmMachine.exportRoomKeys(() => true);
+    }
+
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         return await this.backupManager.importRoomKeys(keys, opts);
+    }
+
+    public async importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void> {
+        return await this.backupManager.importRoomKeysAsJson(keys, opts);
     }
 
     /**
