@@ -183,9 +183,10 @@ async function initOlmMachine(
     // XXX: find a less hacky way to do this.
     await olmMachine.outgoingRequests();
 
-    if (legacyCryptoStore) {
+    if (legacyCryptoStore && (await legacyCryptoStore.containsData())) {
         const migrationState = await legacyCryptoStore.getMigrationState();
         if (migrationState < MigrationState.INITIAL_OWN_KEY_QUERY_DONE) {
+            logger.debug(`Performing initial key query after migration`);
             // We need to do an initial keys query so that the rust stack can properly update trust of
             // the user device and identity from the migrated private keys.
             // If not done, there is a short period where the own device/identity trust will be undefined after migration.
