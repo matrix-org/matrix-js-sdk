@@ -335,6 +335,10 @@ export enum MigrationState {
 
     /** MEGOLM_SESSIONS_MIGRATED, and in addition, we have migrated all the room settings. */
     ROOM_SETTINGS_MIGRATED,
+
+    /** ROOM_SETTINGS_MIGRATED, and in addition, we have done the first own keys query in order to
+     * load the public part of the keys that have been migrated */
+    INITIAL_OWN_KEY_QUERY_DONE,
 }
 
 /**
