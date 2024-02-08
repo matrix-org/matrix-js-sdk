@@ -22,7 +22,7 @@ import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
 import { Logger } from "../logger";
-import { CryptoStore } from "../crypto/store/base";
+import { CryptoStore, MigrationState } from "../crypto/store/base";
 import { migrateFromLegacyCrypto, migrateRoomSettingsFromLegacyCrypto } from "./libolm_migration";
 
 /**
@@ -152,6 +152,7 @@ async function initOlmMachine(
     olmMachine.roomKeyRequestsEnabled = false;
 
     const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
+
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );
@@ -181,6 +182,24 @@ async function initOlmMachine(
     //
     // XXX: find a less hacky way to do this.
     await olmMachine.outgoingRequests();
+
+    if (legacyCryptoStore && (await legacyCryptoStore.containsData())) {
+        const migrationState = await legacyCryptoStore.getMigrationState();
+        if (migrationState < MigrationState.INITIAL_OWN_KEY_QUERY_DONE) {
+            logger.debug(`Performing initial key query after migration`);
+            // We need to do an initial keys query so that the rust stack can properly update trust of
+            // the user device and identity from the migrated private keys.
+            // If not done, there is a short period where the own device/identity trust will be undefined after migration.
+            try {
+                await rustCrypto.userHasCrossSigningKeys(userId);
+            } catch (e) {
+                // We don't want to fail the startup if this fails, but we do want to log it.
+                // It will be retried by the sdk.
+                logger.error("Failed to check for cross-signing keys after migration", e);
+            }
+            await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
+        }
+    }
 
     return rustCrypto;
 }
