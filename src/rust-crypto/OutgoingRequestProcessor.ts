@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import {
-    OlmMachine,
     KeysBackupRequest,
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
+    OlmMachine,
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
@@ -27,8 +27,8 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { logDuration, QueryDict } from "../utils";
+import { ConnectionError, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
+import { logDuration, QueryDict, sleep } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
@@ -42,6 +42,11 @@ export interface OutgoingRequest {
     readonly id: string | undefined;
     readonly type: number;
 }
+
+// A list of HTTP status codes that we should retry on.
+const retryableHttpStatuses = [429, 500, 502, 503, 504, 525];
+// The default delay to wait before retrying a request.
+const DEFAULT_RETRY_DELAY_MS = 1000;
 
 /**
  * OutgoingRequestManager: turns `OutgoingRequest`s from the rust sdk into HTTP requests
@@ -71,15 +76,15 @@ export class OutgoingRequestProcessor {
          * for the complete list of request types
          */
         if (msg instanceof KeysUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
+            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
         } else if (msg instanceof KeysQueryRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
+            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
         } else if (msg instanceof KeysClaimRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
+            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
         } else if (msg instanceof SignatureUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
+            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
         } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(
+            resp = await this.fetchWithRetry(
                 Method.Put,
                 "/_matrix/client/v3/room_keys/keys",
                 { version: msg.version },
@@ -91,7 +96,7 @@ export class OutgoingRequestProcessor {
             const path =
                 `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
-            resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
+            resp = await this.fetchWithRetry(Method.Put, path, {}, msg.body);
         } else if (msg instanceof UploadSigningKeysRequest) {
             await this.makeRequestWithUIA(
                 Method.Post,
@@ -154,7 +159,7 @@ export class OutgoingRequestProcessor {
         const path =
             `/_matrix/client/v3/sendToDevice/${encodeURIComponent(request.event_type)}/` +
             encodeURIComponent(request.txn_id);
-        return await this.rawJsonRequest(Method.Put, path, {}, request.body);
+        return await this.fetchWithRetry(Method.Put, path, {}, request.body);
     }
 
     private async makeRequestWithUIA<T>(
@@ -165,7 +170,7 @@ export class OutgoingRequestProcessor {
         uiaCallback: UIAuthCallback<T> | undefined,
     ): Promise<string> {
         if (!uiaCallback) {
-            return await this.rawJsonRequest(method, path, queryParams, body);
+            return await this.fetchWithRetry(method, path, queryParams, body);
         }
 
         const parsedBody = JSON.parse(body);
@@ -176,7 +181,7 @@ export class OutgoingRequestProcessor {
             if (auth !== null) {
                 newBody.auth = auth;
             }
-            const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
+            const resp = await this.fetchWithRetry(method, path, queryParams, JSON.stringify(newBody));
             return JSON.parse(resp) as T;
         };
 
@@ -200,5 +205,65 @@ export class OutgoingRequestProcessor {
         };
 
         return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
+    }
+
+    private async fetchWithRetry(
+        method: Method,
+        path: string,
+        queryParams: QueryDict,
+        body: string,
+        maxRetryCount: number = 3,
+    ): Promise<string> {
+        let currentRetryCount = 0;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            try {
+                return await this.rawJsonRequest(method, path, queryParams, body);
+            } catch (e) {
+                if (currentRetryCount >= maxRetryCount) {
+                    // Max number of retries reached, rethrow the error
+                    throw e;
+                }
+
+                currentRetryCount++;
+
+                const maybeRetryAfter = this.shouldWaitBeforeRetryingMillis(e);
+                if (maybeRetryAfter) {
+                    // wait for the specified time and then retry the request
+                    await sleep(maybeRetryAfter);
+                    // continue the loop and retry the request
+                } else {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    /**
+     * Determine if a given error should be retried, and if so, how long to wait before retrying.
+     * If the error should not be retried, returns undefined.
+     *
+     * @param e the error returned by the http stack
+     * @private
+     */
+    private shouldWaitBeforeRetryingMillis(e: any): number | undefined {
+        if (e instanceof MatrixError) {
+            // On rate limited errors, we should retry after the rate limit has expired.
+            if (e.errcode === "M_LIMIT_EXCEEDED") {
+                return e.data.retry_after_ms ?? DEFAULT_RETRY_DELAY_MS;
+            }
+        }
+
+        if (e.httpStatus && retryableHttpStatuses.includes(e.httpStatus)) {
+            return DEFAULT_RETRY_DELAY_MS;
+        }
+
+        if (e instanceof ConnectionError) {
+            return DEFAULT_RETRY_DELAY_MS;
+        }
+
+        // don't retry
+        return;
     }
 }
