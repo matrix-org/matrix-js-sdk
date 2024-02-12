@@ -302,7 +302,6 @@ describe("OutgoingRequestProcessor", () => {
                 [500, { status: 500, body: { error: "Internal Server Error" } }],
                 [502, { status: 502, body: { error: "Bad Gateway" } }],
                 [503, { status: 503, body: { error: "Service Unavailable" } }],
-                [504, { status: 504, body: { error: "Gateway Timeout" } }],
                 [525, { status: 525, body: { error: "SSL Handshake Failed" } }],
             ];
             describe.each(retryableErrors)(`When status code is %s`, (_, error) => {

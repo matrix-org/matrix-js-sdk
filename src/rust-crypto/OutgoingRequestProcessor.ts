@@ -56,8 +56,6 @@ const retryableHttpStatuses = [
     502,
     // Service Unavailable (overloaded or down for maintenance)
     503,
-    // Gateway Timeout
-    504,
     // SSL Handshake Failed
     525,
 ];
