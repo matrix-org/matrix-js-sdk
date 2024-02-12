@@ -44,7 +44,23 @@ export interface OutgoingRequest {
 }
 
 // A list of HTTP status codes that we should retry on.
-const retryableHttpStatuses = [429, 500, 502, 503, 504, 525];
+// These status codes represent server errors or rate limiting issues.
+// Retrying the request after a delay might succeed when the server issue
+// is resolved or when the rate limit is reset.
+const retryableHttpStatuses = [
+    // Too Many Requests
+    429,
+    // Internal Server Error
+    500,
+    // Bad Gateway
+    502,
+    // Service Unavailable (overloaded or down for maintenance)
+    503,
+    // Gateway Timeout
+    504,
+    // SSL Handshake Failed
+    525,
+];
 // The default delay to wait before retrying a request.
 const DEFAULT_RETRY_DELAY_MS = 1000;
 
@@ -244,8 +260,7 @@ export class OutgoingRequestProcessor {
      * Determine if a given error should be retried, and if so, how long to wait before retrying.
      * If the error should not be retried, returns undefined.
      *
-     * @param e the error returned by the http stack
-     * @private
+     * @param e - the error returned by the http stack
      */
     private shouldWaitBeforeRetryingMillis(e: any): number | undefined {
         if (e instanceof MatrixError) {
