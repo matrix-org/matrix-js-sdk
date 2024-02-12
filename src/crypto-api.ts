@@ -474,6 +474,23 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
+     * Rehydrate the dehydrated device stored on the server
+     *
+     * Checks if there is a dehydrated device on the server.  If so, rehydrates
+     * the device and processes the to-device events.
+     *
+     * Returns whether or not a dehydrated device was found.
+     */
+    rehydrateDeviceIfAvailable(): Promise<boolean>;
+
+    /**
+     * Creates and uploads a new dehydrated device
+     *
+     * Creates and stores a new key in secret storage if none is available.
+     */
+    createAndUploadDehydratedDevice(): Promise<void>;
 }
 
 /**

@@ -73,6 +73,7 @@ import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
+import { RustDehydrationManager } from "./dehydration";
 
 const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
 
@@ -105,6 +106,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
 
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
+
+    private readonly dehydrationManager: RustDehydrationManager;
 
     public constructor(
         private readonly logger: Logger,
@@ -142,6 +145,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+
+        this.dehydrationManager = new RustDehydrationManager(
+            this.logger,
+            this,
+            olmMachine,
+            http,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
 
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             this.logger,
@@ -1616,6 +1628,27 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
             this.logger.warn("onKeyVerificationRequest: Error processing outgoing requests", e);
         });
+    }
+
+    /**
+     * Rehydrate the dehydrated device stored on the server
+     *
+     * Checks if there is a dehydrated device on the server.  If so, rehydrates
+     * the device and processes the to-device events.
+     *
+     * Returns whether or not a dehydrated device was found.
+     */
+    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
+        return await this.dehydrationManager.rehydrateDeviceIfAvailable();
+    }
+
+    /**
+     * Creates and uploads a new dehydrated device
+     *
+     * Creates and stores a new key in secret storage if none is available.
+     */
+    public async createAndUploadDehydratedDevice(): Promise<void> {
+        return await this.dehydrationManager.createAndUploadDehydratedDevice();
     }
 }
 

@@ -736,8 +736,11 @@ describe("RustCrypto", () => {
                             },
                         },
                     };
-                } else if (request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) {
-                    // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+                } else if (
+                    request instanceof RustSdkCryptoJs.UploadSigningKeysRequest ||
+                    request instanceof RustSdkCryptoJs.PutDehydratedDeviceRequest
+                ) {
+                    // These request types does not implement OutgoingRequest and does not need to be marked as sent.
                     return;
                 }
                 if (request.id) {
