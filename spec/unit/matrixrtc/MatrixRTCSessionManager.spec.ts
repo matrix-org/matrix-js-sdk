@@ -101,6 +101,7 @@ describe("MatrixRTCSessionManager", () => {
             getContent: jest.fn().mockReturnValue({}),
             getSender: jest.fn().mockReturnValue("@mock:user.example"),
             getRoomId: jest.fn().mockReturnValue("!room:id"),
+            shouldAttemptDecryption: jest.fn().mockReturnValue(false),
             sender: {
                 userId: "@mock:user.example",
             },
