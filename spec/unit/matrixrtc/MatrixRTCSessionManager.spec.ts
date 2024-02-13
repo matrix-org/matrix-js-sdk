@@ -87,7 +87,7 @@ describe("MatrixRTCSessionManager", () => {
         expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
     });
 
-    it("Calls onCallEncryption on encryption keys event", () => {
+    it("Calls onCallEncryption on encryption keys event", async () => {
         const room1 = makeMockRoom([membershipTemplate]);
         jest.spyOn(client, "getRooms").mockReturnValue([room1]);
         jest.spyOn(client, "getRoom").mockReturnValue(room1);
@@ -95,18 +95,18 @@ describe("MatrixRTCSessionManager", () => {
         client.emit(ClientEvent.Room, room1);
         const onCallEncryptionMock = jest.fn();
         client.matrixRTC.getRoomSession(room1).onCallEncryption = onCallEncryptionMock;
-
+        client.decryptEventIfNeeded = () => Promise.resolve();
         const timelineEvent = {
             getType: jest.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
             getContent: jest.fn().mockReturnValue({}),
             getSender: jest.fn().mockReturnValue("@mock:user.example"),
             getRoomId: jest.fn().mockReturnValue("!room:id"),
-            shouldAttemptDecryption: jest.fn().mockReturnValue(false),
             sender: {
                 userId: "@mock:user.example",
             },
         } as unknown as MatrixEvent;
         client.emit(RoomEvent.Timeline, timelineEvent, undefined, undefined, false, {} as IRoomTimelineData);
+        await new Promise(process.nextTick);
         expect(onCallEncryptionMock).toHaveBeenCalled();
     });
 });
