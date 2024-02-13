@@ -302,6 +302,14 @@ describe("OutgoingRequestProcessor", () => {
                 [500, { status: 500, body: { error: "Internal Server Error" } }],
                 [502, { status: 502, body: { error: "Bad Gateway" } }],
                 [503, { status: 503, body: { error: "Service Unavailable" } }],
+                [504, { status: 504, body: { error: "Gateway timeout" } }],
+                [504, { status: 504, body: { error: "Gateway Timeout" } }],
+                [505, { status: 505, body: { error: "HTTP Version Not Supported" } }],
+                [506, { status: 506, body: { error: "Variant Also Negotiates" } }],
+                [507, { status: 507, body: { error: "Insufficient Storage" } }],
+                [508, { status: 508, body: { error: "Loop Detected" } }],
+                [510, { status: 510, body: { error: "Not Extended" } }],
+                [511, { status: 511, body: { error: "Network Authentication Required" } }],
                 [525, { status: 525, body: { error: "SSL Handshake Failed" } }],
             ];
             describe.each(retryableErrors)(`When status code is %s`, (_, error) => {
@@ -323,6 +331,9 @@ describe("OutgoingRequestProcessor", () => {
                     // Should have ultimately made 4 requests (1 initial + 3 retries)
                     const calls = fetchMock.calls(expectedPath);
                     expect(calls).toHaveLength(4);
+
+                    // The promise should have been rejected
+                    await expect(requestPromise).rejects.toThrow();
                 });
             });
         });
@@ -452,17 +463,21 @@ describe("OutgoingRequestProcessor", () => {
             expect(olmMachine.markRequestAsSent).toHaveBeenCalled();
         });
 
-        describe("Should not retry all sort of errors", () => {
+        const nonRetryableErrors: Array<[number, { status: number; body: { errcode: string } }]> = [
+            [400, { status: 400, body: { errcode: "Bad Request" } }],
+            [401, { status: 401, body: { errcode: "M_UNKNOWN_TOKEN" } }],
+            [403, { status: 403, body: { errcode: "M_FORBIDDEN" } }],
+        ];
+
+        describe.each(nonRetryableErrors)("Should not retry all sort of errors", (_, error) => {
             test.each(tests)("for %ss", async (_, RequestClass, expectedMethod, expectedPath) => {
                 const testBody = '{ "foo": "bar" }';
                 const outgoingRequest = new RequestClass("1234", testBody);
 
                 // @ts-ignore to avoid having to do if else to switch the method (.put/.post)
                 fetchMock[expectedMethod.toLowerCase()](expectedPath, {
-                    status: 401,
-                    body: {
-                        errcode: "M_UNKNOWN_TOKEN",
-                    },
+                    status: error.status,
+                    body: error.body,
                 });
 
                 const requestPromise = processor.makeOutgoingRequest(outgoingRequest);
@@ -475,6 +490,33 @@ describe("OutgoingRequestProcessor", () => {
                 // Should have ultimately made 4 requests (1 initial + 3 retries)
                 const calls = fetchMock.calls(expectedPath);
                 expect(calls).toHaveLength(1);
+
+                await expect(requestPromise).rejects.toThrow();
+            });
+        });
+
+        describe("Should not retry client timeouts", () => {
+            test.each(tests)("for %ss", async (_, RequestClass, expectedMethod, expectedPath) => {
+                const testBody = '{ "foo": "bar" }';
+                const outgoingRequest = new RequestClass("1234", testBody);
+
+                // @ts-ignore to avoid having to do if else to switch the method (.put/.post)
+                fetchMock[expectedMethod.toLowerCase()](expectedPath, () => {
+                    // This is what a client timeout error will throw
+                    throw new DOMException("The user aborted a request.", "AbortError");
+                });
+
+                const requestPromise = processor.makeOutgoingRequest(outgoingRequest);
+
+                // Run all timers and wait for the request promise to resolve/reject
+                await Promise.all([jest.runAllTimersAsync(), requestPromise.catch(() => {})]);
+
+                await expect(requestPromise).rejects.toThrow();
+
+                // Should have ultimately made 4 requests (1 initial + 3 retries)
+                const calls = fetchMock.calls(expectedPath);
+                expect(calls).toHaveLength(1);
+                await expect(requestPromise).rejects.toThrow();
             });
         });
 

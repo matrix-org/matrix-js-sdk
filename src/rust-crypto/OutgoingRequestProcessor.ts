@@ -43,22 +43,6 @@ export interface OutgoingRequest {
     readonly type: number;
 }
 
-// A list of HTTP status codes that we should retry on.
-// These status codes represent server errors or rate limiting issues.
-// Retrying the request after a delay might succeed when the server issue
-// is resolved or when the rate limit is reset.
-const retryableHttpStatuses = [
-    // Too Many Requests
-    429,
-    // Internal Server Error
-    500,
-    // Bad Gateway
-    502,
-    // Service Unavailable (overloaded or down for maintenance)
-    503,
-    // SSL Handshake Failed
-    525,
-];
 // The default delay to wait before retrying a request.
 const DEFAULT_RETRY_DELAY_MS = 1000;
 
@@ -255,6 +239,24 @@ export class OutgoingRequestProcessor {
     }
 
     /**
+     * Returns true if the request should be retried, false otherwise.
+     *
+     * Retrying the request after a delay might succeed when the server issue
+     * is resolved or when the rate limit is reset.
+     * @param httpStatus - the HTTP status code of the response
+     */
+    private canRetry(httpStatus: number): boolean {
+        // Too Many Requests
+        if (httpStatus === 429) return true;
+
+        // 5xx Errors (Bad Gateway, Service Unavailable, Internal Server Error ...)
+        // This includes gateway timeout (504) and it's ok because all the requests made here are idempotent.
+        // All keys/signatures uploads are, message and to device are because of txn_id, keys claim in worst case will claim
+        // several keys but won't cause harm.
+        return httpStatus >= 500 && httpStatus < 600;
+    }
+
+    /**
      * Determine if a given error should be retried, and if so, how long to wait before retrying.
      * If the error should not be retried, returns undefined.
      *
@@ -268,10 +270,13 @@ export class OutgoingRequestProcessor {
             }
         }
 
-        if (e.httpStatus && retryableHttpStatuses.includes(e.httpStatus)) {
+        if (e.httpStatus && this.canRetry(e.httpStatus)) {
             return DEFAULT_RETRY_DELAY_MS;
         }
 
+        // Notice that client timeout errors are not ConnectionErrors, they would be `AbortError`.
+        // Client timeout (AbortError) errors are not retried, the default timout is already
+        // very high (using browser defaults e.g. 300 or 90 seconds).
         if (e instanceof ConnectionError) {
             return DEFAULT_RETRY_DELAY_MS;
         }
