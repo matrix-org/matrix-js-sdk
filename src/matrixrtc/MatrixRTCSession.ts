@@ -176,7 +176,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Return a the MatrixRTC for the room, whether there are currently active members or not
+     * Return the MatrixRTC session for the room, whether there are currently active members or not
      */
     public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
         const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
@@ -506,7 +506,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        // We currently only handle callId = ""
+        // We currently only handle callId = "" (which is the default for room scoped calls)
         if (callId !== "") {
             logger.warn(
                 `Received m.call.encryption_keys with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,

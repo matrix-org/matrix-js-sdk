@@ -98,7 +98,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
-    private onTimeline = (event: MatrixEvent): void => {
+    private onTimeline = async (event: MatrixEvent): Promise<void> => {
+        await this.client.decryptEventIfNeeded(event);
         if (event.getType() !== EventType.CallEncryptionKeysPrefix) return;
 
         const room = this.client.getRoom(event.getRoomId());
