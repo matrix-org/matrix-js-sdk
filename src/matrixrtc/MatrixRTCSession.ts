@@ -152,9 +152,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     }
 
                     if (membership.isExpired()) {
-                        logger.info(
-                            `Ignoring expired device membership ${memberEvent.getSender()}/${membership.deviceId}`,
-                        );
+                        logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
+                        continue;
+                    }
+                    if (!room.hasMembershipState(membership.sender ?? "", "join")) {
+                        logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
                         continue;
                     }
                     callMemberships.push(membership);
