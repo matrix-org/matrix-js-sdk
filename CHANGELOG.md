@@ -1,3 +1,24 @@
+Changes in [31.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.3.0) (2024-02-13)
+==================================================================================================
+## ✨ Features
+
+* Add expire\_ts compatibility to matrixRTC ([#4032](https://github.com/matrix-org/matrix-js-sdk/pull/4032)). Contributed by @toger5.
+* Element-R: support for migration of the room list from legacy crypto ([#4036](https://github.com/matrix-org/matrix-js-sdk/pull/4036)). Contributed by @richvdh.
+* Element-R: check persistent room list for encryption config ([#4035](https://github.com/matrix-org/matrix-js-sdk/pull/4035)). Contributed by @richvdh.
+* Support optional MSC3860 redirects ([#4007](https://github.com/matrix-org/matrix-js-sdk/pull/4007)). Contributed by @turt2live.
+
+## 🐛 Bug Fixes
+
+* WebR: migrate the megolm session imported flag ([#4037](https://github.com/matrix-org/matrix-js-sdk/pull/4037)). Contributed by @BillCarsonFr.
+* ElementR: fix emoji verification stalling when both ends hit start at the same time ([#4004](https://github.com/matrix-org/matrix-js-sdk/pull/4004)). Contributed by @uhoreg.
+* Dependencies: Bump wasm bindings version to 4.3.0 ([#4042](https://github.com/matrix-org/matrix-js-sdk/pull/4042)). Contributed by @BillCarsonFr.
+* Element R: emit events when devices have changed ([#4019](https://github.com/matrix-org/matrix-js-sdk/pull/4019)). Contributed by @uhoreg.
+* ElementR: report invalid keys rather than failing to restore from backup ([#4006](https://github.com/matrix-org/matrix-js-sdk/pull/4006)). Contributed by @uhoreg.
+* Make `timeline` a getter ([#4022](https://github.com/matrix-org/matrix-js-sdk/pull/4022)). Contributed by @florianduros.
+* Implement getting verification cancellation info in Rust crypto ([#3947](https://github.com/matrix-org/matrix-js-sdk/pull/3947)). Contributed by @uhoreg.
+* Fix crypto migration for megolm sessions with no sender key ([#4024](https://github.com/matrix-org/matrix-js-sdk/pull/4024)). Contributed by @richvdh.
+
+
 Changes in [31.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.2.0) (2024-01-31)
 ==================================================================================================
 ## ✨ Features
