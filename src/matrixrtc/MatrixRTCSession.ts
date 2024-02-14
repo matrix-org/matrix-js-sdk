@@ -21,8 +21,9 @@ import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
+import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
-import { MatrixError, MatrixEvent, RoomStateEvent } from "../matrix";
+import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
@@ -193,7 +194,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     ) {
         super();
         this._callId = memberships[0]?.callId;
-        this.room.on(RoomStateEvent.Members, this.onMembershipUpdate);
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.on(RoomStateEvent.Members, this.onMembershipUpdate);
         this.setExpiryTimer();
     }
 
@@ -217,7 +219,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
         }
-        this.room.off(RoomStateEvent.Members, this.onMembershipUpdate);
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
 
     /**
