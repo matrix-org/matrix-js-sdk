@@ -22,7 +22,7 @@ import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { Focus } from "./focus";
-import { MatrixError, MatrixEvent, RoomEvent } from "../matrix";
+import { MatrixError, MatrixEvent, RoomStateEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
@@ -193,7 +193,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     ) {
         super();
         this._callId = memberships[0]?.callId;
-        this.room.on(RoomEvent.MembershipsChanged, this.onMembershipUpdate);
+        this.room.on(RoomStateEvent.Members, this.onMembershipUpdate);
         this.setExpiryTimer();
     }
 
@@ -217,7 +217,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
         }
-        this.room.off(RoomEvent.MembershipsChanged, this.onMembershipUpdate);
+        this.room.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
 
     /**
