@@ -102,6 +102,8 @@ describe("MatrixRTCSession", () => {
             roomId: randomString(8),
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
+                    on: jest.fn(),
+                    off: jest.fn(),
                     getStateEvents: (_type: string, _stateKey: string) => [
                         {
                             getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
@@ -124,6 +126,8 @@ describe("MatrixRTCSession", () => {
             roomId: randomString(8),
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
+                    on: jest.fn(),
+                    off: jest.fn(),
                     getStateEvents: (_type: string, _stateKey: string) => [
                         {
                             getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
