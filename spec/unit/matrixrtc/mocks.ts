@@ -24,6 +24,9 @@ export function makeMockRoom(memberships: CallMembershipData[], localAge: number
     const roomState = makeMockRoomState(memberships, roomId, localAge);
     return {
         roomId: roomId,
+        on: jest.fn(),
+        off: jest.fn(),
+        hasMembershipState: jest.fn().mockReturnValue(true),
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(roomState),
         }),
