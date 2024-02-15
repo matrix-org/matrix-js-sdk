@@ -56,6 +56,7 @@ export * from "./crypto/store/localStorage-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
 export * from "./content-repo";
+export * from "./@types/common";
 export * from "./@types/uia";
 export * from "./@types/event";
 export * from "./@types/PushRules";
