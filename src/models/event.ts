@@ -163,6 +163,10 @@ export interface IVisibilityChange {
     reason: string | null;
 }
 
+export interface IMarkedUnreadEvent {
+    unread: boolean;
+}
+
 export interface IClearEvent {
     room_id?: string;
     type: string;
