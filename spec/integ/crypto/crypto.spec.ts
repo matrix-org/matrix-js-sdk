@@ -1379,7 +1379,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         expect(decryptedEvent.getContent().body).toEqual("42");
 
-        const exported = await aliceClient.exportRoomKeys();
+        const exported = await aliceClient.getCrypto()!.exportRoomKeysAsJson();
 
         // start a new client
         await aliceClient.stopClient();
@@ -1395,7 +1395,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         keyReceiver = new E2EKeyReceiver(homeserverUrl);
         syncResponder = new SyncResponder(homeserverUrl);
         await initCrypto(aliceClient);
-        await aliceClient.importRoomKeys(exported);
+        await aliceClient.getCrypto()!.importRoomKeysAsJson(exported);
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
 

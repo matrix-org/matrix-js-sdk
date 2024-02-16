@@ -21,6 +21,7 @@ import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
+import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
 import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
@@ -152,9 +153,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     }
 
                     if (membership.isExpired()) {
-                        logger.info(
-                            `Ignoring expired device membership ${memberEvent.getSender()}/${membership.deviceId}`,
-                        );
+                        logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
+                        continue;
+                    }
+                    if (!room.hasMembershipState(membership.sender ?? "", "join")) {
+                        logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
                         continue;
                     }
                     callMemberships.push(membership);
@@ -176,7 +179,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Return a the MatrixRTC for the room, whether there are currently active members or not
+     * Return the MatrixRTC session for the room, whether there are currently active members or not
      */
     public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
         const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
@@ -191,6 +194,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     ) {
         super();
         this._callId = memberships[0]?.callId;
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.on(RoomStateEvent.Members, this.onMembershipUpdate);
         this.setExpiryTimer();
     }
 
@@ -214,6 +219,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
         }
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
 
     /**
@@ -506,7 +513,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        // We currently only handle callId = ""
+        // We currently only handle callId = "" (which is the default for room scoped calls)
         if (callId !== "") {
             logger.warn(
                 `Received m.call.encryption_keys with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,

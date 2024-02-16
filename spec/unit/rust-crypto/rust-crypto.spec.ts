@@ -383,7 +383,7 @@ describe("RustCrypto", () => {
         );
     });
 
-    describe(".importRoomKeys and .exportRoomKeys", () => {
+    describe("importing and exporting room keys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(
@@ -407,6 +407,29 @@ describe("RustCrypto", () => {
             expect(importTotal).toBe(someRoomKeys.length);
 
             const keys = await rustCrypto.exportRoomKeys();
+            expect(Array.isArray(keys)).toBeTruthy();
+            expect(keys.length).toBe(someRoomKeys.length);
+
+            const aSession = someRoomKeys[0];
+
+            const exportedKey = keys.find((k) => k.session_id == aSession.session_id);
+
+            expect(aSession).toStrictEqual(exportedKey);
+        });
+
+        it("should import and export keys as JSON", async () => {
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            let importTotal = 0;
+            const opt: ImportRoomKeysOpts = {
+                progressCallback: (stage) => {
+                    importTotal = stage.total ?? 0;
+                },
+            };
+            await rustCrypto.importRoomKeysAsJson(JSON.stringify(someRoomKeys), opt);
+
+            expect(importTotal).toBe(someRoomKeys.length);
+
+            const keys: Array<IMegolmSessionData> = JSON.parse(await rustCrypto.exportRoomKeysAsJson());
             expect(Array.isArray(keys)).toBeTruthy();
             expect(keys.length).toBe(someRoomKeys.length);
 

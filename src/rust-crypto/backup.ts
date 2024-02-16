@@ -188,7 +188,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a promise which resolves once the keys have been imported
      */
     public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
-        const jsonKeys = JSON.stringify(keys);
+        await this.importRoomKeysAsJson(JSON.stringify(keys), opts);
+    }
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export objects,
+     *    each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeysAsJson(jsonKeys: string, opts?: ImportRoomKeysOpts): Promise<void> {
         await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: BigInt, total: BigInt): void => {
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
