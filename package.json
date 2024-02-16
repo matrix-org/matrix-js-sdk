@@ -116,7 +116,7 @@
         "jest-mock": "^29.0.0",
         "lint-staged": "^15.0.2",
         "matrix-mock-request": "^2.5.0",
-        "node-fetch": "^3.3.2",
+        "node-fetch": "^2.7.0",
         "prettier": "3.2.4",
         "rimraf": "^5.0.0",
         "ts-node": "^10.9.1",
