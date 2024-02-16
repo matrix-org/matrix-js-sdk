@@ -14,11 +14,17 @@ jobs:
         name: Preview Changelog
         runs-on: ubuntu-latest
         steps:
-            - uses: matrix-org/allchange@main
+            - uses: github-action-required-labels@80a96a4863886addcbc9f681b5b295ba7f5424e1 # v5
               if: github.event_name != 'merge_group'
               with:
-                  ghToken: ${{ secrets.GITHUB_TOKEN }}
-                  requireLabel: true
+                  labels: |
+                      X-Breaking-Change
+                      T-Deprecation
+                      T-Enhancement
+                      T-Defect
+                      Dependencies
+                  mode: minimum
+                  count: 1
 
     prevent-blocked:
         name: Prevent Blocked
