@@ -27,7 +27,7 @@ import { NonEmptyArray } from "../@types/common";
 export type OidcRegistrationClientMetadata = {
     clientName: OidcRegistrationRequestBody["client_name"];
     clientUri: OidcRegistrationRequestBody["client_uri"];
-    logoUri: OidcRegistrationRequestBody["logo_uri"];
+    logoUri?: OidcRegistrationRequestBody["logo_uri"];
     applicationType: OidcRegistrationRequestBody["application_type"];
     redirectUris: OidcRegistrationRequestBody["redirect_uris"];
     contacts: OidcRegistrationRequestBody["contacts"];
