@@ -93,7 +93,6 @@
         "@types/uuid": "9",
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
-        "allchange": "^1.3.0",
         "babel-jest": "^29.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
