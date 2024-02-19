@@ -31,6 +31,7 @@ export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;
     registrationEndpoint?: string;
+    accountManagementEndpoint?: string;
 };
 
 /**
@@ -102,6 +103,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
         requiredStringProperty(wellKnown, "token_endpoint"),
         requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
+        optionalStringProperty(wellKnown, "account_management_uri"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
         requiredArrayValue(wellKnown, "code_challenge_methods_supported", "S256"),
@@ -112,6 +114,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
             authorizationEndpoint: wellKnown["authorization_endpoint"],
             tokenEndpoint: wellKnown["token_endpoint"],
             registrationEndpoint: wellKnown["registration_endpoint"],
+            accountManagementEndpoint: wellKnown["account_management_uri"],
         } as ValidatedIssuerConfig;
     }
 
