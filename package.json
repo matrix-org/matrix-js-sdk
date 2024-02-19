@@ -83,6 +83,7 @@
         "@babel/register": "^7.12.10",
         "@casualbot/jest-sonar-reporter": "2.2.7",
         "@matrix-org/olm": "3.2.15",
+        "@peculiar/webcrypto": "^1.4.5",
         "@types/bs58": "^4.0.1",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
@@ -116,6 +117,7 @@
         "jest-mock": "^29.0.0",
         "lint-staged": "^15.0.2",
         "matrix-mock-request": "^2.5.0",
+        "node-fetch": "^2.7.0",
         "prettier": "3.2.4",
         "rimraf": "^5.0.0",
         "ts-node": "^10.9.1",
@@ -125,9 +127,7 @@
         "typedoc-plugin-missing-exports": "^2.0.0",
         "typedoc-plugin-versions": "^0.2.3",
         "typedoc-plugin-versions-cli": "^0.1.12",
-        "typescript": "^5.0.0",
-        "node-fetch": "^2.7.0",
-        "@peculiar/webcrypto": "^1.4.5"
+        "typescript": "^5.0.0"
     },
     "@casualbot/jest-sonar-reporter": {
         "outputDirectory": "coverage",
