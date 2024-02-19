@@ -22,6 +22,7 @@ jobs:
                       T-Deprecation
                       T-Enhancement
                       T-Defect
+                      T-Task
                       Dependencies
                   mode: minimum
                   count: 1
