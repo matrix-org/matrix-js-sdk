@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
 import { IDelegatedAuthConfig } from "../client";

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { mocked } from "jest-mock";
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 import { M_AUTHENTICATION } from "../../../src";
 import { logger } from "../../../src/logger";
