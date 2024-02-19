@@ -17,104 +17,11 @@ limitations under the License.
 import { mocked } from "jest-mock";
 import jwtDecode from "jwt-decode";
 
-import { M_AUTHENTICATION } from "../../../src";
 import { logger } from "../../../src/logger";
-import {
-    validateIdToken,
-    validateOIDCIssuerWellKnown,
-    validateWellKnownAuthentication,
-} from "../../../src/oidc/validate";
+import { validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");
-
-describe("validateWellKnownAuthentication()", () => {
-    const baseWk = {
-        "m.homeserver": {
-            base_url: "https://hs.org",
-        },
-    };
-    it("should throw not supported error when wellKnown has no m.authentication section", () => {
-        expect(() => validateWellKnownAuthentication(undefined)).toThrow(OidcError.NotSupported);
-    });
-
-    it("should throw misconfigured error when authentication issuer is not a string", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: { url: "test.com" },
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should throw misconfigured error when authentication account is not a string", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: { url: "test" },
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should throw misconfigured error when authentication account is false", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: false,
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should return valid config when wk uses stable m.authentication", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: "account.com",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-            account: "account.com",
-        });
-    });
-
-    it("should return valid config when m.authentication account is missing", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-        });
-    });
-
-    it("should remove unexpected properties", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                somethingElse: "test",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-        });
-    });
-});
 
 describe("validateOIDCIssuerWellKnown", () => {
     const validWk: any = {

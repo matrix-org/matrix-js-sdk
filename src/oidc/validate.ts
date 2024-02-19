@@ -17,7 +17,6 @@ limitations under the License.
 import jwtDecode from "jwt-decode";
 import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
 
@@ -32,31 +31,6 @@ export type ValidatedIssuerConfig = {
     tokenEndpoint: string;
     registrationEndpoint?: string;
     accountManagementEndpoint?: string;
-};
-
-/**
- * Validates MSC2965 m.authentication config
- * Returns valid configuration
- * @param wellKnown - client well known as returned from ./well-known/client/matrix
- * @returns config - when present and valid
- * @throws when config is not found or invalid
- */
-export const validateWellKnownAuthentication = (authentication?: IDelegatedAuthConfig): IDelegatedAuthConfig => {
-    if (!authentication) {
-        throw new Error(OidcError.NotSupported);
-    }
-
-    if (
-        typeof authentication.issuer === "string" &&
-        (!authentication.hasOwnProperty("account") || typeof authentication.account === "string")
-    ) {
-        return {
-            issuer: authentication.issuer,
-            account: authentication.account,
-        };
-    }
-
-    throw new Error(OidcError.Misconfigured);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

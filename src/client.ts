@@ -642,14 +642,6 @@ export interface IWellKnownConfig<T = IClientWellKnown> {
     server_name?: string;
 }
 
-export interface IDelegatedAuthConfig {
-    // MSC2965
-    /** The OIDC Provider/issuer the client should use */
-    issuer: string;
-    /** The optional URL of the web UI where the user can manage their account */
-    account?: string;
-}
-
 interface IKeyBackupPath {
     path: string;
     queryData?: {

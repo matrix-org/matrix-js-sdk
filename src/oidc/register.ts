@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IDelegatedAuthConfig } from "../client";
+import { OidcClientConfig } from ".";
 import { OidcError } from "./error";
 import { Method } from "../http-api";
 import { logger } from "../logger";
-import { ValidatedIssuerConfig } from "./validate";
 import { NonEmptyArray } from "../@types/common";
 
 /**
@@ -118,7 +117,7 @@ const doRegistration = async (
  * @throws when registration is not supported, on failed request or invalid response
  */
 export const registerOidcClient = async (
-    delegatedAuthConfig: IDelegatedAuthConfig & ValidatedIssuerConfig,
+    delegatedAuthConfig: Omit<OidcClientConfig, "metadata"> & { issuer: string },
     clientMetadata: OidcRegistrationClientMetadata,
 ): Promise<string> => {
     if (!delegatedAuthConfig.registrationEndpoint) {

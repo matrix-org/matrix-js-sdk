@@ -53,7 +53,10 @@ describe("oidc authorization", () => {
         jest.spyOn(logger, "warn");
         jest.setSystemTime(now);
 
-        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
+        fetchMock.get(
+            delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
+            mockOpenIdConfiguration(),
+        );
     });
 
     afterEach(() => {
