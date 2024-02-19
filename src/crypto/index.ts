@@ -3143,6 +3143,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Get a JSON list containing all of the room keys
+     *
+     * @returns a JSON string encoding a list of session
+     *    export objects, each of which is an IMegolmSessionData
+     */
+    public async exportRoomKeysAsJson(): Promise<string> {
+        return JSON.stringify(await this.exportRoomKeys());
+    }
+
+    /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
@@ -3182,6 +3192,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 });
             }),
         ).then();
+    }
+
+    /**
+     * Import a JSON string encoding a list of room keys previously
+     * exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export
+     *    objects, each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void> {
+        return await this.importRoomKeys(JSON.parse(keys));
     }
 
     /**

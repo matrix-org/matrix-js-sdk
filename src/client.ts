@@ -9974,6 +9974,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw err;
         }
     }
+
+    /**
+     * Get the OIDC issuer responsible for authentication on this server, if any
+     * @returns Resolves: A promise of an object containing the OIDC issuer if configured
+     * @returns Rejects: when the request fails (module:http-api.MatrixError)
+     * @experimental - part of MSC2965
+     */
+    public async getAuthIssuer(): Promise<{
+        issuer: string;
+    }> {
+        return this.http.request(Method.Get, "/auth_issuer", undefined, undefined, {
+            prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+        });
+    }
 }
 
 /**
