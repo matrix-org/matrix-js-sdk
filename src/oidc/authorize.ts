@@ -235,7 +235,7 @@ export const completeAuthorizationCodeGrant = async (
 
         // hydrate the sign in state and create a client
         // the stored sign in state includes oidc configuration we set at the start of the oidc login flow
-        const signInState = SigninState.fromStorageString(stateString);
+        const signInState = await SigninState.fromStorageString(stateString);
         const client = new OidcClient({ ...signInState, stateStore });
 
         // validate the code and state, and attempt to swap the code for tokens
