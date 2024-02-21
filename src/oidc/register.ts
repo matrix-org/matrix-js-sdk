@@ -111,7 +111,7 @@ const doRegistration = async (
 
 /**
  * Attempts dynamic registration against the configured registration endpoint
- * @param delegatedAuthConfig - Auth config from ValidatedServerConfig
+ * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}
  * @param clientMetadata - The metadata for the client which to register
  * @returns Promise<string> resolved with registered clientId
  * @throws when registration is not supported, on failed request or invalid response
