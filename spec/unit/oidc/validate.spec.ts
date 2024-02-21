@@ -125,6 +125,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
+        account_management_uri: "https://authorize.org/account",
+        account_management_actions_supported: ["org.matrix.cross_signing_reset"],
     };
     beforeEach(() => {
         // stub to avoid console litter
@@ -157,6 +159,8 @@ describe("validateOIDCIssuerWellKnown", () => {
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: validWk.registration_endpoint,
+            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
+            accountManagementEndpoint: "https://authorize.org/account",
         });
     });
 
@@ -167,6 +171,8 @@ describe("validateOIDCIssuerWellKnown", () => {
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: undefined,
+            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
+            accountManagementEndpoint: "https://authorize.org/account",
         });
     });
 
@@ -186,6 +192,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         ["code_challenge_methods_supported", undefined],
         ["code_challenge_methods_supported", "not an array"],
         ["code_challenge_methods_supported", ["doesnt include S256"]],
+        ["account_management_uri", { not: "a string" }],
+        ["account_management_actions_supported", { not: "an array" }],
     ])("should throw OP support error when %s is %s", (key, value) => {
         const wk = {
             ...validWk,
