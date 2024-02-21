@@ -24,6 +24,10 @@ export * from "./register";
 export * from "./tokenRefresher";
 export * from "./validate";
 
+/**
+ * Validated config for native OIDC authentication
+ * Contains metadata and signing keys from the issuer's well-known.
+ */
 export interface OidcClientConfig extends ValidatedIssuerConfig {
     metadata: ValidatedIssuerMetadata;
     signingKeys?: SigningKey[];

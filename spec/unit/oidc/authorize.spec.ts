@@ -46,8 +46,8 @@ const realSubtleCrypto = crypto.subtleCrypto;
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
-    const authorizationEndpoint = delegatedAuthConfig.metadata.authorization_endpoint;
-    const tokenEndpoint = delegatedAuthConfig.metadata.token_endpoint;
+    const authorizationEndpoint = delegatedAuthConfig.authorizationEndpoint;
+    const tokenEndpoint = delegatedAuthConfig.tokenEndpoint;
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 

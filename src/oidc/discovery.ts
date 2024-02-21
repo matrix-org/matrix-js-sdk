@@ -14,15 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MetadataService, OidcClientSettingsStore, SigningKey } from "oidc-client-ts";
+import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
-import {
-    isValidatedIssuerMetadata,
-    ValidatedIssuerConfig,
-    ValidatedIssuerMetadata,
-    validateOIDCIssuerWellKnown,
-} from "./validate";
+import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate";
 import { Method, timeoutSignal } from "../http-api";
+import { OidcClientConfig } from "./index";
 
 /**
  * @experimental
@@ -34,14 +30,7 @@ import { Method, timeoutSignal } from "../http-api";
  * @returns validated authentication metadata and optionally signing keys
  * @throws when delegated auth config is invalid or unreachable
  */
-export const discoverAndValidateOIDCIssuerWellKnown = async (
-    issuer: string,
-): Promise<
-    ValidatedIssuerConfig & {
-        metadata: ValidatedIssuerMetadata;
-        signingKeys?: SigningKey[];
-    }
-> => {
+export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Promise<OidcClientConfig> => {
     const issuerOpenIdConfigUrl = new URL(".well-known/openid-configuration", issuer);
     const issuerWellKnownResponse = await fetch(issuerOpenIdConfigUrl, {
         method: Method.Get,
