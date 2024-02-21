@@ -118,7 +118,7 @@
         "lint-staged": "^15.0.2",
         "matrix-mock-request": "^2.5.0",
         "node-fetch": "^2.7.0",
-        "prettier": "3.2.4",
+        "prettier": "3.2.5",
         "rimraf": "^5.0.0",
         "ts-node": "^10.9.1",
         "typedoc": "^0.24.0",
