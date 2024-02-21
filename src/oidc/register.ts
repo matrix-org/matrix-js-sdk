@@ -117,7 +117,7 @@ const doRegistration = async (
  * @throws when registration is not supported, on failed request or invalid response
  */
 export const registerOidcClient = async (
-    delegatedAuthConfig: Omit<OidcClientConfig, "metadata"> & { issuer: string },
+    delegatedAuthConfig: OidcClientConfig,
     clientMetadata: OidcRegistrationClientMetadata,
 ): Promise<string> => {
     if (!delegatedAuthConfig.registrationEndpoint) {
