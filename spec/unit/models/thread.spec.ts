@@ -78,6 +78,50 @@ describe("Thread", () => {
         expect(thread.length).toBe(3);
     });
 
+    it("does not fetch root event if it's already in the store", async () => {
+        Thread.hasServerSideSupport = FeatureSupport.Stable;
+        const myUserId = "@bob:example.org";
+        const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, { timelineSupport: false });
+        const client = testClient.client;
+        client.supportsThreads = jest.fn().mockReturnValue(true);
+        const room = new Room("123", client, myUserId, {
+            pendingEventOrdering: PendingEventOrdering.Detached,
+        });
+
+        jest.spyOn(client, "getRoom").mockReturnValue(room);
+        client.fetchRoomEvent = jest.fn();
+
+        const rootEvent = mkMessage({
+            user: "@charlie:example.org",
+            room: room.roomId,
+            msg: "root event message " + Math.random(),
+            ts: 1,
+            event: true,
+        });
+
+        room.addLiveEvents([rootEvent]);
+
+        const firstReply = makeThreadEvent({
+            user: "@charlie:example.org",
+            room: room.roomId,
+            event: true,
+            msg: `reply`,
+            rootEvent: rootEvent.getId(),
+            replyToEventId: rootEvent.getId(),
+            ts: 2,
+        });
+
+        room.addLiveEvents([firstReply]);
+
+        const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, [rootEvent, firstReply], true);
+
+        // hack to wait for it to try to initialise the thread
+        await (thread as any).processRootEventPromise;
+
+        expect(thread.initialEventsFetched).toEqual(true);
+        expect(client.fetchRoomEvent).not.toHaveBeenCalled();
+    });
+
     describe("hasUserReadEvent", () => {
         let myUserId: string;
         let client: MatrixClient;
