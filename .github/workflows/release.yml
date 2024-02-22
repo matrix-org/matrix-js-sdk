@@ -63,6 +63,7 @@ jobs:
                   yarn tpv purge --yes --out _docs --stale --major 10
                   yarn gendoc
                   symlinks -rc _docs
+                  find _docs -xtype l -delete
 
             - name: 🔨 Set up git
               run: |
