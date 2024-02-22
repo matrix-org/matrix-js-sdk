@@ -124,7 +124,11 @@ export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
-    >;
+    > & {
+        // MSC2965 extensions to the OIDC spec
+        account_management_uri?: string;
+        account_management_actions_supported?: string[];
+    };
 
 /**
  * Wraps validateOIDCIssuerWellKnown in a type assertion
