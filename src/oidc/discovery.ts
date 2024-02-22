@@ -25,6 +25,7 @@ import { OidcClientConfig } from "./index";
  * Discover and validate delegated auth configuration
  * - delegated auth issuer openid-configuration is reachable
  * - delegated auth issuer openid-configuration is configured correctly for us
+ * Fetches https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
  * When successful, validated metadata is returned
  * @param issuer - the OIDC issuer as returned by the /auth_issuer API
  * @returns validated authentication metadata and optionally signing keys

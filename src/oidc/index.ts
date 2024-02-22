@@ -25,8 +25,8 @@ export * from "./tokenRefresher";
 export * from "./validate";
 
 /**
- * Validated config for native OIDC authentication
- * Contains metadata and signing keys from the issuer's well-known.
+ * Validated config for native OIDC authentication, as returned by {@link discoverAndValidateOIDCIssuerWellKnown}.
+ * Contains metadata and signing keys from the issuer's well-known (https://oidc-issuer.example.com/.well-known/openid-configuration).
  */
 export interface OidcClientConfig extends ValidatedIssuerConfig {
     metadata: ValidatedIssuerMetadata;
