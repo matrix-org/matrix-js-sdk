@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
 import { IDelegatedAuthConfig } from "../client";
@@ -31,6 +31,8 @@ export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;
     registrationEndpoint?: string;
+    accountManagementEndpoint?: string;
+    accountManagementActionsSupported?: string[];
 };
 
 /**
@@ -74,6 +76,16 @@ const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string)
     }
     return true;
 };
+const optionalStringArrayProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
+    if (
+        !!wellKnown[key] &&
+        (!Array.isArray(wellKnown[key]) || !(<unknown[]>wellKnown[key]).every((v) => typeof v === "string"))
+    ) {
+        logger.error(`Invalid property: ${key}`);
+        return false;
+    }
+    return true;
+};
 const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, value: any): boolean => {
     const array = wellKnown[key];
     if (!array || !Array.isArray(array) || !array.includes(value)) {
@@ -102,6 +114,8 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
         requiredStringProperty(wellKnown, "token_endpoint"),
         requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
+        optionalStringProperty(wellKnown, "account_management_uri"),
+        optionalStringArrayProperty(wellKnown, "account_management_actions_supported"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
         requiredArrayValue(wellKnown, "code_challenge_methods_supported", "S256"),
@@ -109,10 +123,12 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 
     if (!isInvalid) {
         return {
-            authorizationEndpoint: wellKnown["authorization_endpoint"],
-            tokenEndpoint: wellKnown["token_endpoint"],
-            registrationEndpoint: wellKnown["registration_endpoint"],
-        } as ValidatedIssuerConfig;
+            authorizationEndpoint: <string>wellKnown["authorization_endpoint"],
+            tokenEndpoint: <string>wellKnown["token_endpoint"],
+            registrationEndpoint: <string>wellKnown["registration_endpoint"],
+            accountManagementEndpoint: <string>wellKnown["account_management_uri"],
+            accountManagementActionsSupported: <string[]>wellKnown["account_management_actions_supported"],
+        };
     }
 
     logger.error("Issuer configuration not valid");

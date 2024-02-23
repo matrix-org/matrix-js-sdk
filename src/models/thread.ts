@@ -198,8 +198,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     };
 
     private async fetchRootEvent(): Promise<void> {
-        this.rootEvent = this.room.findEventById(this.id);
-        // If the rootEvent does not exist in the local stores, then fetch it from the server.
+        // Always fetch the root event, even if we already have it, so we can get the latest
+        // state (via unsigned).
         try {
             const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
             const mapper = this.client.getEventMapper();

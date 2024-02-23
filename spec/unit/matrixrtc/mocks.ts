@@ -24,6 +24,7 @@ export function makeMockRoom(memberships: CallMembershipData[], localAge: number
     const roomState = makeMockRoomState(memberships, roomId, localAge);
     return {
         roomId: roomId,
+        hasMembershipState: jest.fn().mockReturnValue(true),
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(roomState),
         }),
@@ -33,6 +34,8 @@ export function makeMockRoom(memberships: CallMembershipData[], localAge: number
 export function makeMockRoomState(memberships: CallMembershipData[], roomId: string, localAge: number | null = null) {
     const event = mockRTCEvent(memberships, roomId, localAge);
     return {
+        on: jest.fn(),
+        off: jest.fn(),
         getStateEvents: (_: string, stateKey: string) => {
             if (stateKey !== undefined) return event;
             return [event];

@@ -74,6 +74,13 @@ describe("MatrixRTCSession", () => {
         expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
     });
 
+    it("ignores memberships events of members not in the room", () => {
+        const mockRoom = makeMockRoom([membershipTemplate]);
+        mockRoom.hasMembershipState = (state) => state === "join";
+        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        expect(sess?.memberships.length).toEqual(0);
+    });
+
     it("honours created_ts", () => {
         const expiredMembership = Object.assign({}, membershipTemplate);
         expiredMembership.created_ts = 500;
@@ -91,9 +98,12 @@ describe("MatrixRTCSession", () => {
 
     it("safely ignores events with no memberships section", () => {
         const mockRoom = {
+            ...makeMockRoom([]),
             roomId: randomString(8),
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
+                    on: jest.fn(),
+                    off: jest.fn(),
                     getStateEvents: (_type: string, _stateKey: string) => [
                         {
                             getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
@@ -112,9 +122,12 @@ describe("MatrixRTCSession", () => {
 
     it("safely ignores events with junk memberships section", () => {
         const mockRoom = {
+            ...makeMockRoom([]),
             roomId: randomString(8),
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
+                    on: jest.fn(),
+                    off: jest.fn(),
                     getStateEvents: (_type: string, _stateKey: string) => [
                         {
                             getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
