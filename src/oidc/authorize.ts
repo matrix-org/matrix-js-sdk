@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
@@ -209,7 +208,7 @@ export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
 ): Promise<{
-    oidcClientSettings: IDelegatedAuthConfig & { clientId: string };
+    oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
     homeserverUrl: string;
     idTokenClaims: IdTokenClaims;
