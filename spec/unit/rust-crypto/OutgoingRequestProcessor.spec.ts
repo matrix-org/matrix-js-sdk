@@ -336,6 +336,31 @@ describe("OutgoingRequestProcessor", () => {
             });
         });
 
+        it("should not retry if M_TOO_LARGE", async () => {
+            const testBody = '{ "messages": { "user": {"device": "bar" }}}';
+            const outgoingRequest = new ToDeviceRequest("1234", "custom.type", "12345", testBody);
+
+            fetchMock.put("express:/_matrix/client/v3/sendToDevice/:type/:txnId", {
+                status: 502,
+                body: {
+                    errcode: "M_TOO_LARGE",
+                    error: "Request too large",
+                },
+            });
+
+            const requestPromise = processor.makeOutgoingRequest(outgoingRequest);
+
+            await Promise.all([requestPromise.catch(() => {}), jest.runAllTimersAsync()]);
+
+            await expect(requestPromise).rejects.toThrow();
+
+            const calls = fetchMock.calls("express:/_matrix/client/v3/sendToDevice/:type/:txnId");
+            expect(calls).toHaveLength(1);
+
+            // The promise should have been rejected
+            await expect(requestPromise).rejects.toThrow();
+        });
+
         it("should retry on Failed to fetch connection errors", async () => {
             let callCount = 0;
             fetchMock.post("path:/_matrix/client/v3/keys/upload", (url, opts) => {

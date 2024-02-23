@@ -252,6 +252,12 @@ export class OutgoingRequestProcessor {
             if (e.errcode === "M_LIMIT_EXCEEDED") {
                 return e.data.retry_after_ms ?? DEFAULT_RETRY_DELAY_MS;
             }
+
+            if (e.errcode === "M_TOO_LARGE") {
+                // The request was too large, we should not retry.
+                // Could be a 502 or 413 status code as per documentation.
+                return undefined;
+            }
         }
 
         if (e.httpStatus && this.canRetry(e.httpStatus)) {
