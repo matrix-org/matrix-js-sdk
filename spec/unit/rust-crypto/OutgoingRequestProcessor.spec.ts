@@ -303,7 +303,6 @@ describe("OutgoingRequestProcessor", () => {
                 [502, { status: 502, body: { error: "Bad Gateway" } }],
                 [503, { status: 503, body: { error: "Service Unavailable" } }],
                 [504, { status: 504, body: { error: "Gateway timeout" } }],
-                [504, { status: 504, body: { error: "Gateway Timeout" } }],
                 [505, { status: 505, body: { error: "HTTP Version Not Supported" } }],
                 [506, { status: 506, body: { error: "Variant Also Negotiates" } }],
                 [507, { status: 507, body: { error: "Insufficient Storage" } }],
@@ -318,8 +317,7 @@ describe("OutgoingRequestProcessor", () => {
                     const testBody = '{ "foo": "bar" }';
                     const outgoingRequest = new RequestClass("1234", testBody);
 
-                    // @ts-ignore to avoid having to do if else to switch the method (.put/.post)
-                    fetchMock[expectedMethod.toLowerCase()](expectedPath, error);
+                    fetchMock.mock(expectedPath, error, { method: expectedMethod });
 
                     const requestPromise = processor.makeOutgoingRequest(outgoingRequest);
 
@@ -487,7 +485,7 @@ describe("OutgoingRequestProcessor", () => {
 
                 await expect(requestPromise).rejects.toThrow();
 
-                // Should have ultimately made 4 requests (1 initial + 3 retries)
+                // Should have only tried once
                 const calls = fetchMock.calls(expectedPath);
                 expect(calls).toHaveLength(1);
 
@@ -513,7 +511,7 @@ describe("OutgoingRequestProcessor", () => {
 
                 await expect(requestPromise).rejects.toThrow();
 
-                // Should have ultimately made 4 requests (1 initial + 3 retries)
+                // Should have only tried once
                 const calls = fetchMock.calls(expectedPath);
                 expect(calls).toHaveLength(1);
                 await expect(requestPromise).rejects.toThrow();

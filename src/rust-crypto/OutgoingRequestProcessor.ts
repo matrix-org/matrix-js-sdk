@@ -46,6 +46,9 @@ export interface OutgoingRequest {
 // The default delay to wait before retrying a request.
 const DEFAULT_RETRY_DELAY_MS = 1000;
 
+// The http request will be retried at most 4 times if the error is retryable.
+const MAX_REQUEST_RETRY_COUNT = 3;
+
 /**
  * OutgoingRequestManager: turns `OutgoingRequest`s from the rust sdk into HTTP requests
  *
@@ -74,15 +77,15 @@ export class OutgoingRequestProcessor {
          * for the complete list of request types
          */
         if (msg instanceof KeysUploadRequest) {
-            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
         } else if (msg instanceof KeysQueryRequest) {
-            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
         } else if (msg instanceof KeysClaimRequest) {
-            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
         } else if (msg instanceof SignatureUploadRequest) {
-            resp = await this.fetchWithRetry(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
         } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.fetchWithRetry(
+            resp = await this.requestWithRetry(
                 Method.Put,
                 "/_matrix/client/v3/room_keys/keys",
                 { version: msg.version },
@@ -94,7 +97,7 @@ export class OutgoingRequestProcessor {
             const path =
                 `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
-            resp = await this.fetchWithRetry(Method.Put, path, {}, msg.body);
+            resp = await this.requestWithRetry(Method.Put, path, {}, msg.body);
         } else if (msg instanceof UploadSigningKeysRequest) {
             await this.makeRequestWithUIA(
                 Method.Post,
@@ -157,7 +160,7 @@ export class OutgoingRequestProcessor {
         const path =
             `/_matrix/client/v3/sendToDevice/${encodeURIComponent(request.event_type)}/` +
             encodeURIComponent(request.txn_id);
-        return await this.fetchWithRetry(Method.Put, path, {}, request.body);
+        return await this.requestWithRetry(Method.Put, path, {}, request.body);
     }
 
     private async makeRequestWithUIA<T>(
@@ -168,7 +171,7 @@ export class OutgoingRequestProcessor {
         uiaCallback: UIAuthCallback<T> | undefined,
     ): Promise<string> {
         if (!uiaCallback) {
-            return await this.fetchWithRetry(method, path, queryParams, body);
+            return await this.requestWithRetry(method, path, queryParams, body);
         }
 
         const parsedBody = JSON.parse(body);
@@ -179,12 +182,44 @@ export class OutgoingRequestProcessor {
             if (auth !== null) {
                 newBody.auth = auth;
             }
-            const resp = await this.fetchWithRetry(method, path, queryParams, JSON.stringify(newBody));
+            const resp = await this.requestWithRetry(method, path, queryParams, JSON.stringify(newBody));
             return JSON.parse(resp) as T;
         };
 
         const resp = await uiaCallback(makeRequest);
         return JSON.stringify(resp);
+    }
+
+    private async requestWithRetry(
+        method: Method,
+        path: string,
+        queryParams: QueryDict,
+        body: string,
+    ): Promise<string> {
+        let currentRetryCount = 0;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            try {
+                return await this.rawJsonRequest(method, path, queryParams, body);
+            } catch (e) {
+                if (currentRetryCount >= MAX_REQUEST_RETRY_COUNT) {
+                    // Max number of retries reached, rethrow the error
+                    throw e;
+                }
+
+                const maybeRetryAfter = this.shouldWaitBeforeRetryingMillis(e);
+                if (maybeRetryAfter === undefined) {
+                    // this error is not retryable
+                    throw e;
+                }
+
+                currentRetryCount++;
+                // wait for the specified time and then retry the request
+                await sleep(maybeRetryAfter);
+                // continue the loop and retry the request
+            }
+        }
     }
 
     private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {
@@ -203,57 +238,6 @@ export class OutgoingRequestProcessor {
         };
 
         return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
-    }
-
-    private async fetchWithRetry(
-        method: Method,
-        path: string,
-        queryParams: QueryDict,
-        body: string,
-        maxRetryCount: number = 3,
-    ): Promise<string> {
-        let currentRetryCount = 0;
-
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            try {
-                return await this.rawJsonRequest(method, path, queryParams, body);
-            } catch (e) {
-                if (currentRetryCount >= maxRetryCount) {
-                    // Max number of retries reached, rethrow the error
-                    throw e;
-                }
-
-                currentRetryCount++;
-
-                const maybeRetryAfter = this.shouldWaitBeforeRetryingMillis(e);
-                if (maybeRetryAfter) {
-                    // wait for the specified time and then retry the request
-                    await sleep(maybeRetryAfter);
-                    // continue the loop and retry the request
-                } else {
-                    throw e;
-                }
-            }
-        }
-    }
-
-    /**
-     * Returns true if the request should be retried, false otherwise.
-     *
-     * Retrying the request after a delay might succeed when the server issue
-     * is resolved or when the rate limit is reset.
-     * @param httpStatus - the HTTP status code of the response
-     */
-    private canRetry(httpStatus: number): boolean {
-        // Too Many Requests
-        if (httpStatus === 429) return true;
-
-        // 5xx Errors (Bad Gateway, Service Unavailable, Internal Server Error ...)
-        // This includes gateway timeout (504) and it's ok because all the requests made here are idempotent.
-        // All keys/signatures uploads are, message and to device are because of txn_id, keys claim in worst case will claim
-        // several keys but won't cause harm.
-        return httpStatus >= 500 && httpStatus < 600;
     }
 
     /**
@@ -283,5 +267,24 @@ export class OutgoingRequestProcessor {
 
         // don't retry
         return;
+    }
+
+    /**
+     * Returns true if the request should be retried, false otherwise.
+     *
+     * Retrying the request after a delay might succeed when the server issue
+     * is resolved or when the rate limit is reset.
+     * @param httpStatus - the HTTP status code of the response
+     */
+    private canRetry(httpStatus: number): boolean {
+        // Too Many Requests
+        if (httpStatus === 429) return true;
+
+        // 5xx Errors (Bad Gateway, Service Unavailable, Internal Server Error ...)
+        // This includes gateway timeout (504) and it's ok because all the requests made here are idempotent.
+        //  * All key/signature uploads are idempotent.
+        //  * Room message and to-device send requests are idempotent because of txn_id.
+        //  * Keys claim in worst case will claim several keys but won't cause harm.
+        return httpStatus >= 500 && httpStatus < 600;
     }
 }
