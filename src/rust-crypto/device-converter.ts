@@ -80,6 +80,7 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
         verified,
         signatures,
         displayName: device.displayName,
+        dehydrated: device.isDehydrated,
     });
 }
 
