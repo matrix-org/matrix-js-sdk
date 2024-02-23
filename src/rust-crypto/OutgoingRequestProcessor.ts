@@ -27,11 +27,12 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
-import { ConnectionError, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { logDuration, QueryDict, sleep } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
+import { calculateRetryBackoff } from "../request-retry-utils";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -42,12 +43,6 @@ export interface OutgoingRequest {
     readonly id: string | undefined;
     readonly type: number;
 }
-
-// The default delay to wait before retrying a request.
-const DEFAULT_RETRY_DELAY_MS = 1000;
-
-// The http request will be retried at most 4 times if the error is retryable.
-const MAX_REQUEST_RETRY_COUNT = 3;
 
 /**
  * OutgoingRequestManager: turns `OutgoingRequest`s from the rust sdk into HTTP requests
@@ -203,20 +198,14 @@ export class OutgoingRequestProcessor {
             try {
                 return await this.rawJsonRequest(method, path, queryParams, body);
             } catch (e) {
-                if (currentRetryCount >= MAX_REQUEST_RETRY_COUNT) {
-                    // Max number of retries reached, rethrow the error
-                    throw e;
-                }
-
-                const maybeRetryAfter = this.shouldWaitBeforeRetryingMillis(e);
-                if (maybeRetryAfter === undefined) {
-                    // this error is not retryable
-                    throw e;
-                }
-
                 currentRetryCount++;
+                const backoff = calculateRetryBackoff(e, currentRetryCount, true);
+                if (backoff < 0) {
+                    // Max number of retries reached, or error is not retryable. rethrow the error
+                    throw e;
+                }
                 // wait for the specified time and then retry the request
-                await sleep(maybeRetryAfter);
+                await sleep(backoff);
                 // continue the loop and retry the request
             }
         }
@@ -238,59 +227,5 @@ export class OutgoingRequestProcessor {
         };
 
         return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
-    }
-
-    /**
-     * Determine if a given error should be retried, and if so, how long to wait before retrying.
-     * If the error should not be retried, returns undefined.
-     *
-     * @param e - the error returned by the http stack
-     */
-    private shouldWaitBeforeRetryingMillis(e: any): number | undefined {
-        if (e instanceof MatrixError) {
-            // On rate limited errors, we should retry after the rate limit has expired.
-            if (e.errcode === "M_LIMIT_EXCEEDED") {
-                return e.data.retry_after_ms ?? DEFAULT_RETRY_DELAY_MS;
-            }
-
-            if (e.errcode === "M_TOO_LARGE") {
-                // The request was too large, we should not retry.
-                // Could be a 502 or 413 status code as per documentation.
-                return undefined;
-            }
-        }
-
-        if (e.httpStatus && this.canRetry(e.httpStatus)) {
-            return DEFAULT_RETRY_DELAY_MS;
-        }
-
-        // Notice that client timeout errors are not ConnectionErrors, they would be `AbortError`.
-        // Client timeout (AbortError) errors are not retried, the default timout is already
-        // very high (using browser defaults e.g. 300 or 90 seconds).
-        if (e instanceof ConnectionError) {
-            return DEFAULT_RETRY_DELAY_MS;
-        }
-
-        // don't retry
-        return;
-    }
-
-    /**
-     * Returns true if the request should be retried, false otherwise.
-     *
-     * Retrying the request after a delay might succeed when the server issue
-     * is resolved or when the rate limit is reset.
-     * @param httpStatus - the HTTP status code of the response
-     */
-    private canRetry(httpStatus: number): boolean {
-        // Too Many Requests
-        if (httpStatus === 429) return true;
-
-        // 5xx Errors (Bad Gateway, Service Unavailable, Internal Server Error ...)
-        // This includes gateway timeout (504) and it's ok because all the requests made here are idempotent.
-        //  * All key/signature uploads are idempotent.
-        //  * Room message and to-device send requests are idempotent because of txn_id.
-        //  * Keys claim in worst case will claim several keys but won't cause harm.
-        return httpStatus >= 500 && httpStatus < 600;
     }
 }

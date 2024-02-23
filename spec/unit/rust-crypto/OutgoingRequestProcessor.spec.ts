@@ -326,9 +326,9 @@ describe("OutgoingRequestProcessor", () => {
 
                     await expect(requestPromise).rejects.toThrow();
 
-                    // Should have ultimately made 4 requests (1 initial + 3 retries)
+                    // Should have ultimately made 5 requests (1 initial + 4 retries)
                     const calls = fetchMock.calls(expectedPath);
-                    expect(calls).toHaveLength(4);
+                    expect(calls).toHaveLength(5);
 
                     // The promise should have been rejected
                     await expect(requestPromise).rejects.toThrow();
