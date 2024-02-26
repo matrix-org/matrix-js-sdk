@@ -25,7 +25,6 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
-import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../@types/event";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -222,16 +221,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Returns the number of joined functional members in this room
-     * @returns The number of functional members in this room whose membership is 'join'
-     */
-    public getJoinedFunctionalMemberCount(): number {
-        return this.getFunctionalMembers().reduce((count, m) => {
-            return this.getMembers().find((member) => member.userId === m)?.membership === "join" ? count + 1 : count;
-        }, 0);
-    }
-
-    /**
      * Returns the number of invited members in this room
      * @returns The number of members in this room whose membership is 'invite'
      */
@@ -248,16 +237,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Returns the number of invited functional members in this room
-     * @returns The number of functional members in this room whose membership is 'invite'
-     */
-    public getInvitedFunctionalMemberCount(): number {
-        return this.getFunctionalMembers().reduce((count, m) => {
-            return this.getMembers().find((member) => member.userId === m)?.membership === "invite" ? count + 1 : count;
-        }, 0);
-    }
-
-    /**
      * Set the amount of invited members in this room
      * @param count - the amount of invited members
      */
@@ -271,20 +250,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public getMembers(): RoomMember[] {
         return Object.values(this.members);
-    }
-
-    /**
-     * Get all functional members in this room.
-     * @returns A list of MXID Strings.
-     */
-    public getFunctionalMembers(): String[] {
-        const [functionalUsersStateEvent] = this.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name);
-
-        if (Array.isArray(functionalUsersStateEvent?.getContent().service_members)) {
-            return functionalUsersStateEvent.getContent().service_members;
-        }
-
-        return [];
     }
 
     /**

@@ -21,12 +21,7 @@ import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
-import {
-    EventType,
-    RelationType,
-    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
-    UNSTABLE_MSC2716_MARKER,
-} from "../../src/@types/event";
+import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { MatrixClient } from "../../src/client";
@@ -709,59 +704,6 @@ describe("RoomState", function () {
         });
     });
 
-    describe("getJoinedFunctionalMemberCount", function () {
-        beforeEach(() => {
-            state = new RoomState(roomId);
-        });
-
-        it("should update after adding joined functional member", function () {
-            state.setStateEvents([
-                utils.mkMembership({ event: true, mship: "join", user: userA, room: roomId }),
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA] },
-                }),
-            ]);
-            expect(state.getJoinedMemberCount()).toEqual(1);
-            expect(state.getJoinedFunctionalMemberCount()).toEqual(1);
-            state.setStateEvents([
-                utils.mkMembership({ event: true, mship: "join", user: userC, room: roomId }),
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA, userC] },
-                }),
-            ]);
-            expect(state.getJoinedMemberCount()).toEqual(2);
-            expect(state.getJoinedFunctionalMemberCount()).toEqual(2);
-        });
-
-        it("should not update after adding joined non-functional member", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userA, room: roomId })]);
-            expect(state.getJoinedMemberCount()).toEqual(1);
-            expect(state.getJoinedFunctionalMemberCount()).toEqual(0);
-            state.setStateEvents([
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA] },
-                }),
-            ]);
-            expect(state.getJoinedMemberCount()).toEqual(1);
-            expect(state.getJoinedFunctionalMemberCount()).toEqual(1);
-        });
-    });
-
     describe("getInvitedMemberCount", function () {
         beforeEach(() => {
             state = new RoomState(roomId);
@@ -772,58 +714,6 @@ describe("RoomState", function () {
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userC, room: roomId })]);
             expect(state.getInvitedMemberCount()).toEqual(2);
-        });
-    });
-
-    describe("getInvitedFunctionalMemberCount", function () {
-        beforeEach(() => {
-            state = new RoomState(roomId);
-        });
-        it("should update after adding invited functional member", function () {
-            state.setStateEvents([
-                utils.mkMembership({ event: true, mship: "invite", user: userA, room: roomId }),
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA] },
-                }),
-            ]);
-            expect(state.getInvitedMemberCount()).toEqual(1);
-            expect(state.getInvitedFunctionalMemberCount()).toEqual(1);
-            state.setStateEvents([
-                utils.mkMembership({ event: true, mship: "invite", user: userC, room: roomId }),
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA, userC] },
-                }),
-            ]);
-            expect(state.getInvitedMemberCount()).toEqual(2);
-            expect(state.getInvitedFunctionalMemberCount()).toEqual(2);
-        });
-
-        it("should not update after adding invited non-functional member", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userA, room: roomId })]);
-            expect(state.getInvitedMemberCount()).toEqual(1);
-            expect(state.getInvitedFunctionalMemberCount()).toEqual(0);
-            state.setStateEvents([
-                utils.mkEvent({
-                    event: true,
-                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.unstable!,
-                    skey: "",
-                    sender: userB,
-                    room: roomId,
-                    content: { service_members: [userA] },
-                }),
-            ]);
-            expect(state.getInvitedMemberCount()).toEqual(1);
-            expect(state.getInvitedFunctionalMemberCount()).toEqual(1);
         });
     });
 

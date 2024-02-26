@@ -914,8 +914,31 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.myUserId;
     }
 
+    // gets service members (e.g. helper bots) for exclusion
+    private getFunctionalMembers(): string[] {
+        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
+        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
+            return mFunctionalMembers!.getContent().service_members;
+        }
+        return [];
+    }
+
+    private getInvitedAndJoinedFunctionalMemberCount(functionalMembers: String[]): number {
+        return functionalMembers.reduce((count, m) => {
+            const membership = this.getMembers().find((member) => member.userId === m)?.membership;
+            if (membership && ["join", "invite"].includes(membership)) {
+                return count + 1;
+            }
+            return count;
+        }, 0);
+    }
+
     public getAvatarFallbackMember(): RoomMember | undefined {
-        const memberCount = this.getInvitedAndJoinedMemberCount() - this.getInvitedAndJoinedFunctionalMemberCount();
+        const functionalMembers = this.getFunctionalMembers();
+        const invitedAndJoinedFunctionalMemberCount = this.getInvitedAndJoinedFunctionalMemberCount(functionalMembers);
+
+        // only get avatar if conversation is with a single specific other user
+        const memberCount = this.getInvitedAndJoinedMemberCount() - invitedAndJoinedFunctionalMemberCount;
         if (memberCount > 2) {
             return;
         }
@@ -1700,38 +1723,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Returns the number of joined non-functional members in this room
-     * This method caches the result.
-     * This is a wrapper around the method of the same name in roomState, returning
-     * its result for the room's current state.
-     * @returns The number of non-functional members in this room whose membership is 'join'
-     */
-    public getJoinedFunctionalMemberCount(): number {
-        return this.currentState.getJoinedFunctionalMemberCount();
-    }
-
-    /**
-     * Returns the number of non-functional invited members in this room
-     * @returns The number of non-functional members in this room whose membership is 'invite'
-     */
-    public getInvitedFunctionalMemberCount(): number {
-        return this.currentState.getInvitedFunctionalMemberCount();
-    }
-
-    /**
      * Returns the number of invited + joined members in this room
      * @returns The number of members in this room whose membership is 'invite' or 'join'
      */
     public getInvitedAndJoinedMemberCount(): number {
         return this.getInvitedMemberCount() + this.getJoinedMemberCount();
-    }
-
-    /**
-     * Returns the number of invited + joined non-functional members in this room
-     * @returns The number of non-functional members in this room whose membership is 'invite' or 'join'
-     */
-    public getInvitedAndJoinedFunctionalMemberCount(): number {
-        return this.getInvitedFunctionalMemberCount() + this.getJoinedFunctionalMemberCount();
     }
 
     /**
@@ -3378,11 +3374,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
-        let excludedUserIds: string[] = [];
-        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
-        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mFunctionalMembers!.getContent().service_members;
-        }
+        let excludedUserIds: string[] = this.getFunctionalMembers();
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];
