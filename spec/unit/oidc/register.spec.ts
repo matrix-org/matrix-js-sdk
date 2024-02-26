@@ -18,10 +18,10 @@ import fetchMockJest from "fetch-mock-jest";
 
 import { OidcError } from "../../../src/oidc/error";
 import { OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
+import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("registerOidcClient()", () => {
     const issuer = "https://auth.com/";
-    const registrationEndpoint = "https://auth.com/register";
     const clientName = "Element";
     const baseUrl = "https://just.testing";
     const metadata: OidcRegistrationClientMetadata = {
@@ -35,25 +35,20 @@ describe("registerOidcClient()", () => {
     };
     const dynamicClientId = "xyz789";
 
-    const delegatedAuthConfig = {
-        issuer,
-        registrationEndpoint,
-        authorizationEndpoint: issuer + "auth",
-        tokenEndpoint: issuer + "token",
-    };
+    const delegatedAuthConfig = makeDelegatedAuthConfig(issuer);
     beforeEach(() => {
         fetchMockJest.mockClear();
         fetchMockJest.resetBehavior();
     });
 
     it("should make correct request to register client", async () => {
-        fetchMockJest.post(registrationEndpoint, {
+        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
         expect(await registerOidcClient(delegatedAuthConfig, metadata)).toEqual(dynamicClientId);
         expect(fetchMockJest).toHaveBeenCalledWith(
-            registrationEndpoint,
+            delegatedAuthConfig.registrationEndpoint!,
             expect.objectContaining({
                 headers: {
                     "Accept": "application/json",
@@ -77,7 +72,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration request fails", async () => {
-        fetchMockJest.post(registrationEndpoint, {
+        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
             status: 500,
         });
         await expect(() => registerOidcClient(delegatedAuthConfig, metadata)).rejects.toThrow(
@@ -86,7 +81,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration response is invalid", async () => {
-        fetchMockJest.post(registrationEndpoint, {
+        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
             status: 200,
             // no clientId in response
             body: "{}",

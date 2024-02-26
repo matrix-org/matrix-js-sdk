@@ -14,9 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { SigningKey } from "oidc-client-ts";
+import { ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate";
+
 export * from "./authorize";
 export * from "./discovery";
 export * from "./error";
 export * from "./register";
 export * from "./tokenRefresher";
 export * from "./validate";
+
+/**
+ * Validated config for native OIDC authentication, as returned by {@link discoverAndValidateOIDCIssuerWellKnown}.
+ * Contains metadata and signing keys from the issuer's well-known (https://oidc-issuer.example.com/.well-known/openid-configuration).
+ */
+export interface OidcClientConfig extends ValidatedIssuerConfig {
+    metadata: ValidatedIssuerMetadata;
+    signingKeys?: SigningKey[];
+}
