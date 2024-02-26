@@ -27,12 +27,11 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { logDuration, QueryDict, sleep } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
-import { calculateRetryBackoff } from "../request-retry-utils";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -206,7 +205,6 @@ export class OutgoingRequestProcessor {
                 }
                 // wait for the specified time and then retry the request
                 await sleep(backoff);
-                // continue the loop and retry the request
             }
         }
     }

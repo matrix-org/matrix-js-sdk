@@ -22,9 +22,8 @@ import { logger } from "./logger";
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { defer, IDeferred, removeElement } from "./utils";
-import { MatrixError } from "./http-api";
+import { calculateRetryBackoff, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
-import { calculateRetryBackoff } from "./request-retry-utils";
 
 const DEBUG = false; // set true to enable console logging.
 
