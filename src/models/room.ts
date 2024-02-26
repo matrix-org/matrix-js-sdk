@@ -942,7 +942,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (memberCount > 2) {
             return;
         }
-        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
+
+        // prefer hero as indicated by the room summary
+        const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
+        const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
             const availableMember = this.summaryHeroes!.map((userId) => {
                 return this.getMember(userId);
@@ -951,17 +954,21 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return availableMember;
             }
         }
+
+        // include previous members
         const members = this.currentState.getMembers();
+        const nonFunctionalMembers = members?.filter((m) => !functionalMembers.includes(m.userId));
         // could be different than memberCount
         // as this includes left members
-        if (members.length <= 2) {
-            const availableMember = members.find((m) => {
+        if (nonFunctionalMembers.length <= 2) {
+            const availableMember = nonFunctionalMembers.find((m) => {
                 return m.userId !== this.myUserId;
             });
             if (availableMember) {
                 return availableMember;
             }
         }
+
         // if all else fails, try falling back to a user,
         // and create a one-off member for it
         if (hasHeroes) {
