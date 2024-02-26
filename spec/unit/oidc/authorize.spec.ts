@@ -46,8 +46,8 @@ const realSubtleCrypto = crypto.subtleCrypto;
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
-    const authorizationEndpoint = delegatedAuthConfig.metadata.authorization_endpoint;
-    const tokenEndpoint = delegatedAuthConfig.metadata.token_endpoint;
+    const authorizationEndpoint = delegatedAuthConfig.authorizationEndpoint;
+    const tokenEndpoint = delegatedAuthConfig.tokenEndpoint;
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
@@ -58,7 +58,10 @@ describe("oidc authorization", () => {
         jest.spyOn(logger, "warn");
         jest.setSystemTime(now);
 
-        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
+        fetchMock.get(
+            delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
+            mockOpenIdConfiguration(),
+        );
 
         Object.defineProperty(window, "crypto", {
             value: {
