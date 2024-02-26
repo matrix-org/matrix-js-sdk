@@ -3199,6 +3199,25 @@ describe("Room", function () {
             expect(room.eventShouldLiveIn(reply).shouldLiveInRoom).toBeTruthy();
             expect(room.eventShouldLiveIn(reply).shouldLiveInThread).toBeFalsy();
         });
+
+        it("an event with m.reference relation to unknown parent event should live in the main timeline only", async () => {
+            const event = utils.mkEvent({
+                event: true,
+                type: "org.example.child",
+                user: "@alice:example.org",
+                content: {
+                    "key": "value",
+                    "m.relates_to": {
+                        event_id: "$unknown-parent",
+                        rel_type: "m.reference",
+                    },
+                },
+                room: roomId,
+            });
+
+            expect(room.eventShouldLiveIn(event).shouldLiveInRoom).toBeTruthy();
+            expect(room.eventShouldLiveIn(event).shouldLiveInThread).toBeFalsy();
+        });
     });
 
     describe("getEventReadUpTo()", () => {

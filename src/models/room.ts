@@ -2197,7 +2197,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Due to replies not being typical relations and being used as fallbacks for threads relations
         // If we bypass the if case above then we know we are not a thread, so if we are still a reply
         // then we know that we must be in the main timeline. Same goes if we have no associated parent event.
-        if (!parentEventId || !!event.replyEventId) {
+        if (!parentEventId || !!event.replyEventId || event.getRelation()?.rel_type === "m.reference") {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
