@@ -2,8 +2,19 @@
 
 const fs = require("fs");
 
+async function listReleases(github, owner, repo) {
+    const response = await github.rest.repos.listReleases({
+        owner,
+        repo,
+        per_page: 100,
+    });
+    // Filters out draft releases
+    return response.data.filter((release) => !release.draft);
+}
+
 // Dependency can be the name of an entry in package.json, in which case the owner, repo & version will be looked up in its own package.json
-// Or it can be a string in the form owner/repo@tag
+// Or it can be a string in the form owner/repo@tag - in this case the tag is used exactly to find the release
+// Or it can be a string in the form owner/repo~tag - in this case the latest tag in the same major.minor.patch set is used to find the release
 // Or it can be a tuple of dependency, from version, to version, in which case a list of releases in that range (to inclusive) will be returned
 async function getReleases(github, dependency) {
     if (Array.isArray(dependency)) {
@@ -11,14 +22,10 @@ async function getReleases(github, dependency) {
         const upstreamPackageJson = getDependencyPackageJson(dep);
         const [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
 
-        const response = await github.rest.repos.listReleases({
-            owner,
-            repo,
-            per_page: 100,
-        });
+        const unfilteredReleases = await listReleases(github, owner, repo);
         // Only include non-draft & non-prerelease releases, unless the to-release is a pre-release, include that one
-        const releases = response.data.filter(
-            (release) => !release.draft && (!release.prerelease || release.tag_name === `v${toVersion}`),
+        const releases = unfilteredReleases.filter(
+            (release) => !release.prerelease || release.tag_name === `v${toVersion}`,
         );
 
         const fromVersionIndex = releases.findIndex((release) => release.tag_name === `v${fromVersion}`);
@@ -34,10 +41,28 @@ async function getRelease(github, dependency) {
     let owner;
     let repo;
     let tag;
-    if (dependency.includes("/") && dependency.includes("@")) {
-        owner = dependency.split("/")[0];
-        repo = dependency.split("/")[1].split("@")[0];
-        tag = dependency.split("@")[1];
+
+    if (dependency.includes("/")) {
+        let rest;
+        [owner, rest] = dependency.split("/")[0];
+
+        if (dependency.includes("@")) {
+            [repo, tag] = rest.split("@");
+        } else if (dependency.includes("~")) {
+            [repo, tag] = rest.split("~");
+
+            if (tag.includes("-rc.")) {
+                // If the tag is an RC, find the latest matching RC in the set
+                try {
+                    const releases = await listReleases(github, owner, repo);
+                    const baseVersion = tag.split("-rc.")[0];
+                    const release = releases.find((release) => release.tag_name.startsWith(baseVersion));
+                    if (release) return release;
+                } catch (e) {
+                    // Fall back to getReleaseByTag
+                }
+            }
+        }
     } else {
         const upstreamPackageJson = getDependencyPackageJson(dependency);
         [owner, repo] = upstreamPackageJson.repository.url.split("/").slice(-2);
@@ -129,7 +154,7 @@ if (require.main === module) {
         process.exit(1);
     }
     const [releaseId, ...dependencies] = process.argv.slice(2);
-    main({ github, releaseId, dependencies: ["matrix-react-sdk"] }).then((output) => {
+    main({ github, releaseId, dependencies }).then((output) => {
         // eslint-disable-next-line no-console
         console.log(output);
     });
