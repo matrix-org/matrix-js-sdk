@@ -956,9 +956,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
-            const availableMember = nonFunctionalHeroes.map((userId) => {
-                return this.getMember(userId);
-            }).find((member) => !!member);
+            const availableMember = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.getMember(userId);
+                })
+                .find((member) => !!member);
             if (availableMember) {
                 return availableMember;
             }
@@ -966,7 +968,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // Consider *all*, including previous, members, to generate the avatar for DMs where the other user left.
         // Needed to generate a matching avatar for rooms named "Empty Room (was Alice)".
-        const members = this.currentState.getMembers();
+        const members = this.getMembers();
         const nonFunctionalMembers = members?.filter((m) => !functionalMembers.includes(m.userId));
         if (nonFunctionalMembers.length <= 2) {
             const availableMember = nonFunctionalMembers.find((m) => {
@@ -980,9 +982,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // If all else failed, but the homeserver gave us heroes that previously could not be found in the room members,
         // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
-            const availableUser = nonFunctionalHeroes.map((userId) => {
-                return this.client.getUser(userId);
-            }).find((user) => !!user);
+            const availableUser = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.client.getUser(userId);
+                })
+                .find((user) => !!user);
             if (availableUser) {
                 const member = new RoomMember(this.roomId, availableUser.userId);
                 member.user = availableUser;
@@ -3389,7 +3393,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
-        let excludedUserIds = this.getFunctionalMembers();
+        const excludedUserIds = this.getFunctionalMembers();
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];
