@@ -2232,12 +2232,8 @@ describe("Room", function () {
             expect(room.getAvatarFallbackMember()?.userId).toBe(userD);
         });
 
-        it("should return undefined if the room is a 1:1 with a functional member", async function() {
+        it("should return undefined if the room is a 1:1 plus functional member", async function () {
             const room = new Room(roomId, null!, userA);
-            // room.getMembers = jest.fn().mockReturnValue({
-            //     userB: new RoomMember(roomId, userB),
-            // });
-            jest.spyOn(Room.prototype as any, "getInvitedAndJoinedFunctionalMemberCount").mockReturnValue(1);
             await room.currentState.setStateEvents([
                 utils.mkMembership({
                     user: userA,
@@ -2266,13 +2262,30 @@ describe("Room", function () {
             expect(room.getAvatarFallbackMember()).toBeUndefined();
         });
 
-        it("should use summary heroes of nonfunctional member if 1:1 plus functional member", async function() {
+        it("should pick nonfunctional member from summary heroes if room is a 1:1 plus functional member", async function () {
             const room = new Room(roomId, null!, userA);
-            // room.getMembers = jest.fn().mockReturnValue({
-            //     userB: new RoomMember(roomId, userB),
-            // });
-            jest.spyOn(Room.prototype as any, "getInvitedAndJoinedFunctionalMemberCount").mockReturnValue(1);
             await room.currentState.setStateEvents([
+                utils.mkMembership({
+                    user: userA,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User A",
+                }),
+                utils.mkMembership({
+                    user: userB,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User B",
+                }),
+                utils.mkMembership({
+                    user: userD,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User D",
+                }),
                 utils.mkEvent({
                     type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name,
                     skey: "",
@@ -2280,25 +2293,6 @@ describe("Room", function () {
                     event: true,
                     content: {
                         service_members: [userB],
-                    },
-                }),
-            ]);
-            room.currentState.markOutOfBandMembersStarted();
-            room.currentState.setOutOfBandMembers([
-                new MatrixEvent({
-                    type: EventType.RoomMember,
-                    state_key: userD,
-                    sender: userD,
-                    content: {
-                        membership: "join",
-                    },
-                }),
-                new MatrixEvent({
-                    type: EventType.RoomMember,
-                    state_key: userB,
-                    sender: userB,
-                    content: {
-                        membership: "join",
                     },
                 }),
             ]);
