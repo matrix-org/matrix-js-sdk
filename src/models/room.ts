@@ -3383,7 +3383,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
-        let excludedUserIds: string[] = this.getFunctionalMembers();
+        let excludedUserIds = this.getFunctionalMembers();
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];
