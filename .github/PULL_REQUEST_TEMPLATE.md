@@ -3,6 +3,6 @@
 ## Checklist
 
 -   [ ] Tests written for new code (and old code if feasible)
--   [ ] New or updated `public`/`exported` symbols have accurate [Typedoc](https://typedoc.org/guides/overview) documentation.
+-   [ ] New or updated `public`/`exported` symbols have accurate [TSDoc](https://tsdoc.org/) documentation.
 -   [ ] Linter and other CI checks pass
 -   [ ] Sign-off given on the changes (see [CONTRIBUTING.md](https://github.com/matrix-org/matrix-js-sdk/blob/develop/CONTRIBUTING.md))
