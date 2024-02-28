@@ -930,19 +930,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return [];
     }
 
-    private getInvitedAndJoinedFunctionalMemberCount(functionalMembers: String[]): number {
-        return functionalMembers.reduce((count, m) => {
+    public getAvatarFallbackMember(): RoomMember | undefined {
+        const functionalMembers = this.getFunctionalMembers();
+        const invitedAndJoinedFunctionalMemberCount = functionalMembers.reduce((count, m) => {
             const membership = this.getMembers().find((member) => member.userId === m)?.membership;
             if (membership && ["join", "invite"].includes(membership)) {
                 return count + 1;
             }
             return count;
         }, 0);
-    }
-
-    public getAvatarFallbackMember(): RoomMember | undefined {
-        const functionalMembers = this.getFunctionalMembers();
-        const invitedAndJoinedFunctionalMemberCount = this.getInvitedAndJoinedFunctionalMemberCount(functionalMembers);
 
         // only get avatar if conversation is with a single specific other user
         const memberCount = this.getInvitedAndJoinedMemberCount() - invitedAndJoinedFunctionalMemberCount;
