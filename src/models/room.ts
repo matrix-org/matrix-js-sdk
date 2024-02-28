@@ -914,7 +914,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.myUserId;
     }
 
-    // gets service members (e.g. helper bots) for exclusion
+    /**
+     * Gets the "functional members" in this room.
+     *
+     * Returns the list of userIDs from the `io.element.functional_members` event. Does not consider the
+     * current membership states of those users.
+     *
+     * @see https://github.com/element-hq/element-meta/blob/develop/spec/functional_members.md.
+     */
     private getFunctionalMembers(): string[] {
         const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
