@@ -950,7 +950,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
-            const availableMember = this.summaryHeroes!.map((userId) => {
+            const availableMember = nonFunctionalHeroes.map((userId) => {
                 return this.getMember(userId);
             }).find((member) => !!member);
             if (availableMember) {
@@ -974,7 +974,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // If all else failed, but the homeserver gave us heroes that previously could not be found in the room members,
         // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
-            const availableUser = this.summaryHeroes!.map((userId) => {
+            const availableUser = nonFunctionalHeroes.map((userId) => {
                 return this.client.getUser(userId);
             }).find((user) => !!user);
             if (availableUser) {
