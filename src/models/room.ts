@@ -940,13 +940,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return count;
         }, 0);
 
-        // only get avatar if conversation is with a single specific other user
+        // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
         const memberCount = this.getInvitedAndJoinedMemberCount() - invitedAndJoinedFunctionalMemberCount;
         if (memberCount > 2) {
             return;
         }
 
-        // prefer hero as indicated by the room summary
+        // Prefer the list of heroes, if present. It should only include the single other user in the DM.
         const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
@@ -958,11 +958,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        // include previous members
+        // Consider *all*, including previous, members, to generate the avatar for DMs where the other user left.
+        // Needed to generate a matching avatar for rooms named "Empty Room (was Alice)".
         const members = this.currentState.getMembers();
         const nonFunctionalMembers = members?.filter((m) => !functionalMembers.includes(m.userId));
-        // could be different than memberCount
-        // as this includes left members
         if (nonFunctionalMembers.length <= 2) {
             const availableMember = nonFunctionalMembers.find((m) => {
                 return m.userId !== this.myUserId;
@@ -972,8 +971,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        // if all else fails, try falling back to a user,
-        // and create a one-off member for it
+        // If all else failed, but the homeserver gave us heroes that previously could not be found in the room members,
+        // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
             const availableUser = this.summaryHeroes!.map((userId) => {
                 return this.client.getUser(userId);
