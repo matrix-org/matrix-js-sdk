@@ -169,6 +169,7 @@ export function createRoomWidgetClient(
     capabilities: ICapabilities,
     roomId: string,
     opts: ICreateClientOpts,
+    sendContentLoaded = true,
 ): MatrixClient {
-    return new RoomWidgetClient(widgetApi, capabilities, roomId, amendClientOpts(opts));
+    return new RoomWidgetClient(widgetApi, capabilities, roomId, amendClientOpts(opts), sendContentLoaded);
 }

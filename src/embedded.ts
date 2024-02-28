@@ -108,11 +108,21 @@ export class RoomWidgetClient extends MatrixClient {
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
+    /**
+     *
+     * @param widgetApi - the widget api to use for the embedded "fake" client
+     * @param opts - Client related options
+     * @param sendContentLoaded - Whether to send a content loaded event.
+     *   Set to false if: the widget uses waitForIFrameLoad=true, or if the
+     *   the widget wants to send the ContentLoaded action at a later point in time
+     *   after initial setup.
+     */
     public constructor(
         private readonly widgetApi: WidgetApi,
         private readonly capabilities: ICapabilities,
         private readonly roomId: string,
         opts: IMatrixClientCreateOpts,
+        sendContentLoaded = true,
     ) {
         super(opts);
 
@@ -165,7 +175,7 @@ export class RoomWidgetClient extends MatrixClient {
         // does *not* (yes, that is the right way around) wait for this event. Let's
         // start sending this, then once this has rolled out, we can change element-web to
         // use waitForIFrameLoad=false and have a widget API that's less racy.
-        widgetApi.sendContentLoaded();
+        if (sendContentLoaded) widgetApi.sendContentLoaded();
     }
 
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
