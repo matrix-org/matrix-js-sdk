@@ -204,6 +204,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
             const mapper = this.client.getEventMapper();
             this.rootEvent = mapper(eventData); // will merge with existing event object if such is known
+            //console.log("changed root event. unsigned is now", JSON.stringify(this.rootEvent.getUnsigned()));
+            //console.log("floop " + this.rootEvent.getUnsigned()["m.relations"]["io.element.thread"]);
+            if (this.rootEvent.getUnsigned()["m.relations"]["io.element.thread"].count > 1) {
+                console.log("floop");
+            }
         } catch (e) {
             logger.error("Failed to fetch thread root to construct thread with", e);
         }
@@ -498,6 +503,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     private async processRootEvent(): Promise<void> {
         const bundledRelationship = this.getRootEventBundledRelationship();
+        if (bundledRelationship?.count > 1) {
+            console.log("sfgsdfg");
+        }
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
