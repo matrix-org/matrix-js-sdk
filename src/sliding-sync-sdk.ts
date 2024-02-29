@@ -218,7 +218,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
         };
     }
 
-    public onResponse(data: ExtensionAccountDataResponse): void {
+    public async onResponse(data: ExtensionAccountDataResponse): Promise<void> {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
@@ -288,7 +288,7 @@ class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypi
         };
     }
 
-    public onResponse(data: ExtensionTypingResponse): void {
+    public async onResponse(data: ExtensionTypingResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
@@ -327,7 +327,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
         return undefined; // don't send a JSON object for subsequent requests, we don't need to.
     }
 
-    public onResponse(data: ExtensionReceiptsResponse): void {
+    public async onResponse(data: ExtensionReceiptsResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
