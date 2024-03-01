@@ -164,6 +164,20 @@ export function createClient(opts: ICreateClientOpts): MatrixClient {
     return new MatrixClient(amendClientOpts(opts));
 }
 
+/**
+ * Construct a Matrix Client that works in a widget.
+ * This client has a subset of features compared to a full client.
+ * It uses the widget-api to communicate with matrix. (widget \<-\> client \<-\> homeserver)
+ * @returns A new matrix client with a subset of features.
+ * @param opts - The configuration options for this client. These configuration
+ * options will be passed directly to {@link MatrixClient}.
+ * @param widgetApi - The widget api to use for communication.
+ * @param capabilities - The capabilities the widget client will request.
+ * @param roomId - The room id the widget is associated with.
+ * @param sendContentLoaded - Whether to send a content loaded widget action immediately after initial setup.
+ *   Set to `false` if the widget uses `waitForIFrameLoad=true` (in this case the client does not expect a content loaded action at all),
+ *   or if the the widget wants to send the `ContentLoaded` action at a later point in time after the initial setup.
+ */
 export function createRoomWidgetClient(
     widgetApi: WidgetApi,
     capabilities: ICapabilities,

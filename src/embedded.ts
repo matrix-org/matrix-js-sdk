@@ -112,10 +112,9 @@ export class RoomWidgetClient extends MatrixClient {
      *
      * @param widgetApi - the widget api to use for the embedded "fake" client
      * @param opts - Client related options
-     * @param sendContentLoaded - Whether to send a content loaded event.
-     *   Set to false if: the widget uses waitForIFrameLoad=true, or if the
-     *   the widget wants to send the ContentLoaded action at a later point in time
-     *   after initial setup.
+     * @param sendContentLoaded - Whether to send a content loaded widget action immediately after initial setup.
+     *   Set to `false` if the widget uses `waitForIFrameLoad=true` (in this case the client does not expect a content loaded action at all),
+     *   or if the the widget wants to send the `ContentLoaded` action at a later point in time after the initial setup.
      */
     public constructor(
         private readonly widgetApi: WidgetApi,
