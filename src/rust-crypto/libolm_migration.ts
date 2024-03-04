@@ -23,6 +23,8 @@ import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
+import { CrossSigningKeyInfo } from "../crypto-api";
+import { RustCrypto } from "./rust-crypto";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -379,4 +381,78 @@ async function getAndDecryptCachedSecretKey(
     });
 
     return encodedKey === null ? undefined : await decryptAES(encodedKey, legacyPickleKey, name);
+}
+
+/**
+ * Checks if the legacy store has a trusted public master key.
+ * Returns null if the legacy session was not verified, or the trusted public master key if it was.
+ * @param legacyStore - The legacy store to check.
+ */
+async function maybeTrustedPublicMasterKey(legacyStore: CryptoStore): Promise<string | null> {
+    let maybeTrustedKeys: string | null = null;
+    await legacyStore.doTxn("readonly", "account", (txn) => {
+        legacyStore.getCrossSigningKeys(txn, (keys) => {
+            // can be an empty object after resetting cross-signing keys, see storeTrustedSelfKeys
+            if (keys && Object.keys(keys).length !== 0) {
+                const msk = keys["master"];
+                if (msk) {
+                    // `msk.keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+                    maybeTrustedKeys = Object.values(msk.keys)[0];
+                }
+            }
+        });
+    });
+
+    return maybeTrustedKeys;
+}
+
+/**
+ * If the legacy session didn't have the private msk, the migrated session
+ * will revert to unverified, even if the user has verified the session in the past.
+ * This only occurs if the msk was not in cache (usk and ssk private keys won't help to establish trust,
+ * the trust is rooted in the msk).
+ * Rust crypto will only consider the current session as trusted if we import the private MSK itself.
+ *
+ * We could prompt the user to verify the session again, but it's probably better to just
+ * mark the user identity as locally verified if it was before.
+ *
+ * See https://github.com/element-hq/element-web/issues/27079
+ */
+export async function migrateLegacyLocalTrustIfNeeded(
+    legacyCryptoStore: CryptoStore,
+    rustCrypto: RustCrypto,
+    logger: Logger,
+): Promise<void> {
+    // Now get what the rust session own identity.
+    const rustSeenIdentity = await rustCrypto.getOwnIdentity();
+    if (!rustSeenIdentity || rustSeenIdentity.isVerified()) {
+        // Nothing to do, there is no cross-signing or the rust session is already verified
+        return;
+    }
+
+    // This would be null is the user never verified their identity in the legacy session.
+    const legacyLocallyTrustedMSK = await maybeTrustedPublicMasterKey(legacyCryptoStore);
+    if (!legacyLocallyTrustedMSK) {
+        // Nothing to do, the legacy session was not verified
+        return;
+    }
+
+    const mskInfo: CrossSigningKeyInfo = JSON.parse(rustSeenIdentity.masterKey);
+    if (!mskInfo.keys || Object.keys(mskInfo.keys).length === 0) {
+        // This should not happen, but let's be safe
+        logger.error("Post Migration | Unexpected error: no master key in the rust session.");
+        return;
+    }
+    const rustSeenMSK = Object.values(mskInfo.keys)[0];
+
+    logger.info(`Post Migration rust seen MSK: ${rustSeenMSK}`);
+    if (rustSeenMSK && rustSeenMSK == legacyLocallyTrustedMSK) {
+        logger.info(`Post Migration | Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
+        // Let's mark the user identity as locally verified as part of the migration.
+        /* const request = */ await rustSeenIdentity!.verify();
+        // This will also sign the MSK with the current device key, and return the request to be sent to the server.
+        // We ignored it in our case, we don't need to publish this signature
+        // (also should anyhow have been already done in the legacy session, but rust crypto doesn't consider such signatures
+        // to establish own identity trust).
+    }
 }

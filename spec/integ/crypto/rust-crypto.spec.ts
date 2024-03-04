@@ -20,6 +20,12 @@ import fetchMock from "fetch-mock-jest";
 
 import { createClient, CryptoEvent, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
+import {
+    MIGRATION_BACKUP,
+    MIGRATION_KEY_QUERY_RESPONSE,
+    ROTATED_MIGRATION_KEY_QUERY_RESPONSE,
+} from "../../test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump";
+import { UNTRUSTED_KEY_QUERY_RESPONSE } from "../../test-utils/test_indexeddb_cryptostore_dump/unverified";
 
 jest.setTimeout(15000);
 
@@ -93,25 +99,7 @@ describe("MatrixClient.initRustCrypto", () => {
         await matrixClient.initRustCrypto();
     });
 
-    it("should migrate from libolm", async () => {
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-            auth_data: {
-                public_key: "q+HZiJdHl2Yopv9GGvv7EYSzDMrAiRknK4glSdoaomI",
-                signatures: {
-                    "@vdhtest200713:matrix.org": {
-                        "ed25519:gh9fGr39eNZUdWynEMJ/q/WZq/Pk/foFxHXFBFm18ZI":
-                            "reDp6Mu+j+tfUL3/T6f5OBT3N825Lzpc43vvG+RvjX6V+KxXzodBQArgCoeEHLtL9OgSBmNrhTkSOX87MWCKAw",
-                        "ed25519:KMFSTJSMLB":
-                            "F8tyV5W6wNi0GXTdSg+gxSCULQi0EYxdAAqfkyNq58KzssZMw5i+PRA0aI2b+D7NH/aZaJrtiYNHJ0gWLSQvAw",
-                    },
-                },
-            },
-            version: "7",
-            algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-            etag: "1",
-            count: 79,
-        });
-
+    function mockKeyQueryForTestMigration() {
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
             device_keys: {
                 "@vdhtest200713:matrix.org": {
@@ -183,6 +171,28 @@ describe("MatrixClient.initRustCrypto", () => {
                 },
             },
         });
+    }
+
+    it("should migrate from libolm", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+            auth_data: {
+                public_key: "q+HZiJdHl2Yopv9GGvv7EYSzDMrAiRknK4glSdoaomI",
+                signatures: {
+                    "@vdhtest200713:matrix.org": {
+                        "ed25519:gh9fGr39eNZUdWynEMJ/q/WZq/Pk/foFxHXFBFm18ZI":
+                            "reDp6Mu+j+tfUL3/T6f5OBT3N825Lzpc43vvG+RvjX6V+KxXzodBQArgCoeEHLtL9OgSBmNrhTkSOX87MWCKAw",
+                        "ed25519:KMFSTJSMLB":
+                            "F8tyV5W6wNi0GXTdSg+gxSCULQi0EYxdAAqfkyNq58KzssZMw5i+PRA0aI2b+D7NH/aZaJrtiYNHJ0gWLSQvAw",
+                    },
+                },
+            },
+            version: "7",
+            algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            etag: "1",
+            count: 79,
+        });
+
+        mockKeyQueryForTestMigration();
 
         const testStoreName = "test-store";
         await populateStore(testStoreName);
@@ -237,6 +247,143 @@ describe("MatrixClient.initRustCrypto", () => {
         // The final call should have progress == total == -1
         expect(progressListener).toHaveBeenLastCalledWith(-1, -1);
     }, 60000);
+
+    describe("Legacy trust migration", () => {
+        beforeEach(() => {
+            fetchMock.reset();
+        });
+
+        it("should not revert to untrusted if legacy was trusted but msk not in cache, big account", async () => {
+            // Just 404 here for the test
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "No backup found",
+                },
+            });
+
+            mockKeyQueryForTestMigration();
+
+            const testStoreName = "test-store";
+            await populateStore(testStoreName);
+            const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+            await cryptoStore.startup();
+
+            // Remove the master key from the cache
+            await cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                const objectStore = txn.objectStore("account");
+                objectStore.delete(`ssss_cache:master`);
+            });
+
+            const matrixClient = createClient({
+                baseUrl: "http://test.server",
+                userId: "@vdhtest200713:matrix.org",
+                deviceId: "KMFSTJSMLB",
+                cryptoStore,
+                pickleKey: "+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o",
+            });
+
+            await matrixClient.initRustCrypto();
+
+            const verificationStatus = await matrixClient
+                .getCrypto()!
+                .getUserVerificationStatus("@vdhtest200713:matrix.org");
+
+            expect(verificationStatus.isCrossSigningVerified()).toBe(true);
+        }, 60000);
+
+        it("should not revert to untrusted if legacy was trusted but msk not in cache", async () => {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", MIGRATION_BACKUP);
+
+            fetchMock.post("path:/_matrix/client/v3/keys/query", MIGRATION_KEY_QUERY_RESPONSE);
+
+            const testStoreName = "test-store-no-msk";
+            await populateStore(
+                testStoreName,
+                "spec/test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump/dump.json",
+            );
+            const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+
+            const matrixClient = createClient({
+                baseUrl: "http://test.server",
+                userId: "@migration:localhost",
+                deviceId: "CBGTADUILV",
+                cryptoStore,
+                pickleKey: "qEURMepfkMvoBQGaWlI9MZKYnDMsSAiW8aFTKXaeDV0",
+            });
+
+            await matrixClient.initRustCrypto();
+
+            const verificationStatus = await matrixClient
+                .getCrypto()!
+                .getUserVerificationStatus("@migration:localhost");
+
+            expect(verificationStatus.isCrossSigningVerified()).toBe(true);
+        });
+
+        it("should not migrate local trust if key has changed", async () => {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", MIGRATION_BACKUP);
+
+            fetchMock.post("path:/_matrix/client/v3/keys/query", ROTATED_MIGRATION_KEY_QUERY_RESPONSE);
+
+            const testStoreName = "test-store-no-msk";
+            await populateStore(
+                testStoreName,
+                "spec/test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump/dump.json",
+            );
+            const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+
+            const matrixClient = createClient({
+                baseUrl: "http://test.server",
+                userId: "@migration:localhost",
+                deviceId: "CBGTADUILV",
+                cryptoStore,
+                pickleKey: "qEURMepfkMvoBQGaWlI9MZKYnDMsSAiW8aFTKXaeDV0",
+            });
+
+            await matrixClient.initRustCrypto();
+
+            const verificationStatus = await matrixClient
+                .getCrypto()!
+                .getUserVerificationStatus("@migration:localhost");
+
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+        });
+
+        it("should not migrate local trust if was not trusted in legacy", async () => {
+            // Just 404 here for the test
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "No backup found",
+                },
+            });
+
+            fetchMock.post("path:/_matrix/client/v3/keys/query", UNTRUSTED_KEY_QUERY_RESPONSE);
+
+            const testStoreName = "test-store-untrusted";
+            await populateStore(testStoreName, "spec/test-utils/test_indexeddb_cryptostore_dump/unverified/dump.json");
+            const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+
+            const matrixClient = createClient({
+                baseUrl: "http://test.server",
+                userId: "@untrusted:localhost",
+                deviceId: "VJPSPVPWZT",
+                cryptoStore,
+                pickleKey: "WVllQb4Lk/WwP4Q7iBfeTUHpgydZm9YqXI1B5bTvnIM",
+            });
+
+            await matrixClient.initRustCrypto();
+
+            const verificationStatus = await matrixClient
+                .getCrypto()!
+                .getUserVerificationStatus("@untrusted:localhost");
+
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+        });
+    });
 });
 
 describe("MatrixClient.clearStores", () => {

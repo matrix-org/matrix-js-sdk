@@ -23,7 +23,11 @@ import { ServerSideSecretStorage } from "../secret-storage";
 import { ICryptoCallbacks } from "../crypto";
 import { Logger } from "../logger";
 import { CryptoStore, MigrationState } from "../crypto/store/base";
-import { migrateFromLegacyCrypto, migrateRoomSettingsFromLegacyCrypto } from "./libolm_migration";
+import {
+    migrateFromLegacyCrypto,
+    migrateLegacyLocalTrustIfNeeded,
+    migrateRoomSettingsFromLegacyCrypto,
+} from "./libolm_migration";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -197,6 +201,14 @@ async function initOlmMachine(
                 // It will be retried by the sdk.
                 logger.error("Failed to check for cross-signing keys after migration", e);
             }
+
+            // If the master cross signing key secret was not cached in the legacy store, the rust session
+            // will not be able to establish the trust of the user identity.
+            // That means that after migration the session could revert to unverified.
+            // In order to avoid asking the users to re-verify their sessions, we need to migrate the legacy local trust
+            // (if the legacy session was already verified) to the new session.
+            await migrateLegacyLocalTrustIfNeeded(legacyCryptoStore, rustCrypto, logger);
+
             await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
         }
     }

@@ -1566,6 +1566,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Not part of the public crypto-api interface.
+     * Used during migration from legacy js-crypto to update local trust if needed.
+     */
+    public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
+        return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+    }
+
+    /**
      * Handle key verification request.
      *
      * @param event - a key validation request event.
