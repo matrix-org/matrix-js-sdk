@@ -1,7 +1,6 @@
-import { IDownloadKeyResult } from "../../../../src";
 import { KeyBackupInfo } from "../../../../src/crypto-api/keybackup";
 
-export const MIGRATION_KEY_QUERY_RESPONSE: IDownloadKeyResult = {
+export const MIGRATION_KEY_QUERY_RESPONSE: any = {
     device_keys: {
         "@migration:localhost": {
             CBGTADUILV: {
@@ -112,7 +111,7 @@ export const MIGRATION_KEY_QUERY_RESPONSE: IDownloadKeyResult = {
     },
 };
 
-export const ROTATED_MIGRATION_KEY_QUERY_RESPONSE: IDownloadKeyResult = {
+export const ROTATED_MIGRATION_KEY_QUERY_RESPONSE: any = {
     device_keys: {
         "@migration:localhost": {
             TMWBMDZPFT: {
