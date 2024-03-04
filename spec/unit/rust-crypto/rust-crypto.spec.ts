@@ -99,6 +99,7 @@ describe("initRustCrypto", () => {
             isBackupEnabled: jest.fn().mockResolvedValue(false),
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
             getBackupKeys: jest.fn(),
+            getIdentity: jest.fn().mockResolvedValue(null),
         } as unknown as Mocked<OlmMachine>;
     }
 
