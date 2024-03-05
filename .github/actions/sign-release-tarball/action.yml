@@ -22,7 +22,7 @@ runs:
 
         - name: Upload tarball signature
           if: ${{ inputs.upload-url }}
-          uses: shogo82148/actions-upload-release-asset@dccd6d23e64fd6a746dce6814c0bde0a04886085 # v1
+          uses: shogo82148/actions-upload-release-asset@5bd52f05dd8076794da5975d4c0a4f3bce7dd8f5 # v1
           with:
               upload_url: ${{ inputs.upload-url }}
               asset_path: ${{ env.VERSION }}.tar.gz.asc
