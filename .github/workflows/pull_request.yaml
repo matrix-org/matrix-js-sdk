@@ -47,7 +47,7 @@ jobs:
         steps:
             - name: Check membership
               if: github.event.pull_request.user.login != 'renovate[bot]'
-              uses: tspascoal/get-user-teams-membership@ba78054988f58bea69b7c6136d563236f8ed2fc0 # v3
+              uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3
               id: teams
               with:
                   username: ${{ github.event.pull_request.user.login }}
