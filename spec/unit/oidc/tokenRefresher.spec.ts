@@ -64,7 +64,7 @@ describe("OidcTokenRefresher", () => {
             keys: [],
         });
 
-        fetchMock.post(config.metadata.token_endpoint, {
+        fetchMock.post(config.tokenEndpoint, {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
@@ -88,7 +88,7 @@ describe("OidcTokenRefresher", () => {
             },
             { overwriteRoutes: true },
         );
-        const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+        const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
         await expect(refresher.oidcClientReady).rejects.toThrow();
         expect(logger.error).toHaveBeenCalledWith(
             "Failed to initialise OIDC client.",
@@ -98,7 +98,7 @@ describe("OidcTokenRefresher", () => {
     });
 
     it("initialises oidc client", async () => {
-        const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+        const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
         await refresher.oidcClientReady;
 
         // @ts-ignore peek at private property to see we initialised the client correctly
@@ -114,19 +114,19 @@ describe("OidcTokenRefresher", () => {
 
     describe("doRefreshAccessToken()", () => {
         it("should throw when oidcClient has not been initialised", async () => {
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow(
                 "Cannot get new token before OIDC client is initialised.",
             );
         });
 
         it("should refresh the tokens", async () => {
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
             const result = await refresher.doRefreshAccessToken("refresh-token");
 
-            expect(fetchMock).toHaveFetched(config.metadata.token_endpoint, {
+            expect(fetchMock).toHaveFetched(config.tokenEndpoint, {
                 method: "POST",
             });
 
@@ -137,7 +137,7 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should persist the new tokens", async () => {
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // spy on our stub
             jest.spyOn(refresher, "persistTokens");
@@ -153,7 +153,7 @@ describe("OidcTokenRefresher", () => {
         it("should only have one inflight refresh request at once", async () => {
             fetchMock
                 .postOnce(
-                    config.metadata.token_endpoint,
+                    config.tokenEndpoint,
                     {
                         status: 200,
                         headers: {
@@ -164,7 +164,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: true },
                 )
                 .postOnce(
-                    config.metadata.token_endpoint,
+                    config.tokenEndpoint,
                     {
                         status: 200,
                         headers: {
@@ -175,7 +175,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: false },
                 );
 
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
             fetchMock.resetHistory();
@@ -188,7 +188,7 @@ describe("OidcTokenRefresher", () => {
             const result2 = await first;
 
             // only one call to token endpoint
-            expect(fetchMock).toHaveFetchedTimes(1, config.metadata.token_endpoint);
+            expect(fetchMock).toHaveFetchedTimes(1, config.tokenEndpoint);
             expect(result1).toEqual({
                 accessToken: "first-new-access-token",
                 refreshToken: "first-new-refresh-token",
@@ -208,7 +208,7 @@ describe("OidcTokenRefresher", () => {
 
         it("should log and rethrow when token refresh fails", async () => {
             fetchMock.post(
-                config.metadata.token_endpoint,
+                config.tokenEndpoint,
                 {
                     status: 503,
                     headers: {
@@ -218,7 +218,7 @@ describe("OidcTokenRefresher", () => {
                 { overwriteRoutes: true },
             );
 
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
 
             await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
@@ -228,7 +228,7 @@ describe("OidcTokenRefresher", () => {
             // make sure inflight request is cleared after a failure
             fetchMock
                 .postOnce(
-                    config.metadata.token_endpoint,
+                    config.tokenEndpoint,
                     {
                         status: 503,
                         headers: {
@@ -238,7 +238,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: true },
                 )
                 .postOnce(
-                    config.metadata.token_endpoint,
+                    config.tokenEndpoint,
                     {
                         status: 200,
                         headers: {
@@ -249,7 +249,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: false },
                 );
 
-            const refresher = new OidcTokenRefresher(authConfig, clientId, redirectUri, deviceId, idTokenClaims);
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
             fetchMock.resetHistory();

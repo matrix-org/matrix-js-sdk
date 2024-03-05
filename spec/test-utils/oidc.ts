@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClientConfig } from "../../src";
-import { ValidatedIssuerMetadata } from "../../src/oidc/validate";
+import { OidcClientConfig, ValidatedIssuerMetadata } from "../../src";
 
 /**
  * Makes a valid OidcClientConfig with minimum valid values
@@ -26,8 +25,7 @@ export const makeDelegatedAuthConfig = (issuer = "https://auth.org/"): OidcClien
     const metadata = mockOpenIdConfiguration(issuer);
 
     return {
-        issuer,
-        account: issuer + "account",
+        accountManagementEndpoint: issuer + "account",
         registrationEndpoint: metadata.registration_endpoint,
         authorizationEndpoint: metadata.authorization_endpoint,
         tokenEndpoint: metadata.token_endpoint,
