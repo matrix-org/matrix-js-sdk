@@ -121,7 +121,7 @@ export class RoomWidgetClient extends MatrixClient {
         private readonly capabilities: ICapabilities,
         private readonly roomId: string,
         opts: IMatrixClientCreateOpts,
-        sendContentLoaded = true,
+        sendContentLoaded: boolean,
     ) {
         super(opts);
 
