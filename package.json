@@ -67,8 +67,8 @@
         "uuid": "9"
     },
     "devDependencies": {
-        "@action-validator/cli": "^0.5.3",
-        "@action-validator/core": "^0.5.3",
+        "@action-validator/cli": "^0.6.0",
+        "@action-validator/core": "^0.6.0",
         "@babel/cli": "^7.12.10",
         "@babel/core": "^7.12.10",
         "@babel/eslint-parser": "^7.12.10",
@@ -97,7 +97,7 @@
         "babel-jest": "^29.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.56.0",
+        "eslint": "8.57.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
