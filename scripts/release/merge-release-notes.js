@@ -45,7 +45,7 @@ async function getRelease(github, dependency) {
 
     if (dependency.includes("/")) {
         let rest;
-        [owner, rest] = dependency.split("/")[0];
+        [owner, rest] = dependency.split("/");
 
         if (dependency.includes("@")) {
             [repo, tag] = rest.split("@");
