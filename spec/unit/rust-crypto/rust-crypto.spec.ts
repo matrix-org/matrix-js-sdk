@@ -1395,6 +1395,83 @@ describe("RustCrypto", () => {
             });
         });
     });
+
+    describe("dehydration", () => {
+        it("should rehydrate and dehydrate a device", async () => {
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+            const rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+                undefined,
+                secretStorage,
+            );
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+            rustCrypto["checkKeyBackupAndEnable"] = async () => {
+                return null;
+            };
+
+            const outgoingRequestProcessor = {
+                makeOutgoingRequest: jest.fn(),
+            } as unknown as OutgoingRequestProcessor;
+            rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            (rustCrypto["dehydrationManager"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            // create initial secret storage
+            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            let dehydratedDeviceBody: any;
+            const makeDehydrationRequest = (outgoingRequestProcessor.makeOutgoingRequest = jest.fn(
+                async (req, uiaCallback) => {
+                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+                    dehydratedDeviceBody = JSON.parse((req as RustSdkCryptoJs.PutDehydratedDeviceRequest).body);
+                },
+            ));
+            await rustCrypto.createAndUploadDehydratedDevice();
+
+            expect(makeDehydrationRequest).toHaveBeenCalled();
+
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: dehydratedDeviceBody.device_id,
+                device_data: dehydratedDeviceBody.device_data,
+            });
+            fetchMock.post(
+                `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
+                {
+                    events: [],
+                    next_batch: "token",
+                },
+            );
+
+            expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(true);
+        });
+    });
 });
 
 /** Build a MatrixHttpApi instance */

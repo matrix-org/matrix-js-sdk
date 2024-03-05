@@ -1658,6 +1658,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async createAndUploadDehydratedDevice(): Promise<void> {
         return await this.dehydrationManager.createAndUploadDehydratedDevice();
     }
+
+    /** Return whether the dehydration key is stored in Secret Storage
+     */
+    public async isDehydrationKeyStored(): Promise<boolean> {
+        return await this.dehydrationManager.isKeyStored();
+    }
+
+    /**
+     * Schedule periodic creation of dehydrated devices
+     *
+     * @param interval - the time to wait between creating dehydrated devices
+     * @param delay - how long to wait before creating the first dehydrated device.
+     *     Defaults to creating the device immediately.
+     */
+    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
+        return await this.dehydrationManager.scheduleDeviceDehydration(interval, delay);
+    }
 }
 
 class EventDecryptor {

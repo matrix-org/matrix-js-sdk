@@ -497,6 +497,12 @@ export interface CryptoApi {
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Dehydrated devices
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     /**
      * Rehydrate the dehydrated device stored on the server
      *
@@ -513,6 +519,15 @@ export interface CryptoApi {
      * Creates and stores a new key in secret storage if none is available.
      */
     createAndUploadDehydratedDevice(): Promise<void>;
+
+    /**
+     * Schedule periodic creation of dehydrated devices
+     *
+     * @param interval - the time to wait between creating dehydrated devices
+     * @param delay - how long to wait before creating the first dehydrated device.
+     *     Defaults to creating the device immediately.
+     */
+    scheduleDeviceDehydration(interval: number, delay?: number): Promise<void>;
 }
 
 /**

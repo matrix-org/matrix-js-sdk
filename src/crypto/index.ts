@@ -4324,6 +4324,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async createAndUploadDehydratedDevice(): Promise<void> {
         throw new Error("Not implemented");
     }
+
+    /**
+     * Stub function -- dehydration is not implemented here, so throw error
+     */
+    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
+        throw new Error("Not implemented");
+    }
 }
 
 /**
