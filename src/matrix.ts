@@ -104,6 +104,7 @@ export { IdentityProviderBrand, SSOAction } from "./@types/auth";
 export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces";
 export { LocationAssetType } from "./@types/location";
+export * from "./models/media";
 
 /**
  * Types supporting cryptography.
