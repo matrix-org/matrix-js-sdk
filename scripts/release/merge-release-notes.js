@@ -12,10 +12,8 @@ async function listReleases(github, owner, repo) {
     return response.data.filter((release) => !release.draft);
 }
 
-// Dependency can be the name of an entry in package.json, in which case the owner, repo & version will be looked up in its own package.json
-// Or it can be a string in the form owner/repo@tag - in this case the tag is used exactly to find the release
-// Or it can be a string in the form owner/repo~tag - in this case the latest tag in the same major.minor.patch set is used to find the release
-// Or it can be a tuple of dependency, from version, to version, in which case a list of releases in that range (to inclusive) will be returned
+// Dependency can be a tuple of dependency, from version, to version, in which case a list of releases in that range (to inclusive) will be returned
+// Or it can be a string in the form accepted by `getRelease`
 async function getReleases(github, dependency) {
     if (Array.isArray(dependency)) {
         const [dep, fromVersion, toVersion] = dependency;
@@ -37,6 +35,9 @@ async function getReleases(github, dependency) {
     return [await getRelease(github, dependency)];
 }
 
+// Dependency can be the name of an entry in package.json, in which case the owner, repo & version will be looked up in its own package.json
+// Or it can be a string in the form owner/repo@tag - in this case the tag is used exactly to find the release
+// Or it can be a string in the form owner/repo~tag - in this case the latest tag in the same major.minor.patch set is used to find the release
 async function getRelease(github, dependency) {
     let owner;
     let repo;
