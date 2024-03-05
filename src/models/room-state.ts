@@ -297,13 +297,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get state events from the state of the room.
      * @param eventType - The event type of the state event.
-     * @param stateKey - Optional. The state_key of the state event. If
-     * this is `undefined` then all matching state events will be
-     * returned.
-     * @returns A list of events if state_key was
-     * `undefined`, else a single event (or null if no match found).
+     * @returns A list of events
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
+    /**
+     * Get state events from the state of the room.
+     * @param eventType - The event type of the state event.
+     * @param stateKey - The state_key of the state event.
+     * @returns A single event (or null if no match found).
+     */
     public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
     public getStateEvents(eventType: EventType | string, stateKey?: string): MatrixEvent[] | MatrixEvent | null {
         if (!this.events.has(eventType)) {
