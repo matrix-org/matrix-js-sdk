@@ -1566,6 +1566,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Returns the cross-signing user identity of the current user.
+     *
      * Not part of the public crypto-api interface.
      * Used during migration from legacy js-crypto to update local trust if needed.
      */

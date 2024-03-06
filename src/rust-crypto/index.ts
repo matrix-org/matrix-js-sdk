@@ -207,7 +207,7 @@ async function initOlmMachine(
             // That means that after migration the session could revert to unverified.
             // In order to avoid asking the users to re-verify their sessions, we need to migrate the legacy local trust
             // (if the legacy session was already verified) to the new session.
-            await migrateLegacyLocalTrustIfNeeded(legacyCryptoStore, rustCrypto, logger);
+            await migrateLegacyLocalTrustIfNeeded({ legacyCryptoStore, rustCrypto, logger });
 
             await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
         }

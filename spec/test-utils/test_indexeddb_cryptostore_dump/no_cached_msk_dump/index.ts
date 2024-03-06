@@ -1,6 +1,10 @@
 import { KeyBackupInfo } from "../../../../src/crypto-api/keybackup";
 
-export const MIGRATION_KEY_QUERY_RESPONSE: any = {
+/**
+ * A key query response containing the current keys of the tested user.
+ * To be used during tests with fetchmock.
+ */
+const KEY_QUERY_RESPONSE: any = {
     device_keys: {
         "@migration:localhost": {
             CBGTADUILV: {
@@ -111,7 +115,11 @@ export const MIGRATION_KEY_QUERY_RESPONSE: any = {
     },
 };
 
-export const ROTATED_MIGRATION_KEY_QUERY_RESPONSE: any = {
+/**
+ * A new  key query response for the same user simulating a cross-signing key reset.
+ * To be used during tests with fetchmock.
+ */
+const ROTATED_KEY_QUERY_RESPONSE: any = {
     device_keys: {
         "@migration:localhost": {
             TMWBMDZPFT: {
@@ -216,7 +224,11 @@ export const ROTATED_MIGRATION_KEY_QUERY_RESPONSE: any = {
     },
 };
 
-export const MIGRATION_BACKUP: KeyBackupInfo = {
+/**
+ * A `/room_keys/version` response containing the current server-side backup info.
+ * To be used during tests with fetchmock.
+ */
+const BACKUP_RESPONSE: KeyBackupInfo = {
     auth_data: {
         public_key: "2ffIfIB4oryqZpsJQjQNUaxgCzxliC6A4PJvnrN+XAA",
         signatures: {
@@ -230,4 +242,18 @@ export const MIGRATION_BACKUP: KeyBackupInfo = {
     algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
     etag: "0",
     count: 0,
+};
+
+/**
+ * A dataset containing the information for the tested user.
+ * To be used during tests.
+ */
+export const MSK_NOT_CACHED_DATASET = {
+    USER_ID: "@migration:localhost",
+    DEVICE_ID: "CBGTADUILV",
+    PICKLE_KEY: "qEURMepfkMvoBQGaWlI9MZKYnDMsSAiW8aFTKXaeDV0",
+    KEY_QUERY_RESPONSE,
+    ROTATED_KEY_QUERY_RESPONSE,
+    BACKUP_RESPONSE,
+    DUMP_PATH: "spec/test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump/dump.json",
 };

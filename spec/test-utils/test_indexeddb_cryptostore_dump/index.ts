@@ -18,15 +18,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 /**
- * Populate an IndexedDB store with the test data from this directory.
+ * Populate an IndexedDB store with a set of test data.
  *
  * @param name - Name of the IndexedDB database to create.
  * @param dumpPath - The path to the dump file to import.
  */
-export async function populateStore(
-    name: string,
-    dumpPath: string = "spec/test-utils/test_indexeddb_cryptostore_dump/dump.json",
-): Promise<IDBDatabase> {
+export async function populateStore(name: string, dumpPath: string): Promise<IDBDatabase> {
     const req = indexedDB.open(name, 11);
 
     const db = await new Promise<IDBDatabase>((resolve, reject) => {

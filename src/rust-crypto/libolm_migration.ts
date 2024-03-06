@@ -384,50 +384,40 @@ async function getAndDecryptCachedSecretKey(
 }
 
 /**
- * Checks if the legacy store has a trusted public master key.
- * Returns null if the legacy session was not verified, or the trusted public master key if it was.
- * @param legacyStore - The legacy store to check.
- */
-async function getLegacyTrustedPublicMasterKeyBase64(legacyStore: CryptoStore): Promise<string | null> {
-    let maybeTrustedKeys: string | null = null;
-    await legacyStore.doTxn("readonly", "account", (txn) => {
-        legacyStore.getCrossSigningKeys(txn, (keys) => {
-            // can be an empty object after resetting cross-signing keys, see storeTrustedSelfKeys
-            if (keys && Object.keys(keys).length !== 0) {
-                const msk = keys["master"];
-                if (msk) {
-                    // `msk.keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-                    maybeTrustedKeys = Object.values(msk.keys)[0];
-                }
-            }
-        });
-    });
-
-    return maybeTrustedKeys;
-}
-
-/**
- * If the legacy session didn't have the private msk, the migrated session
- * will revert to unverified, even if the user has verified the session in the past.
- * This only occurs if the msk was not in cache (usk and ssk private keys won't help to establish trust,
- * the trust is rooted in the msk).
+ * Check if the user's published identity (ie, public cross-signing keys) was trusted by the legacy session,
+ * and if so mark it as trusted in the Rust session if needed.
+ *
+ * By default, if the legacy session didn't have the private MSK, the migrated session will revert to unverified,
+ * even if the user has verified the session in the past.
+ * This only occurs if the private MSK was not cached in the crypto store (USK and SSK private keys won't help
+ * to establish trust: the trust is rooted in the MSK).
  * Rust crypto will only consider the current session as trusted if we import the private MSK itself.
  *
- * We could prompt the user to verify the session again, but it's probably better to just
- * mark the user identity as locally verified if it was before.
+ * We could prompt the user to verify the session again, but it's probably better to just mark the user identity
+ * as locally verified if it was before.
  *
  * See https://github.com/element-hq/element-web/issues/27079
+ *
+ * @param args - Argument object.
  */
-export async function migrateLegacyLocalTrustIfNeeded(
-    legacyCryptoStore: CryptoStore,
-    rustCrypto: RustCrypto,
-    logger: Logger,
-): Promise<void> {
+export async function migrateLegacyLocalTrustIfNeeded(args: {
+    /** The legacy crypto store that is migrated. */
+    legacyCryptoStore: CryptoStore;
+    /** The migrated rust crypto stack. */
+    rustCrypto: RustCrypto;
+    /** The logger to use */
+    logger: Logger;
+}): Promise<void> {
+    const { legacyCryptoStore, rustCrypto, logger } = args;
     // Now get the cross-signing identity from rust.
     // If this is null that means that there are no cross-signing keys published server side.
-    const rustSeenIdentity = await rustCrypto.getOwnIdentity();
-    if (!rustSeenIdentity || rustSeenIdentity.isVerified()) {
-        // Nothing to do, there is no cross-signing or the rust session is already verified
+    const rustOwnIdentity = await rustCrypto.getOwnIdentity();
+    if (!rustOwnIdentity) {
+        // There are no cross-signing keys published server side, so nothing to do here.
+        return;
+    }
+    if (rustOwnIdentity.isVerified()) {
+        // The rust session already trusts the keys, so again, nothing to do.
         return;
     }
 
@@ -438,7 +428,7 @@ export async function migrateLegacyLocalTrustIfNeeded(
         return;
     }
 
-    const mskInfo: CrossSigningKeyInfo = JSON.parse(rustSeenIdentity.masterKey);
+    const mskInfo: CrossSigningKeyInfo = JSON.parse(rustOwnIdentity.masterKey);
     if (!mskInfo.keys || Object.keys(mskInfo.keys).length === 0) {
         // This should not happen, but let's be safe
         logger.error("Post Migration | Unexpected error: no master key in the rust session.");
@@ -446,14 +436,37 @@ export async function migrateLegacyLocalTrustIfNeeded(
     }
     const rustSeenMSK = Object.values(mskInfo.keys)[0];
 
-    logger.info(`Post Migration rust seen MSK: ${rustSeenMSK}`);
     if (rustSeenMSK && rustSeenMSK == legacyLocallyTrustedMSK) {
-        logger.info(`Post Migration | Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
+        logger.info(`Post Migration: Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
         // Let's mark the user identity as locally verified as part of the migration.
-        /* const request = */ await rustSeenIdentity!.verify();
+        await rustOwnIdentity!.verify();
         // This will also sign the MSK with the current device key, and return the request to be sent to the server.
-        // We ignored it in our case, we don't need to publish this signature
-        // (also should anyhow have been already done in the legacy session, but rust crypto doesn't consider such signatures
-        // to establish own identity trust).
+        // We ignored it in our case. As the local trust was migrated and not actually done by the user it looks
+        // sane to not publish the signature. Anyhow, these device's signatures are not considered by the rust-sdk to
+        // establish the trust of the user identity.
     }
+}
+
+/**
+ * Checks if the legacy store has a trusted public master key, and returns it if so.
+ * @param legacyStore - The legacy store to check.
+ *
+ * @returns `null` if there was no cross signing keys or if they were not trusted. The trusted public master key if it was.
+ */
+async function getLegacyTrustedPublicMasterKeyBase64(legacyStore: CryptoStore): Promise<string | null> {
+    let maybeTrustedKeys: string | null = null;
+    await legacyStore.doTxn("readonly", "account", (txn) => {
+        legacyStore.getCrossSigningKeys(txn, (keys) => {
+            // can be an empty object after resetting cross-signing keys, see storeTrustedSelfKeys
+            if (keys) {
+                const msk = keys?.master;
+                if (msk && Object.keys(msk.keys).length != 0) {
+                    // `msk.keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+                    maybeTrustedKeys = Object.values(msk.keys)[0];
+                }
+            }
+        });
+    });
+
+    return maybeTrustedKeys;
 }
