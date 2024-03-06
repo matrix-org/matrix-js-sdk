@@ -90,6 +90,73 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         ],
         actions: [],
     },
+    {
+        // Matrix v1.7
+        rule_id: ".m.rule.is_user_mention",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyContains,
+                key: "content.m\\.mentions.user_ids",
+                value: "[the user's Matrix ID]",
+            },
+        ],
+        actions: [
+            PushRuleActionName.Notify,
+            {
+                set_tweak: TweakName.Sound,
+                value: "default",
+            },
+            {
+                set_tweak: TweakName.Highlight,
+            },
+        ],
+    },
+    {
+        // Matrix v1.7
+        rule_id: ".m.rule.contains_display_name",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.ContainsDisplayName,
+            },
+        ],
+        actions: [
+            PushRuleActionName.Notify,
+            {
+                set_tweak: TweakName.Sound,
+                value: "default",
+            },
+            {
+                set_tweak: TweakName.Highlight,
+            },
+        ],
+    },
+    {
+        // Matrix v1.7
+        rule_id: ".m.rule.is_room_mention",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyIs,
+                key: "content.m\\.mentions.room",
+                value: true,
+            },
+            {
+                kind: ConditionKind.SenderNotificationPermission,
+                key: "room",
+            },
+        ],
+        actions: [
+            PushRuleActionName.Notify,
+            {
+                set_tweak: TweakName.Highlight,
+            },
+        ],
+    },
 ];
 
 const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
