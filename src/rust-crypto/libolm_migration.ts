@@ -388,7 +388,7 @@ async function getAndDecryptCachedSecretKey(
  * Returns null if the legacy session was not verified, or the trusted public master key if it was.
  * @param legacyStore - The legacy store to check.
  */
-async function maybeTrustedPublicMasterKey(legacyStore: CryptoStore): Promise<string | null> {
+async function getLegacyTrustedPublicMasterKeyBase64(legacyStore: CryptoStore): Promise<string | null> {
     let maybeTrustedKeys: string | null = null;
     await legacyStore.doTxn("readonly", "account", (txn) => {
         legacyStore.getCrossSigningKeys(txn, (keys) => {
@@ -423,7 +423,8 @@ export async function migrateLegacyLocalTrustIfNeeded(
     rustCrypto: RustCrypto,
     logger: Logger,
 ): Promise<void> {
-    // Now get what the rust session own identity.
+    // Now get the cross-signing identity from rust.
+    // If this is null that means that there are no cross-signing keys published server side.
     const rustSeenIdentity = await rustCrypto.getOwnIdentity();
     if (!rustSeenIdentity || rustSeenIdentity.isVerified()) {
         // Nothing to do, there is no cross-signing or the rust session is already verified
@@ -431,7 +432,7 @@ export async function migrateLegacyLocalTrustIfNeeded(
     }
 
     // This would be null is the user never verified their identity in the legacy session.
-    const legacyLocallyTrustedMSK = await maybeTrustedPublicMasterKey(legacyCryptoStore);
+    const legacyLocallyTrustedMSK = await getLegacyTrustedPublicMasterKeyBase64(legacyCryptoStore);
     if (!legacyLocallyTrustedMSK) {
         // Nothing to do, the legacy session was not verified
         return;
