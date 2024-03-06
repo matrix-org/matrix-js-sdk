@@ -547,19 +547,23 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     private async onPreExtensionsResponse(ext: Record<string, object>): Promise<void> {
-        await Promise.all(Object.keys(ext).map(async (extName) => {
-            if (this.extensions[extName].when() == ExtensionState.PreProcess) {
-                await this.extensions[extName].onResponse(ext[extName]);
-            }
-        }));
+        await Promise.all(
+            Object.keys(ext).map(async (extName) => {
+                if (this.extensions[extName].when() == ExtensionState.PreProcess) {
+                    await this.extensions[extName].onResponse(ext[extName]);
+                }
+            }),
+        );
     }
 
     private async onPostExtensionsResponse(ext: Record<string, object>): Promise<void> {
-        await Promise.all(Object.keys(ext).map(async (extName) => {
-            if (this.extensions[extName].when() == ExtensionState.PostProcess) {
-                await this.extensions[extName].onResponse(ext[extName]);
-            }
-        }));
+        await Promise.all(
+            Object.keys(ext).map(async (extName) => {
+                if (this.extensions[extName].when() == ExtensionState.PostProcess) {
+                    await this.extensions[extName].onResponse(ext[extName]);
+                }
+            }),
+        );
     }
 
     /**
