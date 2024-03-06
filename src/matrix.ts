@@ -75,6 +75,7 @@ export * from "./@types/read_receipts";
 export * from "./@types/crypto";
 export * from "./@types/extensible_events";
 export * from "./@types/IIdentityServerProvider";
+export * from "./@types/media";
 export * from "./models/room-summary";
 export * from "./models/event-status";
 export * as ContentHelpers from "./content-helpers";
@@ -104,7 +105,6 @@ export { IdentityProviderBrand, SSOAction } from "./@types/auth";
 export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces";
 export { LocationAssetType } from "./@types/location";
-export * from "./models/media";
 
 /**
  * Types supporting cryptography.
