@@ -455,7 +455,7 @@ export class SlidingSyncSdk {
      * @returns A promise which resolves once the room has been added to the
      * store.
      */
-    public async peek(_roomId: string): Promise<Room> {
+    public async peek(roomId: string): Promise<Room> {
         return null!; // TODO
     }
 

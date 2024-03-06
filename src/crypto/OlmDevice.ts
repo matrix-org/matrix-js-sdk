@@ -55,7 +55,14 @@ function checkPayloadLength(payloadString: string): void {
 }
 
 interface IInitOpts {
+    /**
+     * (Optional) data from exported device that must be re-created.
+     * If present, opts.pickleKey is ignored (exported data already provides a pickle key)
+     */
     fromExportedDevice?: IExportedDevice;
+    /**
+     * (Optional) pickle key to set instead of default one
+     */
     pickleKey?: string;
 }
 
@@ -174,11 +181,7 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param fromExportedDevice - (Optional) data from exported device
-     *     that must be re-created.
-     *     If present, opts.pickleKey is ignored
-     *     (exported data already provides a pickle key)
-     * @param pickleKey - (Optional) pickle key to set instead of default one
+     * @param IInitOpts - opts to initialise the OlmAccount with
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;

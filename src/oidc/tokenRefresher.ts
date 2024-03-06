@@ -113,10 +113,10 @@ export class OidcTokenRefresher {
      *
      * This function is intended to be overriden by the consumer when persistence is necessary.
      *
-     * @param accessToken - new access token
-     * @param refreshToken - OPTIONAL new refresh token
+     * @param tokens.accessToken - new access token
+     * @param tokens.refreshToken - OPTIONAL new refresh token
      */
-    public async persistTokens(_tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
+    public async persistTokens(tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
         // NOOP
     }
 
