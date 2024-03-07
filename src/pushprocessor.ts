@@ -58,6 +58,29 @@ const RULEKINDS_IN_ORDER = [
 //      and so we can put them here.
 const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     {
+        // Matrix v1.7
+        rule_id: ".m.rule.is_room_mention",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventPropertyIs,
+                key: "content.m\\.mentions.room",
+                value: true,
+            },
+            {
+                kind: ConditionKind.SenderNotificationPermission,
+                key: "room",
+            },
+        ],
+        actions: [
+            PushRuleActionName.Notify,
+            {
+                set_tweak: TweakName.Highlight,
+            },
+        ],
+    },
+    {
         // For homeservers which don't support MSC2153 yet
         rule_id: ".m.rule.reaction",
         default: true,
@@ -90,29 +113,22 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         ],
         actions: [],
     },
-    {
-        // Matrix v1.7
-        rule_id: ".m.rule.is_room_mention",
-        default: true,
-        enabled: true,
-        conditions: [
-            {
-                kind: ConditionKind.EventPropertyIs,
-                key: "content.m\\.mentions.room",
-                value: true,
-            },
-            {
-                kind: ConditionKind.SenderNotificationPermission,
-                key: "room",
-            },
-        ],
-        actions: [
-            PushRuleActionName.Notify,
-            {
-                set_tweak: TweakName.Highlight,
-            },
-        ],
-    },
+];
+
+const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS = [
+    RuleId.Master,
+    RuleId.SuppressNotices,
+    RuleId.InviteToSelf,
+    RuleId.MemberEvent,
+    RuleId.IsUserMention,
+    RuleId.ContainsDisplayName,
+    RuleId.IsRoomMention,
+    RuleId.AtRoomNotification,
+    RuleId.Tombstone,
+    ".m.rule.reaction",
+    ".m.rule.room.server_acl",
+    ".org.matrix.msc3786.rule.room.server_acl",
+    ".m.rule.suppress_edits",
 ];
 
 const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
@@ -134,6 +150,61 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
         actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
     },
 ];
+
+const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS = [
+    RuleId.IncomingCall,
+    RuleId.EncryptedDM,
+    RuleId.DM,
+    RuleId.Message,
+    RuleId.EncryptedMessage,
+];
+
+function mergeRulesWithDefaults(
+    incomingRules: IPushRule[],
+    defaultRules: IPushRule[],
+    defaultRuleIds: string[],
+): IPushRule[] {
+    const firstCustomRuleIndex = incomingRules.findIndex((r) => !r.default);
+
+    let nextExpectedRuleIdIndex = 0;
+    const newRules: IPushRule[] = [];
+    for (const rule of incomingRules.slice(0, firstCustomRuleIndex)) {
+        const ruleIndex = defaultRuleIds.indexOf(rule.rule_id);
+        if (ruleIndex === -1) {
+            // an unrecognised rule; copy it over
+            newRules.push(rule);
+            continue;
+        }
+        while (ruleIndex > nextExpectedRuleIdIndex) {
+            // insert new rules
+            const defaultRuleId = defaultRuleIds[nextExpectedRuleIdIndex];
+            const defaultRule = defaultRules.find((r) => r.rule_id === defaultRuleId);
+            if (defaultRule) {
+                logger.warn(`Adding default global ${defaultRule.rule_id}`);
+                newRules.push(defaultRule);
+            }
+            nextExpectedRuleIdIndex += 1;
+        }
+        // copy over the existing rule
+        newRules.push(rule);
+        nextExpectedRuleIdIndex += 1;
+    }
+
+    // Now copy over any remaining default rules
+    for (const ruleId of defaultRuleIds.slice(nextExpectedRuleIdIndex)) {
+        const defaultRule = defaultRules.find((r) => r.rule_id === ruleId);
+        if (defaultRule) {
+            logger.warn(`Adding default global ${defaultRule.rule_id}`);
+            newRules.push(defaultRule);
+        }
+    }
+
+    // Finally any non-default rules that were in `incomingRules`
+    if (firstCustomRuleIndex >= 0) {
+        newRules.push(...incomingRules.slice(firstCustomRuleIndex));
+    }
+    return newRules;
+}
 
 export interface IActionsObject {
     /** Whether this event should notify the user or not. */
@@ -198,53 +269,17 @@ export class PushProcessor {
         if (!newRules.global.underride) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
-        const globalOverrides = newRules.global.override;
-        for (const originalOverride of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides.find((r) => r.rule_id === originalOverride.rule_id);
+        newRules.global.override = mergeRulesWithDefaults(
+            newRules.global.override,
+            DEFAULT_OVERRIDE_RULES,
+            EXPECTED_DEFAULT_OVERRIDE_RULE_IDS,
+        );
 
-            // Dynamically add the user ID as the value for the is_user_mention rule.
-            let override: IPushRule;
-            if (originalOverride.rule_id === RuleId.IsUserMention) {
-                // If the user ID wasn't provided, skip the rule.
-                if (!userId) {
-                    continue;
-                }
-
-                override = JSON.parse(JSON.stringify(originalOverride)); // deep clone
-                override.conditions![0].value = userId;
-            } else {
-                override = originalOverride;
-            }
-
-            if (existingRule) {
-                // Copy over the actions, default, and conditions. Don't touch the user's preference.
-                existingRule.default = override.default;
-                existingRule.conditions = override.conditions;
-                existingRule.actions = override.actions;
-            } else {
-                // Add the rule
-                const ruleId = override.rule_id;
-                logger.warn(`Adding default global override for ${ruleId}`);
-                globalOverrides.push(override);
-            }
-        }
-
-        const globalUnderrides = newRules.global.underride ?? [];
-        for (const underride of DEFAULT_UNDERRIDE_RULES) {
-            const existingRule = globalUnderrides.find((r) => r.rule_id === underride.rule_id);
-
-            if (existingRule) {
-                // Copy over the actions, default, and conditions. Don't touch the user's preference.
-                existingRule.default = underride.default;
-                existingRule.conditions = underride.conditions;
-                existingRule.actions = underride.actions;
-            } else {
-                // Add the rule
-                const ruleId = underride.rule_id;
-                logger.warn(`Adding default global underride for ${ruleId}`);
-                globalUnderrides.push(underride);
-            }
-        }
+        newRules.global.underride = mergeRulesWithDefaults(
+            newRules.global.underride,
+            DEFAULT_UNDERRIDE_RULES,
+            EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS,
+        );
 
         return newRules;
     }
