@@ -42,7 +42,7 @@ import {
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
+import { GuestAccess, HistoryVisibility, JoinRule, Membership, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
 import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
 import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
@@ -177,7 +177,7 @@ export type RoomEventHandlerMap = {
      * @param membership - The new membership value
      * @param prevMembership - The previous membership value
      */
-    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.MyMembership]: (room: Room, membership: Membership, prevMembership?: Membership) => void;
     /**
      * Fires whenever a room's tags are updated.
      * @param event - The tags event
@@ -351,7 +351,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
-    private selfMembership?: string;
+    private selfMembership?: Membership;
     private summaryHeroes: string[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -863,7 +863,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
-    public getMyMembership(): string {
+    public getMyMembership(): Membership {
         return this.selfMembership ?? "leave";
     }
 
@@ -957,7 +957,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Sets the membership this room was received as during sync
      * @param membership - join | leave | invite
      */
-    public updateMyMembership(membership: string): void {
+    public updateMyMembership(membership: Membership): void {
         const prevMembership = this.selfMembership;
         this.selfMembership = membership;
         if (prevMembership !== membership) {
@@ -1712,7 +1712,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership state.
      * @returns A list of members with the given membership state.
      */
-    public getMembersWithMembership(membership: string): RoomMember[] {
+    public getMembersWithMembership(membership: Membership): RoomMember[] {
         return this.currentState.getMembers().filter(function (m) {
             return m.membership === membership;
         });
@@ -1758,7 +1758,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership e.g. `'join'`
      * @returns True if this user_id has the given membership state.
      */
-    public hasMembershipState(userId: string, membership: string): boolean {
+    public hasMembershipState(userId: string, membership: Membership): boolean {
         const member = this.getMember(userId);
         if (!member) {
             return false;

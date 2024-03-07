@@ -87,3 +87,5 @@ export interface IUsageLimit {
     // eslint-disable-next-line camelcase
     admin_contact?: string;
 }
+
+export type Membership = "ban" | "invite" | "join" | "knock" | "leave" | string;

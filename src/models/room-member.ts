@@ -22,6 +22,7 @@ import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
+import { Membership } from "../@types/partials";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -119,7 +120,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * The membership state for this room member e.g. 'join'.
      */
-    public membership?: string;
+    public membership?: Membership;
     /**
      * True if the member's name is disambiguated.
      */
