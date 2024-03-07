@@ -2758,7 +2758,6 @@ describe("Room", function () {
             // XXX: If we add the relation to the thread response before the thread finishes fetching via /relations
             // then the test will fail
             await emitPromise(room, ThreadEvent.Update);
-            await emitPromise(room, ThreadEvent.Update);
             await Promise.all([emitPromise(room, ThreadEvent.Update), room.addLiveEvents([threadResponseEdit])]);
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
@@ -2791,7 +2790,6 @@ describe("Room", function () {
             let prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
             const thread = await prom;
-            await emitPromise(room, ThreadEvent.Update);
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
@@ -2856,6 +2854,10 @@ describe("Room", function () {
                     },
                 });
 
+            room.client.fetchRelations = jest.fn().mockResolvedValue({
+                chunk: [threadResponse2Reaction.event, threadResponse2.event, threadResponse1.event],
+            });
+
             const prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
@@ -2896,18 +2898,20 @@ describe("Room", function () {
                     },
                 });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
-            await emitPromise(room, ThreadEvent.Update);
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
-            prom = emitPromise(room, ThreadEvent.Update);
             const threadRootRedaction = mkRedaction(threadRoot);
             await room.addLiveEvents([threadRootRedaction]);
-            await prom;
+
+            // We can't wait for a thread update here because there shouldn't be one (which is
+            // what we're asserting). Flush any promises to try to get more certainty that an
+            // update is not happening some time after the event is added.
+            await flushPromises();
             expect(thread).toHaveLength(2);
         });
 
@@ -2985,7 +2989,6 @@ describe("Room", function () {
 
             await emitPromise(room, ThreadEvent.Update);
             const threadResponse2Redaction = mkRedaction(threadResponse2);
-            await emitPromise(room, ThreadEvent.Update);
             await room.addLiveEvents([threadResponse2Redaction]);
             expect(thread).toHaveLength(1);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());

@@ -138,6 +138,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * that we've already fetched them.
      */
     public initialEventsFetched = !Thread.hasServerSideSupport;
+    private initalEventFetchProm: Promise<boolean> | undefined;
 
     /**
      * An array of events to add to the timeline once the thread has been initialised
@@ -377,15 +378,15 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             // When there's no server-side support, just add it to the end of the timeline.
             this.addEventToTimeline(event, toStartOfTimeline);
             this.client.decryptEventIfNeeded(event);
-        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
+        } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
+            this.addRelatedThreadEvent(event, toStartOfTimeline);
+            return;
+        } else if (!toStartOfTimeline && isNewestReply) {
             // When we've asked for the event to be added to the end, and we're
             // not in the initial state, and this event belongs at the end, add it.
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
-        } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
-            this.addRelatedThreadEvent(event, toStartOfTimeline);
-            return;
-        } else if (this.initialEventsFetched) {
+        } else {
             // If initial events have not been fetched, we are OK to throw away
             // this event, because we are about to fetch all the events for this
             // thread from the server.
@@ -606,29 +607,36 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         await this.processRootEventPromise;
 
         if (!this.initialEventsFetched) {
-            this.initialEventsFetched = true;
-            // fetch initial event to allow proper pagination
-            try {
-                // if the thread has regular events, this will just load the last reply.
-                // if the thread is newly created, this will load the root event.
-                if (this.replyCount === 0 && this.rootEvent) {
-                    this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
-                    this.liveTimeline.setPaginationToken(null, Direction.Backward);
-                } else {
-                    await this.client.paginateEventTimeline(this.liveTimeline, {
-                        backwards: true,
-                    });
+            if (this.initalEventFetchProm) {
+                await this.initalEventFetchProm;
+            } else {
+                // fetch initial event to allow proper pagination
+                try {
+                    // clear out any events we added previously
+                    this.timelineSet.resetLiveTimeline();
+                    // if the thread has regular events, this will just load the last reply.
+                    // if the thread is newly created, this will load the root event.
+                    if (this.replyCount === 0 && this.rootEvent) {
+                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
+                        this.liveTimeline.setPaginationToken(null, Direction.Backward);
+                    } else {
+                        this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {
+                            backwards: true,
+                        });
+                        await this.initalEventFetchProm;
+                    }
+                    this.initialEventsFetched = true;
+                    for (const event of this.replayEvents!) {
+                        this.addEvent(event, false);
+                    }
+                    this.replayEvents = null;
+                    // just to make sure that, if we've created a timeline window for this thread before the thread itself
+                    // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+                    this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
+                } catch (e) {
+                    logger.error("Failed to load start of newly created thread: ", e);
+                    this.initialEventsFetched = false;
                 }
-                for (const event of this.replayEvents!) {
-                    this.addEvent(event, false);
-                }
-                this.replayEvents = null;
-                // just to make sure that, if we've created a timeline window for this thread before the thread itself
-                // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
-                this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
-            } catch (e) {
-                logger.error("Failed to load start of newly created thread: ", e);
-                this.initialEventsFetched = false;
             }
         }
 
