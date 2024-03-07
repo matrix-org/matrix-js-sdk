@@ -164,7 +164,8 @@ function mergeRulesWithDefaults(
     defaultRules: IPushRule[],
     defaultRuleIds: string[],
 ): IPushRule[] {
-    const firstCustomRuleIndex = incomingRules.findIndex((r) => !r.default);
+    let firstCustomRuleIndex = incomingRules.findIndex((r) => !r.default);
+    if (firstCustomRuleIndex < 0) firstCustomRuleIndex = incomingRules.length;
 
     let nextExpectedRuleIdIndex = 0;
     const newRules: IPushRule[] = [];
@@ -200,9 +201,7 @@ function mergeRulesWithDefaults(
     }
 
     // Finally any non-default rules that were in `incomingRules`
-    if (firstCustomRuleIndex >= 0) {
-        newRules.push(...incomingRules.slice(firstCustomRuleIndex));
-    }
+    newRules.push(...incomingRules.slice(firstCustomRuleIndex));
     return newRules;
 }
 
