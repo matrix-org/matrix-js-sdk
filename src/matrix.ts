@@ -75,7 +75,6 @@ export * from "./@types/read_receipts";
 export * from "./@types/crypto";
 export * from "./@types/extensible_events";
 export * from "./@types/IIdentityServerProvider";
-export * from "./@types/media";
 export * from "./models/room-summary";
 export * from "./models/event-status";
 export * as ContentHelpers from "./content-helpers";
