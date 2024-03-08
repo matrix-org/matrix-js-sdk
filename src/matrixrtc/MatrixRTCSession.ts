@@ -610,7 +610,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Constructs our own membership
-     * @param prevEvent - The previous version of our call membership, if any
+     * @param prevMembership - The previous value of our call membership, if any
      */
     private makeMyMembership(prevMembership?: CallMembership): CallMembershipData {
         if (this.relativeExpiry === undefined) {

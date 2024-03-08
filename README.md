@@ -298,7 +298,7 @@ host the API reference from the source files like this:
 
 ```
   $ yarn gendoc
-  $ cd _docs
+  $ cd docs
   $ python -m http.server 8005
 ```
 

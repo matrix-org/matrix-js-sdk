@@ -162,11 +162,21 @@ export interface ICreateRoomOpts {
 }
 
 export interface IRoomDirectoryOptions {
+    /**
+     * The remote server to query for the room list.
+     * Optional. If unspecified, get the local homeserver's public room list.
+     */
     server?: string;
+    /**
+     * Maximum number of entries to return
+     */
     limit?: number;
+    /**
+     * Token to paginate from
+     */
     since?: string;
 
-    // Filter parameters
+    /** Filter parameters */
     filter?: {
         // String to search for
         generic_search_term?: string;
