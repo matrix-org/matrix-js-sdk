@@ -1639,6 +1639,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Returns whether dehydrated devices are supported by the crypto backend
+     * and by the server.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return await this.dehydrationManager.isSupported();
+    }
+
+    /**
      * Rehydrate the dehydrated device stored on the server
      *
      * Checks if there is a dehydrated device on the server.  If so, rehydrates
@@ -1674,6 +1682,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
         return await this.dehydrationManager.scheduleDeviceDehydration(interval, delay);
+    }
+
+    /**
+     * Reset the dehydration key
+     *
+     * Note: this does not create a new dehydrated device.  This will need to
+     * be done either by calling `createAndUploadDehydratedDevice` or
+     * `scheduleDeviceDehydration`.
+     */
+    public async resetDehydrationKey(): Promise<void> {
+        return await this.dehydrationManager.resetKey();
     }
 }
 

@@ -62,10 +62,43 @@ export class RustDehydrationManager {
         this.dehydratedDevices = olmMachine.dehydratedDevices();
     }
 
+    /** Return whether the server supports dehydrated devices
+     */
+    public async isSupported(): Promise<boolean> {
+        // call the endpoint to get a dehydrated device.  If it returns an
+        // M_UNRECOGNIZED error, then dehydration is unsupported
+        try {
+            await this.http.authedRequest<IDehydratedDeviceResp>(
+                Method.Get,
+                "/dehydrated_device",
+                undefined,
+                undefined,
+                {
+                    prefix: UnstablePrefix,
+                },
+            );
+        } catch (error) {
+            const err = error as MatrixError;
+            if (err.errcode === "M_UNRECOGNIZED") {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Return whether the dehydration key is stored in Secret Storage
      */
     public async isKeyStored(): Promise<boolean> {
         return Boolean(await this.secretStorage.isStored(SECRET_STORAGE_NAME.name));
+    }
+
+    /** Reset the dehydration key
+     */
+    public async resetKey(): Promise<void> {
+        const key = new Uint8Array(32);
+        crypto.getRandomValues(key);
+        await this.secretStorage.store(SECRET_STORAGE_NAME.name, encodeUnpaddedBase64(key));
+        this.key = key;
     }
 
     /** Get and cache the encryption key from secret storage
@@ -79,9 +112,7 @@ export class RustDehydrationManager {
                 if (!create) {
                     return false;
                 }
-                this.key = new Uint8Array(32);
-                crypto.getRandomValues(this.key);
-                await this.secretStorage.store(SECRET_STORAGE_NAME.name, encodeUnpaddedBase64(this.key));
+                await this.resetKey();
             } else {
                 this.key = decodeBase64(keyB64);
             }

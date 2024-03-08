@@ -504,6 +504,12 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * Returns whether MSC3814 dehydrated devices are supported by the crypto
+     * backend and by the server.
+     */
+    isDehydrationSupported(): Promise<boolean>;
+
+    /**
      * Rehydrate the dehydrated device stored on the server
      *
      * Checks if there is a dehydrated device on the server.  If so, rehydrates
@@ -528,6 +534,19 @@ export interface CryptoApi {
      *     Defaults to creating the device immediately.
      */
     scheduleDeviceDehydration(interval: number, delay?: number): Promise<void>;
+
+    /** Return whether the dehydration key is stored in Secret Storage
+     */
+    isDehydrationKeyStored(): Promise<boolean>;
+
+    /**
+     * Reset the dehydration key
+     *
+     * Note: this does not create a new dehydrated device.  This will need to
+     * be done either by calling `createAndUploadDehydratedDevice` or
+     * `scheduleDeviceDehydration`.
+     */
+    resetDehydrationKey(): Promise<void>;
 }
 
 /**
