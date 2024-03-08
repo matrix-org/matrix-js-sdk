@@ -2762,6 +2762,23 @@ describe("Room", function () {
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
 
+        it("emits event for the first event added to a thread", async () => {
+            room.client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+
+            await room.addLiveEvents([threadRoot]);
+
+            const onEvent = jest.fn();
+            room.on(RoomEvent.Timeline, onEvent);
+
+            await room.addLiveEvents([threadResponse1]);
+
+            expect(onEvent).toHaveBeenCalled();
+        });
+
         it("Redactions to thread responses decrement the length", async () => {
             room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
