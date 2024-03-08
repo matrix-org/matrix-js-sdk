@@ -2779,6 +2779,20 @@ describe("Room", function () {
             expect(onEvent).toHaveBeenCalled();
         });
 
+        it("contains the events added as soon as it's created", async () => {
+            room.client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+
+            const newThreadEventPromise = emitPromise(room, ThreadEvent.New);
+            await room.addLiveEvents([threadRoot, threadResponse1]);
+            const thread = await newThreadEventPromise;
+
+            expect(thread.timeline).toContain(threadResponse1);
+        });
+
         it("Redactions to thread responses decrement the length", async () => {
             room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
