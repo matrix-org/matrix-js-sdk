@@ -140,6 +140,9 @@ export interface VideoInfo extends AudioInfo, ImageInfo {
     duration?: number;
 }
 
+/**
+ * Union type representing the `content.info` field of all specified media events.
+ */
 export type MediaEventInfo = FileInfo | ImageInfo | AudioInfo | VideoInfo;
 
 interface BaseContent {

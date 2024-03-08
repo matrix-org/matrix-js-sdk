@@ -14,6 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Type-only entrypoint for low level types and interfaces
+/*
+ * This file is a secondary entrypoint for the js-sdk library, for use by Typescript projects.
+ * It exposes low-level types and interfaces reflecting structures defined in the Matrix specification.
+ *
+ * Remember to only export *public* types from this file.
+ */
 
 export type * from "./@types/media";
