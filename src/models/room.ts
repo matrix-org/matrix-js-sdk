@@ -2307,6 +2307,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
         });
 
+        // Add the re-emitter before we start adding events to the thread so we don't miss events
+        this.reEmitter.reEmit(thread, [
+            ThreadEvent.Delete,
+            ThreadEvent.Update,
+            ThreadEvent.NewReply,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
+        ]);
+
         // All read receipts should now come down from sync, we do not need to keep
         // a reference to the cached receipts anymore.
         this.cachedThreadReadReceipts.delete(threadId);
@@ -2322,13 +2331,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // and pass the event through this.
         thread.addEvents(events, false);
 
-        this.reEmitter.reEmit(thread, [
-            ThreadEvent.Delete,
-            ThreadEvent.Update,
-            ThreadEvent.NewReply,
-            RoomEvent.Timeline,
-            RoomEvent.TimelineReset,
-        ]);
         const isNewer =
             this.lastThread?.rootEvent &&
             rootEvent?.localTimestamp &&
