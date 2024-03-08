@@ -56,8 +56,8 @@ const RULEKINDS_IN_ORDER = [
 //      more details.
 //   2. We often want to start using push rules ahead of the server supporting them,
 //      and so we can put them here.
-const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
-    {
+const DEFAULT_OVERRIDE_RULES: Record<string, IPushRule> = {
+    ".m.rule.is_room_mention": {
         // Matrix v1.7
         rule_id: ".m.rule.is_room_mention",
         default: true,
@@ -80,7 +80,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
     },
-    {
+    ".m.rule.reaction": {
         // For homeservers which don't support MSC2153 yet
         rule_id: ".m.rule.reaction",
         default: true,
@@ -94,7 +94,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         ],
         actions: [PushRuleActionName.DontNotify],
     },
-    {
+    ".org.matrix.msc3786.rule.room.server_acl": {
         // For homeservers which don't support MSC3786 yet
         rule_id: ".org.matrix.msc3786.rule.room.server_acl",
         default: true,
@@ -113,7 +113,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         ],
         actions: [],
     },
-];
+};
 
 const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS = [
     RuleId.Master,
@@ -131,8 +131,8 @@ const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS = [
     ".m.rule.suppress_edits",
 ];
 
-const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
-    {
+const DEFAULT_UNDERRIDE_RULES: Record<string, IPushRule> = {
+    ".org.matrix.msc3914.rule.room.call": {
         // For homeservers which don't support MSC3914 yet
         rule_id: ".org.matrix.msc3914.rule.room.call",
         default: true,
@@ -149,7 +149,7 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
         ],
         actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
     },
-];
+};
 
 const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS = [
     RuleId.IncomingCall,
@@ -159,13 +159,33 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS = [
     RuleId.EncryptedMessage,
 ];
 
+/**
+ * Make sure that each of the rules listed in `defaultRuleIds` is listed in the given set of push rules.
+ *
+ * @param incomingRules - the existing set of known push rules for the user.
+ * @param defaultRules - a lookup table for the default definitions of push rules.
+ * @param defaultRuleIds - the IDs of the expected default push rules, in order.
+ *
+ * @returns A copy of `incomingRules`, with any missing default rules inserted in the right place.
+ */
 function mergeRulesWithDefaults(
     incomingRules: IPushRule[],
-    defaultRules: IPushRule[],
+    defaultRules: Record<string, IPushRule>,
     defaultRuleIds: string[],
 ): IPushRule[] {
+    // Calculate the index after the last default rule in `incomingRules`
+    // to allow us to split the incomingRules into defaults and custom
     let firstCustomRuleIndex = incomingRules.findIndex((r) => !r.default);
     if (firstCustomRuleIndex < 0) firstCustomRuleIndex = incomingRules.length;
+
+    function insertDefaultPushRule(ruleId: string): void {
+        if (ruleId in defaultRules) {
+            logger.warn(`Adding default global push rule ${ruleId}`);
+            newRules.push(defaultRules[ruleId]);
+        } else {
+            logger.warn(`Missing default global push rule ${ruleId}`);
+        }
+    }
 
     let nextExpectedRuleIdIndex = 0;
     const newRules: IPushRule[] = [];
@@ -179,11 +199,7 @@ function mergeRulesWithDefaults(
         while (ruleIndex > nextExpectedRuleIdIndex) {
             // insert new rules
             const defaultRuleId = defaultRuleIds[nextExpectedRuleIdIndex];
-            const defaultRule = defaultRules.find((r) => r.rule_id === defaultRuleId);
-            if (defaultRule) {
-                logger.warn(`Adding default global ${defaultRule.rule_id}`);
-                newRules.push(defaultRule);
-            }
+            insertDefaultPushRule(defaultRuleId);
             nextExpectedRuleIdIndex += 1;
         }
         // copy over the existing rule
@@ -193,11 +209,7 @@ function mergeRulesWithDefaults(
 
     // Now copy over any remaining default rules
     for (const ruleId of defaultRuleIds.slice(nextExpectedRuleIdIndex)) {
-        const defaultRule = defaultRules.find((r) => r.rule_id === ruleId);
-        if (defaultRule) {
-            logger.warn(`Adding default global ${defaultRule.rule_id}`);
-            newRules.push(defaultRule);
-        }
+        insertDefaultPushRule(ruleId);
     }
 
     // Finally any non-default rules that were in `incomingRules`

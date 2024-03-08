@@ -188,6 +188,8 @@ describe("NotificationService", function () {
     });
 
     it("should add default rules in the correct order", () => {
+        // By the time we get here, we expect the PushProcessor to have merged the new .m.rule.is_room_mention rule into the existing list of rules.
+        // Check that has happened, and that it is in the right place.
         const containsDisplayNameRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
             (rule) => rule.rule_id === RuleId.ContainsDisplayName,
         );
