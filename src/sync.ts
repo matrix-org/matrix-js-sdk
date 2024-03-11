@@ -1354,11 +1354,11 @@ export class SyncApi {
             const unreadThreadNotifications =
                 joinObj[UNREAD_THREAD_NOTIFICATIONS.name] ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
             if (unreadThreadNotifications) {
-                // Only partially reset unread notification
-                // We want to keep the client-generated count. Particularly important
-                // for encrypted room that refresh their notification count on event
-                // decryption
-                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                // This mirrors the logic above for rooms: take the *total* notification count from
+                // the server for unencrypted rooms or is it's zero. Any threads not present in this
+                // object implicitly have zero notifications, so start by clearing the total counts
+                // for all such threads.
+                room.resetThreadTotalUnreadNotificationCount(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
                         room.setThreadUnreadNotificationCount(
@@ -1379,7 +1379,7 @@ export class SyncApi {
                     }
                 }
             } else {
-                room.resetThreadUnreadNotificationCount();
+                room.resetThreadTotalUnreadNotificationCount();
             }
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
