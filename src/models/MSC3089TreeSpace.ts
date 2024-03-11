@@ -33,6 +33,7 @@ import { MSC3089Branch } from "./MSC3089Branch";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
 import { FileType } from "../http-api";
+import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -175,7 +176,7 @@ export class MSC3089TreeSpace {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
-        const pls = currentPls?.getContent() || {};
+        const pls = currentPls?.getContent<RoomPowerLevelsEventContent>() || {};
         const viewLevel = pls["users_default"] || 0;
         const editLevel = pls["events_default"] || 50;
         const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
@@ -233,7 +234,7 @@ export class MSC3089TreeSpace {
             this.roomId,
             EventType.SpaceChild,
             {
-                via: [this.client.getDomain()],
+                via: [this.client.getDomain()!],
             },
             directory.roomId,
         );
@@ -242,7 +243,7 @@ export class MSC3089TreeSpace {
             directory.roomId,
             EventType.SpaceParent,
             {
-                via: [this.client.getDomain()],
+                via: [this.client.getDomain()!],
             },
             this.roomId,
         );
@@ -449,7 +450,9 @@ export class MSC3089TreeSpace {
                     // XXX: We should be creating gaps to avoid conflicts
                     lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
                     const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
-                    const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
+                    const content = currentChild?.getContent<SpaceChildEventContent>() ?? {
+                        via: [this.client.getDomain()!],
+                    };
                     await this.client.sendStateEvent(
                         parentRoom.roomId,
                         EventType.SpaceChild,
@@ -472,7 +475,7 @@ export class MSC3089TreeSpace {
 
         // Now we can finally update our own order state
         const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
-        const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
+        const content = currentChild?.getContent<SpaceChildEventContent>() ?? { via: [this.client.getDomain()!] };
         await this.client.sendStateEvent(
             parentRoom.roomId,
             EventType.SpaceChild,

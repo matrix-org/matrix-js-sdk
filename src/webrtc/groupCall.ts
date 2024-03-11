@@ -34,6 +34,7 @@ import {
 } from "./stats/statsReport";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
+import { CallMembershipData } from "../matrixrtc/CallMembership";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -166,6 +167,7 @@ export interface IGroupCallDataChannelOptions {
 export interface IGroupCallRoomState {
     "m.intent": GroupCallIntent;
     "m.type": GroupCallType;
+    "m.terminated"?: GroupCallTerminationReason;
     "io.element.ptt"?: boolean;
     // TODO: Specify data-channels
     "dataChannelsEnabled"?: boolean;
@@ -193,6 +195,11 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
+}
+
+// XXX: this hasn't made it into the MSC yet
+export interface ExperimentalGroupCallRoomMemberState {
+    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
