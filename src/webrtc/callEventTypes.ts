@@ -34,6 +34,7 @@ export interface CallReplacesTarget {
 
 export interface MCallBase {
     call_id: string;
+    conf_id?: string;
     version: string | number;
     party_id?: string;
     sender_session_id?: string;
@@ -82,7 +83,7 @@ export interface MCAllAssertedIdentity extends MCallBase {
 }
 
 export interface MCallCandidates extends MCallBase {
-    candidates: RTCIceCandidate[];
+    candidates: Omit<RTCIceCandidateInit, "usernameFragment">[];
 }
 
 export interface MCallHangupReject extends MCallBase {

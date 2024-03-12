@@ -50,6 +50,7 @@ import {
     ClientEvent,
     createClient,
     CryptoEvent,
+    HistoryVisibility,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -59,11 +60,11 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    MsgType,
     PendingEventOrdering,
     Room,
     RoomMember,
     RoomStateEvent,
-    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -1927,7 +1928,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery({ device_keys: { "@other:user": {} }, failures: {} });
         aliceClient.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
             if (member.userId == "@other:user") {
-                aliceClient.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
+                aliceClient.sendMessage(testRoomId, { msgtype: MsgType.Text, body: "Hello, World" });
             }
         });
 
