@@ -934,15 +934,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const functionalMembers = this.getFunctionalMembers();
 
         // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
-        const nonFunctionalMemberCount = this.getMembers()!.reduce((count, m) => {
-            if (m.membership !== 'join' && m.membership !== 'invite') return count;
-            if (functionalMembers.includes(m.userId)) return count;
-            return count+1;
-        }, 0);
-
-        if (nonFunctionalMemberCount > 2) {
-            return;
-        }
+        let nonFunctionalMemberCount = 0;
+        this.getMembers()!.forEach((m) => {
+            if (m.membership !== "join" && m.membership !== "invite") return;
+            if (functionalMembers.includes(m.userId)) return;
+            nonFunctionalMemberCount++;
+        });
+        if (nonFunctionalMemberCount > 2) return;
 
         // Prefer the list of heroes, if present. It should only include the single other user in the DM.
         const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
