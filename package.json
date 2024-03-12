@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "31.3.0",
+    "version": "31.5.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=18.0.0"
@@ -67,8 +67,8 @@
         "uuid": "9"
     },
     "devDependencies": {
-        "@action-validator/cli": "^0.5.3",
-        "@action-validator/core": "^0.5.3",
+        "@action-validator/cli": "^0.6.0",
+        "@action-validator/core": "^0.6.0",
         "@babel/cli": "^7.12.10",
         "@babel/core": "^7.12.10",
         "@babel/eslint-parser": "^7.12.10",
@@ -97,7 +97,7 @@
         "babel-jest": "^29.0.0",
         "debug": "^4.3.4",
         "domexception": "^4.0.0",
-        "eslint": "8.56.0",
+        "eslint": "8.57.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
@@ -121,13 +121,11 @@
         "prettier": "3.2.5",
         "rimraf": "^5.0.0",
         "ts-node": "^10.9.1",
-        "typedoc": "^0.24.0",
+        "typedoc": "^0.25.10",
         "typedoc-plugin-coverage": "^3.0.0",
         "typedoc-plugin-mdn-links": "^3.0.3",
         "typedoc-plugin-missing-exports": "^2.0.0",
-        "typedoc-plugin-versions": "^0.2.3",
-        "typedoc-plugin-versions-cli": "^0.1.12",
-        "typescript": "^5.0.0"
+        "typescript": "^5.3.3"
     },
     "@casualbot/jest-sonar-reporter": {
         "outputDirectory": "coverage",

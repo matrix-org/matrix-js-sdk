@@ -3286,7 +3286,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Encrypts and sends a given object via Olm to-device messages to a given
      * set of devices.
      *
-     * @param userDeviceMap - mapping from userId to deviceInfo
+     * @param userDeviceInfoArr - list of deviceInfo objects representing the devices to send to
      *
      * @param payload - fields to include in the encrypted payload
      *
@@ -6565,8 +6565,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, newToken ?? null);
                     if (!newToken && backwards) {
-                        const originalEvent = await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id);
-                        timelineSet.addEventsToTimeline([mapper(originalEvent)], true, eventTimeline, null);
+                        const originalEvent =
+                            thread.rootEvent ??
+                            mapper(await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id));
+                        timelineSet.addEventsToTimeline([originalEvent], true, eventTimeline, null);
                     }
                     this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
@@ -7498,7 +7500,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * store client options with boolean/string/numeric values
      * to know in the next session what flags the sync data was
      * created with (e.g. lazy loading)
-     * @param opts - the complete set of client options
      * @returns for store operation
      */
     public storeClientOptions(): Promise<void> {
@@ -8480,12 +8481,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param options - Options for this request
-     * @param server - The remote server to query for the room list.
-     *                                Optional. If unspecified, get the local home
-     *                                server's public room list.
-     * @param limit - Maximum number of entries to return
-     * @param since - Token to paginate from
+     * @param params - Options for this request
      * @returns Promise which resolves: IPublicRoomsResponse
      * @returns Rejects: with an error response.
      */
@@ -8601,9 +8597,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Query the user directory with a term matching user IDs, display names and domains.
-     * @param term - the term with which to search.
-     * @param limit - the maximum number of results to return. The server will
-     *                 apply a limit if unspecified.
+     * @param options
+     * @param options.term - the term with which to search.
+     * @param options.limit - the maximum number of results to return. The server will apply a limit if unspecified.
      * @returns Promise which resolves: an array of results.
      */
     public searchUserDirectory({ term, limit }: { term: string; limit?: number }): Promise<IUserDirectoryResponse> {
@@ -9008,8 +9004,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Perform a server-side search.
-     * @param next_batch - the batch token to pass in the query string
-     * @param body - the JSON object to pass to the request body.
+     * @param params
+     * @param params.next_batch - the batch token to pass in the query string
+     * @param params.body - the JSON object to pass to the request body.
      * @param abortSignal - optional signal used to cancel the http request.
      * @returns Promise which resolves to the search response object.
      * @returns Rejects: with an error response.

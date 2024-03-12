@@ -612,11 +612,6 @@ describe("MatrixClient event timelines", function () {
                 .respond(200, function () {
                     return THREAD_ROOT;
                 });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
 
             httpBackend
                 .when(
@@ -1545,9 +1540,7 @@ describe("MatrixClient event timelines", function () {
                 expect(timelineSets).not.toBeNull();
                 respondToThreads(threadsResponse);
                 respondToThreads(threadsResponse);
-                respondToEvent(THREAD_ROOT);
                 respondToEvent(THREAD2_ROOT);
-                respondToThread(THREAD_ROOT, [THREAD_REPLY]);
                 respondToThread(THREAD2_ROOT, [THREAD2_REPLY]);
                 await flushHttp(room.fetchRoomThreads());
                 const threadIds = room.getThreads().map((thread) => thread.id);
@@ -1566,7 +1559,6 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.NewReply);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
                 await prom;
@@ -1643,7 +1635,7 @@ describe("MatrixClient event timelines", function () {
                             ...THREAD_ROOT.unsigned!["m.relations"],
                             "io.element.thread": {
                                 ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
-                                count: 2,
+                                count: 1,
                                 latest_event: THREAD_REPLY,
                             },
                         },
@@ -1692,7 +1684,6 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.Update);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY_REACTION]);
                 await httpBackend.flushAllExpected();
                 await prom;
@@ -2007,11 +1998,6 @@ describe("MatrixClient event timelines", function () {
                     },
                 },
             });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
             httpBackend
                 .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function () {
