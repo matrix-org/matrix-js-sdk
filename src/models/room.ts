@@ -934,17 +934,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const functionalMembers = this.getFunctionalMembers();
         // Optimizing for performance, we iterate over all members outermost, as is it the longest of the 3 lists we are comparing.
         const nonFunctionalMemberCount = this.getMembers()!.reduce((count, m) => {
-            if (
-                m.membership &&
-                // We care most about big rooms where also possibly lots of users may have left,
-                // so we first do the O(2) membership check, as it is definitely cheap and might remove candidates before the next step.
-                ["join", "invite"].includes(m.membership) &&
-                // Then we do the O(functionalMembers.length) functionalMember check, which is probably usually still cheap.
-                !functionalMembers.includes(m.userId)
-            ) {
-                return count + 1;
-            }
-            return count;
+            if (m.membership !== 'join' && m.membership !== 'invite') return count;
+            if (functionalMembers.includes(m.userId)) return count;
+            return count+1;
         }, 0);
 
         // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
