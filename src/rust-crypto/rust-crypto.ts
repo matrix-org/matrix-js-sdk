@@ -218,6 +218,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
         this.perSessionBackupDownloader.stop();
+        this.dehydrationManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they

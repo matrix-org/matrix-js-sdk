@@ -233,14 +233,7 @@ export class RustDehydrationManager {
      */
     public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
         // cancel any previously-scheduled tasks
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = undefined;
-        }
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = undefined;
-        }
+        this.stop();
 
         if (delay) {
             this.timeoutId = setTimeout(() => {
@@ -251,6 +244,17 @@ export class RustDehydrationManager {
             await this.createAndUploadDehydratedDevice();
             // FIXME: should we randomize the time?
             this.intervalId = setInterval(this.createAndUploadDehydratedDevice.bind(this), interval);
+        }
+    }
+
+    public stop(): void {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = undefined;
+        }
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
         }
     }
 }
