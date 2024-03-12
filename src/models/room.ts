@@ -932,14 +932,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     public getAvatarFallbackMember(): RoomMember | undefined {
         const functionalMembers = this.getFunctionalMembers();
-        // Optimizing for performance, we iterate over all members outermost, as is it the longest of the 3 lists we are comparing.
+
+        // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
         const nonFunctionalMemberCount = this.getMembers()!.reduce((count, m) => {
             if (m.membership !== 'join' && m.membership !== 'invite') return count;
             if (functionalMembers.includes(m.userId)) return count;
             return count+1;
         }, 0);
 
-        // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
         if (nonFunctionalMemberCount > 2) {
             return;
         }
