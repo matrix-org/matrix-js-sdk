@@ -22,7 +22,7 @@ import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
-import { Membership } from "../@types/partials";
+import { KnownMembership, Membership } from "../@types/partials";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -315,7 +315,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     public isKicked(): boolean {
         return (
-            this.membership === "leave" &&
+            this.membership === KnownMembership.Leave &&
             this.events.member !== undefined &&
             this.events.member.getSender() !== this.events.member.getStateKey()
         );
@@ -341,12 +341,12 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             let memberContent = memberEvent.getContent();
             let inviteSender: string | undefined = memberEvent.getSender();
 
-            if (memberContent.membership === "join") {
+            if (memberContent.membership === KnownMembership.Join) {
                 memberContent = memberEvent.getPrevContent();
                 inviteSender = memberEvent.getUnsigned().prev_sender;
             }
 
-            if (memberContent.membership === "invite" && memberContent.is_direct) {
+            if (memberContent.membership === KnownMembership.Invite && memberContent.is_direct) {
                 return inviteSender;
             }
         }

@@ -1,7 +1,7 @@
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { ClientEvent, MatrixClient } from "../../src/matrix";
+import { ClientEvent, KnownMembership, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
@@ -43,13 +43,13 @@ describe("MatrixClient opts", function () {
                             }),
                             utils.mkMembership({
                                 room: roomId,
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: userB,
                                 name: "Bob",
                             }),
                             utils.mkMembership({
                                 room: roomId,
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: userId,
                                 name: "Alice",
                             }),

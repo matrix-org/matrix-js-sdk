@@ -45,9 +45,9 @@ import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
 import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
-import { Membership } from "../matrix";
 import { Room } from "./room";
 import { EventTimeline } from "./event-timeline";
+import { Membership } from "../@types/partials";
 
 export { EventStatus } from "./event-status";
 

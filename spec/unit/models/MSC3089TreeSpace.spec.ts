@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IContent, MatrixClient } from "../../../src";
+import { IContent, KnownMembership, MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { MatrixEvent } from "../../../src/models/event";
 import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../../../src/@types/event";
@@ -458,14 +458,14 @@ describe("MSC3089TreeSpace", () => {
                 expect(stateKey).toBeUndefined();
                 return [
                     // Partial implementations
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => joinMemberId },
-                    { getContent: () => ({ membership: "knock" }), getStateKey: () => knockMemberId },
-                    { getContent: () => ({ membership: "invite" }), getStateKey: () => inviteMemberId },
-                    { getContent: () => ({ membership: "leave" }), getStateKey: () => leaveMemberId },
-                    { getContent: () => ({ membership: "ban" }), getStateKey: () => banMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => joinMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Knock }), getStateKey: () => knockMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Invite }), getStateKey: () => inviteMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Leave }), getStateKey: () => leaveMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Ban }), getStateKey: () => banMemberId },
 
                     // ensure we don't kick ourselves
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => selfUserId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => selfUserId },
                 ];
             },
         };

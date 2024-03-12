@@ -31,7 +31,7 @@ import { Room } from "../models/room";
 import { Logger, logger, LogSpan } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
-import { HistoryVisibility } from "../@types/partials";
+import { HistoryVisibility, KnownMembership } from "../@types/partials";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { logDuration } from "../utils";
 
@@ -100,8 +100,8 @@ export class RoomEncryptor {
      */
     public onRoomMembership(member: RoomMember): void {
         if (
-            member.membership == "join" ||
-            (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
+            member.membership == KnownMembership.Join ||
+            (member.membership == KnownMembership.Invite && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
             logDuration(this.prefixedLogger, "updateTrackedUsers", async () => {

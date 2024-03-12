@@ -34,7 +34,14 @@ import { logger } from "../../../src/logger";
 import * as testUtils from "../../test-utils/test-utils";
 import { TestClient } from "../../TestClient";
 import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../../src/client";
-import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../../src/matrix";
+import {
+    ClientEvent,
+    IContent,
+    ISendEventResponse,
+    KnownMembership,
+    MatrixClient,
+    MatrixEvent,
+} from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 
 let aliTestClient: TestClient;
@@ -316,11 +323,11 @@ function firstSync(testClient: TestClient): Promise<void> {
                     state: {
                         events: [
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: aliUserId,
                             }),
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: bobUserId,
                             }),
                         ],

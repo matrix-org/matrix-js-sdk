@@ -29,7 +29,7 @@ import {
     SyncAccumulator,
     IInviteState,
 } from "../../src/sync-accumulator";
-import { IRoomSummary } from "../../src";
+import { IRoomSummary, KnownMembership, Membership } from "../../src";
 import * as utils from "../test-utils/test-utils";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
@@ -95,7 +95,7 @@ describe("SyncAccumulator", function () {
                         ephemeral: { events: [] },
                         unread_notifications: {},
                         state: {
-                            events: [member("alice", "join"), member("bob", "join")],
+                            events: [member("alice", KnownMembership.Join), member("bob", KnownMembership.Join)],
                         },
                         summary: {
                             "m.heroes": undefined,
@@ -111,7 +111,7 @@ describe("SyncAccumulator", function () {
                 knock: {
                     "!knock": {
                         knock_state: {
-                            events: [member("alice", "knock")],
+                            events: [member("alice", KnownMembership.Knock)],
                         },
                     },
                 },
@@ -128,7 +128,7 @@ describe("SyncAccumulator", function () {
         // 10 timeline messages with a prev_batch of "pinned_to_1"
         sa.accumulate(
             syncSkeleton({
-                state: { events: [member("alice", "join")] },
+                state: { events: [member("alice", KnownMembership.Join)] },
                 timeline: {
                     events: [
                         msg("alice", "1"),
@@ -204,7 +204,7 @@ describe("SyncAccumulator", function () {
     it("should remove the stored timeline on limited syncs", () => {
         sa.accumulate(
             syncSkeleton({
-                state: { events: [member("alice", "join")] },
+                state: { events: [member("alice", KnownMembership.Join)] },
                 timeline: {
                     events: [msg("alice", "1"), msg("alice", "2"), msg("alice", "3")],
                     prev_batch: "pinned_to_1",
@@ -312,7 +312,7 @@ describe("SyncAccumulator", function () {
             events: [
                 {
                     content: {
-                        membership: "invite",
+                        membership: KnownMembership.Invite,
                     },
                     state_key: "bob",
                     sender: "alice",
@@ -336,7 +336,7 @@ describe("SyncAccumulator", function () {
         const rejectMemberEvent: IStateEvent = {
             event_id: "$" + Math.random(),
             content: {
-                membership: "leave",
+                membership: KnownMembership.Leave,
             },
             origin_server_ts: 123456789,
             state_key: "bob",
@@ -344,7 +344,7 @@ describe("SyncAccumulator", function () {
             type: "m.room.member",
             unsigned: {
                 prev_content: {
-                    membership: "invite",
+                    membership: KnownMembership.Invite,
                 },
             },
         };
@@ -366,7 +366,7 @@ describe("SyncAccumulator", function () {
 
     it("should accumulate knock state", () => {
         const initKnockState = {
-            events: [member("alice", "knock")],
+            events: [member("alice", KnownMembership.Knock)],
         };
         sa.accumulate(
             syncSkeleton(
@@ -453,7 +453,7 @@ describe("SyncAccumulator", function () {
         const inviteStateEvents = [
             {
                 content: {
-                    membership: "invite",
+                    membership: KnownMembership.Invite,
                 },
                 state_key: "bob",
                 sender: "alice",
@@ -482,7 +482,7 @@ describe("SyncAccumulator", function () {
         const memberEvent: IStateEvent = {
             event_id: "$" + Math.random(),
             content: {
-                membership: "leave",
+                membership: KnownMembership.Leave,
             },
             origin_server_ts: 123456789,
             state_key: "bob",
@@ -490,7 +490,7 @@ describe("SyncAccumulator", function () {
             type: "m.room.member",
             unsigned: {
                 prev_content: {
-                    membership: "knock",
+                    membership: KnownMembership.Knock,
                 },
             },
         };
@@ -528,7 +528,7 @@ describe("SyncAccumulator", function () {
         const memberEvent: IStateEvent = {
             event_id: "$" + Math.random(),
             content: {
-                membership: "leave",
+                membership: KnownMembership.Leave,
             },
             origin_server_ts: 123456789,
             state_key: "bob",
@@ -536,7 +536,7 @@ describe("SyncAccumulator", function () {
             type: "m.room.member",
             unsigned: {
                 prev_content: {
-                    membership: "knock",
+                    membership: KnownMembership.Knock,
                 },
             },
         };
@@ -933,7 +933,7 @@ function makeKnockState(): IKnockState {
                     name: "Room",
                 },
             }) as IStrippedState,
-            member("bob", "knock"),
+            member("bob", KnownMembership.Knock),
         ],
     };
 }
@@ -950,7 +950,7 @@ function msg(localpart: string, text: string) {
     };
 }
 
-function member(localpart: string, membership: string) {
+function member(localpart: string, membership: Membership) {
     return {
         event_id: "$" + Math.random(),
         content: {

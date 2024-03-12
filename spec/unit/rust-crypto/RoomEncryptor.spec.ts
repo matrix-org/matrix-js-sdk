@@ -25,7 +25,7 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 
-import { HistoryVisibility, MatrixEvent, Room, RoomMember } from "../../../src";
+import { HistoryVisibility, KnownMembership, MatrixEvent, Room, RoomMember } from "../../../src";
 import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { defer } from "../../../src/utils";
@@ -54,7 +54,7 @@ describe("RoomEncryptor", () => {
 
         const mockRoomMember = {
             userId: "@alice:example.org",
-            membership: "join",
+            membership: KnownMembership.Join,
         } as unknown as Mocked<RoomMember>;
 
         function createMockEvent(text: string): Mocked<MatrixEvent> {

@@ -88,4 +88,12 @@ export interface IUsageLimit {
     admin_contact?: string;
 }
 
-export type Membership = "ban" | "invite" | "join" | "knock" | "leave" | string;
+export enum KnownMembership {
+    Ban = "ban",
+    Invite = "invite",
+    Join = "join",
+    Knock = "knock",
+    Leave = "leave",
+}
+
+export type Membership = KnownMembership | string;

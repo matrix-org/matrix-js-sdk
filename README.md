@@ -216,7 +216,7 @@ const matrixClient = sdk.createClient({
 
 ```javascript
 matrixClient.on(RoomMemberEvent.Membership, function (event, member) {
-    if (member.membership === "invite" && member.userId === myUserId) {
+    if (member.membership === KnownMembership.Invite && member.userId === myUserId) {
         matrixClient.joinRoom(member.roomId).then(function () {
             console.log("Auto-joined %s", member.roomId);
         });

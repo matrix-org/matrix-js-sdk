@@ -15,7 +15,7 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from "../../src/logger";
-import { DeviceVerification, MemoryStore } from "../../src";
+import { DeviceVerification, KnownMembership, MemoryStore } from "../../src";
 import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestManager";
 import { RoomMember } from "../../src/models/room-member";
 import { IStore } from "../../src/store";
@@ -463,7 +463,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@alice:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);
@@ -795,7 +795,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@clara:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);

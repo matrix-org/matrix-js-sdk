@@ -12,6 +12,7 @@ import {
     IJoinedRoom,
     IPusher,
     ISyncResponse,
+    KnownMembership,
     MatrixClient,
     Membership,
     MsgType,
@@ -88,7 +89,7 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
     for (let i = 0; i < roomMembers.length; i++) {
         roomResponse.state.events.push(
             mkMembershipCustom({
-                membership: "join",
+                membership: KnownMembership.Join,
                 sender: roomMembers[i],
             }),
         );

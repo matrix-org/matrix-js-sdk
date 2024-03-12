@@ -30,7 +30,7 @@ import { TestClient } from "../../../TestClient";
 import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { TypedEventEmitter } from "../../../../src/models/typed-event-emitter";
-import { ClientEvent, MatrixClient, RoomMember } from "../../../../src";
+import { ClientEvent, KnownMembership, MatrixClient, RoomMember } from "../../../../src";
 import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
 import { DeviceTrustLevel } from "../../../../src/crypto/CrossSigning";
 import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
@@ -806,11 +806,11 @@ describe("MegolmDecryption", function () {
         aliceRoom.getEncryptionTargetMembers = jest.fn().mockResolvedValue([
             {
                 userId: "@alice:example.com",
-                membership: "join",
+                membership: KnownMembership.Join,
             },
             {
                 userId: "@bob:example.com",
-                membership: "join",
+                membership: KnownMembership.Join,
             },
         ]);
         const BOB_DEVICES = {
