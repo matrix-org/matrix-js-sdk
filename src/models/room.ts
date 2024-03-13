@@ -914,37 +914,69 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.myUserId;
     }
 
-    public getAvatarFallbackMember(): RoomMember | undefined {
-        const memberCount = this.getInvitedAndJoinedMemberCount();
-        if (memberCount > 2) {
-            return;
+    /**
+     * Gets the "functional members" in this room.
+     *
+     * Returns the list of userIDs from the `io.element.functional_members` event. Does not consider the
+     * current membership states of those users.
+     *
+     * @see https://github.com/element-hq/element-meta/blob/develop/spec/functional_members.md.
+     */
+    private getFunctionalMembers(): string[] {
+        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
+        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
+            return mFunctionalMembers!.getContent().service_members;
         }
-        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
+        return [];
+    }
+
+    public getAvatarFallbackMember(): RoomMember | undefined {
+        const functionalMembers = this.getFunctionalMembers();
+
+        // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
+        let nonFunctionalMemberCount = 0;
+        this.getMembers()!.forEach((m) => {
+            if (m.membership !== "join" && m.membership !== "invite") return;
+            if (functionalMembers.includes(m.userId)) return;
+            nonFunctionalMemberCount++;
+        });
+        if (nonFunctionalMemberCount > 2) return;
+
+        // Prefer the list of heroes, if present. It should only include the single other user in the DM.
+        const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
+        const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
-            const availableMember = this.summaryHeroes!.map((userId) => {
-                return this.getMember(userId);
-            }).find((member) => !!member);
+            const availableMember = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.getMember(userId);
+                })
+                .find((member) => !!member);
             if (availableMember) {
                 return availableMember;
             }
         }
-        const members = this.currentState.getMembers();
-        // could be different than memberCount
-        // as this includes left members
-        if (members.length <= 2) {
-            const availableMember = members.find((m) => {
+
+        // Consider *all*, including previous, members, to generate the avatar for DMs where the other user left.
+        // Needed to generate a matching avatar for rooms named "Empty Room (was Alice)".
+        const members = this.getMembers();
+        const nonFunctionalMembers = members?.filter((m) => !functionalMembers.includes(m.userId));
+        if (nonFunctionalMembers.length <= 2) {
+            const availableMember = nonFunctionalMembers.find((m) => {
                 return m.userId !== this.myUserId;
             });
             if (availableMember) {
                 return availableMember;
             }
         }
-        // if all else fails, try falling back to a user,
-        // and create a one-off member for it
+
+        // If all else failed, but the homeserver gave us heroes that previously could not be found in the room members,
+        // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
-            const availableUser = this.summaryHeroes!.map((userId) => {
-                return this.client.getUser(userId);
-            }).find((user) => !!user);
+            const availableUser = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.client.getUser(userId);
+                })
+                .find((user) => !!user);
             if (availableUser) {
                 const member = new RoomMember(this.roomId, availableUser.userId);
                 member.user = availableUser;
@@ -3351,11 +3383,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
-        let excludedUserIds: string[] = [];
-        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
-        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mFunctionalMembers!.getContent().service_members;
-        }
+        const excludedUserIds = this.getFunctionalMembers();
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];

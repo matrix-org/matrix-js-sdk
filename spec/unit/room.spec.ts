@@ -2204,7 +2204,7 @@ describe("Room", function () {
     });
 
     describe("getAvatarFallbackMember", () => {
-        it("should should return undefined if the room isn't a 1:1", () => {
+        it("should return undefined if the room isn't a 1:1", () => {
             const room = new Room(roomId, null!, userA);
             room.currentState.setJoinedMemberCount(2);
             room.currentState.setInvitedMemberCount(1);
@@ -2227,6 +2227,78 @@ describe("Room", function () {
             room.setSummary({
                 "m.heroes": [userA, userD],
                 "m.joined_member_count": 1,
+                "m.invited_member_count": 1,
+            });
+            expect(room.getAvatarFallbackMember()?.userId).toBe(userD);
+        });
+
+        it("should return undefined if the room is a 1:1 plus functional member", async function () {
+            const room = new Room(roomId, null!, userA);
+            await room.currentState.setStateEvents([
+                utils.mkMembership({
+                    user: userA,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User A",
+                }),
+                utils.mkMembership({
+                    user: userB,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User B",
+                }),
+                utils.mkEvent({
+                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name,
+                    skey: "",
+                    room: roomId,
+                    event: true,
+                    content: {
+                        service_members: [userB],
+                    },
+                }),
+            ]);
+            expect(room.getAvatarFallbackMember()).toBeUndefined();
+        });
+
+        it("should pick nonfunctional member from summary heroes if room is a 1:1 plus functional member", async function () {
+            const room = new Room(roomId, null!, userA);
+            await room.currentState.setStateEvents([
+                utils.mkMembership({
+                    user: userA,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User A",
+                }),
+                utils.mkMembership({
+                    user: userB,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User B",
+                }),
+                utils.mkMembership({
+                    user: userD,
+                    mship: "join",
+                    room: roomId,
+                    event: true,
+                    name: "User D",
+                }),
+                utils.mkEvent({
+                    type: UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name,
+                    skey: "",
+                    room: roomId,
+                    event: true,
+                    content: {
+                        service_members: [userB],
+                    },
+                }),
+            ]);
+            room.setSummary({
+                "m.heroes": [userA, userD, userB],
+                "m.joined_member_count": 2,
                 "m.invited_member_count": 1,
             });
             expect(room.getAvatarFallbackMember()?.userId).toBe(userD);
