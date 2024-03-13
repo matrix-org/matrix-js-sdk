@@ -68,6 +68,7 @@ import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
+import * as utils from "../utils";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -472,6 +473,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.name = roomId;
         this.normalizedName = roomId;
+
+        // Listen to our own receipt event as a more modular way of processing our own
+        // receipts. No need to remove the listener: it's on ourself anyway.
+        this.on(RoomEvent.Receipt, this.onReceipt);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -1298,6 +1303,60 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 BeaconEvent.LivenessChange,
             ]);
         }
+    }
+
+    private onReceipt(event: MatrixEvent): void {
+        if (this.hasEncryptionStateEvent()) {
+            this.clearNotificationsOnReceipt(event);
+        }
+    }
+
+    private clearNotificationsOnReceipt(event: MatrixEvent): void {
+        // Like above, we have to listen for read receipts from ourselves in order to
+        // correctly handle notification counts on encrypted rooms.
+        // This fixes https://github.com/vector-im/element-web/issues/9421
+
+        // Figure out if we've read something or if it's just informational
+        const content = event.getContent();
+        const isSelf =
+            Object.keys(content).filter((eid) => {
+                for (const [key, value] of Object.entries(content[eid])) {
+                    if (!utils.isSupportedReceiptType(key)) continue;
+                    if (!value) continue;
+
+                    if (Object.keys(value).includes(this.client.getUserId()!)) return true;
+                }
+
+                return false;
+            }).length > 0;
+
+        if (!isSelf) return;
+
+        // Work backwards to determine how many events are unread. We also set
+        // a limit for how back we'll look to avoid spinning CPU for too long.
+        // If we hit the limit, we assume the count is unchanged.
+        const maxHistory = 20;
+        const events = this.getLiveTimeline().getEvents();
+
+        let highlightCount = 0;
+
+        for (let i = events.length - 1; i >= 0; i--) {
+            if (i === events.length - maxHistory) return; // limit reached
+
+            const event = events[i];
+
+            if (this.hasUserReadEvent(this.client.getUserId()!, event.getId()!)) {
+                // If the user has read the event, then the counting is done.
+                break;
+            }
+
+            const pushActions = this.client.getPushActionsForEvent(event);
+            highlightCount += pushActions?.tweaks?.highlight ? 1 : 0;
+        }
+
+        // Note: we don't need to handle 'total' notifications because the counts
+        // will come from the server.
+        this.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
     }
 
     /**

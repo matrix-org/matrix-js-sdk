@@ -1436,55 +1436,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             fixNotificationCountOnDecryption(this, event);
         });
 
-        // Like above, we have to listen for read receipts from ourselves in order to
-        // correctly handle notification counts on encrypted rooms.
-        // This fixes https://github.com/vector-im/element-web/issues/9421
-        this.on(RoomEvent.Receipt, (event, room) => {
-            if (room?.hasEncryptionStateEvent()) {
-                // Figure out if we've read something or if it's just informational
-                const content = event.getContent();
-                const isSelf =
-                    Object.keys(content).filter((eid) => {
-                        for (const [key, value] of Object.entries(content[eid])) {
-                            if (!utils.isSupportedReceiptType(key)) continue;
-                            if (!value) continue;
-
-                            if (Object.keys(value).includes(this.getUserId()!)) return true;
-                        }
-
-                        return false;
-                    }).length > 0;
-
-                if (!isSelf) return;
-
-                // Work backwards to determine how many events are unread. We also set
-                // a limit for how back we'll look to avoid spinning CPU for too long.
-                // If we hit the limit, we assume the count is unchanged.
-                const maxHistory = 20;
-                const events = room.getLiveTimeline().getEvents();
-
-                let highlightCount = 0;
-
-                for (let i = events.length - 1; i >= 0; i--) {
-                    if (i === events.length - maxHistory) return; // limit reached
-
-                    const event = events[i];
-
-                    if (room.hasUserReadEvent(this.getUserId()!, event.getId()!)) {
-                        // If the user has read the event, then the counting is done.
-                        break;
-                    }
-
-                    const pushActions = this.getPushActionsForEvent(event);
-                    highlightCount += pushActions?.tweaks?.highlight ? 1 : 0;
-                }
-
-                // Note: we don't need to handle 'total' notifications because the counts
-                // will come from the server.
-                room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
-            }
-        });
-
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
 
