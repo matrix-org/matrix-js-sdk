@@ -409,7 +409,7 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
     logger: Logger;
 }): Promise<void> {
     const { legacyCryptoStore, rustCrypto, logger } = args;
-    // Now get the cross-signing identity from rust.
+    // Get the public cross-signing identity from rust.
     // If this is null that means that there are no cross-signing keys published server side.
     const rustOwnIdentity = await rustCrypto.getOwnIdentity();
     if (!rustOwnIdentity) {
@@ -421,10 +421,9 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
         return;
     }
 
-    // This would be null is the user never verified their identity in the legacy session.
     const legacyLocallyTrustedMSK = await getLegacyTrustedPublicMasterKeyBase64(legacyCryptoStore);
     if (!legacyLocallyTrustedMSK) {
-        // Nothing to do, the legacy session was not verified
+        // The user never verified their identity in the legacy session, so nothing to do.
         return;
     }
 
@@ -451,7 +450,7 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
  * Checks if the legacy store has a trusted public master key, and returns it if so.
  * @param legacyStore - The legacy store to check.
  *
- * @returns `null` if there was no cross signing keys or if they were not trusted. The trusted public master key if it was.
+ * @returns `null` if there were no cross signing keys or if they were not trusted. The trusted public master key if it was.
  */
 async function getLegacyTrustedPublicMasterKeyBase64(legacyStore: CryptoStore): Promise<string | null> {
     let maybeTrustedKeys: string | null = null;

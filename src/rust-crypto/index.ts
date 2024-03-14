@@ -202,7 +202,7 @@ async function initOlmMachine(
                 logger.error("Failed to check for cross-signing keys after migration", e);
             }
 
-            // If the master cross signing key secret was not cached in the legacy store, the rust session
+            // If the private master cross-signing key was not cached in the legacy store, the rust session
             // will not be able to establish the trust of the user identity.
             // That means that after migration the session could revert to unverified.
             // In order to avoid asking the users to re-verify their sessions, we need to migrate the legacy local trust
