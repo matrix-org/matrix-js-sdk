@@ -1805,16 +1805,15 @@ describe("MatrixClient syncing", () => {
                 const firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
 
                 // add a receipt for the first event in the room (let's say the user has already read that one)
-                const receipt: Record<string, any> = {};
-                receipt[firstEventId] = {
-                    "m.read": {},
-                };
-                receipt[firstEventId]["m.read"][myUserId] = {
-                    ts: 1,
-                };
                 syncData.rooms.join[roomId].ephemeral.events = [
                     {
-                        content: receipt,
+                        content: {
+                            [firstEventId]: {
+                                "m.read": {
+                                    [myUserId]: { ts: 1 },
+                                },
+                            },
+                        },
                         type: "m.receipt",
                     },
                 ];
