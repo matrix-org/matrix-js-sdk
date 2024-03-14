@@ -338,9 +338,8 @@ export class MSC4108SignInWithQR {
                 throw new RendezvousError("Unexpected message", RendezvousFailureReason.UnexpectedMessage);
             }
 
-            const { device_id: deviceId } = res as SuccessPayload;
-
             // PROTOTYPE: we should be validating that the device on the other end of the rendezvous did actually successfully authenticate as this device once we decide how that should be done
+            // const { device_id: deviceId } = res as SuccessPayload;
 
             const availableSecrets = (await this.client?.getCrypto()?.exportSecretsForQRLogin()) ?? {};
             // send secrets

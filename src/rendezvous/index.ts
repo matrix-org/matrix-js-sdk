@@ -23,6 +23,10 @@ import { RendezvousIntent } from "./RendezvousIntent";
 import { MSC4108SecureChannel } from "./channels";
 import { MSC4108RendezvousSession } from "./transports";
 
+/**
+ * @deprecated in favour of MSC4108-based implementation
+ */
+export * from "./MSC3906Rendezvous";
 export * from "./MSC4108SignInWithQR";
 export * from "./RendezvousChannel";
 export * from "./RendezvousCode";
