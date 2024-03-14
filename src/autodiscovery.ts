@@ -49,7 +49,7 @@ export enum AutoDiscoveryError {
     //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
 
-interface AutoDiscoveryState {
+export interface AutoDiscoveryState {
     state: AutoDiscoveryAction;
     error?: IWellKnownConfig["error"] | null;
 }

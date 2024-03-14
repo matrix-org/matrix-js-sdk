@@ -197,11 +197,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         backup?: { algorithm: string; key: string; backup_version: string } | undefined;
     }): Promise<void> {
         if (secrets.cross_signing) {
+            // import the keys
             await this.olmMachine.importCrossSigningKeys(
                 secrets.cross_signing.master_key,
                 secrets.cross_signing.self_signing_key,
                 secrets.cross_signing.user_signing_key,
             );
+
+            // cross sign our device
+            // PROTOTYPE: Not implemented
         }
         if (secrets.backup) {
             // PROTOTYPE: Not implemented
