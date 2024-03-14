@@ -421,10 +421,9 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
         return;
     }
 
-    // This would be null is the user never verified their identity in the legacy session.
     const legacyLocallyTrustedMSK = await getLegacyTrustedPublicMasterKeyBase64(legacyCryptoStore);
     if (!legacyLocallyTrustedMSK) {
-        // Nothing to do, the legacy session was not verified
+        // The user never verified their identity in the legacy session, so nothing to do.
         return;
     }
 
