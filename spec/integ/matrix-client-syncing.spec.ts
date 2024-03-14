@@ -40,7 +40,6 @@ import {
     RelationType,
     EventType,
     MatrixEventEvent,
-    IEvent,
 } from "../../src";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
