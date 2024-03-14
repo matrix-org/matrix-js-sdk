@@ -45,7 +45,7 @@ import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
-import { FeatureSupport, THREAD_RELATION_TYPE, Thread } from "../../src/models/thread";
+import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IActionsObject } from "../../src/pushprocessor";
 
 describe("MatrixClient syncing", () => {
