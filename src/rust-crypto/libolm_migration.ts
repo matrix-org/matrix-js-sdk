@@ -389,8 +389,10 @@ async function getAndDecryptCachedSecretKey(
  *
  * By default, if the legacy session didn't have the private MSK, the migrated session will revert to unverified,
  * even if the user has verified the session in the past.
+ *
  * This only occurs if the private MSK was not cached in the crypto store (USK and SSK private keys won't help
  * to establish trust: the trust is rooted in the MSK).
+ *
  * Rust crypto will only consider the current session as trusted if we import the private MSK itself.
  *
  * We could prompt the user to verify the session again, but it's probably better to just mark the user identity
