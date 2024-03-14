@@ -1,4 +1,5 @@
 import { KeyBackupInfo } from "../../../../src/crypto-api/keybackup";
+import { DumpDataSetInfo } from "../index";
 
 /**
  * A key query response containing the current keys of the tested user.
@@ -248,12 +249,12 @@ const BACKUP_RESPONSE: KeyBackupInfo = {
  * A dataset containing the information for the tested user.
  * To be used during tests.
  */
-export const MSK_NOT_CACHED_DATASET = {
-    USER_ID: "@migration:localhost",
-    DEVICE_ID: "CBGTADUILV",
-    PICKLE_KEY: "qEURMepfkMvoBQGaWlI9MZKYnDMsSAiW8aFTKXaeDV0",
-    KEY_QUERY_RESPONSE,
-    ROTATED_KEY_QUERY_RESPONSE,
-    BACKUP_RESPONSE,
-    DUMP_PATH: "spec/test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump/dump.json",
+export const MSK_NOT_CACHED_DATASET: DumpDataSetInfo = {
+    userId: "@migration:localhost",
+    deviceId: "CBGTADUILV",
+    pickleKey: "qEURMepfkMvoBQGaWlI9MZKYnDMsSAiW8aFTKXaeDV0",
+    keyQueryResponse: KEY_QUERY_RESPONSE,
+    rotatedKeyQueryResponse: ROTATED_KEY_QUERY_RESPONSE,
+    backupResponse: BACKUP_RESPONSE,
+    dumpPath: "spec/test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump/dump.json",
 };

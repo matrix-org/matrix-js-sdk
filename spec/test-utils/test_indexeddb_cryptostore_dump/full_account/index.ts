@@ -1,3 +1,5 @@
+import { DumpDataSetInfo } from "../index";
+
 /**
  * A key query response containing the current keys of the tested user.
  * To be used during tests with fetchmock.
@@ -97,11 +99,11 @@ const BACKUP_RESPONSE: any = {
  * A dataset containing the information for the tested user.
  * To be used during tests.
  */
-export const FULL_ACCOUNT_DATASET = {
-    USER_ID: "@vdhtest200713:matrix.org",
-    DEVICE_ID: "KMFSTJSMLB",
-    PICKLE_KEY: "+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o",
-    BACKUP_RESPONSE,
-    KEYS_QUERY_RESPONSE,
-    DUMP_PATH: "spec/test-utils/test_indexeddb_cryptostore_dump/full_account/dump.json",
+export const FULL_ACCOUNT_DATASET: DumpDataSetInfo = {
+    userId: "@vdhtest200713:matrix.org",
+    deviceId: "KMFSTJSMLB",
+    pickleKey: "+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o",
+    backupResponse: BACKUP_RESPONSE,
+    keyQueryResponse: KEYS_QUERY_RESPONSE,
+    dumpPath: "spec/test-utils/test_indexeddb_cryptostore_dump/full_account/dump.json",
 };

@@ -135,3 +135,20 @@ async function importData(db: IDBDatabase, dumpPath: string) {
         });
     }
 }
+
+export interface DumpDataSetInfo {
+    /** The user ID to use for the test.*/
+    userId: string;
+    /** The device ID to use for the test.*/
+    deviceId: string;
+    /** The path to the dump file to import {@link populateStore}.*/
+    dumpPath: string;
+    /** The pickle key to use for the dumped account.*/
+    pickleKey: string;
+    /** The response to use for the keys query. */
+    keyQueryResponse: any;
+    /** The response to use for the backup query.*/
+    backupResponse?: any;
+    /** Additional dump info specific for some tests.*/
+    [key: string]: any;
+}

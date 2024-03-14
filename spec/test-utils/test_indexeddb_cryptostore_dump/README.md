@@ -1,7 +1,11 @@
-## Dump of libolm indexeddb cryptostore
+## Dumps of libolm indexeddb cryptostore
 
 This directory contains several dumps of real indexeddb stores from a session using
 libolm crypto.
+
+Each directory contains, in dump.json, a dump of data created by pasting the following
+code into the browser console; and in index.ts, details of the user, pickle key,
+and corresponding key query and backup responses (`DumpDataSetInfo`).
 
 The dump is created by pasting the following into the browser console:
 

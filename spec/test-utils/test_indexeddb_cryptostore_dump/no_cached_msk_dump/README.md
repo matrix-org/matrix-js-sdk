@@ -1,5 +1,4 @@
 ## Dump of a libolm indexeddb cryptostore where the msk is not cached
 
-It was created by pasting the same code as in the README of the parent directory into the browser console.
-
-The corresponding user data, key query and backup response can be found in `index.ts`
+A dump simulating an account where the identity was verified, but the msk was not in cache.
+Used to test that the owner identity local trust is migrated correctly.

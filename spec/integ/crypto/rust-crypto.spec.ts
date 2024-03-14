@@ -97,25 +97,25 @@ describe("MatrixClient.initRustCrypto", () => {
     });
 
     describe("Libolm Migration", () => {
-        afterEach(() => {
+        beforeEach(() => {
             fetchMock.reset();
         });
 
         it("should migrate from libolm", async () => {
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.BACKUP_RESPONSE);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
 
-            fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.KEYS_QUERY_RESPONSE);
+            fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.keyQueryResponse);
 
             const testStoreName = "test-store";
-            await populateStore(testStoreName, FULL_ACCOUNT_DATASET.DUMP_PATH);
+            await populateStore(testStoreName, FULL_ACCOUNT_DATASET.dumpPath);
             const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
 
             const matrixClient = createClient({
                 baseUrl: "http://test.server",
-                userId: FULL_ACCOUNT_DATASET.USER_ID,
-                deviceId: FULL_ACCOUNT_DATASET.DEVICE_ID,
+                userId: FULL_ACCOUNT_DATASET.userId,
+                deviceId: FULL_ACCOUNT_DATASET.deviceId,
                 cryptoStore,
-                pickleKey: FULL_ACCOUNT_DATASET.PICKLE_KEY,
+                pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
             });
 
             const progressListener = jest.fn();
@@ -125,7 +125,7 @@ describe("MatrixClient.initRustCrypto", () => {
 
             const verificationStatus = await matrixClient
                 .getCrypto()!
-                .getDeviceVerificationStatus(FULL_ACCOUNT_DATASET.USER_ID, FULL_ACCOUNT_DATASET.DEVICE_ID);
+                .getDeviceVerificationStatus(FULL_ACCOUNT_DATASET.userId, FULL_ACCOUNT_DATASET.deviceId);
 
             // Check that the current device and identity trust is migrated correctly just after migration
             expect(verificationStatus).toBeDefined();
@@ -180,9 +180,9 @@ describe("MatrixClient.initRustCrypto", () => {
                     },
                 });
 
-                fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.KEYS_QUERY_RESPONSE);
+                fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.keyQueryResponse);
 
-                const cryptoStore = await populateAndStartLegacyCryptoStore(FULL_ACCOUNT_DATASET.DUMP_PATH);
+                const cryptoStore = await populateAndStartLegacyCryptoStore(FULL_ACCOUNT_DATASET.dumpPath);
 
                 // Remove the master key from the cache
                 await cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
@@ -192,34 +192,34 @@ describe("MatrixClient.initRustCrypto", () => {
 
                 const matrixClient = createClient({
                     baseUrl: "http://test.server",
-                    userId: FULL_ACCOUNT_DATASET.USER_ID,
-                    deviceId: FULL_ACCOUNT_DATASET.DEVICE_ID,
+                    userId: FULL_ACCOUNT_DATASET.userId,
+                    deviceId: FULL_ACCOUNT_DATASET.deviceId,
                     cryptoStore,
-                    pickleKey: FULL_ACCOUNT_DATASET.PICKLE_KEY,
+                    pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
                 });
 
                 await matrixClient.initRustCrypto();
 
                 const verificationStatus = await matrixClient
                     .getCrypto()!
-                    .getUserVerificationStatus(FULL_ACCOUNT_DATASET.USER_ID);
+                    .getUserVerificationStatus(FULL_ACCOUNT_DATASET.userId);
 
                 expect(verificationStatus.isCrossSigningVerified()).toBe(true);
             }, 60000);
 
             it("should not revert to untrusted if legacy was trusted but msk not in cache", async () => {
-                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.BACKUP_RESPONSE);
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.backupResponse);
 
-                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.KEY_QUERY_RESPONSE);
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
 
-                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.DUMP_PATH);
+                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.dumpPath);
 
                 const matrixClient = createClient({
                     baseUrl: "http://test.server",
-                    userId: MSK_NOT_CACHED_DATASET.USER_ID,
-                    deviceId: MSK_NOT_CACHED_DATASET.DEVICE_ID,
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
                     cryptoStore,
-                    pickleKey: MSK_NOT_CACHED_DATASET.PICKLE_KEY,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
                 });
 
                 await matrixClient.initRustCrypto();
@@ -232,18 +232,18 @@ describe("MatrixClient.initRustCrypto", () => {
             });
 
             it("should not migrate local trust if key has changed", async () => {
-                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.BACKUP_RESPONSE);
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.backupResponse);
 
-                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.ROTATED_KEY_QUERY_RESPONSE);
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.rotatedKeyQueryResponse);
 
-                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.DUMP_PATH);
+                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.dumpPath);
 
                 const matrixClient = createClient({
                     baseUrl: "http://test.server",
-                    userId: MSK_NOT_CACHED_DATASET.USER_ID,
-                    deviceId: MSK_NOT_CACHED_DATASET.DEVICE_ID,
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
                     cryptoStore,
-                    pickleKey: MSK_NOT_CACHED_DATASET.PICKLE_KEY,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
                 });
 
                 await matrixClient.initRustCrypto();
@@ -265,16 +265,16 @@ describe("MatrixClient.initRustCrypto", () => {
                     },
                 });
 
-                fetchMock.post("path:/_matrix/client/v3/keys/query", IDENTITY_NOT_TRUSTED_DATASET.KEY_QUERY_RESPONSE);
+                fetchMock.post("path:/_matrix/client/v3/keys/query", IDENTITY_NOT_TRUSTED_DATASET.keyQueryResponse);
 
-                const cryptoStore = await populateAndStartLegacyCryptoStore(IDENTITY_NOT_TRUSTED_DATASET.DUMP_PATH);
+                const cryptoStore = await populateAndStartLegacyCryptoStore(IDENTITY_NOT_TRUSTED_DATASET.dumpPath);
 
                 const matrixClient = createClient({
                     baseUrl: "http://test.server",
-                    userId: IDENTITY_NOT_TRUSTED_DATASET.USER_ID,
-                    deviceId: IDENTITY_NOT_TRUSTED_DATASET.DEVICE_ID,
+                    userId: IDENTITY_NOT_TRUSTED_DATASET.userId,
+                    deviceId: IDENTITY_NOT_TRUSTED_DATASET.deviceId,
                     cryptoStore,
-                    pickleKey: IDENTITY_NOT_TRUSTED_DATASET.PICKLE_KEY,
+                    pickleKey: IDENTITY_NOT_TRUSTED_DATASET.pickleKey,
                 });
 
                 await matrixClient.initRustCrypto();

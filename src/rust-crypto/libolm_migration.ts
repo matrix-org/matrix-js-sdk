@@ -460,8 +460,8 @@ async function getLegacyTrustedPublicMasterKeyBase64(legacyStore: CryptoStore): 
             // can be an empty object after resetting cross-signing keys, see storeTrustedSelfKeys
             const msk = keys?.master;
             if (msk && Object.keys(msk.keys).length != 0) {
-                   // `msk.keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
-                   maybeTrustedKeys = Object.values(msk.keys)[0];
+                // `msk.keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+                maybeTrustedKeys = Object.values(msk.keys)[0];
             }
         });
     });

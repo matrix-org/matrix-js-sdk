@@ -1,3 +1,5 @@
+import { DumpDataSetInfo } from "../index";
+
 /**
  * A key query response containing the current keys of the tested user.
  * To be used during tests with fetchmock.
@@ -99,10 +101,10 @@ const KEY_QUERY_RESPONSE = {
  * A dataset containing the information for the tested user.
  * To be used during tests.
  */
-export const IDENTITY_NOT_TRUSTED_DATASET = {
-    USER_ID: "@untrusted:localhost",
-    DEVICE_ID: "VJPSPVPWZT",
-    PICKLE_KEY: "WVllQb4Lk/WwP4Q7iBfeTUHpgydZm9YqXI1B5bTvnIM",
-    KEY_QUERY_RESPONSE,
-    DUMP_PATH: "spec/test-utils/test_indexeddb_cryptostore_dump/unverified/dump.json",
+export const IDENTITY_NOT_TRUSTED_DATASET: DumpDataSetInfo = {
+    userId: "@untrusted:localhost",
+    deviceId: "VJPSPVPWZT",
+    pickleKey: "WVllQb4Lk/WwP4Q7iBfeTUHpgydZm9YqXI1B5bTvnIM",
+    keyQueryResponse: KEY_QUERY_RESPONSE,
+    dumpPath: "spec/test-utils/test_indexeddb_cryptostore_dump/unverified/dump.json",
 };
