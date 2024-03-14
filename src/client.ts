@@ -8491,11 +8491,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         since,
         ...options
     }: IRoomDirectoryOptions = {}): Promise<IPublicRoomsResponse> {
-        const queryParams: QueryDict = { server, limit, since };
         if (Object.keys(options).length === 0) {
+            const queryParams: QueryDict = { server, limit, since };
             return this.http.authedRequest(Method.Get, "/publicRooms", queryParams);
         } else {
-            return this.http.authedRequest(Method.Post, "/publicRooms", queryParams, options);
+            const queryParams: QueryDict = { server };
+            const body = {
+                limit,
+                since,
+                ...options,
+            };
+            return this.http.authedRequest(Method.Post, "/publicRooms", queryParams, body);
         }
     }
 
