@@ -448,6 +448,7 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
 
 /**
  * Checks if the legacy store has a trusted public master key, and returns it if so.
+ *
  * @param legacyStore - The legacy store to check.
  *
  * @returns `null` if there were no cross signing keys or if they were not trusted. The trusted public master key if it was.
