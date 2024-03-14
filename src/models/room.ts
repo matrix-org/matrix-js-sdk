@@ -1362,7 +1362,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // a limit for how back we'll look to avoid spinning CPU for too long.
             // If we hit the limit, we assume the count is unchanged.
             const maxHistory = 20;
-            const timeline = threadId === "main" ? this.getLiveTimeline() : this.getThread(threadId)!.liveTimeline;
+            const timeline = threadId === "main" ? this.getLiveTimeline() : this.getThread(threadId)?.liveTimeline;
+
+            if (!timeline) {
+                logger.warn(`Couldn't find timeline for thread ID ${threadId} in room ${this.roomId}`);
+                continue;
+            }
 
             const events = timeline.getEvents();
 

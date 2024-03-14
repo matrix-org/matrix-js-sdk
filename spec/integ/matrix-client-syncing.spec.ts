@@ -45,7 +45,7 @@ import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
-import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { FeatureSupport, THREAD_RELATION_TYPE, Thread } from "../../src/models/thread";
 import { IActionsObject } from "../../src/pushprocessor";
 
 describe("MatrixClient syncing", () => {
@@ -1799,7 +1799,7 @@ describe("MatrixClient syncing", () => {
                 expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
             });
 
-            it("should recalculate highlights on receipt for encrypted rooms", async () => {
+            it("should recalculate highlights on unthreaded receipt for encrypted rooms", async () => {
                 const myUserId = client!.getUserId()!;
 
                 const firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
@@ -1847,6 +1847,148 @@ describe("MatrixClient syncing", () => {
                 const room = client!.getRoom(roomId)!;
                 expect(room).toBeInstanceOf(Room);
                 // the room should now have one highlight since our receipt was before the ping message
+                expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
+            });
+
+            it("should recalculate highlights on main thread receipt for encrypted rooms", async () => {
+                const myUserId = client!.getUserId()!;
+
+                const firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
+
+                // add a receipt for the first event in the room (let's say the user has already read that one)
+                syncData.rooms.join[roomId].ephemeral.events = [
+                    {
+                        content: {
+                            [firstEventId]: {
+                                "m.read": {
+                                    [myUserId]: { ts: 1, thread_id: "main" },
+                                },
+                            },
+                        },
+                        type: "m.receipt",
+                    },
+                ];
+
+                // Now add a highlighting event after that receipt
+                const pingEvent = utils.mkMessage({
+                    room: roomId,
+                    user: otherUserId,
+                    msg: client?.getUserId() + " ping",
+                }) as IRoomEvent;
+                syncData.rooms.join[roomId].timeline.events.push(pingEvent);
+
+                // fudge this to make it a highlight
+                client!.getPushActionsForEvent = (ev: MatrixEvent): IActionsObject | null => {
+                    if (ev.getId() === pingEvent.event_id) {
+                        return {
+                            notify: true,
+                            tweaks: {
+                                highlight: true,
+                            },
+                        };
+                    }
+                    return null;
+                };
+
+                httpBackend!.when("GET", "/sync").respond(200, syncData);
+                client!.startClient();
+
+                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+                const room = client!.getRoom(roomId)!;
+                expect(room).toBeInstanceOf(Room);
+                // the room should now have one highlight since our receipt was before the ping message
+                expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
+            });
+
+            // This doesn't work yet because the threads aren't in the event in time!
+            // Enable after https://github.com/matrix-org/matrix-js-sdk/pull/4104 is merged!
+            it.skip("should recalculate highlights on threaded receipt for encrypted rooms", async () => {
+                // Replace the http backend so we can change the /versions expectation
+                // Once we no longer have to support old servers, just have the mock /versions
+                // call return 1.4 for everything.
+                const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
+                httpBackend = testClient.httpBackend;
+                client = testClient.client;
+                httpBackend!.when("GET", "/versions").respond(200, { versions: ["v1.4"] });
+                httpBackend!.when("GET", "/pushrules").respond(200, {});
+                httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+                const myUserId = client!.getUserId()!;
+
+                const firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
+
+                // Add a threaded event off of the first event
+                const threadEvent1 = utils.mkEvent({
+                    type: EventType.RoomMessage,
+                    user: otherUserId,
+                    room: roomId,
+                    content: {
+                        "body": "first thread response",
+                        "m.relates_to": {
+                            "event_id": firstEventId,
+                            "m.in_reply_to": {
+                                event_id: firstEventId,
+                            },
+                            "rel_type": "m.thread",
+                        },
+                    },
+                }) as IRoomEvent;
+                syncData.rooms.join[roomId].timeline.events.push(threadEvent1);
+
+                // ...and another
+                const threadEvent2 = utils.mkEvent({
+                    type: EventType.RoomMessage,
+                    user: otherUserId,
+                    room: roomId,
+                    content: {
+                        "body": "second thread response",
+                        "m.relates_to": {
+                            "event_id": firstEventId,
+                            "m.in_reply_to": {
+                                event_id: firstEventId,
+                            },
+                            "rel_type": "m.thread",
+                        },
+                    },
+                }) as IRoomEvent;
+                syncData.rooms.join[roomId].timeline.events.push(threadEvent2);
+
+                // add a receipt for the first message in the threadm leaving the second one unread
+                syncData.rooms.join[roomId].ephemeral.events = [
+                    {
+                        content: {
+                            [threadEvent1.event_id]: {
+                                "m.read": {
+                                    [myUserId]: { ts: 1, thread_id: firstEventId },
+                                },
+                            },
+                        },
+                        type: "m.receipt",
+                    },
+                ];
+
+                // fudge to make both thread replies highlights
+                client!.getPushActionsForEvent = (ev: MatrixEvent): IActionsObject | null => {
+                    if ([threadEvent1.event_id, threadEvent2.event_id].includes(ev.getId()!)) {
+                        return {
+                            notify: true,
+                            tweaks: {
+                                highlight: true,
+                            },
+                        };
+                    }
+                    return null;
+                };
+
+                httpBackend!.when("GET", "/sync").respond(200, syncData);
+                client!.startClient({ threadSupport: true });
+
+                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+                const room = client!.getRoom(roomId)!;
+                expect(room).toBeInstanceOf(Room);
+                // the room should now have one highlight: the second thread message
                 expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
             });
         });
