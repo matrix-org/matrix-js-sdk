@@ -1235,7 +1235,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Starts/stops screensharing
      * @param enabled - the desired screensharing state
-     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @param opts - screen sharing options
      * @returns new screensharing state
      */
     public async setScreensharingEnabled(enabled: boolean, opts?: IScreensharingOpts): Promise<boolean> {
@@ -1292,7 +1292,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Starts/stops screensharing
      * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
      * @param enabled - the desired screensharing state
-     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @param opts - screen sharing options
      * @returns new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(

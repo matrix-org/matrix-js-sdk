@@ -192,6 +192,10 @@ via an optional `callback` argument. The callback support is now deprecated:
 new methods do not include a `callback` argument, and in the future it may be
 removed from existing methods.
 
+## Low level types
+
+There are some low level TypeScript types exported via the `matrix-js-sdk/lib/types` entrypoint to not bloat the main entrypoint.
+
 ## Examples
 
 This section provides some useful code snippets which demonstrate the
@@ -294,7 +298,7 @@ host the API reference from the source files like this:
 
 ```
   $ yarn gendoc
-  $ cd _docs
+  $ cd docs
   $ python -m http.server 8005
 ```
 

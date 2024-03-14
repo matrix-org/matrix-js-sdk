@@ -1,3 +1,14 @@
+Changes in [31.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.5.0) (2024-03-12)
+==================================================================================================
+## ✨ Features
+
+* Update MSC2965 OIDC Discovery implementation ([#4064](https://github.com/matrix-org/matrix-js-sdk/pull/4064)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Add basic retry for rust crypto outgoing requests ([#4061](https://github.com/matrix-org/matrix-js-sdk/pull/4061)). Contributed by @BillCarsonFr.
+
+
 Changes in [31.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.4.0) (2024-02-27)
 ==================================================================================================
 ## ✨ Features

@@ -140,8 +140,9 @@ export class IgnoredInvites {
     /**
      * Find out whether an invite should be ignored.
      *
-     * @param sender - The user id for the user who issued the invite.
-     * @param roomId - The room to which the user is invited.
+     * @param params
+     * @param params.sender - The user id for the user who issued the invite.
+     * @param params.roomId - The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
     public async getRuleForInvite({
