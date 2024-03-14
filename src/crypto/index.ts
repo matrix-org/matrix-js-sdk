@@ -580,6 +580,20 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
+    public async exportSecretsForQRLogin(): Promise<{
+        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
+        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
+    }> {
+        throw new Error("Method not implemented.");
+    }
+
+    public async importSecretsForQRLogin(secrets: {
+        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
+        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
+    }): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+
     /**
      * Initialise the crypto module so that it is ready for use
      *

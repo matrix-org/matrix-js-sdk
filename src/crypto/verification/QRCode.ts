@@ -28,6 +28,7 @@ import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixEvent } from "../../models/event";
 import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification";
+import { RendezvousIntent } from "../../rendezvous";
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
@@ -134,16 +135,32 @@ enum Mode {
     VerifyOtherUser = 0x00, // Verifying someone who isn't us
     VerifySelfTrusted = 0x01, // We trust the master key
     VerifySelfUntrusted = 0x02, // We do not trust the master key
+    LoginInitiate = 0x03, // a new device wishing to initiate a login and self-verify
+    LoginReciprocate = 0x04, //an existing device wishing to reciprocate the login of a new device and self-verify that other device
 }
 
-interface IQrData {
+export type IQrData = VerificationQrData | LoginQrData;
+
+interface IBaseQrData {
     prefix: string;
     version: number;
     mode: Mode;
+}
+
+interface VerificationQrData extends IBaseQrData {
     transactionId?: string;
     firstKeyB64: string;
     secondKeyB64: string;
     secretB64: string;
+}
+
+export interface LoginQrData extends IBaseQrData {
+    prefix: typeof BINARY_PREFIX;
+    version: 2;
+    mode: Mode.LoginInitiate | Mode.LoginReciprocate;
+    ephemeralPublicKey: string;
+    rendezvousSessionUrl: string;
+    homeserverBaseUrl?: string;
 }
 
 export class QRCodeData {
@@ -300,11 +317,98 @@ export class QRCodeData {
         appendStr(qrData.prefix, "ascii", false);
         appendByte(qrData.version);
         appendByte(qrData.mode);
-        appendStr(qrData.transactionId!, "utf-8");
-        appendEncBase64(qrData.firstKeyB64);
-        appendEncBase64(qrData.secondKeyB64);
-        appendEncBase64(qrData.secretB64);
+        if ("firstKeyB64" in qrData) {
+            appendStr(qrData.transactionId!, "utf-8");
+            appendEncBase64(qrData.firstKeyB64);
+            appendEncBase64(qrData.secondKeyB64);
+            appendEncBase64(qrData.secretB64);
+        } else if ("ephemeralPublicKey" in qrData) {
+            // PROTOTYPE: this is actually 65 bytes not 32 due to it currently using P-256 not Curve25519
+            appendEncBase64(qrData.ephemeralPublicKey);
+            appendStr(qrData.rendezvousSessionUrl, "utf-8");
+            if (qrData.homeserverBaseUrl && qrData.mode === Mode.LoginReciprocate) {
+                appendStr(qrData.homeserverBaseUrl, "utf-8");
+            }
+        }
 
         return buf;
+    }
+
+    public static async createForRendezvous(
+        intent: RendezvousIntent,
+        publicKey: CryptoKey,
+        rendezvousSessionUrl: string,
+        homeserverBaseUrl?: string,
+    ): Promise<Buffer> {
+        const rawPublicKey = await global.crypto.subtle.exportKey("raw", publicKey);
+        const ephemeralPublicKey = encodeUnpaddedBase64(rawPublicKey);
+        const qrData: LoginQrData = {
+            prefix: BINARY_PREFIX,
+            version: CODE_VERSION,
+            mode: intent === RendezvousIntent.LOGIN_ON_NEW_DEVICE ? Mode.LoginInitiate : Mode.LoginReciprocate,
+            ephemeralPublicKey,
+            rendezvousSessionUrl,
+            homeserverBaseUrl,
+        };
+
+        return QRCodeData.generateBuffer(qrData);
+    }
+
+    public static async parseForRendezvous(buffer: Buffer): Promise<{
+        intent: RendezvousIntent;
+        publicKey: CryptoKey;
+        rendezvousSessionUrl: string;
+        homeserverBaseUrl?: string;
+    }> {
+        let offset = 0;
+
+        if (buffer.toString("ascii", offset, 6) !== BINARY_PREFIX) {
+            throw new Error("QR code does not have the expected prefix");
+        }
+        offset += 6;
+
+        if (buffer.readUInt8(offset) !== CODE_VERSION) {
+            throw new Error("QR code has an unsupported version");
+        }
+        offset += 1;
+
+        const mode = buffer.readUInt8(offset);
+        offset += 1;
+
+        if (mode === Mode.LoginInitiate || mode === Mode.LoginReciprocate) {
+            const ephemeralPublicKey = buffer.slice(offset, offset + 65); // PROTOTYPE: this should be 32, but it's currently using P-256 not Curve25519
+            offset += 65; // PROTOTYPE: this should be 32, but it's currently using P-256 not Curve25519
+
+            const rendezvousSessionUrlLen = buffer.readUInt16BE(offset);
+            offset += 2;
+            const rendezvousSessionUrl = buffer.toString("utf-8", offset, offset + rendezvousSessionUrlLen);
+            offset += rendezvousSessionUrlLen;
+
+            let homeserverBaseUrl: string | undefined;
+            if (mode === Mode.LoginReciprocate) {
+                const homeserverBaseUrlLen = buffer.readUInt16BE(offset);
+                offset += 2;
+                homeserverBaseUrl = buffer.toString("utf-8", offset, offset + homeserverBaseUrlLen);
+                offset += homeserverBaseUrlLen;
+            }
+
+            return {
+                intent:
+                    mode === Mode.LoginInitiate
+                        ? RendezvousIntent.LOGIN_ON_NEW_DEVICE
+                        : RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE,
+                publicKey: await global.crypto.subtle.importKey(
+                    "raw",
+                    ephemeralPublicKey,
+                    { name: "ECDH", namedCurve: "P-256" }, // PROTOTYPE: should use Curve25519
+                    true,
+                    [],
+                ),
+                rendezvousSessionUrl,
+                homeserverBaseUrl,
+            };
+        }
+
+        throw new Error("QR code has an unsupported mode");
     }
 }

@@ -124,6 +124,7 @@ export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
+        | "device_authorization_endpoint" // PROTOTYPE: this is actually optional, but the typings are wrong
     > & {
         // MSC2965 extensions to the OIDC spec
         account_management_uri?: string;

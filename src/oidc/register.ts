@@ -62,11 +62,12 @@ const doRegistration = async (
     clientMetadata: OidcRegistrationClientMetadata,
 ): Promise<string> => {
     // https://openid.net/specs/openid-connect-registration-1_0.html
+    // PROTOTYPE: should check which scopes are supported by the OP
     const metadata: OidcRegistrationRequestBody = {
         client_name: clientMetadata.clientName,
         client_uri: clientMetadata.clientUri,
         response_types: ["code"],
-        grant_types: ["authorization_code", "refresh_token"],
+        grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
         redirect_uris: clientMetadata.redirectUris,
         id_token_signed_response_alg: "RS256",
         token_endpoint_auth_method: "none",

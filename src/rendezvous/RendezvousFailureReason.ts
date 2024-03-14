@@ -28,4 +28,5 @@ export enum RendezvousFailureReason {
     DataMismatch = "data_mismatch",
     UnsupportedTransport = "unsupported_transport",
     HomeserverLacksSupport = "homeserver_lacks_support",
+    UnexpectedMessage = "unexpected_message",
 }
