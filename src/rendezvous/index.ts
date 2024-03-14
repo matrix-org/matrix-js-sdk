@@ -30,12 +30,14 @@ export * from "./RendezvousError";
 export * from "./RendezvousFailureReason";
 export * from "./RendezvousIntent";
 export * from "./RendezvousTransport";
+export * from "./transports";
+export * from "./channels";
 
 export async function buildLoginFromScannedCode(
     client: MatrixClient | undefined,
     code: Buffer,
     onFailure: RendezvousFailureListener,
-): Promise<{ signin: MSC4108SignInWithQR, homeserverBaseUrl?: string}> {
+): Promise<{ signin: MSC4108SignInWithQR; homeserverBaseUrl?: string }> {
     const scannerIntent = client
         ? RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE
         : RendezvousIntent.LOGIN_ON_NEW_DEVICE;
