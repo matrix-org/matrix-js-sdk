@@ -439,10 +439,21 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
         logger.info(`Post Migration: Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
         // Let's mark the user identity as locally verified as part of the migration.
         await rustOwnIdentity!.verify();
-        // This will also sign the MSK with the current device key, and return the request to be sent to the server.
-        // We ignored it in our case. As the local trust was migrated and not actually done by the user it looks
-        // sane to not publish the signature. Anyhow, these device's signatures are not considered by the rust-sdk to
-        // establish the trust of the user identity.
+        // As well as marking the MSK as trusted, `OlmMachine.verify` returns a
+        // `SignatureUploadRequest` which will publish a signature of the MSK using
+        // this device. In this case, we ignore the request: since the user hasn't
+        // actually re-verified the MSK, we don't publish a new signature. (`.verify`
+        // doesn't store the signature, and if we drop the request here it won't be
+        // retried.)
+        //
+        // Not publishing the signature is consistent with the behaviour of
+        // matrix-crypto-sdk when the private key is imported via
+        // `importCrossSigningKeys`, and when the identity is verified via interactive
+        // verification.
+        //
+        // [Aside: device signatures on the MSK are not considered by the rust-sdk to
+        // establish the trust of the user identity so in any case, what we actually do
+        // here is somewhat moot.]
     }
 }
 
