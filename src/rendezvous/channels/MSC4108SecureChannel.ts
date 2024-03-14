@@ -14,47 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { xchacha20poly1305 } from "@noble/ciphers/chacha"; // PROTOTYPE: we should use chacha implementation that will be exposed from the matrix rust crypto module
+import { Curve25519PublicKey, EstablishedSecureChannel, SecureChannel } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RendezvousError, RendezvousIntent, RendezvousFailureReason, MSC4108Payload } from "..";
-import { encodeUnpaddedBase64, decodeBase64 } from "../../base64";
-import { TextEncoder } from "../../crypto/crypto";
 import { QRCodeData } from "../../crypto/verification/QRCode";
 import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession";
 import { logger } from "../../logger";
 
-function makeNonce(input: number): Uint8Array {
-    const nonce = new Uint8Array(24);
-    nonce.set([input], 23);
-    return nonce;
-}
-
+/**
+ * Imports @matrix-org/matrix-sdk-crypto-wasm so should be async-imported to avoid bundling the WASM into the main bundle.
+ */
 export class MSC4108SecureChannel {
-    private ephemeralKeyPair?: CryptoKeyPair;
+    private readonly secureChannel: SecureChannel;
+    private establishedChannel?: EstablishedSecureChannel;
     private connected = false;
-    private EncKey?: CryptoKey;
-    private OurNonce = 0;
-    private TheirNonce = 0;
 
     public constructor(
         private rendezvousSession: MSC4108RendezvousSession,
-        private theirPublicKey?: CryptoKey,
+        private theirPublicKey?: Curve25519PublicKey,
         public onFailure?: (reason: RendezvousFailureReason) => void,
-    ) {}
-
-    public async getKeyPair(): Promise<CryptoKeyPair> {
-        if (!this.ephemeralKeyPair) {
-            this.ephemeralKeyPair = await global.crypto.subtle.generateKey(
-                {
-                    name: "ECDH",
-                    namedCurve: "P-256", // PROTOTYPE: This should be "Curve25519"
-                },
-                true,
-                ["deriveBits"],
-            );
-        }
-
-        return this.ephemeralKeyPair;
+    ) {
+        this.secureChannel = new SecureChannel();
     }
 
     public async generateCode(intent: RendezvousIntent, homeserverBaseUrl?: string): Promise<Buffer> {
@@ -64,9 +44,7 @@ export class MSC4108SecureChannel {
             throw new Error("No rendezvous session URL");
         }
 
-        const ephemeralKeyPair = await this.getKeyPair();
-
-        return QRCodeData.createForRendezvous(intent, ephemeralKeyPair.publicKey, url, homeserverBaseUrl);
+        return QRCodeData.createForRendezvous(intent, this.secureChannel.public_key(), url, homeserverBaseUrl);
     }
 
     public async connect(): Promise<void> {
@@ -74,75 +52,24 @@ export class MSC4108SecureChannel {
             throw new Error("Channel already connected");
         }
 
-        const ephemeralKeyPair = await this.getKeyPair();
+        if (this.theirPublicKey) {
+            // We are the scanning device
+            this.establishedChannel = this.secureChannel.create_outbound_channel(this.theirPublicKey);
 
-        const isScanningDevice = this.theirPublicKey;
-
-        if (isScanningDevice) {
             /**
-                Secure Channel step 4. Device S sends the initial message
+             Secure Channel step 4. Device S sends the initial message
 
-                Nonce := 0
-                SH := ECDH(Ss, Gp)
-                EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-                TaggedCiphertext := ChaCha20Poly1305_Encrypt(EncKey, Nonce, "MATRIX_QR_CODE_LOGIN_INITIATE")
-                Nonce := Nonce + 2
-                LoginInitiateMessage := UnpaddedBase64(TaggedCiphertext) || "|" || UnpaddedBase64(Sp)
-            */
-            const Ss = ephemeralKeyPair.privateKey;
-            const Sp = ephemeralKeyPair.publicKey;
-            const Gp = this.theirPublicKey;
-            this.OurNonce = 0;
-            this.TheirNonce = 1;
-
-            const SHBits = await global.crypto.subtle.deriveBits(
-                {
-                    name: "ECDH",
-                    public: Gp,
-                },
-                Ss,
-                256,
-            );
-
-            const SH = await global.crypto.subtle.importKey(
-                "raw",
-                SHBits,
-                {
-                    name: "HKDF",
-                    length: 256,
-                },
-                false,
-                ["deriveKey"],
-            );
-
-            this.EncKey = await global.crypto.subtle.deriveKey(
-                {
-                    name: "HKDF",
-                    hash: "SHA-256",
-                    salt: new Uint8Array(0),
-                    info: new Int8Array([
-                        ...new TextEncoder().encode("MATRIX_QR_CODE_LOGIN|"),
-                        ...new Uint8Array(await global.crypto.subtle.exportKey("raw", Gp!)),
-                        ...new TextEncoder().encode("|"),
-                        ...new Uint8Array(await global.crypto.subtle.exportKey("raw", Sp!)),
-                    ]).buffer,
-                },
-                SH,
-                {
-                    name: "AES-GCM",
-                    length: 256,
-                },
-                true,
-                ["encrypt"],
-            );
+             Nonce := 0
+             SH := ECDH(Ss, Gp)
+             EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
+             TaggedCiphertext := ChaCha20Poly1305_Encrypt(EncKey, Nonce, "MATRIX_QR_CODE_LOGIN_INITIATE")
+             Nonce := Nonce + 2
+             LoginInitiateMessage := UnpaddedBase64(TaggedCiphertext) || "|" || UnpaddedBase64(Sp)
+             */
             {
-                const TaggedCiphertext = await this.encrypt(new TextEncoder().encode("MATRIX_QR_CODE_LOGIN_INITIATE"));
-                const LoginInitiateMessage =
-                    encodeUnpaddedBase64(TaggedCiphertext) +
-                    "|" +
-                    encodeUnpaddedBase64(await global.crypto.subtle.exportKey("raw", Sp!));
                 logger.info("Sending LoginInitiateMessage");
-                await this.rendezvousSession.send(LoginInitiateMessage);
+                const loginInitiateMessage = this.establishedChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
+                await this.rendezvousSession.send(loginInitiateMessage);
             }
 
             /**
@@ -159,14 +86,14 @@ export class MSC4108SecureChannel {
              */
             {
                 logger.info("Waiting for LoginOkMessage");
-                const TaggedCiphertext = await this.rendezvousSession.receive();
+                const ciphertext = await this.rendezvousSession.receive();
 
-                if (!TaggedCiphertext) {
+                if (!ciphertext) {
                     throw new RendezvousError("No response from other device", RendezvousFailureReason.Unknown);
                 }
-                const CandidateLoginOkMessage = await this.decrypt(decodeBase64(TaggedCiphertext));
+                const candidateLoginOkMessage = await this.decrypt(ciphertext);
 
-                if (new TextDecoder().decode(CandidateLoginOkMessage) !== "MATRIX_QR_CODE_LOGIN_OK") {
+                if (candidateLoginOkMessage !== "MATRIX_QR_CODE_LOGIN_OK") {
                     throw new RendezvousError(
                         "Invalid response from other device",
                         RendezvousFailureReason.DataMismatch,
@@ -188,81 +115,24 @@ export class MSC4108SecureChannel {
 
              */
             // wait for the other side to send us their public key
-            this.OurNonce = 1;
-            this.TheirNonce = 0;
             logger.info("Waiting for LoginInitiateMessage");
-            const LoginInitiateMessage = await this.rendezvousSession.receive();
-            if (!LoginInitiateMessage) {
+            const loginInitiateMessage = await this.rendezvousSession.receive();
+            if (!loginInitiateMessage) {
                 throw new Error("No response from other device");
             }
-            const Gs = ephemeralKeyPair.privateKey;
-            const Gp = ephemeralKeyPair.publicKey;
 
-            const [TaggedCipherTextEncoded, SpEncoded] = LoginInitiateMessage.split("|");
-            const TaggedCiphertext = decodeBase64(TaggedCipherTextEncoded);
-            const Sp = await global.crypto.subtle.importKey(
-                "raw",
-                decodeBase64(SpEncoded),
-                { name: "ECDH", namedCurve: "P-256" }, // PROTOTYPE: this should be Curve25519
-                true,
-                [],
-            );
+            const { channel, message: candidateLoginInitiateMessage } =
+                this.secureChannel.create_inbound_channel(loginInitiateMessage);
+            this.establishedChannel = channel;
 
-            const SHBits = await global.crypto.subtle.deriveBits(
-                {
-                    name: "ECDH",
-                    public: Sp,
-                },
-                Gs,
-                256,
-            );
-
-            const SH = await global.crypto.subtle.importKey(
-                "raw",
-                SHBits,
-                {
-                    name: "HKDF",
-                    length: 256,
-                },
-                false,
-                ["deriveKey"],
-            );
-
-            this.EncKey = await global.crypto.subtle.deriveKey(
-                {
-                    name: "HKDF",
-                    hash: "SHA-256",
-                    salt: new Uint8Array(0),
-                    info: new Int8Array([
-                        ...new TextEncoder().encode("MATRIX_QR_CODE_LOGIN|"),
-                        ...new Uint8Array(await global.crypto.subtle.exportKey("raw", Gp!)),
-                        ...new TextEncoder().encode("|"),
-                        ...new Uint8Array(await global.crypto.subtle.exportKey("raw", Sp!)),
-                    ]).buffer,
-                },
-                SH,
-                {
-                    name: "AES-GCM",
-                    length: 256,
-                },
-                true,
-                ["encrypt"],
-            );
-            const CandidateLoginInitiateMessage = await this.decrypt(TaggedCiphertext);
-
-            if (new TextDecoder().decode(CandidateLoginInitiateMessage) !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
+            if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
                 throw new RendezvousError("Invalid response from other device", RendezvousFailureReason.DataMismatch);
             }
-
-            this.theirPublicKey = Sp;
-
             logger.info("LoginInitiateMessage received");
 
-            const LoginOkMessage = encodeUnpaddedBase64(
-                await this.encrypt(new TextEncoder().encode("MATRIX_QR_CODE_LOGIN_OK")),
-            );
             logger.info("Sending LoginOkMessage");
-            await this.rendezvousSession.send(LoginOkMessage);
+            const loginOkMessage = await this.encrypt("MATRIX_QR_CODE_LOGIN_OK");
+            await this.rendezvousSession.send(loginOkMessage);
 
             // Step 5 is complete. We don't yet trust the channel
 
@@ -272,30 +142,20 @@ export class MSC4108SecureChannel {
         this.connected = true;
     }
 
-    private async decrypt(TaggedCiphertext: Uint8Array): Promise<Uint8Array> {
-        if (!this.EncKey) {
-            throw new Error("Shared secret not set up");
+    private async decrypt(ciphertext: string): Promise<string> {
+        if (!this.establishedChannel) {
+            throw new Error("Channel closed");
         }
-        logger.info(`Decrypting with nonce ${this.TheirNonce}`);
-        const chacha = xchacha20poly1305(
-            new Uint8Array(await global.crypto.subtle.exportKey("raw", this.EncKey)),
-            makeNonce(this.TheirNonce),
-        );
-        this.TheirNonce += 2;
-        return chacha.decrypt(TaggedCiphertext);
+
+        return this.establishedChannel.decrypt(ciphertext);
     }
 
-    private async encrypt(Plaintext: Uint8Array): Promise<Uint8Array> {
-        if (!this.EncKey) {
-            throw new Error("Shared secret not set up");
+    private async encrypt(plaintext: string): Promise<string> {
+        if (!this.establishedChannel) {
+            throw new Error("Channel closed");
         }
-        logger.info(`Encrypting with nonce ${this.OurNonce}`);
-        const chacha = xchacha20poly1305(
-            new Uint8Array(await global.crypto.subtle.exportKey("raw", this.EncKey)),
-            makeNonce(this.OurNonce),
-        );
-        this.OurNonce += 2;
-        return chacha.encrypt(Plaintext);
+
+        return this.establishedChannel.encrypt(plaintext);
     }
 
     public async secureSend(payload: MSC4108Payload): Promise<void> {
@@ -303,26 +163,24 @@ export class MSC4108SecureChannel {
             throw new Error("Channel closed");
         }
 
-        logger.info(`=> ${JSON.stringify(payload)}`);
+        const stringifiedPayload = JSON.stringify(payload);
+        const encryptedPayload = await this.encrypt(stringifiedPayload);
+        logger.info(`=> ${stringifiedPayload} [${encryptedPayload}]`);
 
-        await this.rendezvousSession.send(
-            encodeUnpaddedBase64(await this.encrypt(new TextEncoder().encode(JSON.stringify(payload)))),
-        );
+        await this.rendezvousSession.send(encryptedPayload);
     }
 
     public async secureReceive(): Promise<Partial<MSC4108Payload> | undefined> {
-        if (!this.EncKey) {
-            throw new Error("Shared secret not set up");
+        if (!this.establishedChannel) {
+            throw new Error("Channel closed");
         }
 
-        const rawData = await this.rendezvousSession.receive();
-        if (!rawData) {
+        const ciphertext = await this.rendezvousSession.receive();
+        if (!ciphertext) {
             return undefined;
         }
-        const ciphertext = decodeBase64(rawData);
         const plaintext = await this.decrypt(ciphertext);
-
-        const json = JSON.parse(new TextDecoder().decode(plaintext));
+        const json = JSON.parse(plaintext);
 
         logger.info(`<= ${JSON.stringify(json)}`);
         return json as any as Partial<MSC4108Payload>;
@@ -333,6 +191,7 @@ export class MSC4108SecureChannel {
     public async cancel(reason: RendezvousFailureReason): Promise<void> {
         try {
             await this.rendezvousSession.cancel(reason);
+            this.onFailure?.(reason);
         } finally {
             await this.close();
         }

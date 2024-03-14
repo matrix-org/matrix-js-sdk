@@ -18,6 +18,7 @@ limitations under the License.
  * QR code key verification.
  */
 
+import type { Curve25519PublicKey } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { crypto } from "../crypto";
 import { VerificationBase as Base } from "./Base";
 import { newKeyMismatchError, newUserCancelledError } from "./Error";
@@ -323,7 +324,6 @@ export class QRCodeData {
             appendEncBase64(qrData.secondKeyB64);
             appendEncBase64(qrData.secretB64);
         } else if ("ephemeralPublicKey" in qrData) {
-            // PROTOTYPE: this is actually 65 bytes not 32 due to it currently using P-256 not Curve25519
             appendEncBase64(qrData.ephemeralPublicKey);
             appendStr(qrData.rendezvousSessionUrl, "utf-8");
             if (qrData.homeserverBaseUrl && qrData.mode === Mode.LoginReciprocate) {
@@ -336,12 +336,11 @@ export class QRCodeData {
 
     public static async createForRendezvous(
         intent: RendezvousIntent,
-        publicKey: CryptoKey,
+        publicKey: Curve25519PublicKey,
         rendezvousSessionUrl: string,
         homeserverBaseUrl?: string,
     ): Promise<Buffer> {
-        const rawPublicKey = await global.crypto.subtle.exportKey("raw", publicKey);
-        const ephemeralPublicKey = encodeUnpaddedBase64(rawPublicKey);
+        const ephemeralPublicKey = publicKey.toBase64();
         const qrData: LoginQrData = {
             prefix: BINARY_PREFIX,
             version: CODE_VERSION,
@@ -356,7 +355,7 @@ export class QRCodeData {
 
     public static async parseForRendezvous(buffer: Buffer): Promise<{
         intent: RendezvousIntent;
-        publicKey: CryptoKey;
+        publicKey: Curve25519PublicKey;
         rendezvousSessionUrl: string;
         homeserverBaseUrl?: string;
     }> {
@@ -376,8 +375,7 @@ export class QRCodeData {
         offset += 1;
 
         if (mode === Mode.LoginInitiate || mode === Mode.LoginReciprocate) {
-            const ephemeralPublicKey = buffer.slice(offset, offset + 65); // PROTOTYPE: this should be 32, but it's currently using P-256 not Curve25519
-            offset += 65; // PROTOTYPE: this should be 32, but it's currently using P-256 not Curve25519
+            const ephemeralPublicKey = buffer.slice(offset, (offset += 32));
 
             const rendezvousSessionUrlLen = buffer.readUInt16BE(offset);
             offset += 2;
@@ -392,18 +390,13 @@ export class QRCodeData {
                 offset += homeserverBaseUrlLen;
             }
 
+            const RustCrypto = await import("@matrix-org/matrix-sdk-crypto-wasm");
             return {
                 intent:
                     mode === Mode.LoginInitiate
                         ? RendezvousIntent.LOGIN_ON_NEW_DEVICE
                         : RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE,
-                publicKey: await global.crypto.subtle.importKey(
-                    "raw",
-                    ephemeralPublicKey,
-                    { name: "ECDH", namedCurve: "P-256" }, // PROTOTYPE: should use Curve25519
-                    true,
-                    [],
-                ),
+                publicKey: new RustCrypto.Curve25519PublicKey(encodeUnpaddedBase64(ephemeralPublicKey)),
                 rendezvousSessionUrl,
                 homeserverBaseUrl,
             };

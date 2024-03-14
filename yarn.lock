@@ -1710,11 +1710,6 @@
   dependencies:
     eslint-scope "5.1.1"
 
-"@noble/ciphers@^0.5.1":
-  version "0.5.1"
-  resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-0.5.1.tgz#292f388b69c9ed80d49dca1a5cbfd4ff06852111"
-  integrity sha512-aNE06lbe36ifvMbbWvmmF/8jx6EQPu2HVg70V95T+iGjOuYwPpAccwAQc2HlXO2D0aiQ3zavbMga4jjWnrpiPA==
-
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
   resolved "https://registry.yarnpkg.com/@nodelib/fs.scandir/-/fs.scandir-2.1.5.tgz#7619c2eb21b25483f6d167548b4cfd5a7488c3d5"
