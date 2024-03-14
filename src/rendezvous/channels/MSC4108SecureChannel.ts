@@ -164,10 +164,9 @@ export class MSC4108SecureChannel {
         }
 
         const stringifiedPayload = JSON.stringify(payload);
-        const encryptedPayload = await this.encrypt(stringifiedPayload);
-        logger.info(`=> ${stringifiedPayload} [${encryptedPayload}]`);
+        logger.info(`=> ${stringifiedPayload}`);
 
-        await this.rendezvousSession.send(encryptedPayload);
+        await this.rendezvousSession.send(await this.encrypt(stringifiedPayload));
     }
 
     public async secureReceive(): Promise<Partial<MSC4108Payload> | undefined> {
