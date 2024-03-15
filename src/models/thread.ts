@@ -382,8 +382,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.addRelatedThreadEvent(event, toStartOfTimeline);
             return;
         } else if (!toStartOfTimeline && isNewestReply) {
-            // When we've asked for the event to be added to the end, and we're
-            // not in the initial state, and this event belongs at the end, add it.
+            // When we've asked for the event to be added to the end,
+            // and this event belongs at the end, add it.
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else {
