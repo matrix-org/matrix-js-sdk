@@ -609,7 +609,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             if (this.initalEventFetchProm) {
                 await this.initalEventFetchProm;
             } else {
-                // fetch initial event to allow proper pagination
+                // fetch initial events to allow proper pagination
                 try {
                     // clear out any events we added previously
                     this.timelineSet.resetLiveTimeline();
