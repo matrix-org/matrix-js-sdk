@@ -387,11 +387,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else {
-            // If initial events have not been fetched, we are OK to throw away
-            // this event, because we are about to fetch all the events for this
-            // thread from the server.
-
             // Otherwise, we should add it, but we suspect it is out of order.
+            // This may be because we've just created the thread object and are
+            // still fetching events, in which case add it where we think is sensible
+            // and it will be replaced later once the pagination request completes.
             if (toStartOfTimeline) {
                 // If we're adding at the start of the timeline, it doesn't
                 // matter that it's out of order.
