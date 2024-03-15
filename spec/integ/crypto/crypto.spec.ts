@@ -64,7 +64,6 @@ import {
     RoomMember,
     RoomStateEvent,
     HistoryVisibility,
-    KnownMembership,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -100,6 +99,7 @@ import {
 } from "./olm-utils";
 import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
+import { KnownMembership } from "../../../src/@types/membership";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections

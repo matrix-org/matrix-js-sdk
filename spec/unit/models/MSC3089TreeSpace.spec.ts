@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IContent, KnownMembership, MatrixClient } from "../../../src";
+import { IContent, MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { MatrixEvent } from "../../../src/models/event";
 import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../../../src/@types/event";
@@ -25,6 +25,7 @@ import {
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MatrixError } from "../../../src/http-api";
+import { KnownMembership } from "../../../src/@types/membership";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;

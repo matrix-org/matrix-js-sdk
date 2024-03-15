@@ -20,7 +20,7 @@ import { fail } from "assert";
 
 import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { IRoomEvent, IStateEvent, KnownMembership } from "../../src";
+import { IRoomEvent, IStateEvent } from "../../src";
 import {
     MatrixClient,
     MatrixEvent,
@@ -43,6 +43,7 @@ import { IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;

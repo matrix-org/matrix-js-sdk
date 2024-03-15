@@ -39,7 +39,6 @@ import {
     IndexedDBStore,
     RelationType,
     EventType,
-    KnownMembership,
 } from "../../src";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
@@ -47,6 +46,7 @@ import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient syncing", () => {
     const selfUserId = "@alice:localhost";

@@ -28,9 +28,9 @@ import {
     IMinimalEvent,
     IRoomEvent,
     Room,
-    KnownMembership,
 } from "../../src";
 import { TestClient } from "../TestClient";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient room timelines", function () {
     const userId = "@alice:localhost";

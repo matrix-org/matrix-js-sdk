@@ -44,7 +44,7 @@ import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
 import { immediate, MapWithDefault } from "../../utils";
-import { KnownMembership } from "../../@types/partials";
+import { KnownMembership } from "../../@types/membership";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {

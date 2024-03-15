@@ -31,9 +31,10 @@ import { Room } from "../models/room";
 import { Logger, logger, LogSpan } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
 import { RoomMember } from "../models/room-member";
-import { HistoryVisibility, KnownMembership } from "../@types/partials";
+import { HistoryVisibility } from "../@types/partials";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { logDuration } from "../utils";
+import { KnownMembership } from "../@types/membership";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room

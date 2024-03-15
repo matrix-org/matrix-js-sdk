@@ -12,15 +12,14 @@ import {
     IJoinedRoom,
     IPusher,
     ISyncResponse,
-    KnownMembership,
     MatrixClient,
-    Membership,
     MsgType,
     RelationType,
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
+import { KnownMembership, Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a

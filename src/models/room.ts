@@ -42,14 +42,7 @@ import {
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import {
-    GuestAccess,
-    HistoryVisibility,
-    JoinRule,
-    KnownMembership,
-    Membership,
-    ResizeMethod,
-} from "../@types/partials";
+import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
 import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
 import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
@@ -75,6 +68,7 @@ import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
+import { KnownMembership, Membership } from "../@types/membership";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be

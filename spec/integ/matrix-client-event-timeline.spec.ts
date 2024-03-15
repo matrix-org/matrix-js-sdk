@@ -24,7 +24,6 @@ import {
     EventType,
     Filter,
     IEvent,
-    KnownMembership,
     MatrixClient,
     MatrixEvent,
     PendingEventOrdering,
@@ -37,6 +36,7 @@ import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 import { Feature, ServerSupport } from "../../src/feature";
+import { KnownMembership } from "../../src/@types/membership";
 
 const userId = "@alice:localhost";
 const userName = "Alice";

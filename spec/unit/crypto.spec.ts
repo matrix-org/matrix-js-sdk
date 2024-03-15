@@ -15,7 +15,7 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from "../../src/logger";
-import { DeviceVerification, KnownMembership, MemoryStore } from "../../src";
+import { DeviceVerification, MemoryStore } from "../../src";
 import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestManager";
 import { RoomMember } from "../../src/models/room-member";
 import { IStore } from "../../src/store";
@@ -25,6 +25,7 @@ import { UserTrustLevel } from "../../src/crypto/CrossSigning";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
 import * as testData from "../test-utils/test-data";
+import { KnownMembership } from "../../src/@types/membership";
 
 const Olm = global.Olm;
 

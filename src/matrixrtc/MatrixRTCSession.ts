@@ -26,7 +26,7 @@ import { Focus } from "./focus";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
-import { KnownMembership } from "../@types/partials";
+import { KnownMembership } from "../@types/membership";
 import { MatrixError } from "../http-api/errors";
 import { MatrixEvent } from "../models/event";
 

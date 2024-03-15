@@ -32,7 +32,7 @@ import {
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { Crypto } from "../../src/crypto";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
-import { KnownMembership, Preset } from "../../src/@types/partials";
+import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
@@ -71,6 +71,7 @@ import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { KnownMembership } from "../../src/@types/membership";
 
 jest.useFakeTimers();
 

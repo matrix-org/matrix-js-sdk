@@ -104,7 +104,7 @@ import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 import { ClientPrefix, MatrixError, Method } from "../http-api";
 import { decodeBase64, encodeBase64 } from "../base64";
-import { KnownMembership } from "../@types/partials";
+import { KnownMembership } from "../@types/membership";
 
 /* re-exports for backwards compatibility */
 export type {

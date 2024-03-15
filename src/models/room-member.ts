@@ -22,7 +22,7 @@ import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
-import { KnownMembership, Membership } from "../@types/partials";
+import { KnownMembership, Membership } from "../@types/membership";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",

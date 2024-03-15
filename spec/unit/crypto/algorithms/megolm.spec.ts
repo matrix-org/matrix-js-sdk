@@ -30,12 +30,13 @@ import { TestClient } from "../../../TestClient";
 import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { TypedEventEmitter } from "../../../../src/models/typed-event-emitter";
-import { ClientEvent, KnownMembership, MatrixClient, RoomMember } from "../../../../src";
+import { ClientEvent, MatrixClient, RoomMember } from "../../../../src";
 import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
 import { DeviceTrustLevel } from "../../../../src/crypto/CrossSigning";
 import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
 import { recursiveMapToObject } from "../../../../src/utils";
 import { sleep } from "../../../../src/utils";
+import { KnownMembership } from "../../../../src/@types/membership";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;

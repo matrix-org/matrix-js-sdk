@@ -46,7 +46,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
-import { KnownMembership } from "./@types/partials";
+import { KnownMembership } from "./@types/membership";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the

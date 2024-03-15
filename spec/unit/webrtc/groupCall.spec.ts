@@ -16,16 +16,7 @@ limitations under the License.
 
 import { mocked } from "jest-mock";
 
-import {
-    EventType,
-    GroupCallIntent,
-    GroupCallType,
-    KnownMembership,
-    MatrixCall,
-    MatrixEvent,
-    Room,
-    RoomMember,
-} from "../../../src";
+import { EventType, GroupCallIntent, GroupCallType, MatrixCall, MatrixEvent, Room, RoomMember } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { GroupCall, GroupCallEvent, GroupCallState, GroupCallStatsReportEvent } from "../../../src/webrtc/groupCall";
 import { IMyDevice, MatrixClient } from "../../../src/client";
@@ -56,6 +47,7 @@ import { flushPromises } from "../../test-utils/flushPromises";
 import { CallFeedReport } from "../../../src/webrtc/stats/statsReport";
 import { CallFeedStatsReporter } from "../../../src/webrtc/stats/callFeedStatsReporter";
 import { StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
+import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_STATE_EVENTS = [
     {

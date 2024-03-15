@@ -20,11 +20,12 @@ import { isNumber, removeHiddenChars } from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
-import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule, KnownMembership } from "../@types/partials";
+import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+import { KnownMembership } from "../@types/membership";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the

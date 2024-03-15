@@ -47,7 +47,7 @@ import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
 import { Room } from "./room";
 import { EventTimeline } from "./event-timeline";
-import { Membership } from "../@types/partials";
+import { Membership } from "../@types/membership";
 
 export { EventStatus } from "./event-status";
 

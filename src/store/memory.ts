@@ -32,7 +32,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 import { IStoredClientOpts } from "../client";
 import { MapWithDefault } from "../utils";
-import { KnownMembership } from "../@types/partials";
+import { KnownMembership } from "../@types/membership";
 
 function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr =

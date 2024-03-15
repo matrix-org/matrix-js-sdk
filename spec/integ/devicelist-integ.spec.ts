@@ -19,7 +19,7 @@ limitations under the License.
 import { TestClient } from "../TestClient";
 import * as testUtils from "../test-utils/test-utils";
 import { logger } from "../../src/logger";
-import { KnownMembership } from "../../src/@types/partials";
+import { KnownMembership } from "../../src/@types/membership";
 
 const ROOM_ID = "!room:id";
 

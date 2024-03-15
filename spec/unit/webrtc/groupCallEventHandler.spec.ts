@@ -31,7 +31,7 @@ import { RoomState } from "../../../src/models/room-state";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockGroupCallStateEvent, MockCallMatrixClient } from "../../test-utils/webrtc";
-import { KnownMembership } from "../../../src/@types/partials";
+import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_USER_ID = "@alice:test.dummy";
 const FAKE_DEVICE_ID = "AAAAAAA";

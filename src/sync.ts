@@ -61,7 +61,7 @@ import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
 import { Crypto } from "./crypto";
-import { KnownMembership } from "./@types/partials";
+import { KnownMembership } from "./@types/membership";
 
 const DEBUG = true;
 

@@ -149,15 +149,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import {
-    IdServerUnbindResult,
-    IImageInfo,
-    Membership,
-    JoinRule,
-    Preset,
-    Visibility,
-    KnownMembership,
-} from "./@types/partials";
+import { IdServerUnbindResult, IImageInfo, JoinRule, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -230,6 +222,7 @@ import {
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
 import { getRelationsThreadFilter } from "./thread-utils";
+import { KnownMembership, Membership } from "./@types/membership";
 
 export type Store = IStore;
 

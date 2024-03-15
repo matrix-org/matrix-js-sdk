@@ -33,7 +33,7 @@ import { MSC3089Branch } from "./MSC3089Branch";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
 import { FileType } from "../http-api";
-import { KnownMembership } from "../@types/partials";
+import { KnownMembership } from "../@types/membership";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this

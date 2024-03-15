@@ -23,7 +23,6 @@ import {
     ClientEvent,
     EventType,
     ISyncResponse,
-    KnownMembership,
     MatrixClient,
     MatrixEvent,
     NotificationCountType,
@@ -35,6 +34,7 @@ import { TestClient } from "../TestClient";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { mkThread } from "../test-utils/thread";
 import { SyncState } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 const userA = "@alice:localhost";
 const userB = "@bob:localhost";

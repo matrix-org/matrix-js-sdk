@@ -1,11 +1,12 @@
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { ClientEvent, KnownMembership, MatrixClient } from "../../src/matrix";
+import { ClientEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
 import { IStore } from "../../src/store";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient opts", function () {
     const baseUrl = "http://localhost.or.something";

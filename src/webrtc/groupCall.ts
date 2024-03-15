@@ -34,7 +34,7 @@ import {
 } from "./stats/statsReport";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
-import { KnownMembership } from "../@types/partials";
+import { KnownMembership } from "../@types/membership";
 
 export enum GroupCallIntent {
     Ring = "m.ring",

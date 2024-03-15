@@ -25,11 +25,12 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Mocked } from "jest-mock";
 
-import { HistoryVisibility, KnownMembership, MatrixEvent, Room, RoomMember } from "../../../src";
+import { HistoryVisibility, MatrixEvent, Room, RoomMember } from "../../../src";
 import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { defer } from "../../../src/utils";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
+import { KnownMembership } from "../../../src/@types/membership";
 
 describe("RoomEncryptor", () => {
     describe("History Visibility", () => {

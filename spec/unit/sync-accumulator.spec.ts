@@ -29,8 +29,9 @@ import {
     SyncAccumulator,
     IInviteState,
 } from "../../src/sync-accumulator";
-import { IRoomSummary, KnownMembership, Membership } from "../../src";
+import { IRoomSummary } from "../../src";
 import * as utils from "../test-utils/test-utils";
+import { KnownMembership, Membership } from "../../src/@types/membership";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl

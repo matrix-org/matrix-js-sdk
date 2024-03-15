@@ -28,7 +28,7 @@ import { MatrixClient } from "../../src/client";
 import { DecryptionError } from "../../src/crypto/algorithms";
 import { defer } from "../../src/utils";
 import { Room } from "../../src/models/room";
-import { KnownMembership } from "../../src/@types/partials";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("RoomState", function () {
     const roomId = "!foo:bar";

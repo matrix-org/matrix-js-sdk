@@ -19,7 +19,7 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, KnockRoomOpts, KnownMembership, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import { Filter, KnockRoomOpts, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -27,6 +27,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";

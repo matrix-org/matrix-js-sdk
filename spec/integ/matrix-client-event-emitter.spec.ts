@@ -20,7 +20,6 @@ import {
     ClientEvent,
     HttpApiEvent,
     IEvent,
-    KnownMembership,
     MatrixClient,
     RoomEvent,
     RoomMemberEvent,
@@ -29,6 +28,7 @@ import {
 } from "../../src";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient events", function () {
     const selfUserId = "@alice:localhost";

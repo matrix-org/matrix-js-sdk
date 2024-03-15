@@ -34,7 +34,6 @@ import {
     IRelationsRequestOpts,
     IStateEventWithRoomId,
     JoinRule,
-    KnownMembership,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -57,6 +56,7 @@ import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-ut
 import { logger } from "../../src/logger";
 import { IMessageOpts } from "../test-utils/test-utils";
 import { flushPromises } from "../test-utils/flushPromises";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
