@@ -595,18 +595,15 @@ export class SyncApi {
     /**
      * Is the lazy loading option different than in previous session?
      * @param lazyLoadMembers - current options for lazy loading
-     * @returns whether or not the option has changed compared to the previous session */
+     * @returns whether or not the lazyLoadMembers option has changed compared to the previous session (if there was one) */
     private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
-        // assume it was turned off before
-        // if we don't know any better
-        let lazyLoadMembersBefore = false;
         const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
         if (!isStoreNewlyCreated) {
             const prevClientOptions = await this.client.store.getClientOptions();
             if (prevClientOptions) {
-                lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+                let lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+                return lazyLoadMembersBefore !== lazyLoadMembers;
             }
-            return lazyLoadMembersBefore !== lazyLoadMembers;
         }
         return false;
     }
