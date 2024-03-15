@@ -105,7 +105,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      *
      * So it looks like this is only really relevant when initialEventsFetched
      * is false, because as soon as the initial events have been fetched, we
-     * should have a timeline (I think).
+     * should have a proper chunk of timeline from the pagination fetch.
      *
      * If all replies in this thread are redacted, this is set to the root
      * event. I'm not clear what the meaning of this is, since usually after the
