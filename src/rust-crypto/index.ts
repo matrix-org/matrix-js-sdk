@@ -194,12 +194,15 @@ async function initOlmMachine(
             // We need to do an initial keys query so that the rust stack can properly update trust of
             // the user device and identity from the migrated private keys.
             // If not done, there is a short period where the own device/identity trust will be undefined after migration.
-            try {
-                await rustCrypto.userHasCrossSigningKeys(userId);
-            } catch (e) {
-                // We don't want to fail the startup if this fails, but we do want to log it.
-                // It will be retried by the sdk.
-                logger.error("Failed to check for cross-signing keys after migration", e);
+            let initialKeyQueryDone = false;
+            while (!initialKeyQueryDone) {
+                try {
+                    await rustCrypto.userHasCrossSigningKeys(userId);
+                    initialKeyQueryDone = true;
+                } catch (e) {
+                    // If the initial key query fails, we retry until it succeeds.
+                    logger.error("Failed to check for cross-signing keys after migration, retrying", e);
+                }
             }
 
             // If the private master cross-signing key was not cached in the legacy store, the rust session
