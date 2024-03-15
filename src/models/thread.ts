@@ -626,11 +626,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                         await this.initalEventFetchProm;
                     }
                     // We have now fetched the initial events, so set the flag. We need to do this before
-                    // we actually add the events, so it knows that it can now safely add them rather than
-                    // buffer them in the pending event list. The main thing is that this must remain false
-                    // while the async fetch happens, so we don't try to add events before it's ready.
-                    // The important thing is that we're not await-ing anything else between setting this
-                    // and adding events, so no races.
+                    // we actually add the events, so `this.addEvents` knows that it can now safely add
+                    // them rather than buffer them in the pending event list. The main thing is that this
+                    // must remain false while the async fetch happens, so we don't try to add events before
+                    // it's ready. The important thing is that we're not await-ing anything else between
+                    // setting this and adding events, so no races.
                     this.initialEventsFetched = true;
                     for (const event of this.replayEvents!) {
                         this.addEvent(event, false);
