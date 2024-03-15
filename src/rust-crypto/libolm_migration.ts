@@ -16,15 +16,17 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Logger } from "../logger";
+import { logger, Logger } from "../logger";
 import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/store/base";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
-import { CrossSigningKeyInfo } from "../crypto-api";
+import { BackupManager } from "../crypto/backup";
+import { decodeBase64 } from "../base64";
 import { RustCrypto } from "./rust-crypto";
+import { CrossSigningKeyInfo } from "../crypto-api";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -162,8 +164,26 @@ async function migrateBaseData(
     if (recoveryKey) {
         const backupInfo = await requestKeyBackupVersion(http);
         if (backupInfo) {
-            migrationData.backupVersion = backupInfo.version;
-            migrationData.backupRecoveryKey = recoveryKey;
+            // check if the recovery key matches, as the active backup version may have changed since the key was cached
+            // and the migration started.
+            const privateKey = decodeBase64(recoveryKey);
+            // for that we need libolm to be initialized
+            if (!global.Olm) {
+                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                global.Olm = require("@matrix-org/olm");
+                global.Olm.init();
+            }
+            try {
+                const alg = await BackupManager.makeAlgorithm(backupInfo, async () => [0]);
+                const isValid = await alg.keyMatches(privateKey);
+                if (isValid) {
+                    migrationData.backupVersion = backupInfo.version;
+                    migrationData.backupRecoveryKey = recoveryKey;
+                }
+            } catch (e) {
+                // Unknown algorithm, we cannot migrate
+                logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
+            }
         }
     }
 
