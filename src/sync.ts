@@ -601,7 +601,7 @@ export class SyncApi {
         if (!isStoreNewlyCreated) {
             const prevClientOptions = await this.client.store.getClientOptions();
             if (prevClientOptions) {
-                let lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+                const lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
                 return lazyLoadMembersBefore !== lazyLoadMembers;
             }
         }
