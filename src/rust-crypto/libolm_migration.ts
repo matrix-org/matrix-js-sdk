@@ -23,6 +23,8 @@ import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
+import { KeyBackupInfo } from "../crypto-api/keybackup";
+import { sleep } from "../utils";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -158,7 +160,17 @@ async function migrateBaseData(
     // If we have a backup recovery key, we need to try to figure out which backup version it is for.
     // All we can really do is ask the server for the most recent version.
     if (recoveryKey) {
-        const backupInfo = await requestKeyBackupVersion(http);
+        let backupCallDone = false;
+        let backupInfo: KeyBackupInfo | null = null;
+        while (!backupCallDone) {
+            try {
+                backupInfo = await requestKeyBackupVersion(http);
+                backupCallDone = true;
+            } catch (e) {
+                // Retry until successful, use simple constant delay
+                await sleep(2000);
+            }
+        }
         if (backupInfo) {
             migrationData.backupVersion = backupInfo.version;
             migrationData.backupRecoveryKey = recoveryKey;
