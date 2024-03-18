@@ -390,7 +390,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             // Otherwise, we should add it, but we suspect it is out of order.
             // This may be because we've just created the thread object and are
             // still fetching events, in which case add it where we think is sensible
-            // and it will be replaced later once the pagination request completes.
+            // and it will be removed and replaced with the events from the pagination
+            // request once that completes.
             if (toStartOfTimeline) {
                 // If we're adding at the start of the timeline, it doesn't
                 // matter that it's out of order.
