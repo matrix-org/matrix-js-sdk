@@ -92,10 +92,14 @@ export class MSC4108RendezvousSession {
             try {
                 // whilst prototyping we can use the MSC3886 endpoint if available
                 if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc3886")) {
-                    return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
+                    return this.client.http
+                        .getUrl("/org.matrix.msc3886/rendezvous", undefined, ClientPrefix.Unstable)
+                        .toString();
                 }
                 if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc4108")) {
-                    return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc4108/rendezvous`;
+                    return this.client.http
+                        .getUrl("/org.matrix.msc4108/rendezvous", undefined, ClientPrefix.Unstable)
+                        .toString();
                 }
             } catch (err) {
                 logger.warn("Failed to get unstable features", err);
