@@ -100,6 +100,7 @@ describe("initRustCrypto", () => {
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
             getBackupKeys: jest.fn(),
             getIdentity: jest.fn().mockResolvedValue(null),
+            trackedUsers: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
     }
 
@@ -181,6 +182,7 @@ describe("initRustCrypto", () => {
             jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
 
             const testOlmMachine = makeTestOlmMachine();
+            testOlmMachine.trackedUsers.mockResolvedValue([]);
             jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
         });
 
