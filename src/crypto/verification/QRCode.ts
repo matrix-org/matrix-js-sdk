@@ -136,15 +136,10 @@ enum Mode {
     VerifySelfUntrusted = 0x02, // We do not trust the master key
 }
 
-export type IQrData = VerificationQrData;
-
-interface IBaseQrData {
+interface IQrData {
     prefix: string;
     version: number;
     mode: Mode;
-}
-
-interface VerificationQrData extends IBaseQrData {
     transactionId?: string;
     firstKeyB64: string;
     secondKeyB64: string;
