@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QRCodeData } from "../crypto/verification/QRCode";
+import type { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { MatrixClient } from "../matrix";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR";
 import { RendezvousError } from "./RendezvousError";
 import { RendezvousFailureListener, RendezvousFailureReason } from "./RendezvousFailureReason";
-import { RendezvousIntent } from "./RendezvousIntent";
 import { MSC4108SecureChannel } from "./channels";
 import { MSC4108RendezvousSession } from "./transports";
 
@@ -42,9 +41,8 @@ export async function buildLoginFromScannedCode(
     code: Buffer,
     onFailure: RendezvousFailureListener,
 ): Promise<{ signin: MSC4108SignInWithQR; homeserverBaseUrl?: string }> {
-    const scannerIntent = client
-        ? RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE
-        : RendezvousIntent.LOGIN_ON_NEW_DEVICE;
+    const RustCrypto = await import("@matrix-org/matrix-sdk-crypto-wasm");
+    const scannerIntent = client ? RustCrypto.QrCodeMode.Reciprocate : RustCrypto.QrCodeMode.Login;
 
     const { channel, homeserverBaseUrl } = await buildChannelFromCode(scannerIntent, code, onFailure);
 
@@ -52,21 +50,18 @@ export async function buildLoginFromScannedCode(
 }
 
 async function buildChannelFromCode(
-    scannerIntent: RendezvousIntent,
+    scannerMode: QrCodeMode,
     code: Buffer,
     onFailure: RendezvousFailureListener,
-): Promise<{ channel: MSC4108SecureChannel; intent: RendezvousIntent; homeserverBaseUrl?: string }> {
-    const {
-        intent: scannedIntent,
-        publicKey,
-        rendezvousSessionUrl,
-        homeserverBaseUrl,
-    } = await QRCodeData.parseForRendezvous(code);
+): Promise<{ channel: MSC4108SecureChannel; intent: QrCodeMode; homeserverBaseUrl?: string }> {
+    const RustCrypto = await import("@matrix-org/matrix-sdk-crypto-wasm");
 
-    if (scannedIntent === scannerIntent) {
+    const qrCodeData = RustCrypto.QrCodeData.from_bytes(code);
+
+    if (qrCodeData.mode === scannerMode) {
         throw new RendezvousError(
             "The scanned intent is the same as the scanner intent",
-            scannerIntent === RendezvousIntent.LOGIN_ON_NEW_DEVICE
+            scannerMode === RustCrypto.QrCodeMode.Login
                 ? RendezvousFailureReason.OtherDeviceNotSignedIn
                 : RendezvousFailureReason.OtherDeviceAlreadySignedIn,
         );
@@ -75,12 +70,12 @@ async function buildChannelFromCode(
     // need to validate the values
     const rendezvousSession = new MSC4108RendezvousSession({
         onFailure,
-        url: rendezvousSessionUrl,
+        url: qrCodeData.rendevouz_url,
     });
 
     return {
-        channel: new MSC4108SecureChannel(rendezvousSession, publicKey, onFailure),
-        intent: scannedIntent,
-        homeserverBaseUrl,
+        channel: new MSC4108SecureChannel(rendezvousSession, qrCodeData.public_key, onFailure),
+        intent: qrCodeData.mode,
+        homeserverBaseUrl: qrCodeData.homeserver_url,
     };
 }

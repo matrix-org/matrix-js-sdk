@@ -14,10 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Curve25519PublicKey, EstablishedSecureChannel, SecureChannel } from "@matrix-org/matrix-sdk-crypto-wasm";
+import {
+    Curve25519PublicKey,
+    EstablishedSecureChannel,
+    QrCodeData,
+    QrCodeMode,
+    SecureChannel,
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RendezvousError, RendezvousIntent, RendezvousFailureReason, MSC4108Payload } from "..";
-import { QRCodeData } from "../../crypto/verification/QRCode";
+import { MSC4108Payload, RendezvousError, RendezvousFailureReason } from "..";
 import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession";
 import { logger } from "../../logger";
 
@@ -37,14 +42,18 @@ export class MSC4108SecureChannel {
         this.secureChannel = new SecureChannel();
     }
 
-    public async generateCode(intent: RendezvousIntent, homeserverBaseUrl?: string): Promise<Buffer> {
+    public async generateCode(mode: QrCodeMode, homeserverBaseUrl?: string): Promise<Uint8Array> {
         const { url } = this.rendezvousSession;
 
         if (!url) {
             throw new Error("No rendezvous session URL");
         }
 
-        return QRCodeData.createForRendezvous(intent, this.secureChannel.public_key(), url, homeserverBaseUrl);
+        return new QrCodeData(
+            this.secureChannel.public_key(),
+            url,
+            mode === QrCodeMode.Reciprocate ? homeserverBaseUrl : undefined,
+        ).to_bytes();
     }
 
     public async connect(): Promise<void> {

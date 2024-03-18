@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceAuthorizationResponse, OidcClient, DeviceAccessTokenResponse } from "oidc-client-ts";
+import { DeviceAccessTokenResponse, DeviceAuthorizationResponse, OidcClient } from "oidc-client-ts";
+import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RendezvousError, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
+import { RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
@@ -84,8 +85,8 @@ interface SecretsPayload extends MSC4108Payload {
 }
 
 export class MSC4108SignInWithQR {
-    private ourIntent: RendezvousIntent;
-    private _code?: Buffer;
+    private ourIntent: QrCodeMode;
+    private _code?: Uint8Array;
     public protocol?: string;
     private oidcClient?: OidcClient;
     private deviceAuthorizationResponse?: DeviceAuthorizationResponse;
@@ -101,15 +102,13 @@ export class MSC4108SignInWithQR {
         private client?: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {
-        this.ourIntent = client
-            ? RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE
-            : RendezvousIntent.LOGIN_ON_NEW_DEVICE;
+        this.ourIntent = client ? QrCodeMode.Reciprocate : QrCodeMode.Login;
     }
 
     /**
      * Returns the code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
      */
-    public get code(): Buffer | undefined {
+    public get code(): Uint8Array | undefined {
         return this._code;
     }
 
@@ -125,7 +124,7 @@ export class MSC4108SignInWithQR {
     }
 
     public get isExistingDevice(): boolean {
-        return this.ourIntent === RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
+        return this.ourIntent === QrCodeMode.Reciprocate;
     }
 
     public get isNewDevice(): boolean {
