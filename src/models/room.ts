@@ -68,6 +68,7 @@ import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
+import { KnownMembership, Membership } from "../@types/membership";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -177,7 +178,7 @@ export type RoomEventHandlerMap = {
      * @param membership - The new membership value
      * @param prevMembership - The previous membership value
      */
-    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.MyMembership]: (room: Room, membership: Membership, prevMembership?: Membership) => void;
     /**
      * Fires whenever a room's tags are updated.
      * @param event - The tags event
@@ -351,7 +352,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
-    private selfMembership?: string;
+    private selfMembership?: Membership;
     private summaryHeroes: string[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -863,8 +864,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
-    public getMyMembership(): string {
-        return this.selfMembership ?? "leave";
+    public getMyMembership(): Membership {
+        return this.selfMembership ?? KnownMembership.Leave;
     }
 
     /**
@@ -878,7 +879,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return me.getDMInviter();
         }
 
-        if (this.selfMembership === "invite") {
+        if (this.selfMembership === KnownMembership.Invite) {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
             if (memberCount === 2) {
@@ -989,11 +990,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Sets the membership this room was received as during sync
      * @param membership - join | leave | invite
      */
-    public updateMyMembership(membership: string): void {
+    public updateMyMembership(membership: Membership): void {
         const prevMembership = this.selfMembership;
         this.selfMembership = membership;
         if (prevMembership !== membership) {
-            if (membership === "leave") {
+            if (membership === KnownMembership.Leave) {
                 this.cleanupAfterLeaving();
             }
             this.emit(RoomEvent.MyMembership, this, membership, prevMembership);
@@ -1002,7 +1003,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     private async loadMembersFromServer(): Promise<IStateEventWithRoomId[]> {
         const lastSyncToken = this.client.store.getSyncToken();
-        const response = await this.client.members(this.roomId, undefined, "leave", lastSyncToken ?? undefined);
+        const response = await this.client.members(
+            this.roomId,
+            undefined,
+            KnownMembership.Leave,
+            lastSyncToken ?? undefined,
+        );
         return response.chunk;
     }
 
@@ -1709,7 +1715,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns A list of currently joined members.
      */
     public getJoinedMembers(): RoomMember[] {
-        return this.getMembersWithMembership("join");
+        return this.getMembersWithMembership(KnownMembership.Join);
     }
 
     /**
@@ -1744,7 +1750,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership state.
      * @returns A list of members with the given membership state.
      */
-    public getMembersWithMembership(membership: string): RoomMember[] {
+    public getMembersWithMembership(membership: Membership): RoomMember[] {
         return this.currentState.getMembers().filter(function (m) {
             return m.membership === membership;
         });
@@ -1757,9 +1763,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public async getEncryptionTargetMembers(): Promise<RoomMember[]> {
         await this.loadMembersIfNeeded();
-        let members = this.getMembersWithMembership("join");
+        let members = this.getMembersWithMembership(KnownMembership.Join);
         if (this.shouldEncryptForInvitedMembers()) {
-            members = members.concat(this.getMembersWithMembership("invite"));
+            members = members.concat(this.getMembersWithMembership(KnownMembership.Invite));
         }
         return members;
     }
@@ -1790,7 +1796,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership e.g. `'join'`
      * @returns True if this user_id has the given membership state.
      */
-    public hasMembershipState(userId: string, membership: string): boolean {
+    public hasMembershipState(userId: string, membership: Membership): boolean {
         const member = this.getMember(userId);
         if (!member) {
             return false;
@@ -3119,7 +3125,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             const membership = membershipEvent.getContent().membership;
             this.updateMyMembership(membership!);
 
-            if (membership === "invite") {
+            if (membership === KnownMembership.Invite) {
                 const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
                 strippedStateEvents.forEach((strippedEvent) => {
                     const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
@@ -3205,7 +3211,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public maySendMessage(): boolean {
         return (
-            this.getMyMembership() === "join" &&
+            this.getMyMembership() === KnownMembership.Join &&
             (this.hasEncryptionStateEvent()
                 ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
                 : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId))
@@ -3218,7 +3224,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns true if the user should be permitted to issue invites for this room.
      */
     public canInvite(userId: string): boolean {
-        let canInvite = this.getMyMembership() === "join";
+        let canInvite = this.getMyMembership() === KnownMembership.Join;
         const powerLevelsEvent = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         const powerLevels = powerLevelsEvent && powerLevelsEvent.getContent();
         const me = this.getMember(userId);
@@ -3400,7 +3406,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
+                return (
+                    m.userId !== userId &&
+                    (m.membership === KnownMembership.Invite || m.membership === KnownMembership.Join)
+                );
             });
             otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
@@ -3428,7 +3437,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
-        if (myMembership == "join") {
+        if (myMembership == KnownMembership.Join) {
             const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
             if (thirdPartyInvites?.length) {
@@ -3452,7 +3461,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             leftNames = this.currentState
                 .getMembers()
                 .filter((m) => {
-                    return m.userId !== userId && m.membership !== "invite" && m.membership !== "join";
+                    return (
+                        m.userId !== userId &&
+                        m.membership !== KnownMembership.Invite &&
+                        m.membership !== KnownMembership.Join
+                    );
                 })
                 .map((m) => m.name);
         }

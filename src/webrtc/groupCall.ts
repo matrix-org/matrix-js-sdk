@@ -34,6 +34,7 @@ import {
 } from "./stats/statsReport";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
+import { KnownMembership } from "../@types/membership";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -1485,7 +1486,7 @@ export class GroupCall extends TypedEventEmitter<
             }
 
             // Must have a connected device and be joined to the room
-            if (validDevices.length > 0 && member?.membership === "join") {
+            if (validDevices.length > 0 && member?.membership === KnownMembership.Join) {
                 const deviceMap = new Map<string, ParticipantState>();
                 participants.set(member, deviceMap);
 

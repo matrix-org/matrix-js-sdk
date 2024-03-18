@@ -36,6 +36,7 @@ import { TestClient } from "../../TestClient";
 import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../../src/client";
 import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
+import { KnownMembership } from "../../../src/@types/membership";
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";
@@ -316,11 +317,11 @@ function firstSync(testClient: TestClient): Promise<void> {
                     state: {
                         events: [
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: aliUserId,
                             }),
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: bobUserId,
                             }),
                         ],

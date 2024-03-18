@@ -47,6 +47,7 @@ import { flushPromises } from "../../test-utils/flushPromises";
 import { CallFeedReport } from "../../../src/webrtc/stats/statsReport";
 import { CallFeedStatsReporter } from "../../../src/webrtc/stats/callFeedStatsReporter";
 import { StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
+import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_STATE_EVENTS = [
     {
@@ -143,7 +144,7 @@ describe("Group Call", function () {
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
         });
 
@@ -651,11 +652,11 @@ describe("Group Call", function () {
 
             client1Room.currentState.members[FAKE_USER_ID_1] = client2Room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             client1Room.currentState.members[FAKE_USER_ID_2] = client2Room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
 
             groupCall1 = new GroupCall(
@@ -831,11 +832,11 @@ describe("Group Call", function () {
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
         });
 
@@ -1026,11 +1027,11 @@ describe("Group Call", function () {
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
 
             groupCall = await createAndEnterGroupCall(mockClient, room);
@@ -1260,11 +1261,11 @@ describe("Group Call", function () {
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
 
@@ -1741,11 +1742,11 @@ describe("Group Call", function () {
             const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
             groupCall = await createAndEnterGroupCall(mockClient, room);
