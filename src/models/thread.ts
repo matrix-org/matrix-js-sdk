@@ -614,6 +614,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 try {
                     // clear out any events that were added before the pagination request
                     // completed (eg. from sync). They'll be replaced by those from the pagination.
+                    // Really, we should do this after the pagination request completes, but
+                    // paginateEventTimeline does the request and adds the events in one go, so
+                    // this would need a refactor in order to do. It's therefore possible there's
+                    // a remaining race where an event comes in while the pagination request is
+                    // happening.
                     this.timelineSet.resetLiveTimeline();
                     // if the thread has regular events, this will just load the last reply.
                     // if the thread is newly created, this will load the root event.
