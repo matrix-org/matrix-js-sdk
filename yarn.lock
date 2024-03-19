@@ -6177,9 +6177,9 @@ typedoc-plugin-coverage@^3.0.0:
   integrity sha512-fxeJRrxQR3yM/aFZU7mOuatgRCztiMCbeNiCRVZKY6VNgOcVMC1HS+ZfZnlbLLteUOdeWleSQ6yntuipz5zi6A==
 
 typedoc-plugin-mdn-links@^3.0.3:
-  version "3.1.17"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.17.tgz#cb9214f0a60a9a347c778e228c307b9d033ba5cb"
-  integrity sha512-DCkMuXna8qipSwfzXl6c1x7nBeZUW/qWCACoaaP/cUzUyy/1MXedUyteuVsfw6+Sod61gIAr9ccwH78nrdwu6A==
+  version "3.1.18"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.18.tgz#736df9b90245583aa00d726d6eec474e0cbec37a"
+  integrity sha512-BGzSUEHT15o3g2Q1q/5tBQufAM+yqJNwU1aUmYZC9qbfCS1I5qyEkmoxZ9ks2Z3TwPTZ8PMfIKd2vq5/0nmLnw==
 
 typedoc-plugin-missing-exports@^2.0.0:
   version "2.2.0"
@@ -6187,9 +6187,9 @@ typedoc-plugin-missing-exports@^2.0.0:
   integrity sha512-2+XR1IcyQ5UwXZVJe9NE6HrLmNufT9i5OwoIuuj79VxuA3eYq+Y6itS9rnNV1D7UeQnUSH8kISYD73gHE5zw+w==
 
 typedoc@^0.25.10:
-  version "0.25.11"
-  resolved "https://registry.yarnpkg.com/typedoc/-/typedoc-0.25.11.tgz#75080c594c1e26b7676f90faebb367fb5a32dc8d"
-  integrity sha512-5MbI1W/FOG6oXsd8bdssQidSTeKh8Kt3xA5uKVzI+K99uzP8EGN45uPnPvQesyaWdD+89s4wCQdtWEd8QUbiRg==
+  version "0.25.12"
+  resolved "https://registry.yarnpkg.com/typedoc/-/typedoc-0.25.12.tgz#f73f0a8d3731d418cc604d4230f95a857799e27a"
+  integrity sha512-F+qhkK2VoTweDXd1c42GS/By2DvI2uDF4/EpG424dTexSHdtCH52C6IcAvMA6jR3DzAWZjHpUOW+E02kyPNUNw==
   dependencies:
     lunr "^2.3.9"
     marked "^4.3.0"
