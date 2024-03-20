@@ -46,6 +46,7 @@ import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient syncing", () => {
@@ -1733,64 +1734,122 @@ describe("MatrixClient syncing", () => {
             });
         });
 
-        it("should apply encrypted notification logic for events within the same sync blob", async () => {
-            const roomId = "!room123:server";
-            const syncData = {
-                rooms: {
-                    join: {
-                        [roomId]: {
-                            ephemeral: {
-                                events: [],
-                            },
-                            timeline: {
-                                events: [
-                                    utils.mkEvent({
-                                        room: roomId,
-                                        event: true,
-                                        skey: "",
-                                        type: EventType.RoomEncryption,
-                                        content: {},
-                                    }),
-                                    utils.mkMessage({
-                                        room: roomId,
-                                        user: otherUserId,
-                                        msg: "hello",
-                                    }),
-                                ],
-                            },
-                            state: {
-                                events: [
-                                    utils.mkMembership({
-                                        room: roomId,
-                                        mship: KnownMembership.Join,
-                                        user: otherUserId,
-                                    }),
-                                    utils.mkMembership({
-                                        room: roomId,
-                                        mship: KnownMembership.Join,
-                                        user: selfUserId,
-                                    }),
-                                    utils.mkEvent({
-                                        type: "m.room.create",
-                                        room: roomId,
-                                        user: selfUserId,
-                                        content: {},
-                                    }),
-                                ],
+        describe("encrypted notification logic", () => {
+            let roomId: string;
+            let syncData: ISyncResponse;
+
+            beforeEach(() => {
+                roomId = "!room123:server";
+                syncData = {
+                    rooms: {
+                        join: {
+                            [roomId]: {
+                                ephemeral: {
+                                    events: [],
+                                },
+                                timeline: {
+                                    events: [
+                                        utils.mkEvent({
+                                            room: roomId,
+                                            event: true,
+                                            skey: "",
+                                            type: EventType.RoomEncryption,
+                                            content: {},
+                                        }),
+                                        utils.mkMessage({
+                                            room: roomId,
+                                            user: otherUserId,
+                                            msg: "hello",
+                                        }),
+                                    ],
+                                },
+                                state: {
+                                    events: [
+                                        utils.mkMembership({
+                                            room: roomId,
+                                            mship: KnownMembership.Join,
+                                            user: otherUserId,
+                                        }),
+                                        utils.mkMembership({
+                                            room: roomId,
+                                            mship: KnownMembership.Join,
+                                            user: selfUserId,
+                                        }),
+                                        utils.mkEvent({
+                                            type: "m.room.create",
+                                            room: roomId,
+                                            user: selfUserId,
+                                            content: {},
+                                        }),
+                                    ],
+                                },
                             },
                         },
                     },
-                },
-            } as unknown as ISyncResponse;
+                } as unknown as ISyncResponse;
+            });
 
-            httpBackend!.when("GET", "/sync").respond(200, syncData);
-            client!.startClient();
+            it("should apply encrypted notification logic for events within the same sync blob", async () => {
+                httpBackend!.when("GET", "/sync").respond(200, syncData);
+                client!.startClient();
 
-            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
 
-            const room = client!.getRoom(roomId)!;
-            expect(room).toBeInstanceOf(Room);
-            expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
+                const room = client!.getRoom(roomId)!;
+                expect(room).toBeInstanceOf(Room);
+                expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
+            });
+
+            it("should recalculate highlights on receipt for encrypted rooms", async () => {
+                const myUserId = client!.getUserId()!;
+
+                const firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
+
+                // add a receipt for the first event in the room (let's say the user has already read that one)
+                syncData.rooms.join[roomId].ephemeral.events = [
+                    {
+                        content: {
+                            [firstEventId]: {
+                                "m.read": {
+                                    [myUserId]: { ts: 1 },
+                                },
+                            },
+                        },
+                        type: "m.receipt",
+                    },
+                ];
+
+                // Now add a highlighting event after that receipt
+                const pingEvent = utils.mkMessage({
+                    room: roomId,
+                    user: otherUserId,
+                    msg: client?.getUserId() + " ping",
+                }) as IRoomEvent;
+                syncData.rooms.join[roomId].timeline.events.push(pingEvent);
+
+                // fudge this to make it a highlight
+                client!.getPushActionsForEvent = (ev: MatrixEvent): IActionsObject | null => {
+                    if (ev.getId() === pingEvent.event_id) {
+                        return {
+                            notify: true,
+                            tweaks: {
+                                highlight: true,
+                            },
+                        };
+                    }
+                    return null;
+                };
+
+                httpBackend!.when("GET", "/sync").respond(200, syncData);
+                client!.startClient();
+
+                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+                const room = client!.getRoom(roomId)!;
+                expect(room).toBeInstanceOf(Room);
+                // the room should now have one highlight since our receipt was before the ping message
+                expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
+            });
         });
     });
 
