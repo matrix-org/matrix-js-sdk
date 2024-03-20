@@ -33,6 +33,7 @@ import { MSC3089Branch } from "./MSC3089Branch";
 import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
 import { ISendEventResponse } from "../@types/requests";
 import { FileType } from "../http-api";
+import { KnownMembership } from "../@types/membership";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -291,11 +292,11 @@ export class MSC3089TreeSpace {
             await dir.delete();
         }
 
-        const kickMemberships = ["invite", "knock", "join"];
+        const kickMemberships = [KnownMembership.Invite, KnownMembership.Knock, KnownMembership.Join];
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent().membership!)) {
+            if (isNotUs && kickMemberships.includes(member.getContent().membership! as KnownMembership)) {
                 const stateKey = member.getStateKey();
                 if (!stateKey) {
                     throw new Error("State key not found for branch");

@@ -22,3 +22,4 @@ limitations under the License.
  */
 
 export type * from "./@types/media";
+export * from "./@types/membership";

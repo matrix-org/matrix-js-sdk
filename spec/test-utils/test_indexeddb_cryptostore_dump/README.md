@@ -1,11 +1,13 @@
-## Dump of libolm indexeddb cryptostore
+## Dumps of libolm indexeddb cryptostore
 
-This directory contains a dump of a real indexeddb store from a session using
+This directory contains several dumps of real indexeddb stores from a session using
 libolm crypto.
 
-The corresponding pickle key is `+1k2Ppd7HIisUY824v7JtV3/oEE4yX0TqtmNPyhaD7o`.
+Each directory contains, in dump.json, a dump of data created by pasting the following
+code into the browser console; and in index.ts, details of the user, pickle key,
+and corresponding key query and backup responses (`DumpDataSetInfo`).
 
-It was created by pasting the following into the browser console:
+The dump is created by pasting the following into the browser console:
 
 ```javascript
 async function exportIndexedDb(name) {

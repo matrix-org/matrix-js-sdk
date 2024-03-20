@@ -30,6 +30,7 @@ import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { defer } from "../../../src/utils";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
+import { KnownMembership } from "../../../src/@types/membership";
 
 describe("RoomEncryptor", () => {
     describe("History Visibility", () => {
@@ -54,7 +55,7 @@ describe("RoomEncryptor", () => {
 
         const mockRoomMember = {
             userId: "@alice:example.org",
-            membership: "join",
+            membership: KnownMembership.Join,
         } as unknown as Mocked<RoomMember>;
 
         function createMockEvent(text: string): Mocked<MatrixEvent> {
