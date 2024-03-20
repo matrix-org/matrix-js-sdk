@@ -23,10 +23,12 @@ import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
 import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
-import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
+import { KnownMembership } from "../@types/membership";
+import { MatrixError } from "../http-api/errors";
+import { MatrixEvent } from "../models/event";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -156,7 +158,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
                         continue;
                     }
-                    if (!room.hasMembershipState(membership.sender ?? "", "join")) {
+                    if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
                         logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
                         continue;
                     }

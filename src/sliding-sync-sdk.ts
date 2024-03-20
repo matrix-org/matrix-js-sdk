@@ -46,6 +46,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
+import { KnownMembership } from "./@types/membership";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -649,7 +650,7 @@ export class SlidingSyncSdk {
             inviteStateEvents.forEach((e) => {
                 this.client.emit(ClientEvent.Event, e);
             });
-            room.updateMyMembership("invite");
+            room.updateMyMembership(KnownMembership.Invite);
             return;
         }
 
@@ -719,7 +720,7 @@ export class SlidingSyncSdk {
 
         // local fields must be set before any async calls because call site assumes
         // synchronous execution prior to emitting SlidingSyncState.Complete
-        room.updateMyMembership("join");
+        room.updateMyMembership(KnownMembership.Join);
 
         room.recalculate();
         if (roomData.initial) {
@@ -845,7 +846,7 @@ export class SlidingSyncSdk {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -865,7 +866,7 @@ export class SlidingSyncSdk {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member!;
-                    if (inviteEvent.getContent().membership !== "invite") {
+                    if (inviteEvent.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }
