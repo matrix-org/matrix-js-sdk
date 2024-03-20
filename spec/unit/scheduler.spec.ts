@@ -6,6 +6,7 @@ import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils/test-utils";
 import { MatrixEvent } from "../../src";
+import { KnownMembership } from "../../src/@types/membership";
 
 jest.useFakeTimers();
 
@@ -336,7 +337,7 @@ describe("MatrixScheduler", function () {
                     utils.mkMembership({
                         user: "@alice:bar",
                         room: roomId,
-                        mship: "join",
+                        mship: KnownMembership.Join,
                         event: true,
                     }),
                 ),

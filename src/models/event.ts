@@ -47,6 +47,7 @@ import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
 import { Room } from "./room";
 import { EventTimeline } from "./event-timeline";
+import { Membership } from "../@types/membership";
 
 export { EventStatus } from "./event-status";
 
@@ -54,7 +55,7 @@ export { EventStatus } from "./event-status";
 export interface IContent {
     [key: string]: any;
     "msgtype"?: MsgType | string;
-    "membership"?: string;
+    "membership"?: Membership;
     "avatar_url"?: string;
     "displayname"?: string;
     "m.relates_to"?: IEventRelation;
@@ -92,7 +93,7 @@ export interface IEvent {
     origin_server_ts: number;
     txn_id?: string;
     state_key?: string;
-    membership?: string;
+    membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
 

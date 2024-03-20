@@ -44,6 +44,7 @@ import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
 import { immediate, MapWithDefault } from "../../utils";
+import { KnownMembership } from "../../@types/membership";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -1680,7 +1681,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const fromInviter =
             memberEvent?.getSender() === senderKeyUser ||
             (memberEvent?.getUnsigned()?.prev_sender === senderKeyUser &&
-                memberEvent?.getPrevContent()?.membership === "invite");
+                memberEvent?.getPrevContent()?.membership === KnownMembership.Invite);
 
         if (room && fromInviter) {
             return true;

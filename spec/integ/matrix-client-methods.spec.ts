@@ -27,6 +27,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -162,7 +163,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     event: true,
                 }),
             ]);
@@ -182,7 +183,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     event: true,
                 }),
             ]);
@@ -269,7 +270,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "knock",
+                    mship: KnownMembership.Knock,
                     event: true,
                 }),
             ]);
@@ -1912,7 +1913,7 @@ const buildEventJoinRules = () =>
     new MatrixEvent({
         age: 80123696,
         content: {
-            join_rule: "invite",
+            join_rule: KnownMembership.Invite,
         },
         event_id: "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
         origin_server_ts: 1643815441191,
@@ -1966,7 +1967,7 @@ const buildEventMember = () =>
         content: {
             avatar_url: "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
             displayname: "andybalaam-test1",
-            membership: "join",
+            membership: KnownMembership.Join,
         },
         event_id: "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
         origin_server_ts: 1643815439608,

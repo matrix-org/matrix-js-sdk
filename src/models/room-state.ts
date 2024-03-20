@@ -25,6 +25,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+import { KnownMembership } from "../@types/membership";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -206,7 +207,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "join" ? count + 1 : count;
+                return m.membership === KnownMembership.Join ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -230,7 +231,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "invite" ? count + 1 : count;
+                return m.membership === KnownMembership.Invite ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -434,7 +435,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
                 // into the timeline
-                if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                if (
+                    event.getContent().membership === KnownMembership.Leave ||
+                    event.getContent().membership === KnownMembership.Ban
+                ) {
                     event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
                     event.getContent().displayname =
                         event.getContent().displayname || event.getPrevContent().displayname;
@@ -776,7 +780,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === "leave") return false;
+        if (!member || member.membership === KnownMembership.Leave) return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
