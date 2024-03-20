@@ -136,6 +136,7 @@ export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
     Reference = "m.reference",
+    // Don't use this yet: it's only the stable version. Use THREAD_RELATION_TYPE.name.
     Thread = "m.thread",
 }
 
