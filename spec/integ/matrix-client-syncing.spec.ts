@@ -1740,15 +1740,6 @@ describe("MatrixClient syncing", () => {
             let syncData: ISyncResponse;
 
             beforeEach(() => {
-                // This needs to be set for every test. The state of thread support is stored in a
-                // singleton and can never be reset once toggled to experimental, so if any client
-                // in any test sets it to experimental, other tests will start failing.
-                client!.doesServerSupportThread = jest.fn().mockReturnValue({
-                    threads: FeatureSupport.Stable,
-                    list: FeatureSupport.Stable,
-                    fwdPagination: FeatureSupport.Stable,
-                });
-
                 roomId = "!room123:server";
                 syncData = {
                     rooms: {
@@ -1933,7 +1924,7 @@ describe("MatrixClient syncing", () => {
                                 "m.in_reply_to": {
                                     event_id: firstEventId,
                                 },
-                                "rel_type": "m.thread",
+                                "rel_type": "io.element.thread",
                             },
                         },
                     }) as IRoomEvent;
@@ -1952,7 +1943,7 @@ describe("MatrixClient syncing", () => {
                                 "m.in_reply_to": {
                                     event_id: firstEventId,
                                 },
-                                "rel_type": "m.thread",
+                                "rel_type": "io.element.thread",
                             },
                         },
                     }) as IRoomEvent;
