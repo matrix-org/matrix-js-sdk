@@ -14,19 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export interface IImageInfo {
-    size?: number;
-    mimetype?: string;
-    thumbnail_info?: {
-        // eslint-disable-line camelcase
-        w?: number;
-        h?: number;
-        size?: number;
-        mimetype?: string;
-    };
-    w?: number;
-    h?: number;
-}
+import { ImageInfo } from "./media";
+
+/**
+ * @deprecated use {@link ImageInfo} instead.
+ */
+export type IImageInfo = ImageInfo;
 
 export enum Visibility {
     Public = "public",
