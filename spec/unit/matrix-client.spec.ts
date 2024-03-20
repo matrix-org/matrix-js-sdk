@@ -73,6 +73,7 @@ import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
 
 jest.useFakeTimers();
@@ -754,7 +755,7 @@ describe("MatrixClient", function () {
     it("should get (unstable) file trees with valid state", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -793,7 +794,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees if not joined", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "leave", // "not join"
+            getMyMembership: () => KnownMembership.Leave, // "not join"
         } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
@@ -816,7 +817,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -853,7 +854,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -1313,7 +1314,7 @@ describe("MatrixClient", function () {
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomEncryption) {
@@ -1452,7 +1453,7 @@ describe("MatrixClient", function () {
         const txnId = "m12345";
 
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
             hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;

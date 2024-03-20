@@ -36,6 +36,7 @@ import { DeviceTrustLevel } from "../../../../src/crypto/CrossSigning";
 import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
 import { recursiveMapToObject } from "../../../../src/utils";
 import { sleep } from "../../../../src/utils";
+import { KnownMembership } from "../../../../src/@types/membership";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
@@ -806,11 +807,11 @@ describe("MegolmDecryption", function () {
         aliceRoom.getEncryptionTargetMembers = jest.fn().mockResolvedValue([
             {
                 userId: "@alice:example.com",
-                membership: "join",
+                membership: KnownMembership.Join,
             },
             {
                 userId: "@bob:example.com",
-                membership: "join",
+                membership: KnownMembership.Join,
             },
         ]);
         const BOB_DEVICES = {

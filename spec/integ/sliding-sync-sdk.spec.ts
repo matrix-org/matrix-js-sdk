@@ -43,6 +43,7 @@ import { IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;
@@ -189,7 +190,7 @@ describe("SlidingSyncSdk", () => {
                     name: "A",
                     required_state: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnStateEvent(EventType.RoomName, { name: "A" }, ""),
                     ],
@@ -204,7 +205,7 @@ describe("SlidingSyncSdk", () => {
                     required_state: [],
                     timeline: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello B" }),
                         mkOwnEvent(EventType.RoomMessage, { body: "world B" }),
@@ -216,7 +217,7 @@ describe("SlidingSyncSdk", () => {
                     required_state: [],
                     timeline: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello C" }),
                         mkOwnEvent(EventType.RoomMessage, { body: "world C" }),
@@ -229,7 +230,7 @@ describe("SlidingSyncSdk", () => {
                     required_state: [],
                     timeline: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "hello D" }),
                         mkOwnEvent(EventType.RoomMessage, { body: "world D" }),
@@ -244,7 +245,7 @@ describe("SlidingSyncSdk", () => {
                     invite_state: [
                         {
                             type: EventType.RoomMember,
-                            content: { membership: "invite" },
+                            content: { membership: KnownMembership.Invite },
                             state_key: selfUserId,
                             sender: "@bob:localhost",
                             event_id: "$room_e_invite",
@@ -265,7 +266,7 @@ describe("SlidingSyncSdk", () => {
                     name: "#foo:localhost",
                     required_state: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnStateEvent(EventType.RoomCanonicalAlias, { alias: "#foo:localhost" }, ""),
                         mkOwnStateEvent(EventType.RoomName, { name: "This should be ignored" }, ""),
@@ -281,7 +282,7 @@ describe("SlidingSyncSdk", () => {
                     required_state: [],
                     timeline: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     ],
                     joined_count: 5,
@@ -293,7 +294,7 @@ describe("SlidingSyncSdk", () => {
                     required_state: [],
                     timeline: [
                         mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                         mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                         mkOwnEvent(EventType.RoomMessage, { body: "live event" }),
                     ],
@@ -308,7 +309,7 @@ describe("SlidingSyncSdk", () => {
                 const gotRoom = client!.getRoom(roomA);
                 expect(gotRoom).toBeTruthy();
                 expect(gotRoom!.name).toEqual(data[roomA].name);
-                expect(gotRoom!.getMyMembership()).toEqual("join");
+                expect(gotRoom!.getMyMembership()).toEqual(KnownMembership.Join);
                 assertTimelineEvents(gotRoom!.getLiveTimeline().getEvents().slice(-2), data[roomA].timeline);
             });
 
@@ -318,7 +319,7 @@ describe("SlidingSyncSdk", () => {
                 const gotRoom = client!.getRoom(roomB);
                 expect(gotRoom).toBeTruthy();
                 expect(gotRoom!.name).toEqual(data[roomB].name);
-                expect(gotRoom!.getMyMembership()).toEqual("join");
+                expect(gotRoom!.getMyMembership()).toEqual(KnownMembership.Join);
                 assertTimelineEvents(gotRoom!.getLiveTimeline().getEvents().slice(-5), data[roomB].timeline);
             });
 
@@ -372,7 +373,7 @@ describe("SlidingSyncSdk", () => {
                 const gotRoom = client!.getRoom(roomH);
                 expect(gotRoom).toBeTruthy();
                 expect(gotRoom!.name).toEqual(data[roomH].name);
-                expect(gotRoom!.getMyMembership()).toEqual("join");
+                expect(gotRoom!.getMyMembership()).toEqual(KnownMembership.Join);
                 // check the entire timeline is correct
                 assertTimelineEvents(gotRoom!.getLiveTimeline().getEvents(), data[roomH].timeline);
                 await expect(seenLiveEventDeferred.promise).resolves.toBeTruthy();
@@ -383,7 +384,7 @@ describe("SlidingSyncSdk", () => {
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomE);
                 expect(gotRoom).toBeTruthy();
-                expect(gotRoom!.getMyMembership()).toEqual("invite");
+                expect(gotRoom!.getMyMembership()).toEqual(KnownMembership.Invite);
                 expect(gotRoom!.currentState.getJoinRule()).toEqual(JoinRule.Invite);
             });
 
@@ -603,9 +604,9 @@ describe("SlidingSyncSdk", () => {
                 required_state: [],
                 timeline: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Invite }, invitee),
                 ],
             });
             await httpBackend!.flush("/profile", 1, 1000);
@@ -719,7 +720,7 @@ describe("SlidingSyncSdk", () => {
                 required_state: [],
                 timeline: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
                 ],
@@ -923,7 +924,7 @@ describe("SlidingSyncSdk", () => {
                 required_state: [],
                 timeline: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
                 ],
@@ -964,7 +965,7 @@ describe("SlidingSyncSdk", () => {
                 required_state: [],
                 timeline: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
                 ],
@@ -1050,12 +1051,12 @@ describe("SlidingSyncSdk", () => {
                 required_state: [],
                 timeline: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
-                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     {
                         type: EventType.RoomMember,
                         state_key: alice,
-                        content: { membership: "join" },
+                        content: { membership: KnownMembership.Join },
                         sender: alice,
                         origin_server_ts: Date.now(),
                         event_id: "$alice",
