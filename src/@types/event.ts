@@ -15,6 +15,34 @@ limitations under the License.
 */
 
 import { UnstableValue } from "../NamespacedValue";
+import {
+    PolicyRuleEventContent,
+    RoomAvatarEventContent,
+    RoomCanonicalAliasEventContent,
+    RoomCreateEventContent,
+    RoomEncryptionEventContent,
+    RoomGuestAccessEventContent,
+    RoomHistoryVisibilityEventContent,
+    RoomJoinRulesEventContent,
+    RoomMemberEventContent,
+    RoomNameEventContent,
+    RoomPinnedEventsEventContent,
+    RoomPowerLevelsEventContent,
+    RoomServerAclEventContent,
+    RoomThirdPartyInviteEventContent,
+    RoomTombstoneEventContent,
+    RoomTopicEventContent,
+    SpaceChildEventContent,
+    SpaceParentEventContent,
+} from "./state_events";
+import {
+    ExperimentalGroupCallRoomMemberState,
+    IGroupCallRoomMemberState,
+    IGroupCallRoomState,
+} from "../webrtc/groupCall";
+import { MSC3089EventContent } from "../models/MSC3089Branch";
+import { M_BEACON_INFO, MBeaconInfoEventContent } from "./beacon";
+import { XOR } from "./common";
 
 export enum EventType {
     // Room state events
@@ -34,6 +62,11 @@ export enum EventType {
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
     RoomPredecessor = "org.matrix.msc3946.room_predecessor",
+
+    // Moderation policy lists
+    PolicyRuleUser = "m.policy.rule.user",
+    PolicyRuleRoom = "m.policy.rule.room",
+    PolicyRuleServer = "m.policy.rule.server",
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
@@ -259,4 +292,39 @@ export interface IEncryptedFile {
     iv: string;
     hashes: { [alg: string]: string };
     v: string;
+}
+
+export interface StateEvents {
+    [EventType.RoomCanonicalAlias]: RoomCanonicalAliasEventContent;
+    [EventType.RoomCreate]: RoomCreateEventContent;
+    [EventType.RoomJoinRules]: RoomJoinRulesEventContent;
+    [EventType.RoomMember]: RoomMemberEventContent;
+    // XXX: Spec says this event has 3 required fields but kicking such an invitation requires sending `{}`
+    [EventType.RoomThirdPartyInvite]: XOR<RoomThirdPartyInviteEventContent, {}>;
+    [EventType.RoomPowerLevels]: RoomPowerLevelsEventContent;
+    [EventType.RoomName]: RoomNameEventContent;
+    [EventType.RoomTopic]: RoomTopicEventContent;
+    [EventType.RoomAvatar]: RoomAvatarEventContent;
+    [EventType.RoomPinnedEvents]: RoomPinnedEventsEventContent;
+    [EventType.RoomEncryption]: RoomEncryptionEventContent;
+    [EventType.RoomHistoryVisibility]: RoomHistoryVisibilityEventContent;
+    [EventType.RoomGuestAccess]: RoomGuestAccessEventContent;
+    [EventType.RoomServerAcl]: RoomServerAclEventContent;
+    [EventType.RoomTombstone]: RoomTombstoneEventContent;
+    [EventType.SpaceChild]: SpaceChildEventContent;
+    [EventType.SpaceParent]: SpaceParentEventContent;
+
+    [EventType.PolicyRuleUser]: XOR<PolicyRuleEventContent, {}>;
+    [EventType.PolicyRuleRoom]: XOR<PolicyRuleEventContent, {}>;
+    [EventType.PolicyRuleServer]: XOR<PolicyRuleEventContent, {}>;
+
+    // MSC3401
+    [EventType.GroupCallPrefix]: IGroupCallRoomState;
+    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>;
+
+    // MSC3089
+    [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
+
+    // MSC3672
+    [M_BEACON_INFO.name]: MBeaconInfoEventContent;
 }

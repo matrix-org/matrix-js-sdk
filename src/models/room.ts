@@ -1350,7 +1350,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (hasUnthreadedReceipt) {
-            // If we have an untheaded receipt, we need to update any threads that have a notification
+            // If we have an unthreaded receipt, we need to update any threads that have a notification
             // in them (because we know the receipt can't go backwards so we don't need to check any with
             // no notifications: the number can only decrease from a receipt).
             threadIds = this.getThreads()
