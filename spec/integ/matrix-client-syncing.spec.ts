@@ -1926,6 +1926,7 @@ describe("MatrixClient syncing", () => {
                         type: EventType.RoomMessage,
                         user: otherUserId,
                         room: roomId,
+                        ts: 500,
                         content: {
                             "body": "first thread response",
                             "m.relates_to": {
@@ -1944,6 +1945,7 @@ describe("MatrixClient syncing", () => {
                         type: EventType.RoomMessage,
                         user: otherUserId,
                         room: roomId,
+                        ts: 1500,
                         content: {
                             "body": "second thread response",
                             "m.relates_to": {
@@ -1971,10 +1973,23 @@ describe("MatrixClient syncing", () => {
                     };
                 });
 
-                // This doesn't work yet because the threads aren't in the event in time!
-                // Enable after https://github.com/matrix-org/matrix-js-sdk/pull/4104 is merged!
-                it.skip("checks threads with notifications on unthreaded receipts", async () => {
+                it("checks threads with notifications on unthreaded receipts", async () => {
                     const myUserId = client!.getUserId()!;
+
+                    // add a receipt for a random, ficticious thread, otherwise the client will
+                    // think that the thread is before any threaded receipts and ignore it.
+                    syncData.rooms.join[roomId].ephemeral.events = [
+                        {
+                            content: {
+                                [firstEventId]: {
+                                    "m.read": {
+                                        [myUserId]: { ts: 1, thread_id: "some_other_thread" },
+                                    },
+                                },
+                            },
+                            type: "m.receipt",
+                        },
+                    ];
 
                     httpBackend!.when("GET", "/sync").respond(200, syncData);
                     client!.startClient({ threadSupport: true });
@@ -1991,7 +2006,9 @@ describe("MatrixClient syncing", () => {
 
                     expect(room).toBeInstanceOf(Room);
                     // we should now have one highlight: the unread message that pings
-                    expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
+                    expect(
+                        room.getThreadUnreadNotificationCount(firstEventId, NotificationCountType.Highlight),
+                    ).toEqual(2);
 
                     const syncData2 = {
                         rooms: {
@@ -2023,9 +2040,7 @@ describe("MatrixClient syncing", () => {
                     expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
                 });
 
-                // Again, this doesn't work yet because the threads aren't in the event in time!
-                // Enable after https://github.com/matrix-org/matrix-js-sdk/pull/4104 is merged!
-                it.skip("should recalculate highlights on threaded receipt for encrypted rooms", async () => {
+                it("should recalculate highlights on threaded receipt for encrypted rooms", async () => {
                     const myUserId = client!.getUserId()!;
 
                     // add a receipt for the first message in the threadm leaving the second one unread
