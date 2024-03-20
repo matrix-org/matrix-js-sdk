@@ -46,7 +46,7 @@ import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
-import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { FeatureSupport, THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -1740,6 +1740,15 @@ describe("MatrixClient syncing", () => {
             let syncData: ISyncResponse;
 
             beforeEach(() => {
+                // This needs to be set for every test. The state of thread support is stored in a
+                // singleton and can never be reset once toggled to experimental, so if any client
+                // in any test sets it to experimental, other tests will start failing.
+                client!.doesServerSupportThread = jest.fn().mockReturnValue({
+                    threads: FeatureSupport.Stable,
+                    list: FeatureSupport.Stable,
+                    fwdPagination: FeatureSupport.Stable,
+                });
+
                 roomId = "!room123:server";
                 syncData = {
                     rooms: {
@@ -1903,22 +1912,12 @@ describe("MatrixClient syncing", () => {
                 expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
             });
 
-            describe("notification procerssing in threads", () => {
+            describe("notification processing in threads", () => {
                 let threadEvent1: IRoomEvent;
                 let threadEvent2: IRoomEvent;
                 let firstEventId: string;
 
                 beforeEach(() => {
-                    // Replace the http backend so we can change the /versions expectation
-                    // Once we no longer have to support old servers, just have the mock /versions
-                    // call return 1.4 for everything.
-                    const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
-                    httpBackend = testClient.httpBackend;
-                    client = testClient.client;
-                    httpBackend!.when("GET", "/versions").respond(200, { versions: ["v1.4"] });
-                    httpBackend!.when("GET", "/pushrules").respond(200, {});
-                    httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
-
                     firstEventId = syncData.rooms.join[roomId].timeline.events[1].event_id;
 
                     // Add a threaded event off of the first event
@@ -2005,6 +2004,7 @@ describe("MatrixClient syncing", () => {
                     client?.emit(MatrixEventEvent.Decrypted, room.findEventById(threadEvent2.event_id)!);
 
                     expect(room).toBeInstanceOf(Room);
+
                     // we should now have one highlight: the unread message that pings
                     expect(
                         room.getThreadUnreadNotificationCount(firstEventId, NotificationCountType.Highlight),
