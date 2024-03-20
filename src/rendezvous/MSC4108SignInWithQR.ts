@@ -139,8 +139,10 @@ export class MSC4108SignInWithQR {
             // Secure Channel step 6 completed, we trust the channel
 
             if (this.isNewDevice) {
+                // MSC4108-Flow: ExistingScanned
                 // take homeserver from QR code which should already be set
             } else {
+                // MSC4108-Flow: NewScanned
                 // send protocols message
                 // PROTOTYPE: we should be checking that the advertised protocol is available
                 const protocols: ProtocolsPayload = {
@@ -152,6 +154,7 @@ export class MSC4108SignInWithQR {
             }
         } else {
             if (this.isNewDevice) {
+                // MSC4108-Flow: ExistingScanned
                 // wait for protocols message
                 logger.info("Waiting for protocols message");
                 const message = await this.receive();
@@ -161,38 +164,31 @@ export class MSC4108SignInWithQR {
                 const protocolsMessage = message as ProtocolsPayload;
                 return { homeserverBaseUrl: protocolsMessage.homeserver };
             } else {
+                // MSC4108-Flow: NewScanned
                 // nothing to do
             }
         }
         return {};
     }
 
-    public async loginStep2(oidcClient: OidcClient): Promise<void> {
-        if (this.isExistingDevice) {
-            throw new Error("loginStep2OnNewDevice() is not valid for existing devices");
-        }
-        logger.info("loginStep2()");
-
-        this.oidcClient = oidcClient;
-        // do device grant
-        this.deviceAuthorizationResponse = await oidcClient.startDeviceAuthorization({});
-    }
-
-    public async loginStep3(): Promise<{
+    public async loginStep2And3(oidcClient?: OidcClient): Promise<{
         verificationUri?: string;
         userCode?: string;
     }> {
+        logger.info("loginStep2And3()");
         if (this.isNewDevice) {
-            if (!this.deviceAuthorizationResponse) {
-                throw new Error("No device authorization response");
+            if (!oidcClient) {
+                throw new Error("No oidc client");
             }
+            this.oidcClient = oidcClient;
+            // start device grant
+            this.deviceAuthorizationResponse = await oidcClient.startDeviceAuthorization({});
 
             const {
                 verification_uri: verificationUri,
                 verification_uri_complete: verificationUriComplete,
                 user_code: userCode,
             } = this.deviceAuthorizationResponse;
-            // send mock for now, should be using values from step 2:
             const protocol: DeviceAuthorizationGrantProtocolPayload = {
                 type: PayloadType.Protocol,
                 protocol: "device_authorization_grant",
@@ -202,9 +198,11 @@ export class MSC4108SignInWithQR {
                 },
             };
             if (this.didScanCode) {
+                // MSC4108-Flow: NewScanned
                 // send immediately
                 await this.send(protocol);
             } else {
+                // MSC4108-Flow: ExistingScanned
                 // we will send it later
             }
 
@@ -239,8 +237,10 @@ export class MSC4108SignInWithQR {
         logger.info("loginStep4()");
 
         if (this.didScanCode) {
+            // MSC4108-Flow: NewScanned
             // we already sent the protocol message
         } else {
+            // MSC4108-Flow: ExistingScanned
             // send it now
             if (!this.deviceAuthorizationResponse) {
                 throw new Error("No device authorization response");
