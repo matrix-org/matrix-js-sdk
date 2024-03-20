@@ -19,6 +19,7 @@ limitations under the License.
 import { TestClient } from "../TestClient";
 import * as testUtils from "../test-utils/test-utils";
 import { logger } from "../../src/logger";
+import { KnownMembership } from "../../src/@types/membership";
 
 const ROOM_ID = "!room:id";
 
@@ -43,7 +44,7 @@ function getSyncResponse(roomMembers: string[]) {
         stateEvents,
         roomMembers.map((m) =>
             testUtils.mkMembership({
-                mship: "join",
+                mship: KnownMembership.Join,
                 sender: m,
             }),
         ),
@@ -323,7 +324,7 @@ describe("DeviceList management:", function () {
                             timeline: {
                                 events: [
                                     testUtils.mkMembership({
-                                        mship: "leave",
+                                        mship: KnownMembership.Leave,
                                         sender: "@bob:xyz",
                                     }),
                                 ],
@@ -357,7 +358,7 @@ describe("DeviceList management:", function () {
                             timeline: {
                                 events: [
                                     testUtils.mkMembership({
-                                        mship: "leave",
+                                        mship: KnownMembership.Leave,
                                         sender: "@bob:xyz",
                                     }),
                                 ],

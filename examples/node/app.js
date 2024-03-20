@@ -115,7 +115,7 @@ rl.on("line", function (line) {
         if (line.indexOf("/join ") === 0) {
             var roomIndex = line.split(" ")[1];
             viewingRoom = roomList[roomIndex];
-            if (viewingRoom.getMember(myUserId).membership === "invite") {
+            if (viewingRoom.getMember(myUserId).membership === KnownMembership.Invite) {
                 // join the room first
                 matrixClient.joinRoom(viewingRoom.roomId).then(
                     function (room) {
