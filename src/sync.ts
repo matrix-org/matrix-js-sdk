@@ -32,7 +32,6 @@ import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsaf
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { logger } from "./logger";
-import { InvalidStoreError, InvalidStoreState } from "./errors";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
 import {
     IEphemeral,
@@ -593,25 +592,6 @@ export class SyncApi {
         await keepaliveProm;
     }
 
-    /**
-     * Is the lazy loading option different than in previous session?
-     * @param lazyLoadMembers - current options for lazy loading
-     * @returns whether or not the option has changed compared to the previous session */
-    private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
-        // assume it was turned off before
-        // if we don't know any better
-        let lazyLoadMembersBefore = false;
-        const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
-        if (!isStoreNewlyCreated) {
-            const prevClientOptions = await this.client.store.getClientOptions();
-            if (prevClientOptions) {
-                lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
-            }
-            return lazyLoadMembersBefore !== lazyLoadMembers;
-        }
-        return false;
-    }
-
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
@@ -649,9 +629,9 @@ export class SyncApi {
         return filter;
     };
 
-    private checkLazyLoadStatus = async (): Promise<void> => {
-        debuglog("Checking lazy load status...");
-        if (this.opts.lazyLoadMembers && this.client.isGuest()) {
+    private prepareLazyLoadingForSync = async (): Promise<void> => {
+        debuglog("Prepare lazy loading for sync...");
+        if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
@@ -661,23 +641,12 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        // need to vape the store when enabling LL and wasn't enabled before
-        debuglog("Checking whether lazy loading has changed in store...");
-        const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-        if (shouldClear) {
-            this.storeIsInvalid = true;
-            const error = new InvalidStoreError(InvalidStoreState.ToggledLazyLoading, !!this.opts.lazyLoadMembers);
-            this.updateSyncState(SyncState.Error, { error });
-            // bail out of the sync loop now: the app needs to respond to this error.
-            // we leave the state as 'ERROR' which isn't great since this normally means
-            // we're retrying. The client must be stopped before clearing the stores anyway
-            // so the app should stop the client, clear the store and start it again.
-            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
-            return;
-        }
         if (this.opts.lazyLoadMembers) {
             this.syncOpts.crypto?.enableLazyLoading();
         }
+    };
+
+    private storeClientOptions = async (): Promise<void> => {
         try {
             debuglog("Storing client options...");
             await this.client.storeClientOptions();
@@ -757,14 +726,16 @@ export class SyncApi {
         //   1) We need to get push rules so we can check if events should bing as we get
         //      them from /sync.
         //   2) We need to get/create a filter which we can use for /sync.
-        //   3) We need to check the lazy loading option matches what was used in the
-        //       stored sync. If it doesn't, we can't use the stored sync.
+        //   3) We need to prepare lazy loading for sync
+        //   4) We need to store the client options
 
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
         await this.getPushRules();
-        await this.checkLazyLoadStatus();
+        await this.prepareLazyLoadingForSync();
+        await this.storeClientOptions();
+        
         const { filterId, filter } = await this.getFilter();
         if (!filter) return; // bail, getFilter failed
 
