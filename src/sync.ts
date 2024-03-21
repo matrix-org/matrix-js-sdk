@@ -735,7 +735,7 @@ export class SyncApi {
         await this.getPushRules();
         await this.prepareLazyLoadingForSync();
         await this.storeClientOptions();
-        
+
         const { filterId, filter } = await this.getFilter();
         if (!filter) return; // bail, getFilter failed
 
