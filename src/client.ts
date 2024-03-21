@@ -35,14 +35,14 @@ import {
 import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
-import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
+import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
 import {
     GroupCallEventHandler,
     GroupCallEventHandlerEvent,
     GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler";
 import * as utils from "./utils";
-import { replaceParam, QueryDict, sleep, noUnsafeEventProps, safeSet } from "./utils";
+import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils";
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -64,12 +64,12 @@ import {
     IdentityPrefix,
     IHttpOpts,
     IRequestOpts,
-    TokenRefreshFunction,
     MatrixError,
     MatrixHttpApi,
     MediaPrefix,
     Method,
     retryNetworkOperation,
+    TokenRefreshFunction,
     Upload,
     UploadOpts,
     UploadResponse,
@@ -145,11 +145,20 @@ import {
     RelationType,
     RoomCreateTypeField,
     RoomType,
+    StateEvents,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IdServerUnbindResult, IImageInfo, JoinRule, Preset, Visibility } from "./@types/partials";
+import {
+    GuestAccess,
+    HistoryVisibility,
+    IdServerUnbindResult,
+    IImageInfo,
+    JoinRule,
+    Preset,
+    Visibility,
+} from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -1435,55 +1444,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // state, such as highlights when the user's name is mentioned.
         this.on(MatrixEventEvent.Decrypted, (event) => {
             fixNotificationCountOnDecryption(this, event);
-        });
-
-        // Like above, we have to listen for read receipts from ourselves in order to
-        // correctly handle notification counts on encrypted rooms.
-        // This fixes https://github.com/vector-im/element-web/issues/9421
-        this.on(RoomEvent.Receipt, (event, room) => {
-            if (room?.hasEncryptionStateEvent()) {
-                // Figure out if we've read something or if it's just informational
-                const content = event.getContent();
-                const isSelf =
-                    Object.keys(content).filter((eid) => {
-                        for (const [key, value] of Object.entries(content[eid])) {
-                            if (!utils.isSupportedReceiptType(key)) continue;
-                            if (!value) continue;
-
-                            if (Object.keys(value).includes(this.getUserId()!)) return true;
-                        }
-
-                        return false;
-                    }).length > 0;
-
-                if (!isSelf) return;
-
-                // Work backwards to determine how many events are unread. We also set
-                // a limit for how back we'll look to avoid spinning CPU for too long.
-                // If we hit the limit, we assume the count is unchanged.
-                const maxHistory = 20;
-                const events = room.getLiveTimeline().getEvents();
-
-                let highlightCount = 0;
-
-                for (let i = events.length - 1; i >= 0; i--) {
-                    if (i === events.length - maxHistory) return; // limit reached
-
-                    const event = events[i];
-
-                    if (room.hasUserReadEvent(this.getUserId()!, event.getId()!)) {
-                        // If the user has read the event, then the counting is done.
-                        break;
-                    }
-
-                    const pushActions = this.getPushActionsForEvent(event);
-                    highlightCount += pushActions?.tweaks?.highlight ? 1 : 0;
-                }
-
-                // Note: we don't need to handle 'total' notifications because the counts
-                // will come from the server.
-                room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
-            }
         });
 
         this.ignoredInvites = new IgnoredInvites(this);
@@ -6704,7 +6664,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             EventType.RoomGuestAccess,
             {
-                guest_access: opts.allowJoin ? "can_join" : "forbidden",
+                guest_access: opts.allowJoin ? GuestAccess.CanJoin : GuestAccess.Forbidden,
             },
             "",
         );
@@ -6715,7 +6675,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 roomId,
                 EventType.RoomHistoryVisibility,
                 {
-                    history_visibility: "world_readable",
+                    history_visibility: HistoryVisibility.WorldReadable,
                 },
                 "",
             );
@@ -8386,14 +8346,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Send a state event into a room
+     * @param roomId - ID of the room to send the event into
+     * @param eventType - type of the state event to send
+     * @param content - content of the event to send
+     * @param stateKey - the stateKey to send into the room
      * @param opts - Options for the request function.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public sendStateEvent(
+    public sendStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        eventType: string,
-        content: IContent,
+        eventType: K,
+        content: StateEvents[K],
         stateKey = "",
         opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
@@ -8406,7 +8371,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, undefined, content, opts);
+        return this.http.authedRequest(Method.Put, path, undefined, content as Body, opts);
     }
 
     /**
@@ -8492,11 +8457,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         since,
         ...options
     }: IRoomDirectoryOptions = {}): Promise<IPublicRoomsResponse> {
-        const queryParams: QueryDict = { server, limit, since };
         if (Object.keys(options).length === 0) {
+            const queryParams: QueryDict = { server, limit, since };
             return this.http.authedRequest(Method.Get, "/publicRooms", queryParams);
         } else {
-            return this.http.authedRequest(Method.Post, "/publicRooms", queryParams, options);
+            const queryParams: QueryDict = { server };
+            const body = {
+                limit,
+                since,
+                ...options,
+            };
+            return this.http.authedRequest(Method.Post, "/publicRooms", queryParams, body);
         }
     }
 
