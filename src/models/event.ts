@@ -1634,6 +1634,36 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return JSON.stringify(myProps) === JSON.stringify(theirProps);
     }
 
+    /**
+     * Summarise the event as JSON.
+     *
+     * If encrypted, include both the decrypted and encrypted view of the event.
+     *
+     * This is named `toJSON` for use with `JSON.stringify` which checks objects
+     * for functions named `toJSON` and will call them to customise the output
+     * if they are defined.
+     *
+     * **WARNING** Do not log the result of this method; otherwise, it will end up
+     * in rageshakes, leading to a privacy violation.
+     *
+     * @deprecated Prefer to use {@link MatrixEvent#getEffectiveEvent} or similar.
+     * This method will be removed soon; it is too easy to use it accidentally
+     * and cause a privacy violation (cf https://github.com/vector-im/element-web/issues/26380).
+     * In any case, the value it returns is not a faithful serialization of the object.
+     */
+    public toJSON(): object {
+        const event = this.getEffectiveEvent();
+
+        if (!this.isEncrypted()) {
+            return event;
+        }
+
+        return {
+            decrypted: event,
+            encrypted: this.event,
+        };
+    }
+
     public setVerificationRequest(request: VerificationRequest): void {
         this.verificationRequest = request;
     }
