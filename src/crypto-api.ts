@@ -498,6 +498,57 @@ export interface CryptoApi {
     deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
+/** A reason code for a failure to decrypt an event. */
+export enum DecryptionFailureCode {
+    /** Message was encrypted with a Megolm session whose keys have not been shared with us. */
+    MEGOLM_UNKNOWN_INBOUND_SESSION_ID = "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+
+    /** Message was encrypted with a Megolm session which has been shared with us, but in a later ratchet state. */
+    OLM_UNKNOWN_MESSAGE_INDEX = "OLM_UNKNOWN_MESSAGE_INDEX",
+
+    /** Unknown or unclassified error. */
+    UNKNOWN_ERROR = "UNKNOWN_ERROR",
+
+    /** @deprecated only used in legacy crypto */
+    MEGOLM_BAD_ROOM = "MEGOLM_BAD_ROOM",
+
+    /** @deprecated only used in legacy crypto */
+    MEGOLM_MISSING_FIELDS = "MEGOLM_MISSING_FIELDS",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_DECRYPT_GROUP_MESSAGE_ERROR = "OLM_DECRYPT_GROUP_MESSAGE_ERROR",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_ENCRYPTED_MESSAGE = "OLM_BAD_ENCRYPTED_MESSAGE",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_RECIPIENT = "OLM_BAD_RECIPIENT",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_RECIPIENT_KEY = "OLM_BAD_RECIPIENT_KEY",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_ROOM = "OLM_BAD_ROOM",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_SENDER_CHECK_FAILED = "OLM_BAD_SENDER_CHECK_FAILED",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_SENDER = "OLM_BAD_SENDER",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_FORWARDED_MESSAGE = "OLM_FORWARDED_MESSAGE",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_MISSING_CIPHERTEXT = "OLM_MISSING_CIPHERTEXT",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_NOT_INCLUDED_IN_RECIPIENTS = "OLM_NOT_INCLUDED_IN_RECIPIENTS",
+
+    /** @deprecated only used in legacy crypto */
+    UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
+}
+
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
  */

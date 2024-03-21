@@ -27,6 +27,7 @@ import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyReque
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
 import { DeviceInfoMap } from "../DeviceList";
+import { DecryptionFailureCode } from "../../crypto-api";
 
 /**
  * Map of registered encryption algorithm classes. A map from string to {@link EncryptionAlgorithm} class
@@ -202,6 +203,8 @@ export abstract class DecryptionAlgorithm {
 /**
  * Exception thrown when decryption fails
  *
+ * @param code - Reason code for the failure.
+ *
  * @param msg - user-visible message describing the problem
  *
  * @param details - key/value pairs reported in the logs but not shown
@@ -211,12 +214,11 @@ export class DecryptionError extends Error {
     public readonly detailedString: string;
 
     public constructor(
-        public readonly code: string,
+        public readonly code: DecryptionFailureCode,
         msg: string,
         details?: Record<string, string | Error>,
     ) {
         super(msg);
-        this.code = code;
         this.name = "DecryptionError";
         this.detailedString = detailedStringForDecryptionError(this, details);
     }

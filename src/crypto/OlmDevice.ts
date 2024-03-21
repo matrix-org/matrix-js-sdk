@@ -23,6 +23,7 @@ import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
 import { IMessage } from "./algorithms/olm";
+import { DecryptionFailureCode } from "../crypto-api";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -1221,7 +1222,7 @@ export class OlmDevice {
                     if (session === null || sessionData === null) {
                         if (withheld) {
                             error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,
@@ -1237,7 +1238,7 @@ export class OlmDevice {
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
                             error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,

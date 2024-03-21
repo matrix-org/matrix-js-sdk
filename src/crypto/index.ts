@@ -90,6 +90,7 @@ import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -4210,7 +4211,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
             throw new algorithms.DecryptionError(
-                "UNKNOWN_ENCRYPTION_ALGORITHM",
+                DecryptionFailureCode.UNKNOWN_ENCRYPTION_ALGORITHM,
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }

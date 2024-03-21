@@ -80,12 +80,12 @@ import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
+    DecryptionFailureCode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
@@ -472,7 +472,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const awaitUISI = new Promise<void>((resolve) => {
                 aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
                     const error = err as DecryptionError;
-                    if (error.code == "MEGOLM_UNKNOWN_INBOUND_SESSION_ID") {
+                    if (error.code == DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID) {
                         resolve();
                     }
                 });
@@ -501,7 +501,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const awaitUnknownIndex = new Promise<void>((resolve) => {
                 aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
                     const error = err as DecryptionError;
-                    if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
+                    if (error.code === DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX) {
                         resolve();
                     }
                 });
@@ -537,8 +537,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     // rust and libolm can't have an exact 1:1 mapping for all errors,
                     // but some errors are part of API and should match
                     if (
-                        error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" &&
-                        error.code != "OLM_UNKNOWN_MESSAGE_INDEX"
+                        error.code != DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID &&
+                        error.code != DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX
                     ) {
                         resolve();
                     }
