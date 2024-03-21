@@ -887,13 +887,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             let res: IEventDecryptionResult;
             let err: Error | undefined = undefined;
             try {
-                if (!crypto) {
-                    res = this.badEncryptedMessage("Encryption not enabled");
-                } else {
-                    res = await crypto.decryptEvent(this);
-                    if (options.isRetry === true) {
-                        logger.info(`Decrypted event on retry (${this.getDetails()})`);
-                    }
+                res = await crypto.decryptEvent(this);
+                if (options.isRetry === true) {
+                    logger.info(`Decrypted event on retry (${this.getDetails()})`);
                 }
             } catch (e) {
                 const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
