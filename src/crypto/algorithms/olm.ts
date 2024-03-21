@@ -22,12 +22,13 @@ import type { IEventDecryptionResult } from "../../@types/crypto";
 import { logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import { DeviceInfo } from "../deviceinfo";
-import { DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm } from "./base";
+import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base";
 import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
 import { IEncryptedContent, IOlmEncryptedContent } from "../index";
 import { IInboundSession } from "../OlmDevice";
 import { DecryptionFailureCode } from "../../crypto-api";
+import { DecryptionError } from "../../common-crypto/CryptoBackend";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

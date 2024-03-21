@@ -23,7 +23,7 @@ import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger, Logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
@@ -71,7 +71,6 @@ import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
-import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
 

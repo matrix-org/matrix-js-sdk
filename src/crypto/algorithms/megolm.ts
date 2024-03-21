@@ -26,7 +26,6 @@ import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
     DecryptionClassParams,
-    DecryptionError,
     EncryptionAlgorithm,
     IParams,
     registerAlgorithm,
@@ -46,6 +45,7 @@ import { MatrixError } from "../../http-api";
 import { immediate, MapWithDefault } from "../../utils";
 import { KnownMembership } from "../../@types/membership";
 import { DecryptionFailureCode } from "../../crypto-api";
+import { DecryptionError } from "../../common-crypto/CryptoBackend";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
