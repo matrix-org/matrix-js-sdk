@@ -3065,7 +3065,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 [[], [], []],
             );
         } else {
-            // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
+            // When `threadSupport` is disabled treat all events as timelineEvents
             return [events as MatrixEvent[], [] as MatrixEvent[], [] as MatrixEvent[]];
         }
     }

@@ -1528,8 +1528,6 @@ describe("MatrixClient", function () {
             { startOpts: {}, hasThreadSupport: false },
             { startOpts: { threadSupport: true }, hasThreadSupport: true },
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
-            { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
-            { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
         ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);

@@ -509,11 +509,6 @@ export interface IStartClientOpts {
     clientWellKnownPollPeriod?: number;
 
     /**
-     * @deprecated use `threadSupport` instead
-     */
-    experimentalThreadSupport?: boolean;
-
-    /**
      * Will organises events in threaded conversations when
      * a thread relation is encountered
      */
@@ -1533,19 +1528,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         } else {
             this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        }
-
-        if (this.clientOpts.hasOwnProperty("experimentalThreadSupport")) {
-            this.logger.warn("`experimentalThreadSupport` has been deprecated, use `threadSupport` instead");
-        }
-
-        // If `threadSupport` is omitted and the deprecated `experimentalThreadSupport` has been passed
-        // We should fallback to that value for backwards compatibility purposes
-        if (
-            !this.clientOpts.hasOwnProperty("threadSupport") &&
-            this.clientOpts.hasOwnProperty("experimentalThreadSupport")
-        ) {
-            this.clientOpts.threadSupport = this.clientOpts.experimentalThreadSupport;
         }
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
@@ -9798,14 +9780,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             localTimeoutMs: clientTimeout,
             abortSignal,
         });
-    }
-
-    /**
-     * @deprecated use supportsThreads() instead
-     */
-    public supportsExperimentalThreads(): boolean {
-        this.logger.warn(`supportsExperimentalThreads() is deprecated, use supportThreads() instead`);
-        return this.clientOpts?.experimentalThreadSupport || false;
     }
 
     /**
