@@ -775,7 +775,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *     couldn't decrypt.
      */
     public isDecryptionFailure(): boolean {
-        return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
+        return this._decryptionFailureReason !== null;
     }
 
     /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
