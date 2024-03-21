@@ -1648,6 +1648,99 @@ describe("MatrixClient syncing", () => {
             });
         });
 
+        it("should zero total notifications for threads when absent from the notifications object", async () => {
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    highlight_count: 2,
+                    notification_count: 5,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            client!.startClient();
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
+
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {};
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+        });
+
+        it("should zero highlight notifications for threads in encrypted rooms", async () => {
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    highlight_count: 2,
+                    notification_count: 5,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            client!.startClient();
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
+
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    highlight_count: 0,
+                    notification_count: 0,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
+        });
+
+        it("should not zero highlight notifications for threads in encrypted rooms", async () => {
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    highlight_count: 2,
+                    notification_count: 5,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            client!.startClient();
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne);
+            room!.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
+
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    highlight_count: 0,
+                    notification_count: 0,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+            expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(2);
+        });
+
         it("caches unknown threads receipts and replay them when the thread is created", async () => {
             const THREAD_ID = "$unknownthread:localhost";
 
