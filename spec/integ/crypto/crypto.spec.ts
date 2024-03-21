@@ -99,6 +99,7 @@ import {
 } from "./olm-utils";
 import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
+import { KnownMembership } from "../../../src/@types/membership";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -1242,7 +1243,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     content: { algorithm: "m.megolm.v1.aes-sha2" },
                                 }),
                                 testUtils.mkMembership({
-                                    mship: "join",
+                                    mship: KnownMembership.Join,
                                     sender: aliceClient.getUserId()!,
                                 }),
                             ],
@@ -1661,7 +1662,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     type: "m.room.member",
                                     state_key: "@alice:localhost",
                                     content: {
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                 },
                             ],
@@ -1810,7 +1811,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     type: "m.room.member",
                                     state_key: "@alice:localhost",
                                     content: {
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                 },
                             ],
@@ -1886,7 +1887,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 {
                                     type: "m.room.member",
                                     state_key: aliceClient.getUserId(),
-                                    content: { membership: "join" },
+                                    content: { membership: KnownMembership.Join },
                                     event_id: "$alijoin",
                                 },
                             ],
@@ -1913,7 +1914,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 {
                                     type: "m.room.member",
                                     state_key: "@other:user",
-                                    content: { membership: "invite" },
+                                    content: { membership: KnownMembership.Invite },
                                     event_id: "$otherinvite",
                                 },
                             ],
@@ -2061,7 +2062,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             fetchMock.getOnce(new RegExp(membersPath), {
                 chunk: [
                     testUtils.mkMembershipCustom({
-                        membership: "join",
+                        membership: KnownMembership.Join,
                         sender: "@bob:xyz",
                     }),
                 ],
@@ -3090,7 +3091,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const roomResponse = {
                 state: {
                     events: [
-                        mkMembershipCustom({ membership: "join", sender: persistentStoreClient.getSafeUserId() }),
+                        mkMembershipCustom({
+                            membership: KnownMembership.Join,
+                            sender: persistentStoreClient.getSafeUserId(),
+                        }),
                         ...stateEvents,
                     ],
                 },

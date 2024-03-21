@@ -30,6 +30,7 @@ import {
     Room,
 } from "../../src";
 import { TestClient } from "../TestClient";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient room timelines", function () {
     const userId = "@alice:localhost";
@@ -42,7 +43,7 @@ describe("MatrixClient room timelines", function () {
 
     const USER_MEMBERSHIP_EVENT = utils.mkMembership({
         room: roomId,
-        mship: "join",
+        mship: KnownMembership.Join,
         user: userId,
         name: userName,
     });
@@ -76,7 +77,7 @@ describe("MatrixClient room timelines", function () {
                             ROOM_NAME_EVENT,
                             utils.mkMembership({
                                 room: roomId,
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: otherUserId,
                                 name: "Bob",
                             }),
@@ -316,7 +317,7 @@ describe("MatrixClient room timelines", function () {
 
             // make an m.room.member event for alice's join
             const joinMshipEvent = utils.mkMembership({
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userId,
                 room: roomId,
                 name: "Old Alice",
@@ -326,7 +327,7 @@ describe("MatrixClient room timelines", function () {
             // make an m.room.member event with prev_content for alice's nick
             // change
             const oldMshipEvent = utils.mkMembership({
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userId,
                 room: roomId,
                 name: userName,
@@ -335,7 +336,7 @@ describe("MatrixClient room timelines", function () {
             oldMshipEvent.prev_content = {
                 displayname: "Old Alice",
                 avatar_url: undefined,
-                membership: "join",
+                membership: KnownMembership.Join,
             };
 
             // set the list of events to return on scrollback (/messages)
@@ -487,7 +488,7 @@ describe("MatrixClient room timelines", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     name: "New Name",
                 }),
                 utils.mkMessage({ user: userId, room: roomId }),
@@ -554,13 +555,13 @@ describe("MatrixClient room timelines", function () {
                 utils.mkMembership({
                     user: userC,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     name: "C",
                 }),
                 utils.mkMembership({
                     user: userC,
                     room: roomId,
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     skey: userD,
                 }),
             ];
@@ -571,9 +572,9 @@ describe("MatrixClient room timelines", function () {
                 return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     expect(room.currentState.getMembers().length).toEqual(4);
                     expect(room.currentState.getMember(userC)!.name).toEqual("C");
-                    expect(room.currentState.getMember(userC)!.membership).toEqual("join");
+                    expect(room.currentState.getMember(userC)!.membership).toEqual(KnownMembership.Join);
                     expect(room.currentState.getMember(userD)!.name).toEqual(userD);
-                    expect(room.currentState.getMember(userD)!.membership).toEqual("invite");
+                    expect(room.currentState.getMember(userD)!.membership).toEqual(KnownMembership.Invite);
                 });
             });
         });
@@ -598,9 +599,9 @@ describe("MatrixClient room timelines", function () {
                     expect(room.timeline[0].event).toEqual(eventData[0]);
                     expect(room.currentState.getMembers().length).toEqual(2);
                     expect(room.currentState.getMember(userId)!.name).toEqual(userName);
-                    expect(room.currentState.getMember(userId)!.membership).toEqual("join");
+                    expect(room.currentState.getMember(userId)!.membership).toEqual(KnownMembership.Join);
                     expect(room.currentState.getMember(otherUserId)!.name).toEqual("Bob");
-                    expect(room.currentState.getMember(otherUserId)!.membership).toEqual("join");
+                    expect(room.currentState.getMember(otherUserId)!.membership).toEqual(KnownMembership.Join);
                 });
             });
         });

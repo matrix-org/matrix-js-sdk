@@ -75,6 +75,14 @@ class MockWidgetApi extends EventEmitter {
     public transport = { reply: jest.fn() };
 }
 
+declare module "../../src/types" {
+    interface StateEvents {
+        "org.example.foo": {
+            hello: string;
+        };
+    }
+}
+
 describe("RoomWidgetClient", () => {
     let widgetApi: MockedObject<WidgetApi>;
     let client: MatrixClient;
