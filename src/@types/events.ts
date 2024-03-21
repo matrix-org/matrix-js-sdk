@@ -39,6 +39,11 @@ interface NoRelationEvent {
     "m.relates_to"?: never;
 }
 
+/**
+ * Partial content format of timeline events with rel_type `m.replace`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#event-replacements
+ */
 export interface ReplacementEvent<T> {
     "m.new_content": T;
     "m.relates_to": {
@@ -47,6 +52,11 @@ export interface ReplacementEvent<T> {
     };
 }
 
+/**
+ * Partial content format of timeline events with rel_type other than `m.replace`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#forming-relationships-between-events
+ */
 export interface RelationEvent {
     "m.new_content"?: never;
     "m.relates_to": {
@@ -55,12 +65,22 @@ export interface RelationEvent {
     };
 }
 
+/**
+ * Content format of timeline events with type `m.room.message` and `msgtype` `m.text`, `m.emote`, or `m.notice`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#mroommessage
+ */
 export interface RoomMessageTextEventContent extends BaseTimelineEvent {
     msgtype: MsgType.Text | MsgType.Emote | MsgType.Notice;
     format?: "org.matrix.custom.html";
     formatted_body?: string;
 }
 
+/**
+ * Content format of timeline events with type `m.room.message` and `msgtype` `m.location`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#mlocation
+ */
 export interface RoomMessageLocationEventContent extends BaseTimelineEvent {
     body: string;
     geo_uri: string;
@@ -74,12 +94,22 @@ export type RoomMessageEventContent = BaseTimelineEvent &
     XOR<XOR<ReplacementEvent<MessageEventContent>, RelationEvent>, XOR<ReplyEvent, NoRelationEvent>> &
     MessageEventContent;
 
+/**
+ * Content format of timeline events with type `m.sticker`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#msticker
+ */
 export interface StickerEventContent extends BaseTimelineEvent {
     body: string;
     info: ImageInfo;
     url: string;
 }
 
+/**
+ * Content format of timeline events with type `m.reaction`
+ *
+ * @see https://spec.matrix.org/v1.9/client-server-api/#mreaction
+ */
 export interface ReactionEventContent {
     "m.relates_to": {
         event_id: string;
