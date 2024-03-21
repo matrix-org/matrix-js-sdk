@@ -43,7 +43,10 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */
-    public constructor(private readonly workerFactory: () => Worker, private readonly dbName?: string) {}
+    public constructor(
+        private readonly workerFactory: () => Worker,
+        private readonly dbName?: string,
+    ) {}
 
     /**
      * Attempt to connect to the database. This can fail if the user does not

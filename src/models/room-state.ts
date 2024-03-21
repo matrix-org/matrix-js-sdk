@@ -25,6 +25,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+import { KnownMembership } from "../@types/membership";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -187,7 +188,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
      */
-    public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
+    public constructor(
+        public readonly roomId: string,
+        private oobMemberFlags = { status: OobStatus.NotStarted },
+    ) {
         super();
         this.updateModifiedTime();
     }
@@ -203,7 +207,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "join" ? count + 1 : count;
+                return m.membership === KnownMembership.Join ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -227,7 +231,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "invite" ? count + 1 : count;
+                return m.membership === KnownMembership.Invite ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -294,13 +298,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get state events from the state of the room.
      * @param eventType - The event type of the state event.
-     * @param stateKey - Optional. The state_key of the state event. If
-     * this is `undefined` then all matching state events will be
-     * returned.
-     * @returns A list of events if state_key was
-     * `undefined`, else a single event (or null if no match found).
+     * @returns A list of events
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
+    /**
+     * Get state events from the state of the room.
+     * @param eventType - The event type of the state event.
+     * @param stateKey - The state_key of the state event.
+     * @returns A single event (or null if no match found).
+     */
     public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
     public getStateEvents(eventType: EventType | string, stateKey?: string): MatrixEvent[] | MatrixEvent | null {
         if (!this.events.has(eventType)) {
@@ -429,7 +435,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
                 // into the timeline
-                if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                if (
+                    event.getContent().membership === KnownMembership.Leave ||
+                    event.getContent().membership === KnownMembership.Ban
+                ) {
                     event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
                     event.getContent().displayname =
                         event.getContent().displayname || event.getPrevContent().displayname;
@@ -771,14 +780,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === "leave") return false;
+        if (!member || member.membership === KnownMembership.Leave) return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
         // The user may have been the sender, but they can't redact their own message
         // if redactions are blocked.
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
-        if (mxEvent.getSender() === userId) return canRedact;
+
+        if (!canRedact) return false;
+        if (mxEvent.getSender() === userId) return true;
 
         return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }

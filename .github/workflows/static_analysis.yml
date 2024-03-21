@@ -15,7 +15,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v3
+            - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
 
@@ -41,7 +41,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v3
+            - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
 
@@ -51,13 +51,29 @@ jobs:
             - name: Run Linter
               run: "yarn run lint:js"
 
+    workflow_lint:
+        name: "Workflow Lint"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - name: Run Linter
+              run: "yarn lint:workflows"
+
     docs:
         name: "JSDoc Checker"
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v3
+            - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
 
@@ -67,15 +83,8 @@ jobs:
             - name: Generate Docs
               run: "yarn run gendoc --treatWarningsAsErrors"
 
-            # Upload artifact duplicates symlink contents so we do this to save 75% space
-            - name: Flatten symlink and write _redirects
-              run: |
-                  find _docs -mindepth 1 -maxdepth 1 ! -type f ! -name stable -printf '/%f/* /stable/:splat\n' > _docs/_redirects
-                  find _docs -mindepth 1 -maxdepth 1 -type l -delete
-                  find _docs -mindepth 1 -maxdepth 1 -type d -execdir mv {} stable \; -quit
-
             - name: Upload Artifact
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: docs
                   path: _docs

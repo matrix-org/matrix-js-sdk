@@ -224,13 +224,25 @@ export enum VerificationPhase {
     /** An `m.key.verification.ready` event has been sent or received, indicating the verification request is accepted. */
     Ready,
 
-    /** An `m.key.verification.start` event has been sent or received, choosing a verification method */
+    /**
+     * The verification is in flight.
+     *
+     * This means that an `m.key.verification.start` event has been sent or received, choosing a verification method;
+     * however the verification has not yet completed or been cancelled.
+     */
     Started,
 
-    /** An `m.key.verification.cancel` event has been sent or received at any time before the `done` event, cancelling the verification request */
+    /**
+     * An `m.key.verification.cancel` event has been sent or received at any time before the `done` event, cancelling
+     * the verification request
+     */
     Cancelled,
 
-    /** An `m.key.verification.done` event has been **sent**, completing the verification request. */
+    /**
+     * The verification request is complete.
+     *
+     * Normally this means that `m.key.verification.done` events have been sent and received.
+     */
     Done,
 }
 

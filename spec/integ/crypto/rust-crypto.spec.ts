@@ -16,8 +16,15 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import fetchMock from "fetch-mock-jest";
 
-import { createClient } from "../../../src";
+import { createClient, CryptoEvent, IndexedDBCryptoStore } from "../../../src";
+import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
+import { MSK_NOT_CACHED_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump";
+import { IDENTITY_NOT_TRUSTED_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/unverified";
+import { FULL_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/full_account";
+
+jest.setTimeout(15000);
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -87,6 +94,198 @@ describe("MatrixClient.initRustCrypto", () => {
 
         await matrixClient.initRustCrypto();
         await matrixClient.initRustCrypto();
+    });
+
+    describe("Libolm Migration", () => {
+        beforeEach(() => {
+            fetchMock.reset();
+        });
+
+        it("should migrate from libolm", async () => {
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
+
+            fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.keyQueryResponse);
+
+            const testStoreName = "test-store";
+            await populateStore(testStoreName, FULL_ACCOUNT_DATASET.dumpPath);
+            const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+
+            const matrixClient = createClient({
+                baseUrl: "http://test.server",
+                userId: FULL_ACCOUNT_DATASET.userId,
+                deviceId: FULL_ACCOUNT_DATASET.deviceId,
+                cryptoStore,
+                pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
+            });
+
+            const progressListener = jest.fn();
+            matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
+
+            await matrixClient.initRustCrypto();
+
+            const verificationStatus = await matrixClient
+                .getCrypto()!
+                .getDeviceVerificationStatus(FULL_ACCOUNT_DATASET.userId, FULL_ACCOUNT_DATASET.deviceId);
+
+            // Check that the current device and identity trust is migrated correctly just after migration
+            expect(verificationStatus).toBeDefined();
+            expect(verificationStatus!.crossSigningVerified).toEqual(true);
+            expect(verificationStatus!.signedByOwner).toEqual(true);
+
+            // Do some basic checks on the imported data
+            const deviceKeys = await matrixClient.getCrypto()!.getOwnDeviceKeys();
+            expect(deviceKeys.curve25519).toEqual("LKv0bKbc0EC4h0jknbemv3QalEkeYvuNeUXVRgVVTTU");
+            expect(deviceKeys.ed25519).toEqual("qK70DEqIXq7T+UU3v/al47Ab4JkMEBLpNrTBMbS5rrw");
+
+            expect(await matrixClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual("7");
+
+            expect(await matrixClient.getCrypto()!.isEncryptionEnabledInRoom("!CWLUCoEWXSFyTCOtfL:matrix.org")).toBe(
+                true,
+            );
+
+            // check the progress callback
+            expect(progressListener.mock.calls.length).toBeGreaterThan(50);
+
+            // The first call should have progress == 0
+            const [firstProgress, totalSteps] = progressListener.mock.calls[0];
+            expect(totalSteps).toBeGreaterThan(3000);
+            expect(firstProgress).toEqual(0);
+
+            for (let i = 1; i < progressListener.mock.calls.length - 1; i++) {
+                const [progress, total] = progressListener.mock.calls[i];
+                expect(total).toEqual(totalSteps);
+                expect(progress).toBeGreaterThan(progressListener.mock.calls[i - 1][0]);
+                expect(progress).toBeLessThanOrEqual(totalSteps);
+            }
+
+            // The final call should have progress == total == -1
+            expect(progressListener).toHaveBeenLastCalledWith(-1, -1);
+        }, 60000);
+
+        describe("Legacy trust migration", () => {
+            async function populateAndStartLegacyCryptoStore(dumpPath: string): Promise<IndexedDBCryptoStore> {
+                const testStoreName = "test-store";
+                await populateStore(testStoreName, dumpPath);
+                const cryptoStore = new IndexedDBCryptoStore(indexedDB, testStoreName);
+                await cryptoStore.startup();
+                return cryptoStore;
+            }
+
+            it("should not revert to untrusted if legacy was trusted but msk not in cache, big account", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                });
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", FULL_ACCOUNT_DATASET.keyQueryResponse);
+
+                const cryptoStore = await populateAndStartLegacyCryptoStore(FULL_ACCOUNT_DATASET.dumpPath);
+
+                // Remove the master key from the cache
+                await cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                    const objectStore = txn.objectStore("account");
+                    objectStore.delete(`ssss_cache:master`);
+                });
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: FULL_ACCOUNT_DATASET.userId,
+                    deviceId: FULL_ACCOUNT_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const verificationStatus = await matrixClient
+                    .getCrypto()!
+                    .getUserVerificationStatus(FULL_ACCOUNT_DATASET.userId);
+
+                expect(verificationStatus.isCrossSigningVerified()).toBe(true);
+            }, 60000);
+
+            it("should not revert to untrusted if legacy was trusted but msk not in cache", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.backupResponse);
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
+
+                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.dumpPath);
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const verificationStatus = await matrixClient
+                    .getCrypto()!
+                    .getUserVerificationStatus("@migration:localhost");
+
+                expect(verificationStatus.isCrossSigningVerified()).toBe(true);
+            });
+
+            it("should not migrate local trust if key has changed", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.backupResponse);
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.rotatedKeyQueryResponse);
+
+                const cryptoStore = await populateAndStartLegacyCryptoStore(MSK_NOT_CACHED_DATASET.dumpPath);
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const verificationStatus = await matrixClient
+                    .getCrypto()!
+                    .getUserVerificationStatus("@migration:localhost");
+
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            });
+
+            it("should not migrate local trust if was not trusted in legacy", async () => {
+                // Just 404 here for the test
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                });
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", IDENTITY_NOT_TRUSTED_DATASET.keyQueryResponse);
+
+                const cryptoStore = await populateAndStartLegacyCryptoStore(IDENTITY_NOT_TRUSTED_DATASET.dumpPath);
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: IDENTITY_NOT_TRUSTED_DATASET.userId,
+                    deviceId: IDENTITY_NOT_TRUSTED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: IDENTITY_NOT_TRUSTED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const verificationStatus = await matrixClient
+                    .getCrypto()!
+                    .getUserVerificationStatus("@untrusted:localhost");
+
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            });
+        });
     });
 });
 

@@ -75,6 +75,14 @@ class MockWidgetApi extends EventEmitter {
     public transport = { reply: jest.fn() };
 }
 
+declare module "../../src/types" {
+    interface StateEvents {
+        "org.example.foo": {
+            hello: string;
+        };
+    }
+}
+
 describe("RoomWidgetClient", () => {
     let widgetApi: MockedObject<WidgetApi>;
     let client: MatrixClient;
@@ -87,9 +95,12 @@ describe("RoomWidgetClient", () => {
         client.stopClient();
     });
 
-    const makeClient = async (capabilities: ICapabilities): Promise<void> => {
+    const makeClient = async (
+        capabilities: ICapabilities,
+        sendContentLoaded: boolean | undefined = undefined,
+    ): Promise<void> => {
         const baseUrl = "https://example.org";
-        client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl });
+        client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl }, sendContentLoaded);
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
         await client.startClient();
@@ -143,7 +154,7 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("messages", () => {
+    describe("initialization", () => {
         it("requests permissions for specific message types", async () => {
             await makeClient({ sendMessage: [MsgType.Text], receiveMessage: [MsgType.Text] });
             expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
@@ -158,6 +169,15 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToReceiveMessage).toHaveBeenCalledWith();
         });
 
+        it("sends content loaded when configured", async () => {
+            await makeClient({});
+            expect(widgetApi.sendContentLoaded).toHaveBeenCalled();
+        });
+
+        it("does not sent content loaded when configured", async () => {
+            await makeClient({}, false);
+            expect(widgetApi.sendContentLoaded).not.toHaveBeenCalled();
+        });
         // No point in testing sending and receiving since it's done exactly the
         // same way as non-message events
     });
@@ -305,12 +325,14 @@ describe("RoomWidgetClient", () => {
             expect(await emittedSync).toEqual(SyncState.Syncing);
         });
     });
+
     describe("oidc token", () => {
         it("requests an oidc token", async () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
     });
+
     it("gets TURN servers", async () => {
         const server1: ITurnServer = {
             uris: [

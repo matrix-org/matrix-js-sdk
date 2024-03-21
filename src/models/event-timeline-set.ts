@@ -159,7 +159,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param client - the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param thread - the thread to which this timeline set relates.
-     * @param isThreadTimeline - Whether this timeline set relates to a thread list timeline
+     * @param threadListType - the type of thread list represented, if any
      * (e.g., All threads or My threads)
      */
     public constructor(
@@ -674,6 +674,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
+     * @param event - the event to add
+     * @param timeline - the timeline onto which to add it
      * @param options - addEventToTimeline options
      *
      * @remarks
@@ -771,8 +773,6 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @internal
      *
-     * @param options - addEventToTimeline options
-     *
      * @remarks
      * Fires {@link RoomEvent.Timeline}
      */
@@ -839,7 +839,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         const data: IRoomTimelineData = {
             timeline: timeline,
-            liveEvent: timeline == this.liveTimeline,
+            // The purpose of this method is inserting events in the middle of the
+            // timeline, so the events are, by definition, not live (whether or not
+            // we're adding them to the live timeline).
+            liveEvent: false,
         };
         this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }
@@ -899,11 +902,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param eventId1 -   The id of the first event
      * @param eventId2 -   The id of the second event
 
-     * @returns a number less than zero if eventId1 precedes eventId2, and
-     *    greater than zero if eventId1 succeeds eventId2. zero if they are the
-     *    same event; null if we can't tell (either because we don't know about one
-     *    of the events, or because they are in separate timelines which don't join
-     *    up).
+     * @returns -1 if eventId1 precedes eventId2, and +1 eventId1 succeeds
+     * eventId2. 0 if they are the same event; null if we can't tell (either
+     * because we don't know about one of the events, or because they are in
+     * separate timelines which don't join up).
      */
     public compareEventOrdering(eventId1: string, eventId2: string): number | null {
         if (eventId1 == eventId2) {
@@ -935,7 +937,16 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     idx2 = idx;
                 }
             }
-            return idx1! - idx2!;
+            const difference = idx1! - idx2!;
+
+            // Return the sign of difference.
+            if (difference < 0) {
+                return -1;
+            } else if (difference > 0) {
+                return 1;
+            } else {
+                return 0;
+            }
         }
 
         // the events are in different timelines. Iterate through the

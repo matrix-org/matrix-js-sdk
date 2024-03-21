@@ -22,6 +22,7 @@ import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
+import { KnownMembership, Membership } from "../@types/membership";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -119,7 +120,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * The membership state for this room member e.g. 'join'.
      */
-    public membership?: string;
+    public membership?: Membership;
     /**
      * True if the member's name is disambiguated.
      */
@@ -140,7 +141,10 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @param roomId - The room ID of the member.
      * @param userId - The user ID of the member.
      */
-    public constructor(public readonly roomId: string, public readonly userId: string) {
+    public constructor(
+        public readonly roomId: string,
+        public readonly userId: string,
+    ) {
         super();
 
         this.name = userId;
@@ -311,7 +315,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     public isKicked(): boolean {
         return (
-            this.membership === "leave" &&
+            this.membership === KnownMembership.Leave &&
             this.events.member !== undefined &&
             this.events.member.getSender() !== this.events.member.getStateKey()
         );
@@ -337,12 +341,12 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             let memberContent = memberEvent.getContent();
             let inviteSender: string | undefined = memberEvent.getSender();
 
-            if (memberContent.membership === "join") {
+            if (memberContent.membership === KnownMembership.Join) {
                 memberContent = memberEvent.getPrevContent();
                 inviteSender = memberEvent.getUnsigned().prev_sender;
             }
 
-            if (memberContent.membership === "invite" && memberContent.is_direct) {
+            if (memberContent.membership === KnownMembership.Invite && memberContent.is_direct) {
                 return inviteSender;
             }
         }

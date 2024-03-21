@@ -1,0 +1,4 @@
+{
+    "*.(ts|tsx)": ["eslint --fix", "prettier --write"],
+    "*.(py|md|yaml)": ["prettier --write"]
+}

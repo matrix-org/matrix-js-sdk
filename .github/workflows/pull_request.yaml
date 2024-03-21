@@ -14,11 +14,18 @@ jobs:
         name: Preview Changelog
         runs-on: ubuntu-latest
         steps:
-            - uses: matrix-org/allchange@main
+            - uses: mheap/github-action-required-labels@80a96a4863886addcbc9f681b5b295ba7f5424e1 # v5
               if: github.event_name != 'merge_group'
               with:
-                  ghToken: ${{ secrets.GITHUB_TOKEN }}
-                  requireLabel: true
+                  labels: |
+                      X-Breaking-Change
+                      T-Deprecation
+                      T-Enhancement
+                      T-Defect
+                      T-Task
+                      Dependencies
+                  mode: minimum
+                  count: 1
 
     prevent-blocked:
         name: Prevent Blocked
@@ -27,7 +34,7 @@ jobs:
             pull-requests: read
         steps:
             - name: Add notice
-              uses: actions/github-script@v6
+              uses: actions/github-script@v7
               if: contains(github.event.pull_request.labels.*.name, 'X-Blocked')
               with:
                   script: |
@@ -39,7 +46,8 @@ jobs:
         if: github.event.action == 'opened'
         steps:
             - name: Check membership
-              uses: tspascoal/get-user-teams-membership@37c08f7b52a72ca95d12af2e7ab2553ca9adf13b # v2
+              if: github.event.pull_request.user.login != 'renovate[bot]'
+              uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3
               id: teams
               with:
                   username: ${{ github.event.pull_request.user.login }}
@@ -48,8 +56,8 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
             - name: Add label
-              if: ${{ steps.teams.outputs.isTeamMember == 'false' }}
-              uses: actions/github-script@v6
+              if: steps.teams.outputs.isTeamMember == 'false'
+              uses: actions/github-script@v7
               with:
                   script: |
                       github.rest.issues.addLabels({
@@ -68,7 +76,7 @@ jobs:
             github.event.pull_request.head.repo.full_name != github.repository
         steps:
             - name: Close pull request
-              uses: actions/github-script@v6
+              uses: actions/github-script@v7
               with:
                   script: |
                       github.rest.issues.createComment({

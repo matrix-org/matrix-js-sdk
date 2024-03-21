@@ -495,8 +495,9 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
 
     /**
      * Cancels the request, sending a cancellation to the other party
-     * @param reason - the error reason to send the cancellation with
-     * @param code - the error code to send the cancellation with
+     * @param params
+     * @param params.reason - the error reason to send the cancellation with
+     * @param params.code - the error code to send the cancellation with
      * @returns resolves when the event has been sent.
      */
     public async cancel({ reason = "User declined", code = "m.user" } = {}): Promise<void> {

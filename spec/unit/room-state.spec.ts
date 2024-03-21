@@ -27,6 +27,8 @@ import { M_BEACON } from "../../src/@types/beacon";
 import { MatrixClient } from "../../src/client";
 import { DecryptionError } from "../../src/crypto/algorithms";
 import { defer } from "../../src/utils";
+import { Room } from "../../src/models/room";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("RoomState", function () {
     const roomId = "!foo:bar";
@@ -43,14 +45,14 @@ describe("RoomState", function () {
             utils.mkMembership({
                 // userA joined
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userA,
                 room: roomId,
             }),
             utils.mkMembership({
                 // userB joined
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userB,
                 room: roomId,
             }),
@@ -101,20 +103,20 @@ describe("RoomState", function () {
 
         it("should return a member which changes as state changes", function () {
             const member = state.getMember(userB);
-            expect(member?.membership).toEqual("join");
+            expect(member?.membership).toEqual(KnownMembership.Join);
             expect(member?.name).toEqual(userB);
 
             state.setStateEvents([
                 utils.mkMembership({
                     room: roomId,
                     user: userB,
-                    mship: "leave",
+                    mship: KnownMembership.Leave,
                     event: true,
                     name: "BobGone",
                 }),
             ]);
 
-            expect(member?.membership).toEqual("leave");
+            expect(member?.membership).toEqual(KnownMembership.Leave);
             expect(member?.name).toEqual("BobGone");
         });
     });
@@ -130,17 +132,17 @@ describe("RoomState", function () {
                 utils.mkMembership({
                     room: roomId,
                     user: userA,
-                    mship: "leave",
+                    mship: KnownMembership.Leave,
                     event: true,
                     name: "AliceIsGone",
                 }),
             ]);
             const postLeaveUser = state.getSentinelMember(userA);
 
-            expect(preLeaveUser?.membership).toEqual("join");
+            expect(preLeaveUser?.membership).toEqual(KnownMembership.Join);
             expect(preLeaveUser?.name).toEqual(userA);
 
-            expect(postLeaveUser?.membership).toEqual("leave");
+            expect(postLeaveUser?.membership).toEqual(KnownMembership.Leave);
             expect(postLeaveUser?.name).toEqual("AliceIsGone");
         });
     });
@@ -165,7 +167,7 @@ describe("RoomState", function () {
         it("should return a single MatrixEvent if a state_key was specified", function () {
             const event = state.getStateEvents("m.room.member", userA);
             expect(event?.getContent()).toMatchObject({
-                membership: "join",
+                membership: KnownMembership.Join,
             });
         });
     });
@@ -175,13 +177,13 @@ describe("RoomState", function () {
             const memberEvents = [
                 utils.mkMembership({
                     user: "@cleo:bar",
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     room: roomId,
                     event: true,
                 }),
                 utils.mkMembership({
                     user: "@daisy:bar",
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -201,13 +203,13 @@ describe("RoomState", function () {
             const memberEvents = [
                 utils.mkMembership({
                     user: "@cleo:bar",
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     room: roomId,
                     event: true,
                 }),
                 utils.mkMembership({
                     user: "@daisy:bar",
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -227,7 +229,7 @@ describe("RoomState", function () {
             const events = [
                 utils.mkMembership({
                     user: "@cleo:bar",
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     room: roomId,
                     event: true,
                 }),
@@ -281,7 +283,7 @@ describe("RoomState", function () {
 
         it("should call setPowerLevelEvent on a new RoomMember if power levels exist", function () {
             const memberEvent = utils.mkMembership({
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userC,
                 room: roomId,
                 event: true,
@@ -311,7 +313,7 @@ describe("RoomState", function () {
         it("should call setMembershipEvent on the right RoomMember", function () {
             const memberEvent = utils.mkMembership({
                 user: userB,
-                mship: "leave",
+                mship: KnownMembership.Leave,
                 room: roomId,
                 event: true,
             });
@@ -362,9 +364,11 @@ describe("RoomState", function () {
         });
 
         it("does not add redacted beacon info events to state", () => {
+            const mockClient = {} as unknown as MockedObject<MatrixClient>;
             const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId);
             const redactionEvent = new MatrixEvent({ type: "m.room.redaction" });
-            redactedBeaconEvent.makeRedacted(redactionEvent);
+            const room = new Room(roomId, mockClient, userA);
+            redactedBeaconEvent.makeRedacted(redactionEvent, room);
             const emitSpy = jest.spyOn(state, "emit");
 
             state.setStateEvents([redactedBeaconEvent]);
@@ -394,11 +398,13 @@ describe("RoomState", function () {
         });
 
         it("destroys and removes redacted beacon events", () => {
+            const mockClient = {} as unknown as MockedObject<MatrixClient>;
             const beaconId = "$beacon1";
             const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
             const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
             const redactionEvent = new MatrixEvent({ type: "m.room.redaction", redacts: beaconEvent.getId() });
-            redactedBeaconEvent.makeRedacted(redactionEvent);
+            const room = new Room(roomId, mockClient, userA);
+            redactedBeaconEvent.makeRedacted(redactionEvent, room);
 
             state.setStateEvents([beaconEvent]);
             const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
@@ -442,7 +448,7 @@ describe("RoomState", function () {
         it("should add a new member", function () {
             const oobMemberEvent = utils.mkMembership({
                 user: userLazy,
-                mship: "join",
+                mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
             });
@@ -457,7 +463,7 @@ describe("RoomState", function () {
             state.setOutOfBandMembers([
                 utils.mkMembership({
                     user: userLazy,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -469,7 +475,7 @@ describe("RoomState", function () {
             const userLazy = "@oob:hs";
             const oobMemberEvent = utils.mkMembership({
                 user: userLazy,
-                mship: "join",
+                mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
             });
@@ -486,7 +492,7 @@ describe("RoomState", function () {
         it("should never overwrite existing members", function () {
             const oobMemberEvent = utils.mkMembership({
                 user: userA,
-                mship: "join",
+                mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
             });
@@ -501,7 +507,7 @@ describe("RoomState", function () {
             const doesntExistYetUserId = "@doesntexistyet:hs";
             const oobMemberEvent = utils.mkMembership({
                 user: doesntExistYetUserId,
-                mship: "join",
+                mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
             });
@@ -524,7 +530,7 @@ describe("RoomState", function () {
             state.setOutOfBandMembers([
                 utils.mkMembership({
                     user: userLazy,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -549,7 +555,7 @@ describe("RoomState", function () {
             copy.setOutOfBandMembers([
                 utils.mkMembership({
                     user: userA,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -558,7 +564,7 @@ describe("RoomState", function () {
             state.setOutOfBandMembers([
                 utils.mkMembership({
                     user: userLazy,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -571,7 +577,7 @@ describe("RoomState", function () {
             copy.setStateEvents([
                 utils.mkMembership({
                     user: userLazy,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     room: roomId,
                     event: true,
                 }),
@@ -692,9 +698,13 @@ describe("RoomState", function () {
         });
 
         it("should update after adding joined member", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userA, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userA, room: roomId }),
+            ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userC, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userC, room: roomId }),
+            ]);
             expect(state.getJoinedMemberCount()).toEqual(2);
         });
     });
@@ -705,9 +715,13 @@ describe("RoomState", function () {
         });
 
         it("should update after adding invited member", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userA, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userA, room: roomId }),
+            ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userC, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userC, room: roomId }),
+            ]);
             expect(state.getInvitedMemberCount()).toEqual(2);
         });
     });
@@ -718,19 +732,27 @@ describe("RoomState", function () {
         });
 
         it("should, once used, override counting members from state", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userA, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userA, room: roomId }),
+            ]);
             expect(state.getJoinedMemberCount()).toEqual(1);
             state.setJoinedMemberCount(100);
             expect(state.getJoinedMemberCount()).toEqual(100);
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userC, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userC, room: roomId }),
+            ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
 
         it("should, once used, override counting members from state, " + "also after clone", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userA, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userA, room: roomId }),
+            ]);
             state.setJoinedMemberCount(100);
             const copy = state.clone();
-            copy.setStateEvents([utils.mkMembership({ event: true, mship: "join", user: userC, room: roomId })]);
+            copy.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userC, room: roomId }),
+            ]);
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
     });
@@ -741,19 +763,27 @@ describe("RoomState", function () {
         });
 
         it("should, once used, override counting members from state", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userB, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userB, room: roomId }),
+            ]);
             expect(state.getInvitedMemberCount()).toEqual(1);
             state.setInvitedMemberCount(100);
             expect(state.getInvitedMemberCount()).toEqual(100);
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userC, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userC, room: roomId }),
+            ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
 
         it("should, once used, override counting members from state, " + "also after clone", function () {
-            state.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userB, room: roomId })]);
+            state.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userB, room: roomId }),
+            ]);
             state.setInvitedMemberCount(100);
             const copy = state.clone();
-            copy.setStateEvents([utils.mkMembership({ event: true, mship: "invite", user: userC, room: roomId })]);
+            copy.setStateEvents([
+                utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userC, room: roomId }),
+            ]);
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
     });

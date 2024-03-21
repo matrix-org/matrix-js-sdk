@@ -24,7 +24,7 @@ import type { PkSigning } from "@matrix-org/olm";
 import type { IOneTimeKey } from "../@types/crypto";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
-import { logger } from "../logger";
+import { Logger, logger } from "../logger";
 import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
 import { MatrixEvent } from "../models/event";
@@ -215,7 +215,7 @@ export async function ensureOlmSessionsForDevices(
     force = false,
     otkTimeout?: number,
     failedServers?: string[],
-    log = logger,
+    log: Logger = logger,
 ): Promise<Map<string, Map<string, IOlmSessionResult>>> {
     const devicesWithoutSession: [string, string][] = [
         // [userId, deviceId], ...
@@ -319,7 +319,7 @@ export async function ensureOlmSessionsForDevices(
         for (const resolver of resolveSession.values()) {
             resolver();
         }
-        log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
+        log.debug(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
     }
 
@@ -536,31 +536,4 @@ export function isOlmEncrypted(event: MatrixEvent): boolean {
         return false;
     }
     return true;
-}
-
-/**
- * Encode a typed array of uint8 as base64.
- * @param uint8Array - The data to encode.
- * @returns The base64.
- */
-export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return Buffer.from(uint8Array).toString("base64");
-}
-
-/**
- * Encode a typed array of uint8 as unpadded base64.
- * @param uint8Array - The data to encode.
- * @returns The unpadded base64.
- */
-export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeBase64(uint8Array).replace(/=+$/g, "");
-}
-
-/**
- * Decode a base64 string to a typed array of uint8.
- * @param base64 - The base64 to decode.
- * @returns The decoded data.
- */
-export function decodeBase64(base64: string): Uint8Array {
-    return Buffer.from(base64, "base64");
 }

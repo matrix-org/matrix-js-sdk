@@ -29,16 +29,17 @@ const membershipTemplate: CallMembershipData = {
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
-        sender: {
-            userId: "@alice:example.org",
-        },
+        getSender: jest.fn().mockReturnValue("@alice:example.org"),
     } as unknown as MatrixEvent;
 }
 
 describe("CallMembership", () => {
-    it("rejects membership with no expiry", () => {
+    it("rejects membership with no expiry and no expires_ts", () => {
         expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: undefined }));
+            new CallMembership(
+                makeMockEvent(),
+                Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: undefined }),
+            );
         }).toThrow();
     });
 
@@ -59,6 +60,16 @@ describe("CallMembership", () => {
             new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
         }).toThrow();
     });
+    it("rejects with malformatted expires_ts", () => {
+        expect(() => {
+            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires_ts: "string" }));
+        }).toThrow();
+    });
+    it("rejects with malformatted expires", () => {
+        expect(() => {
+            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: "string" }));
+        }).toThrow();
+    });
 
     it("uses event timestamp if no created_ts", () => {
         const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
@@ -73,8 +84,16 @@ describe("CallMembership", () => {
         expect(membership.createdTs()).toEqual(67890);
     });
 
-    it("computes absolute expiry time", () => {
+    it("computes absolute expiry time based on expires", () => {
         const membership = new CallMembership(makeMockEvent(1000), membershipTemplate);
+        expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
+    });
+
+    it("computes absolute expiry time based on expires_ts", () => {
+        const membership = new CallMembership(
+            makeMockEvent(1000),
+            Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: 6000 }),
+        );
         expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
     });
 
@@ -87,7 +106,7 @@ describe("CallMembership", () => {
 
     it("considers memberships expired when local age large", () => {
         const fakeEvent = makeMockEvent(1000);
-        fakeEvent.getLocalAge = jest.fn().mockReturnValue(6000);
+        fakeEvent.localTimestamp = Date.now() - 6000;
         const membership = new CallMembership(fakeEvent, membershipTemplate);
         expect(membership.isExpired()).toEqual(true);
     });

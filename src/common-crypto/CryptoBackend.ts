@@ -17,7 +17,7 @@ limitations under the License.
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { IClearEvent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
-import { CryptoApi } from "../crypto-api";
+import { CryptoApi, ImportRoomKeysOpts } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
@@ -35,8 +35,8 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
      *
-     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
-     * going to support it in the rust crypto implementation.
+     * @remarks This has no effect in Rust Crypto; it exists only for the sake of
+     * the accessors in MatrixClient.
      */
     globalErrorOnUnknownDevices: boolean;
 
@@ -108,6 +108,15 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param privKey - The private decryption key.
      */
     getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
+
+    /**
+     * Import a list of room keys restored from backup
+     *
+     * @param keys - a list of session export objects
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api

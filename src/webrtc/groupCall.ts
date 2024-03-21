@@ -34,6 +34,8 @@ import {
 } from "./stats/statsReport";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
+import { KnownMembership } from "../@types/membership";
+import { CallMembershipData } from "../matrixrtc/CallMembership";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -166,6 +168,7 @@ export interface IGroupCallDataChannelOptions {
 export interface IGroupCallRoomState {
     "m.intent": GroupCallIntent;
     "m.type": GroupCallType;
+    "m.terminated"?: GroupCallTerminationReason;
     "io.element.ptt"?: boolean;
     // TODO: Specify data-channels
     "dataChannelsEnabled"?: boolean;
@@ -193,6 +196,11 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
+}
+
+// XXX: this hasn't made it into the MSC yet
+export interface ExperimentalGroupCallRoomMemberState {
+    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
@@ -1485,7 +1493,7 @@ export class GroupCall extends TypedEventEmitter<
             }
 
             // Must have a connected device and be joined to the room
-            if (validDevices.length > 0 && member?.membership === "join") {
+            if (validDevices.length > 0 && member?.membership === KnownMembership.Join) {
                 const deviceMap = new Map<string, ParticipantState>();
                 participants.set(member, deviceMap);
 
@@ -1605,17 +1613,20 @@ export class GroupCall extends TypedEventEmitter<
             await this.addDeviceToMemberState();
 
             // Resend the state event every so often so it doesn't become stale
-            this.resendMemberStateTimer = setInterval(async () => {
-                logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
-                try {
-                    await this.addDeviceToMemberState();
-                } catch (e) {
-                    logger.error(
-                        `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
-                        e,
-                    );
-                }
-            }, (DEVICE_TIMEOUT * 3) / 4);
+            this.resendMemberStateTimer = setInterval(
+                async () => {
+                    logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
+                    try {
+                        await this.addDeviceToMemberState();
+                    } catch (e) {
+                        logger.error(
+                            `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
+                            e,
+                        );
+                    }
+                },
+                (DEVICE_TIMEOUT * 3) / 4,
+            );
         } else {
             // Remove the local device
             await this.updateDevices(

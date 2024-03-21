@@ -40,7 +40,7 @@ export enum MediaPrefix {
     /**
      * A constant representing the URI path for Client-Server API Media endpoints versioned at v1.
      */
-    V1 = "/_matrix/media/v3",
+    V1 = "/_matrix/media/v1",
     /**
      * A constant representing the URI path for Client-Server API Media endpoints versioned at v3.
      */

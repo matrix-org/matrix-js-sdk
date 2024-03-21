@@ -26,7 +26,7 @@ limitations under the License.
 import { Optional } from "matrix-events-sdk";
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
-import { User, UserEvent } from "./models/user";
+import { User } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils";
 import { Filter } from "./filter";
@@ -61,6 +61,7 @@ import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
 import { Crypto } from "./crypto";
+import { KnownMembership } from "./@types/membership";
 
 const DEBUG = true;
 
@@ -234,7 +235,11 @@ export class SyncApi {
      * @param syncOpts - sync-specific options passed by the client
      * @internal
      */
-    public constructor(private readonly client: MatrixClient, opts?: IStoredClientOpts, syncOpts?: SyncApiOptions) {
+    public constructor(
+        private readonly client: MatrixClient,
+        opts?: IStoredClientOpts,
+        syncOpts?: SyncApiOptions,
+    ) {
         this.opts = defaultClientOpts(opts);
         this.syncOpts = defaultSyncApiOpts(syncOpts);
 
@@ -431,7 +436,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getContent().user_id);
+                        user = User.createUser(presenceEvent.getContent().user_id, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -530,7 +535,7 @@ export class SyncApi {
                             if (user) {
                                 user.setPresenceEvent(presenceEvent);
                             } else {
-                                user = createNewUser(this.client, presenceEvent.getContent().user_id);
+                                user = User.createUser(presenceEvent.getContent().user_id, this.client);
                                 user.setPresenceEvent(presenceEvent);
                                 this.client.store.storeUser(user);
                             }
@@ -1150,7 +1155,7 @@ export class SyncApi {
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getSender()!);
+                        user = User.createUser(presenceEvent.getSender()!, client);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -1716,7 +1721,7 @@ export class SyncApi {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -1736,7 +1741,7 @@ export class SyncApi {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member;
-                    if (inviteEvent?.getContent().membership !== "invite") {
+                    if (inviteEvent?.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }
@@ -1756,11 +1761,11 @@ export class SyncApi {
         return events?.find((e) => e.getType() === EventType.RoomEncryption && e.getStateKey() === "");
     }
 
-    // When processing the sync response we cannot rely on MatrixClient::isRoomEncrypted before we actually
+    // When processing the sync response we cannot rely on Room.hasEncryptionStateEvent we actually
     // inject the events into the room object, so we have to inspect the events themselves.
     private isRoomEncrypted(room: Room, stateEventList: MatrixEvent[], timelineEventList?: MatrixEvent[]): boolean {
         return (
-            this.client.isRoomEncrypted(room.roomId) ||
+            room.hasEncryptionStateEvent() ||
             !!this.findEncryptionEvent(stateEventList) ||
             !!this.findEncryptionEvent(timelineEventList)
         );
@@ -1891,18 +1896,6 @@ export class SyncApi {
         debuglog("Browser thinks we are back online");
         this.startKeepAlives(0);
     };
-}
-
-function createNewUser(client: MatrixClient, userId: string): User {
-    const user = new User(userId);
-    client.reEmitter.reEmit(user, [
-        UserEvent.AvatarUrl,
-        UserEvent.DisplayName,
-        UserEvent.Presence,
-        UserEvent.CurrentlyActive,
-        UserEvent.LastPresenceTs,
-    ]);
-    return user;
 }
 
 // /!\ This function is not intended for public use! It's only exported from

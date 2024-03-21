@@ -33,12 +33,10 @@ export async function resetCrossSigningKeys(
 
 export async function createSecretStorageKey(): Promise<IRecoveryKey> {
     const decryption = new global.Olm.PkDecryption();
-    const storagePublicKey = decryption.generate_key();
+    decryption.generate_key();
     const storagePrivateKey = decryption.get_private_key();
     decryption.free();
     return {
-        // `pubkey` not used anymore with symmetric 4S
-        keyInfo: { pubkey: storagePublicKey, key: undefined! },
         privateKey: storagePrivateKey,
     };
 }

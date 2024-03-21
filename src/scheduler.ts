@@ -22,7 +22,7 @@ import { logger } from "./logger";
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { defer, IDeferred, removeElement } from "./utils";
-import { ConnectionError, MatrixError } from "./http-api";
+import { calculateRetryBackoff, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
 
 const DEBUG = false; // set true to enable console logging.
@@ -43,38 +43,13 @@ type ProcessFunction<T> = (event: MatrixEvent) => Promise<T>;
 // eslint-disable-next-line camelcase
 export class MatrixScheduler<T = ISendEventResponse> {
     /**
-     * Retries events up to 4 times using exponential backoff. This produces wait
-     * times of 2, 4, 8, and 16 seconds (30s total) after which we give up. If the
-     * failure was due to a rate limited request, the time specified in the error is
-     * waited before being retried.
+     * Default retry algorithm for the matrix scheduler. Retries events up to 4 times with exponential backoff.
      * @param attempts - Number of attempts that have been made, including the one that just failed (ie. starting at 1)
      * @see retryAlgorithm
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static RETRY_BACKOFF_RATELIMIT(event: MatrixEvent | null, attempts: number, err: MatrixError): number {
-        if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
-            // client error; no amount of retrying with save you now.
-            return -1;
-        }
-        if (err instanceof ConnectionError) {
-            return -1;
-        }
-
-        // if event that we are trying to send is too large in any way then retrying won't help
-        if (err.name === "M_TOO_LARGE") {
-            return -1;
-        }
-
-        if (err.name === "M_LIMIT_EXCEEDED") {
-            const waitTime = err.data.retry_after_ms;
-            if (waitTime > 0) {
-                return waitTime;
-            }
-        }
-        if (attempts > 4) {
-            return -1; // give up
-        }
-        return 1000 * Math.pow(2, attempts);
+        return calculateRetryBackoff(err, attempts, false);
     }
 
     /**

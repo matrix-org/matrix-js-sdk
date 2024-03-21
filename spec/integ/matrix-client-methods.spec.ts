@@ -27,6 +27,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -162,7 +163,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     event: true,
                 }),
             ]);
@@ -182,7 +183,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     event: true,
                 }),
             ]);
@@ -269,7 +270,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "knock",
+                    mship: KnownMembership.Knock,
                     event: true,
                 }),
             ]);
@@ -1204,51 +1205,20 @@ describe("MatrixClient", function () {
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
-            httpBackend
-                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
-                .respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r1 endpoint when capability is disabled", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
-            const response = { login_token: "xyz", expires_in_ms: 5000 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r0 endpoint for fallback", async () => {
-            httpBackend.when("GET", "/capabilities").respond(200, {});
-            const response = { login_token: "xyz", expires_in: 5 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r1
-            expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
+            expect(await prom).toStrictEqual(response);
         });
     });
 
@@ -1943,7 +1913,7 @@ const buildEventJoinRules = () =>
     new MatrixEvent({
         age: 80123696,
         content: {
-            join_rule: "invite",
+            join_rule: KnownMembership.Invite,
         },
         event_id: "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
         origin_server_ts: 1643815441191,
@@ -1997,7 +1967,7 @@ const buildEventMember = () =>
         content: {
             avatar_url: "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
             displayname: "andybalaam-test1",
-            membership: "join",
+            membership: KnownMembership.Join,
         },
         event_id: "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
         origin_server_ts: 1643815439608,

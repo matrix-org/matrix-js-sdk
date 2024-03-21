@@ -25,6 +25,7 @@ import { UserTrustLevel } from "../../src/crypto/CrossSigning";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
 import * as testData from "../test-utils/test-data";
+import { KnownMembership } from "../../src/@types/membership";
 
 const Olm = global.Olm;
 
@@ -113,6 +114,16 @@ describe("Crypto", function () {
 
     it("Crypto exposes the correct olm library version", function () {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
+    });
+
+    it("getVersion() should return the current version of the olm library", async () => {
+        const client = new TestClient("@alice:example.com", "deviceid").client;
+        await client.initCrypto();
+
+        const olmVersionTuple = Crypto.getOlmVersion();
+        expect(client.getCrypto()?.getVersion()).toBe(
+            `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`,
+        );
     });
 
     describe("encrypted events", function () {
@@ -346,7 +357,6 @@ describe("Crypto", function () {
 
         let crypto: Crypto;
         let mockBaseApis: MatrixClient;
-        let mockRoomList: RoomList;
 
         let fakeEmitter: EventEmitter;
 
@@ -380,19 +390,10 @@ describe("Crypto", function () {
                 isGuest: jest.fn(),
                 emit: jest.fn(),
             } as unknown as MatrixClient;
-            mockRoomList = {} as unknown as RoomList;
 
             fakeEmitter = new EventEmitter();
 
-            crypto = new Crypto(
-                mockBaseApis,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockBaseApis, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
             crypto.registerEventHandlers(fakeEmitter as any);
             await crypto.init();
         });
@@ -463,7 +464,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@alice:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);
@@ -795,7 +796,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@clara:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);
@@ -1106,7 +1107,7 @@ describe("Crypto", function () {
 
     describe("Secret storage", function () {
         it("creates secret storage even if there is no keyInfo", async function () {
-            jest.spyOn(logger, "log").mockImplementation(() => {});
+            jest.spyOn(logger, "debug").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
@@ -1263,7 +1264,7 @@ describe("Crypto", function () {
                     ({
                         init_with_private_key: jest.fn(),
                         free,
-                    } as unknown as PkDecryption),
+                    }) as unknown as PkDecryption,
             );
             client.client.checkSecretStoragePrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();
@@ -1289,7 +1290,7 @@ describe("Crypto", function () {
                     ({
                         init_with_seed: jest.fn(),
                         free,
-                    } as unknown as PkSigning),
+                    }) as unknown as PkSigning,
             );
             client.client.checkCrossSigningPrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();
@@ -1331,15 +1332,9 @@ describe("Crypto", function () {
                 setRoomEncryption: jest.fn().mockResolvedValue(undefined),
             } as unknown as RoomList;
 
-            crypto = new Crypto(
-                mockClient,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockClient, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
+            // @ts-ignore we are injecting a mock into a private property
+            crypto.roomList = mockRoomList;
         });
 
         it("should set the algorithm if called for a known room", async () => {

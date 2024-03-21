@@ -23,19 +23,7 @@ endpoints from before Matrix 1.1, for example.
 
 ## In a browser
 
-### Note, the browserify build has been deprecated. Please use a bundler like webpack or vite instead.
-
-Download the browser version from
-https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
-`<script>` to your page. There will be a global variable `matrixcs`
-attached to `window` through which you can access the SDK. See below for how to
-include libolm to enable end-to-end-encryption.
-
-The browser bundle supports recent versions of browsers. Typically this is ES2015
-or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using
-[browserlists](https://github.com/browserslist/browserslist).
-
-Please check [the working browser example](examples/browser) for more information.
+### Note, the browserify build has been removed. Please use a bundler like webpack or vite instead.
 
 ## In Node.js
 
@@ -70,7 +58,7 @@ await client.startClient({ initialSyncLimit: 10 });
 You can perform a call to `/sync` to get the current state of the client:
 
 ```javascript
-client.once("sync", function (state, prevState, res) {
+client.once(ClientEvent.sync, function (state, prevState, res) {
     if (state === "PREPARED") {
         console.log("prepared");
     } else {
@@ -95,7 +83,7 @@ client.sendEvent("roomId", "m.room.message", content, "", (err, res) => {
 To listen for message events:
 
 ```javascript
-client.on("Room.timeline", function (event, room, toStartOfTimeline) {
+client.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (event.getType() !== "m.room.message") {
         return; // only use messages
     }
@@ -156,12 +144,12 @@ are updated.
 
 ```javascript
 // Listen for low-level MatrixEvents
-client.on("event", function (event) {
+client.on(ClientEvent.Event, function (event) {
     console.log(event.getType());
 });
 
 // Listen for typing changes
-client.on("RoomMember.typing", function (event, member) {
+client.on(RoomMemberEvent.Typing, function (event, member) {
     if (member.typing) {
         console.log(member.name + " is typing...");
     } else {
@@ -204,6 +192,10 @@ via an optional `callback` argument. The callback support is now deprecated:
 new methods do not include a `callback` argument, and in the future it may be
 removed from existing methods.
 
+## Low level types
+
+There are some low level TypeScript types exported via the `matrix-js-sdk/lib/types` entrypoint to not bloat the main entrypoint.
+
 ## Examples
 
 This section provides some useful code snippets which demonstrate the
@@ -223,8 +215,8 @@ const matrixClient = sdk.createClient({
 ### Automatically join rooms when invited
 
 ```javascript
-matrixClient.on("RoomMember.membership", function (event, member) {
-    if (member.membership === "invite" && member.userId === myUserId) {
+matrixClient.on(RoomMemberEvent.Membership, function (event, member) {
+    if (member.membership === KnownMembership.Invite && member.userId === myUserId) {
         matrixClient.joinRoom(member.roomId).then(function () {
             console.log("Auto-joined %s", member.roomId);
         });
@@ -237,7 +229,7 @@ matrixClient.startClient();
 ### Print out messages for all rooms
 
 ```javascript
-matrixClient.on("Room.timeline", function (event, room, toStartOfTimeline) {
+matrixClient.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
@@ -269,7 +261,7 @@ Output:
 ### Print out membership lists whenever they are changed
 
 ```javascript
-matrixClient.on("RoomState.members", function (event, state, member) {
+matrixClient.on(RoomStateEvent.Members, function (event, state, member) {
     const room = matrixClient.getRoom(state.roomId);
     if (!room) {
         return;
@@ -306,7 +298,7 @@ host the API reference from the source files like this:
 
 ```
   $ yarn gendoc
-  $ cd _docs
+  $ cd docs
   $ python -m http.server 8005
 ```
 
@@ -363,7 +355,7 @@ First, you need to pull in the right build tools:
 
 ## Building
 
-To build a browser version from scratch when developing::
+To build a browser version from scratch when developing:
 
 ```
  $ yarn build
@@ -374,9 +366,6 @@ To run tests (Jest):
 ```
  $ yarn test
 ```
-
-> **Note**
-> The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
 To run linting:
 

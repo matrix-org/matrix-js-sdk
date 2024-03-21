@@ -15,13 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
 import MockHttpBackend from "matrix-mock-request";
 
-import { AutoDiscoveryAction, M_AUTHENTICATION } from "../../src";
+import { AutoDiscoveryAction } from "../../src";
 import { AutoDiscovery } from "../../src/autodiscovery";
-import { OidcError } from "../../src/oidc/error";
-import { makeDelegatedAuthConfig } from "../test-utils/oidc";
 
 // keep to reset the fetch function after using MockHttpBackend
 // @ts-ignore private property
@@ -351,7 +348,7 @@ describe("AutoDiscovery", function () {
         function () {
             const httpBackend = getHttpBackend();
             httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                not_matrix_versions: ["v1.1"],
+                not_matrix_versions: ["v1.5"],
             });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -388,7 +385,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["v1.1"],
+                versions: ["v1.5"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -409,10 +406,6 @@ describe("AutoDiscovery", function () {
                         error: null,
                         base_url: null,
                     },
-                    "m.authentication": {
-                        state: "IGNORE",
-                        error: OidcError.NotSupported,
-                    },
                 };
 
                 expect(conf).toEqual(expected);
@@ -428,7 +421,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["v1.1"],
+                versions: ["v1.5"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -449,10 +442,6 @@ describe("AutoDiscovery", function () {
                         state: "PROMPT",
                         error: null,
                         base_url: null,
-                    },
-                    "m.authentication": {
-                        state: "IGNORE",
-                        error: OidcError.NotSupported,
                     },
                 };
 
@@ -469,15 +458,12 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["v1.1"],
+                versions: ["v1.5"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
-            },
-            "m.authentication": {
-                invalid: true,
             },
         });
         return Promise.all([
@@ -493,10 +479,6 @@ describe("AutoDiscovery", function () {
                         state: "PROMPT",
                         error: null,
                         base_url: null,
-                    },
-                    "m.authentication": {
-                        state: "FAIL_ERROR",
-                        error: OidcError.Misconfigured,
                     },
                 };
 
@@ -515,7 +497,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["v1.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -560,7 +542,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["v1.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -606,7 +588,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["v1.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(404, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -653,7 +635,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["v1.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(500, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -697,7 +679,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["v1.1"],
+                versions: ["v1.5"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -728,10 +710,6 @@ describe("AutoDiscovery", function () {
                         error: null,
                         base_url: "https://identity.example.org",
                     },
-                    "m.authentication": {
-                        state: "IGNORE",
-                        error: OidcError.NotSupported,
-                    },
                 };
 
                 expect(conf).toEqual(expected);
@@ -747,7 +725,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["v1.1"],
+                versions: ["v1.5"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -783,10 +761,6 @@ describe("AutoDiscovery", function () {
                     },
                     "org.example.custom.property": {
                         cupcakes: "yes",
-                    },
-                    "m.authentication": {
-                        state: "IGNORE",
-                        error: OidcError.NotSupported,
                     },
                 };
 
@@ -896,76 +870,5 @@ describe("AutoDiscovery", function () {
                 expect(conf).toEqual(expected);
             }),
         ]);
-    });
-
-    describe("m.authentication", () => {
-        const homeserverName = "example.org";
-        const homeserverUrl = "https://chat.example.org/";
-        const issuer = "https://auth.org/";
-
-        beforeAll(() => {
-            // make these tests independent from fetch mocking above
-            AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
-        });
-
-        beforeEach(() => {
-            fetchMock.resetBehavior();
-            fetchMock.get(`${homeserverUrl}_matrix/client/versions`, { versions: ["v1.1"] });
-
-            fetchMock.get("https://example.org/.well-known/matrix/client", {
-                "m.homeserver": {
-                    // Note: we also expect this test to trim the trailing slash
-                    base_url: "https://chat.example.org/",
-                },
-                "m.authentication": {
-                    issuer,
-                },
-            });
-        });
-
-        it("should return valid authentication configuration", async () => {
-            const config = makeDelegatedAuthConfig(issuer);
-
-            fetchMock.get(`${config.metadata.issuer}.well-known/openid-configuration`, config.metadata);
-            fetchMock.get(`${config.metadata.issuer}jwks`, {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
-
-            const result = await AutoDiscovery.findClientConfig(homeserverName);
-
-            expect(result[M_AUTHENTICATION.stable!]).toEqual({
-                state: AutoDiscovery.SUCCESS,
-                ...config,
-                signingKeys: [],
-                account: undefined,
-                error: null,
-            });
-        });
-
-        it("should set state to error for invalid authentication configuration", async () => {
-            const config = makeDelegatedAuthConfig(issuer);
-            // authorization_code is required
-            config.metadata.grant_types_supported = ["openid"];
-
-            fetchMock.get(`${config.metadata.issuer}.well-known/openid-configuration`, config.metadata);
-            fetchMock.get(`${config.metadata.issuer}jwks`, {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
-
-            const result = await AutoDiscovery.findClientConfig(homeserverName);
-
-            expect(result[M_AUTHENTICATION.stable!]).toEqual({
-                state: AutoDiscovery.FAIL_ERROR,
-                error: OidcError.OpSupport,
-            });
-        });
     });
 });
