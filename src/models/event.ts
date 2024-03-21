@@ -48,6 +48,7 @@ import { IAnnotatedPushRule } from "../@types/PushRules";
 import { Room } from "./room";
 import { EventTimeline } from "./event-timeline";
 import { Membership } from "../@types/membership";
+import { DecryptionFailureCode } from "../crypto-api";
 
 export { EventStatus } from "./event-status";
 
@@ -273,6 +274,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     // a public getter to decide if the cache is valid.
     private _hasCachedExtEv = false;
     private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
+
+    /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
+    private _decryptionFailureReason: DecryptionFailureCode | null = null;
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
@@ -774,6 +778,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
+    /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
+    public get decryptionFailureReason(): DecryptionFailureCode | null {
+        return this._decryptionFailureReason;
+    }
+
     /*
      * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
      * the sender has disabled encrypting to unverified devices.
@@ -891,6 +900,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     logger.info(`Decrypted event on retry (${this.getDetails()})`);
                 }
                 this.setClearData(res);
+                this._decryptionFailureReason = null;
             } catch (e) {
                 const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
@@ -924,6 +934,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
                 this.setClearDataForDecryptionFailure(String(e));
+                this._decryptionFailureReason =
+                    e instanceof DecryptionError ? (<DecryptionError>e).code : DecryptionFailureCode.UNKNOWN_ERROR;
             }
 
             // Make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
