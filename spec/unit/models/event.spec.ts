@@ -469,52 +469,6 @@ describe("MatrixEvent", () => {
             default: false,
             enabled: true,
         } as IAnnotatedPushRule;
-        describe("setPushActions()", () => {
-            it("sets actions on event", () => {
-                const actions = { notify: false, tweaks: {} };
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushActions(actions);
-
-                expect(event.getPushActions()).toBe(actions);
-            });
-
-            it("sets actions to undefined", () => {
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushActions(null);
-
-                // undefined is set on state
-                expect(event.getPushDetails().actions).toBe(undefined);
-                // but pushActions getter returns null when falsy
-                expect(event.getPushActions()).toBe(null);
-            });
-
-            it("clears existing push rule", () => {
-                const prevActions = { notify: true, tweaks: { highlight: true } };
-                const actions = { notify: false, tweaks: {} };
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushDetails(prevActions, pushRule);
-
-                event.setPushActions(actions);
-
-                // rule is not in event push cache
-                expect(event.getPushDetails()).toEqual({ actions });
-            });
-        });
 
         describe("setPushDetails()", () => {
             it("sets actions and rule on event", () => {
@@ -543,7 +497,7 @@ describe("MatrixEvent", () => {
                 });
                 event.setPushDetails(prevActions, pushRule);
 
-                event.setPushActions(actions);
+                event.setPushDetails(actions);
 
                 // rule is not in event push cache
                 expect(event.getPushDetails()).toEqual({ actions });
