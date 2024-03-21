@@ -226,10 +226,6 @@ export interface EventDecryptionResult {
      * restored from backup)
      */
     untrusted?: boolean;
-    /**
-     * The sender doesn't authorize the unverified devices to decrypt his messages
-     */
-    encryptedDisabledForUnverifiedDevices?: boolean;
 }
 
 /**

@@ -966,7 +966,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
-        this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
+        this.encryptedDisabledForUnverifiedDevices = false;
         this.invalidateExtensibleEvent();
     }
 
