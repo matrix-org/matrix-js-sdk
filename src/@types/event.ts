@@ -136,6 +136,10 @@ export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
     Reference = "m.reference",
+
+    // Don't use this yet: it's only the stable version. The code still assumes we support the unstable prefix and,
+    // moreover, our tests currently use the unstable prefix. Use THREAD_RELATION_TYPE.name.
+    // Once we support *only* the stable prefix, THREAD_RELATION_TYPE can die and we can switch to this.
     Thread = "m.thread",
 }
 
