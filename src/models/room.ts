@@ -1609,19 +1609,28 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Resets the total thread notifications for this room to zero, excluding any threads
-     * whose IDs are given in `exceptThreadIds`.
+     * Resets the total thread notifications for all threads in this room to zero,
+     * excluding any threads whose IDs are given in `exceptThreadIds`.
+     *
+     * If the room is not encrypted, also resets the highlight notification count to zero
+     * for the same set of threads.
      *
      * This is intended for use from the sync code since we calculate highlight notification
      * counts locally from decrypted messages. We want to partially trust the total from the
-     * server such that we clear notifications when read receipts arrive.
+     * server such that we clear notifications when read receipts arrive. The weird name is
+     * intended to reflect this. You probably do not want to use this.
      *
      * @param exceptThreadIds - The thread IDs to exclude from the reset.
      */
-    public resetThreadTotalUnreadNotificationCount(exceptThreadIds: string[] = []): void {
+    public resetThreadUnreadNotificationCountFromSync(exceptThreadIds: string[] = []): void {
+        const isEncrypted = this.hasEncryptionStateEvent();
+
         for (const [threadId, notifs] of this.threadNotifications) {
             if (!exceptThreadIds.includes(threadId)) {
                 notifs.total = 0;
+                if (!isEncrypted) {
+                    notifs.highlight = 0;
+                }
             }
         }
 

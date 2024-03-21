@@ -3548,12 +3548,12 @@ describe("Room", function () {
 
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadTotalUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
-            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+            expect(room.threadsAggregateNotificationType).toBe(null);
 
             expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(123);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
         });
 
         it("sets the room threads notification type", () => {
@@ -3565,28 +3565,6 @@ describe("Room", function () {
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
         });
 
-        it("partially resets room notifications", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
-            room.setThreadUnreadNotificationCount("321", NotificationCountType.Total, 555);
-            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
-
-            room.resetThreadTotalUnreadNotificationCount(["123"]);
-
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
-            expect(room.getThreadUnreadNotificationCount("321", NotificationCountType.Total)).toBe(0);
-            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(123);
-        });
-
-        it("resets total count to zero", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 555);
-
-            room.resetThreadTotalUnreadNotificationCount();
-
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(555);
-        });
-
         it("emits event on notifications reset", () => {
             const cb = jest.fn();
 
@@ -3595,7 +3573,7 @@ describe("Room", function () {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
             room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
 
-            room.resetThreadTotalUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(cb).toHaveBeenLastCalledWith();
         });
@@ -3620,7 +3598,7 @@ describe("Room", function () {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
             expect(room.hasThreadUnreadNotification()).toBe(true);
 
-            room.resetThreadTotalUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.hasThreadUnreadNotification()).toBe(false);
         });
@@ -3650,20 +3628,36 @@ describe("Room", function () {
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
 
-            room.resetThreadTotalUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.threadsAggregateNotificationType).toBeNull();
         });
 
-        it("retains highlight on reset", () => {
+        it("retains highlight for encrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadTotalUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+        });
+
+        it("resets highlight for unencrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(false);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCountFromSync();
+
+            expect(room.threadsAggregateNotificationType).toBe(null);
+            expect(room.getThreadUnreadNotificationCount("$123", NotificationCountType.Highlight)).toBe(0);
         });
     });
 

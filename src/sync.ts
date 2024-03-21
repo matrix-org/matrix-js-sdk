@@ -1359,7 +1359,7 @@ export class SyncApi {
                 // the server for unencrypted rooms or is it's zero. Any threads not present in this
                 // object implicitly have zero notifications, so start by clearing the total counts
                 // for all such threads.
-                room.resetThreadTotalUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                room.resetThreadUnreadNotificationCountFromSync(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
                         room.setThreadUnreadNotificationCount(
@@ -1380,7 +1380,7 @@ export class SyncApi {
                     }
                 }
             } else {
-                room.resetThreadTotalUnreadNotificationCount();
+                room.resetThreadUnreadNotificationCountFromSync();
             }
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
