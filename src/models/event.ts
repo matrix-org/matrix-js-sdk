@@ -884,13 +884,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         while (true) {
             this.retryDecryption = false;
 
-            let res: IEventDecryptionResult;
             let err: Error | undefined = undefined;
             try {
-                res = await crypto.decryptEvent(this);
+                const res = await crypto.decryptEvent(this);
                 if (options.isRetry === true) {
                     logger.info(`Decrypted event on retry (${this.getDetails()})`);
                 }
+                this.setClearData(res);
             } catch (e) {
                 const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
@@ -923,14 +923,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 // so we don't bother to log `e` separately.
                 logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage(String(e));
+                this.setClearDataForDecryptionFailure(String(e));
             }
 
-            // at this point, we've either successfully decrypted the event, or have given up
-            // (and set res to a 'badEncryptedMessage'). Either way, we can now set the
-            // cleartext of the event and raise Event.decrypted.
-            //
-            // make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
+            // Make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
             // otherwise the app will be confused to see `isBeingDecrypted` still set when
             // there isn't an `Event.decrypted` on the way.
             //
@@ -938,7 +934,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             //
             this.decryptionPromise = null;
             this.retryDecryption = false;
-            this.setClearData(res);
 
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
@@ -956,19 +951,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         }
     }
 
-    private badEncryptedMessage(reason: string): IEventDecryptionResult {
-        return {
-            clearEvent: {
-                type: EventType.RoomMessage,
-                content: {
-                    msgtype: "m.bad.encrypted",
-                    body: "** Unable to decrypt: " + reason + " **",
-                },
-            },
-            encryptedDisabledForUnverifiedDevices: reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`,
-        };
-    }
-
     /**
      * Update the cleartext data on this event.
      *
@@ -977,9 +959,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @internal
      *
      * @param decryptionResult - the decryption result, including the plaintext and some key info
-     *
-     * @remarks
-     * Fires {@link MatrixEventEvent.Decrypted}
      */
     private setClearData(decryptionResult: IEventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
@@ -988,6 +967,27 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
         this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
+        this.invalidateExtensibleEvent();
+    }
+
+    /**
+     * Update the cleartext data on this event after a decryption failure.
+     *
+     * @param reason - the textual reason for the failure
+     */
+    private setClearDataForDecryptionFailure(reason: string): void {
+        this.clearEvent = {
+            type: EventType.RoomMessage,
+            content: {
+                msgtype: "m.bad.encrypted",
+                body: `** Unable to decrypt: ${reason} **`,
+            },
+        };
+        this.senderCurve25519Key = null;
+        this.claimedEd25519Key = null;
+        this.forwardingCurve25519KeyChain = [];
+        this.untrusted = false;
+        this.encryptedDisabledForUnverifiedDevices = reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`;
         this.invalidateExtensibleEvent();
     }
 
