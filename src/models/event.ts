@@ -227,7 +227,18 @@ export interface IMessageVisibilityHidden {
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
 
 export enum MatrixEventEvent {
+    /**
+     * An event has been decrypted, or we have failed to decrypt it.
+     *
+     * The payload consists of:
+     *
+     *  * `event` - The {@link MatrixEvent} which we attempted to decrypt.
+     *
+     *  * `err` - The error that occurred during decryption, or `undefined` if no error occurred.
+     *     Avoid use of this: {@link MatrixEvent.decryptionFailureReason} is more useful.
+     */
     Decrypted = "Event.decrypted",
+
     BeforeRedaction = "Event.beforeRedaction",
     VisibilityChange = "Event.visibilityChange",
     LocalEventIdReplaced = "Event.localEventIdReplaced",
@@ -239,12 +250,6 @@ export enum MatrixEventEvent {
 export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
 
 export type MatrixEventHandlerMap = {
-    /**
-     * Fires when an event is decrypted
-     *
-     * @param event - The matrix event which has been decrypted
-     * @param err - The error that occurred during decryption, or `undefined` if no error occurred.
-     */
     [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
     [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
     [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
