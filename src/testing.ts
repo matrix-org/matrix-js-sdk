@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
+/**
  * This file is a secondary entrypoint for the js-sdk library, exposing utilities which might be useful for writing tests.
  *
  * In general it should not be included in runtime applications.
