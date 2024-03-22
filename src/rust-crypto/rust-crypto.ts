@@ -177,7 +177,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
-        console.log("@@", secrets);
         const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
         return this.olmMachine.importSecretsBundle(secretsBundle);
     }
