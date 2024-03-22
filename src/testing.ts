@@ -27,6 +27,7 @@ import { RoomMember } from "./models/room-member";
 import { EventType } from "./@types/event";
 import { IEventDecryptionResult } from "./@types/crypto";
 import { DecryptionError } from "./crypto/algorithms";
+import { DecryptionFailureCode } from "./crypto-api";
 
 /**
  * Create a {@link MatrixEvent}.
@@ -143,7 +144,7 @@ export async function mkDecryptionFailureMatrixEvent(opts: {
     sender: string;
 
     /** The reason code for the failure */
-    code: string;
+    code: DecryptionFailureCode;
 
     /** A textual reason for the failure */
     msg: string;

@@ -23,7 +23,7 @@ import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger, Logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
@@ -39,6 +39,7 @@ import {
     CrossSigningStatus,
     CryptoCallbacks,
     Curve25519AuthData,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -70,7 +71,6 @@ import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
-import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
 
@@ -1685,7 +1685,7 @@ class EventDecryptor {
                 switch (err.code) {
                     case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey: {
                         jsError = new DecryptionError(
-                            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                             "The sender's device has not sent us the keys for this message.",
                             {
                                 session: content.sender_key + "|" + content.session_id,
@@ -1699,7 +1699,7 @@ class EventDecryptor {
                     }
                     case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex: {
                         jsError = new DecryptionError(
-                            "OLM_UNKNOWN_MESSAGE_INDEX",
+                            DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX,
                             "The sender's device has not sent us the keys for this message at this index.",
                             {
                                 session: content.sender_key + "|" + content.session_id,
@@ -1712,9 +1712,9 @@ class EventDecryptor {
                         break;
                     }
                     // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
-                    // Just put it on the `UNABLE_TO_DECRYPT` bucket.
+                    // Just put it on the `UNKNOWN_ERROR` bucket.
                     default: {
-                        jsError = new DecryptionError("UNABLE_TO_DECRYPT", err.description, {
+                        jsError = new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, err.description, {
                             session: content.sender_key + "|" + content.session_id,
                         });
                         break;
@@ -1722,7 +1722,7 @@ class EventDecryptor {
                 }
                 throw jsError;
             }
-            throw new DecryptionError("UNABLE_TO_DECRYPT", "Unknown error");
+            throw new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, "Unknown error");
         }
     }
 

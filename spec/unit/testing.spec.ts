@@ -16,6 +16,7 @@ limitations under the License.
 
 import { mkDecryptionFailureMatrixEvent, mkEncryptedMatrixEvent, mkMatrixEvent } from "../../src/testing";
 import { EventType } from "../../src";
+import { DecryptionFailureCode } from "../../src/crypto-api";
 
 describe("testing", () => {
     describe("mkMatrixEvent", () => {
@@ -60,6 +61,7 @@ describe("testing", () => {
             expect(event.sender?.userId).toEqual("@alice:test");
             expect(event.isEncrypted()).toBe(true);
             expect(event.isDecryptionFailure()).toBe(false);
+            expect(event.decryptionFailureReason).toBe(null);
             expect(event.getContent()).toEqual({ body: "blah" });
             expect(event.getType()).toEqual("m.room.message");
         });
@@ -70,13 +72,14 @@ describe("testing", () => {
             const event = await mkDecryptionFailureMatrixEvent({
                 sender: "@alice:test",
                 roomId: "!test:room",
-                code: "UNKNOWN",
+                code: DecryptionFailureCode.UNKNOWN_ERROR,
                 msg: "blah",
             });
 
             expect(event.sender?.userId).toEqual("@alice:test");
             expect(event.isEncrypted()).toBe(true);
             expect(event.isDecryptionFailure()).toBe(true);
+            expect(event.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_ERROR);
             expect(event.getContent()).toEqual({
                 body: "** Unable to decrypt: DecryptionError: blah **",
                 msgtype: "m.bad.encrypted",
