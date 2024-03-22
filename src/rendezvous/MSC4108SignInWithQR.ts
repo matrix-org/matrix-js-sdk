@@ -70,18 +70,8 @@ interface AcceptedPayload extends MSC4108Payload {
     type: PayloadType.Accepted;
 }
 
-interface SecretsPayload extends MSC4108Payload {
+interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
     type: PayloadType.Secrets;
-    cross_signing?: {
-        master_key: string;
-        self_signing_key: string;
-        user_signing_key: string;
-    };
-    backup?: {
-        algorithm: string;
-        key: string;
-        backup_version: string;
-    };
 }
 
 export class MSC4108SignInWithQR {
@@ -313,7 +303,7 @@ export class MSC4108SignInWithQR {
             await this.send(payload);
             // then wait for secrets
             logger.info("Waiting for secrets message");
-            const secrets = (await this.receive()) as SecretsPayload;
+            const secrets = await this.receive<SecretsPayload>();
             if (secrets.type !== PayloadType.Secrets) {
                 throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
             }
@@ -340,21 +330,20 @@ export class MSC4108SignInWithQR {
             // PROTOTYPE: we should be validating that the device on the other end of the rendezvous did actually successfully authenticate as this device once we decide how that should be done
             // const { device_id: deviceId } = res as SuccessPayload;
 
-            const availableSecrets = (await this.client?.getCrypto()?.exportSecretsForQRLogin()) ?? {};
+            const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
             // send secrets
-            const secrets: SecretsPayload = {
+            await this.send({
                 type: PayloadType.Secrets,
-                ...availableSecrets,
-            };
-            await this.send(secrets);
+                ...secretsBundle,
+            });
             return {};
             // done?
             // let the other side close the rendezvous session
         }
     }
 
-    private async receive(): Promise<MSC4108Payload> {
-        return (await this.channel.secureReceive()) as MSC4108Payload;
+    private async receive<T extends MSC4108Payload>(): Promise<T> {
+        return (await this.channel.secureReceive()) as T;
     }
 
     private async send(payload: MSC4108Payload): Promise<void> {

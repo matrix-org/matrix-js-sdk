@@ -99,6 +99,7 @@ import {
     KeyBackupInfo,
     VerificationRequest as CryptoApiVerificationRequest,
     OwnDeviceKeys,
+    QRSecretsBundle,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -581,17 +582,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
-    public async exportSecretsForQRLogin(): Promise<{
-        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
-        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
-    }> {
+    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
         throw new Error("Method not implemented.");
     }
 
-    public async importSecretsForQRLogin(secrets: {
-        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
-        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
-    }): Promise<void> {
+    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
         throw new Error("Method not implemented.");
     }
 

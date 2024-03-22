@@ -48,6 +48,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     OwnDeviceKeys,
+    QRSecretsBundle,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -165,52 +166,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.checkKeyBackupAndEnable();
     }
 
-    public async exportSecretsForQRLogin(): Promise<{
-        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
-        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
-    }> {
-        const crossSigning: RustSdkCryptoJs.CrossSigningKeyExport | null =
-            await this.olmMachine.exportCrossSigningKeys();
-
-        const backup: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-
-        return {
-            cross_signing: crossSigning
-                ? {
-                      master_key: crossSigning.masterKey!,
-                      self_signing_key: crossSigning.self_signing_key!,
-                      user_signing_key: crossSigning.userSigningKey!,
-                  }
-                : undefined,
-            backup: backup?.decryptionKey?.megolmV1PublicKey
-                ? {
-                      algorithm: backup.decryptionKey.megolmV1PublicKey.algorithm,
-                      key: backup.decryptionKey.toBase64(),
-                      backup_version: backup.backupVersion!,
-                  }
-                : undefined,
-        };
+    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
+        try {
+            const secretsBundle = await this.olmMachine.exportSecretsBundle();
+            return secretsBundle.to_json();
+        } catch (e) {
+            // No keys to export
+            return {};
+        }
     }
 
-    public async importSecretsForQRLogin(secrets: {
-        cross_signing?: { master_key: string; self_signing_key: string; user_signing_key: string } | undefined;
-        backup?: { algorithm: string; key: string; backup_version: string } | undefined;
-    }): Promise<void> {
-        if (secrets.cross_signing) {
-            // import the keys
-            await this.olmMachine.importCrossSigningKeys(
-                secrets.cross_signing.master_key,
-                secrets.cross_signing.self_signing_key,
-                secrets.cross_signing.user_signing_key,
-            );
-
-            // cross sign our device
-            // PROTOTYPE: Not implemented
-        }
-        if (secrets.backup) {
-            // PROTOTYPE: Not implemented
-            // await this.olmMachine.importBackupKeys(secrets.backup.key, secrets.backup.algorithm, secrets.backup.backup_version);
-        }
+    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
+        console.log("@@", secrets);
+        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
+        return this.olmMachine.importSecretsBundle(secretsBundle);
     }
     /**
      * Return the OlmMachine only if {@link RustCrypto#stop} has not been called.
