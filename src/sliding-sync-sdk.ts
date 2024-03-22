@@ -46,6 +46,7 @@ import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
+import { KnownMembership } from "./@types/membership";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -114,7 +115,10 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(private readonly client: MatrixClient, private readonly cryptoCallbacks?: SyncCryptoCallbacks) {}
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
+    ) {}
 
     public name(): string {
         return "to_device";
@@ -215,7 +219,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
         };
     }
 
-    public onResponse(data: ExtensionAccountDataResponse): void {
+    public async onResponse(data: ExtensionAccountDataResponse): Promise<void> {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
@@ -285,7 +289,7 @@ class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypi
         };
     }
 
-    public onResponse(data: ExtensionTypingResponse): void {
+    public async onResponse(data: ExtensionTypingResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
@@ -324,7 +328,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
         return undefined; // don't send a JSON object for subsequent requests, we don't need to.
     }
 
-    public onResponse(data: ExtensionReceiptsResponse): void {
+    public async onResponse(data: ExtensionReceiptsResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
@@ -452,7 +456,7 @@ export class SlidingSyncSdk {
      * @returns A promise which resolves once the room has been added to the
      * store.
      */
-    public async peek(_roomId: string): Promise<Room> {
+    public async peek(roomId: string): Promise<Room> {
         return null!; // TODO
     }
 
@@ -612,7 +616,7 @@ export class SlidingSyncSdk {
             }
         }
 
-        const encrypted = this.client.isRoomEncrypted(room.roomId);
+        const encrypted = room.hasEncryptionStateEvent();
         // we do this first so it's correct when any of the events fire
         if (roomData.notification_count != null) {
             room.setUnreadNotificationCount(NotificationCountType.Total, roomData.notification_count);
@@ -646,7 +650,7 @@ export class SlidingSyncSdk {
             inviteStateEvents.forEach((e) => {
                 this.client.emit(ClientEvent.Event, e);
             });
-            room.updateMyMembership("invite");
+            room.updateMyMembership(KnownMembership.Invite);
             return;
         }
 
@@ -716,7 +720,7 @@ export class SlidingSyncSdk {
 
         // local fields must be set before any async calls because call site assumes
         // synchronous execution prior to emitting SlidingSyncState.Complete
-        room.updateMyMembership("join");
+        room.updateMyMembership(KnownMembership.Join);
 
         room.recalculate();
         if (roomData.initial) {
@@ -842,7 +846,7 @@ export class SlidingSyncSdk {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -862,7 +866,7 @@ export class SlidingSyncSdk {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member!;
-                    if (inviteEvent.getContent().membership !== "invite") {
+                    if (inviteEvent.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }

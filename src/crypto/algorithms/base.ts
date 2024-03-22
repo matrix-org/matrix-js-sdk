@@ -199,41 +199,6 @@ export abstract class DecryptionAlgorithm {
     public sendSharedHistoryInboundSessions?(devicesByUser: Map<string, DeviceInfo[]>): Promise<void>;
 }
 
-/**
- * Exception thrown when decryption fails
- *
- * @param msg - user-visible message describing the problem
- *
- * @param details - key/value pairs reported in the logs but not shown
- *   to the user.
- */
-export class DecryptionError extends Error {
-    public readonly detailedString: string;
-
-    public constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
-        super(msg);
-        this.code = code;
-        this.name = "DecryptionError";
-        this.detailedString = detailedStringForDecryptionError(this, details);
-    }
-}
-
-function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
-    let result = err.name + "[msg: " + err.message;
-
-    if (details) {
-        result +=
-            ", " +
-            Object.keys(details)
-                .map((k) => k + ": " + details[k])
-                .join(", ");
-    }
-
-    result += "]";
-
-    return result;
-}
-
 export class UnknownDeviceError extends Error {
     /**
      * Exception thrown specifically when we want to warn the user to consider
@@ -242,7 +207,11 @@ export class UnknownDeviceError extends Error {
      * @param msg - message describing the problem
      * @param devices - set of unknown devices per user we're warning about
      */
-    public constructor(msg: string, public readonly devices: DeviceInfoMap, public event?: MatrixEvent) {
+    public constructor(
+        msg: string,
+        public readonly devices: DeviceInfoMap,
+        public event?: MatrixEvent,
+    ) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;
@@ -266,3 +235,6 @@ export function registerAlgorithm<P extends IParams = IParams>(
     ENCRYPTION_CLASSES.set(algorithm, encryptor as new (params: IParams) => EncryptionAlgorithm);
     DECRYPTION_CLASSES.set(algorithm, decryptor as new (params: DecryptionClassParams) => DecryptionAlgorithm);
 }
+
+/* Re-export for backwards compatibility. Deprecated: this is an internal class. */
+export { DecryptionError } from "../../common-crypto/CryptoBackend";

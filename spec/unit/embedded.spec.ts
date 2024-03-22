@@ -23,7 +23,14 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 import { MockedObject } from "jest-mock";
-import { WidgetApi, WidgetApiToWidgetAction, MatrixCapabilities, ITurnServer, IRoomEvent } from "matrix-widget-api";
+import {
+    WidgetApi,
+    WidgetApiToWidgetAction,
+    MatrixCapabilities,
+    ITurnServer,
+    IRoomEvent,
+    IOpenIDCredentials,
+} from "matrix-widget-api";
 
 import { createRoomWidgetClient, MsgType } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
@@ -33,6 +40,12 @@ import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
+const testOIDCToken = {
+    access_token: "12345678",
+    expires_in: "10",
+    matrix_server_name: "homeserver.oabc",
+    token_type: "Bearer",
+};
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn();
     public requestCapability = jest.fn();
@@ -49,10 +62,25 @@ class MockWidgetApi extends EventEmitter {
     public sendRoomEvent = jest.fn(() => ({ event_id: `$${Math.random()}` }));
     public sendStateEvent = jest.fn();
     public sendToDevice = jest.fn();
+    public requestOpenIDConnectToken = jest.fn(() => {
+        return testOIDCToken;
+        return new Promise<IOpenIDCredentials>(() => {
+            return testOIDCToken;
+        });
+    });
     public readStateEvents = jest.fn(() => []);
     public getTurnServers = jest.fn(() => []);
+    public sendContentLoaded = jest.fn();
 
     public transport = { reply: jest.fn() };
+}
+
+declare module "../../src/types" {
+    interface StateEvents {
+        "org.example.foo": {
+            hello: string;
+        };
+    }
 }
 
 describe("RoomWidgetClient", () => {
@@ -67,9 +95,12 @@ describe("RoomWidgetClient", () => {
         client.stopClient();
     });
 
-    const makeClient = async (capabilities: ICapabilities): Promise<void> => {
+    const makeClient = async (
+        capabilities: ICapabilities,
+        sendContentLoaded: boolean | undefined = undefined,
+    ): Promise<void> => {
         const baseUrl = "https://example.org";
-        client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl });
+        client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl }, sendContentLoaded);
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
         await client.startClient();
@@ -123,7 +154,7 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("messages", () => {
+    describe("initialization", () => {
         it("requests permissions for specific message types", async () => {
             await makeClient({ sendMessage: [MsgType.Text], receiveMessage: [MsgType.Text] });
             expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
@@ -138,6 +169,15 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToReceiveMessage).toHaveBeenCalledWith();
         });
 
+        it("sends content loaded when configured", async () => {
+            await makeClient({});
+            expect(widgetApi.sendContentLoaded).toHaveBeenCalled();
+        });
+
+        it("does not sent content loaded when configured", async () => {
+            await makeClient({}, false);
+            expect(widgetApi.sendContentLoaded).not.toHaveBeenCalled();
+        });
         // No point in testing sending and receiving since it's done exactly the
         // same way as non-message events
     });
@@ -283,6 +323,13 @@ describe("RoomWidgetClient", () => {
             });
             expect((await emittedEvent).isEncrypted()).toEqual(encrypted);
             expect(await emittedSync).toEqual(SyncState.Syncing);
+        });
+    });
+
+    describe("oidc token", () => {
+        it("requests an oidc token", async () => {
+            await makeClient({});
+            expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
     });
 

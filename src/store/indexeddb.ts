@@ -19,7 +19,6 @@ limitations under the License.
 import { MemoryStore, IOpts as IBaseOpts } from "./memory";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
-import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
 import { logger } from "../logger";
 import { ISavedSync } from "./index";
@@ -91,10 +90,10 @@ export class IndexedDBStore extends MemoryStore {
      * ```
      * let opts = { indexedDB: window.indexedDB, localStorage: window.localStorage };
      * let store = new IndexedDBStore(opts);
-     * await store.startup(); // load from indexed db
      * let client = sdk.createClient({
      *     store: store,
      * });
+     * await store.startup(); // load from indexed db, must be called after createClient
      * client.startClient();
      * client.on("sync", function(state, prevState, data) {
      *     if (state === "PREPARED") {
@@ -140,7 +139,12 @@ export class IndexedDBStore extends MemoryStore {
             .then((userPresenceEvents) => {
                 logger.log(`IndexedDBStore.startup: processing presence events`);
                 userPresenceEvents.forEach(([userId, rawEvent]) => {
-                    const u = new User(userId);
+                    if (!this.createUser) {
+                        throw new Error(
+                            "`IndexedDBStore.startup` must be called after assigning it to the client, not before!",
+                        );
+                    }
+                    const u = this.createUser(userId);
                     if (rawEvent) {
                         u.setPresenceEvent(new MatrixEvent(rawEvent));
                     }

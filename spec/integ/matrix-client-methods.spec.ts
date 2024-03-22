@@ -27,6 +27,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -73,7 +74,7 @@ describe("MatrixClient", function () {
 
         it("should upload the file", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     expect(req.queryParams?.filename).toEqual("hi.txt");
@@ -108,7 +109,7 @@ describe("MatrixClient", function () {
 
         it("should parse errors into a MatrixError", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     // @ts-ignore private property
@@ -150,7 +151,7 @@ describe("MatrixClient", function () {
     });
 
     describe("joinRoom", function () {
-        it("should no-op if you've already joined a room", function () {
+        it("should no-op given the ID of a room you've already joined", async () => {
             const roomId = "!foo:bar";
             const room = new Room(roomId, client, userId);
             client.fetchRoomEvent = () =>
@@ -162,14 +163,38 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "join",
+                    mship: KnownMembership.Join,
                     event: true,
                 }),
             ]);
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
-            client.joinRoom(roomId);
+
+            const joinPromise = client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
+            expect(await joinPromise).toBe(room);
+        });
+
+        it("should no-op given the alias of a room you've already joined", async () => {
+            const roomId = "!roomId:server";
+            const roomAlias = "#my-fancy-room:server";
+            const room = new Room(roomId, client, userId);
+            room.addLiveEvents([
+                utils.mkMembership({
+                    user: userId,
+                    room: roomId,
+                    mship: KnownMembership.Join,
+                    event: true,
+                }),
+            ]);
+            store.storeRoom(room);
+
+            // The method makes a request to resolve the alias
+            httpBackend.when("POST", "/join/" + encodeURIComponent(roomAlias)).respond(200, { room_id: roomId });
+
+            const joinPromise = client.joinRoom(roomAlias);
+            await httpBackend.flushAllExpected();
+            expect(await joinPromise).toBe(room);
         });
 
         it("should send request to inviteSignUrl if specified", async () => {
@@ -245,7 +270,7 @@ describe("MatrixClient", function () {
                 utils.mkMembership({
                     user: userId,
                     room: roomId,
-                    mship: "knock",
+                    mship: KnownMembership.Knock,
                     event: true,
                 }),
             ]);
@@ -708,7 +733,7 @@ describe("MatrixClient", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
             httpBackend
-                .when("DELETE", "/_matrix/client/r0/devices/my_device")
+                .when("DELETE", "/_matrix/client/v3/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
@@ -1102,10 +1127,6 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
             httpBackend
                 .when("POST", "/register/email/requestToken")
@@ -1125,10 +1146,6 @@ describe("MatrixClient", function () {
     describe("inviteByThreePid", () => {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/invite")
@@ -1165,10 +1182,6 @@ describe("MatrixClient", function () {
                 ],
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             httpBackend
                 .when("POST", "/createRoom")
                 .check((req) => {
@@ -1192,51 +1205,20 @@ describe("MatrixClient", function () {
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
-            httpBackend
-                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
-                .respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r1 endpoint when capability is disabled", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
-            const response = { login_token: "xyz", expires_in_ms: 5000 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r0 endpoint for fallback", async () => {
-            httpBackend.when("GET", "/capabilities").respond(200, {});
-            const response = { login_token: "xyz", expires_in: 5 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r1
-            expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
+            expect(await prom).toStrictEqual(response);
         });
     });
 
@@ -1652,6 +1634,82 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+
+    describe("getFallbackAuthUrl", () => {
+        it("should return fallback url", () => {
+            expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
+                `"http://alice.localhost.test.server/_matrix/client/v3/auth/loginType/fallback/web?session=authSessionId"`,
+            );
+        });
+    });
+
+    describe("addThreePidOnly", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/add")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.addThreePidOnly({
+                    client_secret: "secret",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("bindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/bind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        id_server: "server",
+                        id_access_token: "token",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.bindThreePid({
+                    client_secret: "secret",
+                    id_server: "server",
+                    id_access_token: "token",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("unbindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/unbind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        medium: "email",
+                        address: "alice@server.com",
+                        id_server: "identity.localhost",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1855,7 +1913,7 @@ const buildEventJoinRules = () =>
     new MatrixEvent({
         age: 80123696,
         content: {
-            join_rule: "invite",
+            join_rule: KnownMembership.Invite,
         },
         event_id: "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
         origin_server_ts: 1643815441191,
@@ -1909,7 +1967,7 @@ const buildEventMember = () =>
         content: {
             avatar_url: "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
             displayname: "andybalaam-test1",
-            membership: "join",
+            membership: KnownMembership.Join,
         },
         event_id: "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
         origin_server_ts: 1643815439608,
@@ -1925,7 +1983,6 @@ const buildEventCreate = () =>
     new MatrixEvent({
         age: 80126105,
         content: {
-            creator: "@andybalaam-test1:matrix.org",
             room_version: "6",
         },
         event_id: "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",

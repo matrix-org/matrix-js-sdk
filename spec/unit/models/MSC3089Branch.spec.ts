@@ -213,7 +213,7 @@ describe("MSC3089Branch", () => {
                     expect(eventId).toEqual(fileEventId);
                     return fileEvent;
                 },
-            } as EventTimelineSet);
+            }) as EventTimelineSet;
         client.mxcUrlToHttp = (mxc: string) => {
             expect(mxc).toEqual("mxc://" + mxcLatter);
             return `https://example.org/_matrix/media/v1/download/${mxcLatter}`;
@@ -239,7 +239,7 @@ describe("MSC3089Branch", () => {
                     expect(eventId).toEqual(fileEventId);
                     return fileEvent;
                 },
-            } as EventTimelineSet);
+            }) as EventTimelineSet;
         client.mxcUrlToHttp = (mxc: string) => {
             expect(mxc).toEqual("mxc://" + mxcLatter);
             return `https://example.org/_matrix/media/v1/download/${mxcLatter}`;
@@ -332,7 +332,7 @@ describe("MSC3089Branch", () => {
                 getId: () => "$unknown",
             },
         ];
-        staticRoom.getLiveTimeline = () => ({ getEvents: () => events } as EventTimeline);
+        staticRoom.getLiveTimeline = () => ({ getEvents: () => events }) as EventTimeline;
 
         directory.getFile = (evId: string) => {
             expect(evId).toEqual(fileEventId);

@@ -32,6 +32,8 @@ export interface ISavedSync {
     accountData: IMinimalEvent[];
 }
 
+export type UserCreator = (userId: string) => User;
+
 /**
  * A store for most of the data js-sdk needs to store, apart from crypto data
  */
@@ -61,6 +63,12 @@ export interface IStore {
      * @param room - The room to be stored. All properties must be stored.
      */
     storeRoom(room: Room): void;
+
+    /**
+     * Set the user creator which is used for creating User objects
+     * @param creator - A callback that accepts an user-id and returns an User object
+     */
+    setUserCreator(creator: UserCreator): void;
 
     /**
      * Retrieve a room by its' room ID.

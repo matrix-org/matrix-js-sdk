@@ -1,0 +1,41 @@
+name: Upload release assets
+description: Uploads assets to an existing release and optionally signs them
+inputs:
+    gpg-fingerprint:
+        description: Fingerprint of the GPG key to use for signing the assets, if any.
+        required: false
+    upload-url:
+        description: GitHub release upload URL to upload the assets to.
+        required: true
+    asset-path:
+        description: |
+            The path to the asset you want to upload, if any. You can use glob patterns here.
+            Will be GPG signed and an `.asc` file included in the release artifacts if `gpg-fingerprint` is set.
+        required: true
+runs:
+    using: composite
+    steps:
+        - name: Sign assets
+          if: inputs.gpg-fingerprint
+          shell: bash
+          run: |
+              for FILE in $ASSET_PATH
+              do
+                  gpg -u "$GPG_FINGERPRINT" --armor --output "$FILE".asc --detach-sig "$FILE"
+              done
+          env:
+              GPG_FINGERPRINT: ${{ inputs.gpg-fingerprint }}
+              ASSET_PATH: ${{ inputs.asset-path }}
+
+        - name: Upload asset signatures
+          if: inputs.gpg-fingerprint
+          uses: shogo82148/actions-upload-release-asset@5bd52f05dd8076794da5975d4c0a4f3bce7dd8f5 # v1
+          with:
+              upload_url: ${{ inputs.upload-url }}
+              asset_path: ${{ inputs.asset-path }}.asc
+
+        - name: Upload assets
+          uses: shogo82148/actions-upload-release-asset@5bd52f05dd8076794da5975d4c0a4f3bce7dd8f5 # v1
+          with:
+              upload_url: ${{ inputs.upload-url }}
+              asset_path: ${{ inputs.asset-path }}

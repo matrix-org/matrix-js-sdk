@@ -106,6 +106,8 @@ describe("fixNotificationCountOnDecryption", () => {
             mockClient,
         );
 
+        room.addLiveEvents([event]);
+
         THREAD_ID = event.getId()!;
         threadEvent = mkEvent({
             type: EventType.RoomMessage,

@@ -103,11 +103,8 @@ module.exports = {
             },
         },
         {
-            // We don't need amazing docs in our spec files
             files: ["src/**/*.ts"],
             rules: {
-                "tsdoc/syntax": "error",
-                // We use some select jsdoc rules as the tsdoc linter has only one rule
                 "jsdoc/no-types": "error",
                 "jsdoc/empty-tags": "error",
                 "jsdoc/check-property-names": "error",

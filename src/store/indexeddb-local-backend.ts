@@ -143,7 +143,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */
-    public constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
+    public constructor(
+        private readonly indexedDB: IDBFactory,
+        dbName = "default",
+    ) {
         this.dbName = "matrix-js-sdk:" + dbName;
         this.syncAccumulator = new SyncAccumulator();
     }
@@ -191,7 +194,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 this.db?.close(); // this does not call onclose
                 this.disconnected = true;
                 this.db = undefined;
-                onClose?.();
             };
             this.db.onclose = (): void => {
                 this.disconnected = true;

@@ -17,7 +17,7 @@ limitations under the License.
 import "../../olm-loader";
 import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
 import { MSC3903ECDHPayload, MSC3903ECDHv2RendezvousChannel } from "../../../src/rendezvous/channels";
-import { decodeBase64 } from "../../../src/crypto/olmlib";
+import { decodeBase64 } from "../../../src/base64";
 import { DummyTransport } from "./DummyTransport";
 
 function makeTransport(name: string) {

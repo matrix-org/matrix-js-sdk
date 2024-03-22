@@ -106,7 +106,7 @@ describe("Cross Signing", function () {
         });
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T>() => ({} as T);
+        alice.getAccountDataFromServer = async <T>() => ({}) as T;
         // set Alice's cross-signing key
         await alice.bootstrapCrossSigning({
             authUploadDeviceSigningKeys: async (func) => {
@@ -146,7 +146,7 @@ describe("Cross Signing", function () {
         };
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({} as T);
+        alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({}) as T;
         const authUploadDeviceSigningKeys: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
             await func({});
         };

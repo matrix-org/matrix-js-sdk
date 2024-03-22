@@ -19,6 +19,7 @@ import {
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
+import { KnownMembership, Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -87,7 +88,7 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
     for (let i = 0; i < roomMembers.length; i++) {
         roomResponse.state.events.push(
             mkMembershipCustom({
-                membership: "join",
+                membership: KnownMembership.Join,
                 sender: roomMembers[i],
             }),
         );
@@ -99,6 +100,7 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
             join: { [roomId]: roomResponse },
             invite: {},
             leave: {},
+            knock: {},
         },
         account_data: { events: [] },
     };
@@ -250,7 +252,7 @@ export function mkPresence(opts: IPresenceOpts & { event?: boolean }): Partial<I
 
 interface IMembershipOpts {
     room?: string;
-    mship: string;
+    mship: Membership;
     sender?: string;
     user?: string;
     skey?: string;
@@ -296,7 +298,7 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
 }
 
 export function mkMembershipCustom<T>(
-    base: T & { membership: string; sender: string; content?: IContent },
+    base: T & { membership: Membership; sender: string; content?: IContent },
 ): T & { type: EventType; sender: string; state_key: string; content: IContent } & GeneratedMetadata {
     const content = base.content || {};
     return mkEventCustom({
@@ -314,6 +316,7 @@ export interface IMessageOpts {
     event?: boolean;
     relatesTo?: IEventRelation;
     ts?: number;
+    unsigned?: IUnsigned;
 }
 
 /**
@@ -520,14 +523,21 @@ export async function awaitDecryption(
     }
 
     return new Promise((resolve) => {
-        event.once(MatrixEventEvent.Decrypted, (ev, err) => {
-            logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
-            resolve(ev);
-        });
+        if (waitOnDecryptionFailure) {
+            event.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                if (!err) {
+                    resolve(ev);
+                }
+            });
+        } else {
+            event.once(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                resolve(ev);
+            });
+        }
     });
 }
-
-export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
 
 export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     app_display_name: "app",
@@ -550,4 +560,26 @@ export type InitCrypto = (_: MatrixClient) => Promise<void>;
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
 if (global.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
+}
+
+export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
+
+/**
+ * Advance the fake timers in a loop until the given promise resolves or rejects.
+ *
+ * Returns the result of the promise.
+ *
+ * This can be useful when there are multiple steps in the code which require an iteration of the event loop.
+ */
+export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
+    let resolved = false;
+    promise.finally(() => {
+        resolved = true;
+    });
+
+    while (!resolved) {
+        await jest.advanceTimersByTimeAsync(1);
+    }
+
+    return await promise;
 }

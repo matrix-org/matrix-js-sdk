@@ -25,7 +25,7 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from "./CrossSigning";
 import { keyFromPassphrase } from "./key_passphrase";
-import { safeSet, sleep } from "../utils";
+import { encodeUri, safeSet, sleep } from "../utils";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { encodeRecoveryKey } from "./recoverykey";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
@@ -39,8 +39,9 @@ import {
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
-import { HTTPError, MatrixError } from "../http-api";
+import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api";
 import { BackupTrustInfo } from "../crypto-api/keybackup";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -123,7 +124,10 @@ export class BackupManager {
     // The backup manager will schedule backup of keys when active (`scheduleKeyBackupSend`), this allows cancel when client is stopped
     private clientRunning = true;
 
-    public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
+    public constructor(
+        private readonly baseApis: MatrixClient,
+        public readonly getKey: GetKey,
+    ) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
     }
@@ -222,6 +226,33 @@ export class BackupManager {
 
     public async createKeyBackupVersion(info: IKeyBackupInfo): Promise<void> {
         this.algorithm = await BackupManager.makeAlgorithm(info, this.getKey);
+    }
+
+    /**
+     * Deletes all key backups.
+     *
+     * Will call the API to delete active backup until there is no more present.
+     */
+    public async deleteAllKeyBackupVersions(): Promise<void> {
+        // there could be several backup versions, delete all to be safe.
+        let current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
+        while (current != null) {
+            await this.deleteKeyBackupVersion(current);
+            this.disableKeyBackup();
+            current = (await this.baseApis.getKeyBackupVersion())?.version ?? null;
+        }
+    }
+
+    /**
+     * Deletes the given key backup.
+     *
+     * @param version - The backup version to delete.
+     */
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
+        const path = encodeUri("/room_keys/version/$version", { $version: version });
+        await this.baseApis.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
     }
 
     /**
@@ -333,7 +364,7 @@ export class BackupManager {
         };
 
         if (!backupInfo || !backupInfo.algorithm || !backupInfo.auth_data || !backupInfo.auth_data.signatures) {
-            logger.info("Key backup is absent or missing required data");
+            logger.info(`Key backup is absent or missing required data: ${JSON.stringify(backupInfo)}`);
             return ret;
         }
 
@@ -440,6 +471,7 @@ export class BackupManager {
      * @param maxDelay - Maximum delay to wait in ms. 0 means no delay.
      */
     public async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
+        logger.debug(`Key backup: scheduleKeyBackupSend currentSending:${this.sendingBackups} delay:${maxDelay}`);
         if (this.sendingBackups) return;
 
         this.sendingBackups = true;
@@ -451,7 +483,7 @@ export class BackupManager {
             const delay = Math.random() * maxDelay;
             await sleep(delay);
             if (!this.clientRunning) {
-                logger.debug("Key backup send aborted, client stopped");
+                this.sendingBackups = false;
                 return;
             }
             let numFailures = 0; // number of consecutive failures
@@ -463,24 +495,26 @@ export class BackupManager {
                     const numBackedUp = await this.backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
                     if (numBackedUp === 0) {
                         // no sessions left needing backup: we're done
+                        this.sendingBackups = false;
                         return;
                     }
                     numFailures = 0;
                 } catch (err) {
                     numFailures++;
                     logger.log("Key backup request failed", err);
-                    if ((<MatrixError>err).data) {
-                        if (
-                            (<MatrixError>err).data.errcode == "M_NOT_FOUND" ||
-                            (<MatrixError>err).data.errcode == "M_WRONG_ROOM_KEYS_VERSION"
-                        ) {
-                            // Re-check key backup status on error, so we can be
-                            // sure to present the current situation when asked.
-                            await this.checkKeyBackup();
+                    if (err instanceof MatrixError) {
+                        const errCode = err.data.errcode;
+                        if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
+                            // Set to false now as `checkKeyBackup` might schedule a backupsend before this one ends.
+                            this.sendingBackups = false;
                             // Backup version has changed or this backup version
                             // has been deleted
-                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, (<MatrixError>err).data.errcode!);
-                            throw err;
+                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, errCode);
+                            // Re-check key backup status on error, so we can be
+                            // sure to present the current situation when asked.
+                            // This call might restart the backup loop if new backup version is trusted
+                            await this.checkKeyBackup();
+                            return;
                         }
                     }
                 }
@@ -491,10 +525,14 @@ export class BackupManager {
 
                 if (!this.clientRunning) {
                     logger.debug("Key backup send loop aborted, client stopped");
+                    this.sendingBackups = false;
                     return;
                 }
             }
-        } finally {
+        } catch (err) {
+            // No one actually checks errors on this promise, it's spawned internally.
+            // Just log, apps/client should use events to check status
+            logger.log(`Backup loop failed ${err}`);
             this.sendingBackups = false;
         }
     }
@@ -738,7 +776,10 @@ const UNSTABLE_MSC3270_NAME = new UnstableValue(
 export class Aes256 implements BackupAlgorithm {
     public static algorithmName = UNSTABLE_MSC3270_NAME.name;
 
-    public constructor(public readonly authData: IAes256AuthData, private readonly key: Uint8Array) {}
+    public constructor(
+        public readonly authData: IAes256AuthData,
+        private readonly key: Uint8Array,
+    ) {}
 
     public static async init(authData: IAes256AuthData, getKey: () => Promise<Uint8Array>): Promise<Aes256> {
         if (!authData) {
@@ -842,4 +883,33 @@ export function backupTrustInfoFromLegacyTrustInfo(trustInfo: TrustInfo): Backup
         trusted: trustInfo.usable,
         matchesDecryptionKey: trustInfo.trusted_locally ?? false,
     };
+}
+
+/**
+ * Implementation of {@link BackupDecryptor} for the libolm crypto backend.
+ */
+export class LibOlmBackupDecryptor implements BackupDecryptor {
+    private algorithm: BackupAlgorithm;
+    public readonly sourceTrusted: boolean;
+
+    public constructor(algorithm: BackupAlgorithm) {
+        this.algorithm = algorithm;
+        this.sourceTrusted = !algorithm.untrusted;
+    }
+
+    /**
+     * Implements {@link BackupDecryptor#free}
+     */
+    public free(): void {
+        this.algorithm.free();
+    }
+
+    /**
+     * Implements {@link BackupDecryptor#decryptSessions}
+     */
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
+    ): Promise<IMegolmSessionData[]> {
+        return await this.algorithm.decryptSessions(sessions);
+    }
 }

@@ -14,22 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum InvalidStoreState {
-    ToggledLazyLoading,
-}
-
-export class InvalidStoreError extends Error {
-    public static TOGGLED_LAZY_LOADING = InvalidStoreState.ToggledLazyLoading;
-
-    public constructor(public readonly reason: InvalidStoreState, public readonly value: any) {
-        const message =
-            `Store is invalid because ${reason}, ` +
-            `please stop the client, delete all data and start the client again`;
-        super(message);
-        this.name = "InvalidStoreError";
-    }
-}
-
 export enum InvalidCryptoStoreState {
     TooNew = "TOO_NEW",
 }
@@ -47,7 +31,24 @@ export class InvalidCryptoStoreError extends Error {
 }
 
 export class KeySignatureUploadError extends Error {
-    public constructor(message: string, public readonly value: any) {
+    public constructor(
+        message: string,
+        public readonly value: any,
+    ) {
         super(message);
+    }
+}
+
+/**
+ * It is invalid to call most methods once {@link MatrixClient#stopClient} has been called.
+ *
+ * This error will be thrown if you attempt to do so.
+ *
+ * {@link MatrixClient#stopClient} itself is an exception to this: it may safely be called multiple times on the same
+ * instance.
+ */
+export class ClientStoppedError extends Error {
+    public constructor() {
+        super("MatrixClient has been stopped");
     }
 }

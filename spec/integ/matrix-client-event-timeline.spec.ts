@@ -33,9 +33,10 @@ import {
 import { logger } from "../../src/logger";
 import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
+import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 import { Feature, ServerSupport } from "../../src/feature";
+import { KnownMembership } from "../../src/@types/membership";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -63,7 +64,7 @@ const buildRelationPaginationQuery = (params: QueryDict): string => {
 
 const USER_MEMBERSHIP_EVENT = utils.mkMembership({
     room: roomId,
-    mship: "join",
+    mship: KnownMembership.Join,
     user: userId,
     name: userName,
     event: false,
@@ -98,7 +99,7 @@ const INITIAL_SYNC_DATA = {
                     events: [
                         withoutRoomId(ROOM_NAME_EVENT),
                         utils.mkMembership({
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             user: otherUserId,
                             name: "Bob",
                             event: false,
@@ -107,9 +108,7 @@ const INITIAL_SYNC_DATA = {
                         utils.mkEvent({
                             type: "m.room.create",
                             user: userId,
-                            content: {
-                                creator: userId,
-                            },
+                            content: {},
                             event: false,
                         }),
                     ],
@@ -614,20 +613,13 @@ describe("MatrixClient event timelines", function () {
                 .respond(200, function () {
                     return THREAD_ROOT;
                 });
-            httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
 
             httpBackend
                 .when(
                     "GET",
                     "/rooms/!foo%3Abar/relations/" +
                         encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward }),
                 )
                 .respond(200, function () {
                     return {
@@ -1156,10 +1148,7 @@ describe("MatrixClient event timelines", function () {
         httpBackend
             .when(
                 "GET",
-                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name),
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" + encodeURIComponent(THREAD_ROOT_UPDATED.event_id!),
             )
             .respond(200, {
                 chunk: [THREAD_REPLY3.event, THREAD_REPLY2.event, THREAD_REPLY],
@@ -1264,11 +1253,8 @@ describe("MatrixClient event timelines", function () {
                 "GET",
                 "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                     encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
                     buildRelationPaginationQuery({
                         dir: Direction.Backward,
-                        limit: 3,
                         recurse: true,
                     }),
             )
@@ -1323,11 +1309,7 @@ describe("MatrixClient event timelines", function () {
         function respondToThread(root: Partial<IEvent>, replies: Partial<IEvent>[]): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                    encodeURIComponent(root.event_id!) +
-                    "/" +
-                    encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                    "?dir=b&limit=1",
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" + encodeURIComponent(root.event_id!) + "?dir=b",
             );
             request.respond(200, function () {
                 return {
@@ -1342,7 +1324,7 @@ describe("MatrixClient event timelines", function () {
         function respondToContext(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/context/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1360,7 +1342,7 @@ describe("MatrixClient event timelines", function () {
         function respondToEvent(event: Partial<IEvent> = THREAD_ROOT): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/event/$eventId", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/event/$eventId", {
                     $roomId: roomId,
                     $eventId: event.event_id!,
                 }),
@@ -1371,7 +1353,7 @@ describe("MatrixClient event timelines", function () {
         function respondToMessagesRequest(): ExpectedHttpRequest {
             const request = httpBackend.when(
                 "GET",
-                encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                encodeUri("/_matrix/client/v3/rooms/$roomId/messages", {
                     $roomId: roomId,
                 }),
             );
@@ -1559,9 +1541,7 @@ describe("MatrixClient event timelines", function () {
                 expect(timelineSets).not.toBeNull();
                 respondToThreads(threadsResponse);
                 respondToThreads(threadsResponse);
-                respondToEvent(THREAD_ROOT);
                 respondToEvent(THREAD2_ROOT);
-                respondToThread(THREAD_ROOT, [THREAD_REPLY]);
                 respondToThread(THREAD2_ROOT, [THREAD2_REPLY]);
                 await flushHttp(room.fetchRoomThreads());
                 const threadIds = room.getThreads().map((thread) => thread.id);
@@ -1569,7 +1549,7 @@ describe("MatrixClient event timelines", function () {
                 expect(threadIds).toContain(THREAD2_ROOT.event_id);
                 const [allThreads] = timelineSets!;
                 const timeline = allThreads.getLiveTimeline()!;
-                // Test threads are in chronological order
+                // Test threads are in chronological order (first thread should be first because it has a more recent reply)
                 expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD_ROOT.event_id,
                     THREAD2_ROOT.event_id,
@@ -1580,7 +1560,6 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.NewReply);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY2]);
                 await httpBackend.flushAllExpected();
                 await prom;
@@ -1657,7 +1636,7 @@ describe("MatrixClient event timelines", function () {
                             ...THREAD_ROOT.unsigned!["m.relations"],
                             "io.element.thread": {
                                 ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
-                                count: 2,
+                                count: 1,
                                 latest_event: THREAD_REPLY,
                             },
                         },
@@ -1706,7 +1685,6 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.Update);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                respondToEvent(THREAD2_ROOT);
                 await room.addLiveEvents([THREAD_REPLY_REACTION]);
                 await httpBackend.flushAllExpected();
                 await prom;
@@ -1944,7 +1922,7 @@ describe("MatrixClient event timelines", function () {
 
         // a state event, followed by a redaction thereof
         const event = utils.mkMembership({
-            mship: "join",
+            mship: KnownMembership.Join,
             user: otherUserId,
         });
         const redaction = utils.mkEvent({
@@ -2027,18 +2005,11 @@ describe("MatrixClient event timelines", function () {
                     return THREAD_ROOT;
                 });
             httpBackend
-                .when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function () {
-                    return THREAD_ROOT;
-                });
-            httpBackend
                 .when(
                     "GET",
                     "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                         encodeURIComponent(THREAD_ROOT.event_id!) +
-                        "/" +
-                        encodeURIComponent(THREAD_RELATION_TYPE.name) +
-                        buildRelationPaginationQuery({ dir: Direction.Backward, limit: 1 }),
+                        buildRelationPaginationQuery({ dir: Direction.Backward }),
                 )
                 .respond(200, function () {
                     return {

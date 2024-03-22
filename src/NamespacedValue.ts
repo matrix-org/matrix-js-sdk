@@ -26,7 +26,10 @@ export class NamespacedValue<S extends string, U extends string> {
     public constructor(stable: S, unstable: U);
     public constructor(stable: S, unstable?: U);
     public constructor(stable: null | undefined, unstable: U);
-    public constructor(public readonly stable?: S | null, public readonly unstable?: U) {
+    public constructor(
+        public readonly stable?: S | null,
+        public readonly unstable?: U,
+    ) {
         if (!this.unstable && !this.stable) {
             throw new Error("One of stable or unstable values must be supplied");
         }

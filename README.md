@@ -11,6 +11,8 @@
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
 browser or in Node.js.
 
+#### Minimum Matrix server version: v1.1
+
 The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only
 guarantees that a feature will be supported for at least 4 spec releases. For example, if a feature the js-sdk supports
 is removed in v1.4 then the feature is _eligible_ for removal from the SDK when v1.8 is released. This SDK has no
@@ -18,28 +20,6 @@ guarantee on implementing all features of any particular spec release, currently
 endpoints from before Matrix 1.1, for example.
 
 # Quickstart
-
-## In a browser
-
-### Note, the browserify build has been deprecated. Please use a bundler like webpack or vite instead.
-
-Download the browser version from
-https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
-`<script>` to your page. There will be a global variable `matrixcs`
-attached to `window` through which you can access the SDK. See below for how to
-include libolm to enable end-to-end-encryption.
-
-The browser bundle supports recent versions of browsers. Typically this is ES2015
-or `> 0.5%, last 2 versions, Firefox ESR, not dead` if using
-[browserlists](https://github.com/browserslist/browserslist).
-
-Please check [the working browser example](examples/browser) for more information.
-
-## In Node.js
-
-Ensure you have the latest LTS version of Node.js installed.
-This library relies on `fetch` which is available in Node from v18.0.0 - it should work fine also with polyfills.
-If you wish to use a ponyfill or adapter of some sort then pass it as `fetchFn` to the MatrixClient constructor options.
 
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
@@ -57,8 +37,6 @@ client.publicRooms(function (err, data) {
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
 
-You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
-
 To start the client:
 
 ```javascript
@@ -68,7 +46,7 @@ await client.startClient({ initialSyncLimit: 10 });
 You can perform a call to `/sync` to get the current state of the client:
 
 ```javascript
-client.once("sync", function (state, prevState, res) {
+client.once(ClientEvent.sync, function (state, prevState, res) {
     if (state === "PREPARED") {
         console.log("prepared");
     } else {
@@ -93,7 +71,7 @@ client.sendEvent("roomId", "m.room.message", content, "", (err, res) => {
 To listen for message events:
 
 ```javascript
-client.on("Room.timeline", function (event, room, toStartOfTimeline) {
+client.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (event.getType() !== "m.room.message") {
         return; // only use messages
     }
@@ -116,7 +94,7 @@ Object.keys(client.store.rooms).forEach((roomId) => {
 This SDK provides a full object model around the Matrix Client-Server API and emits
 events for incoming data and state changes. Aside from wrapping the HTTP API, it:
 
--   Handles syncing (via `/initialSync` and `/events`)
+-   Handles syncing (via `/sync`)
 -   Handles the generation of "friendly" room and member names.
 -   Handles historical `RoomMember` information (e.g. display names).
 -   Manages room member state across multiple events (e.g. it handles typing, power
@@ -137,29 +115,29 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
 -   Handles room initial sync on accepting invites.
 -   Handles WebRTC calling.
 
-Later versions of the SDK will:
-
--   Expose a `RoomSummary` which would be suitable for a recents page.
--   Provide different pluggable storage layers (e.g. local storage, database-backed)
-
 # Usage
 
-## Conventions
+## Supported platforms
 
-### Emitted events
+`matrix-js-sdk` can be used in either Node.js applications (ensure you have the latest LTS version of Node.js installed),
+or in browser applications, via a bundler such as Webpack or Vite.
 
-The SDK will emit events using an `EventEmitter`. It also
-emits object models (e.g. `Rooms`, `RoomMembers`) when they
-are updated.
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
+
+## Emitted events
+
+The SDK raises notifications to the application using
+[`EventEmitter`s](https://nodejs.org/api/events.html#class-eventemitter). The `MatrixClient` itself
+implements `EventEmitter`, as do many of the high-level abstractions such as `Room` and `RoomMember`.
 
 ```javascript
 // Listen for low-level MatrixEvents
-client.on("event", function (event) {
+client.on(ClientEvent.Event, function (event) {
     console.log(event.getType());
 });
 
 // Listen for typing changes
-client.on("RoomMember.typing", function (event, member) {
+client.on(RoomMemberEvent.Typing, function (event, member) {
     if (member.typing) {
         console.log(member.name + " is typing...");
     } else {
@@ -171,41 +149,21 @@ client.on("RoomMember.typing", function (event, member) {
 client.startClient();
 ```
 
-### Promises and Callbacks
+## Entry points
 
-Most of the methods in the SDK are asynchronous: they do not directly return a
-result, but instead return a [Promise](http://documentup.com/kriskowal/q/)
-which will be fulfilled in the future.
+As well as the primary entry point (`matrix-js-sdk`), there are several other entry points which may be useful:
 
-The typical usage is something like:
-
-```javascript
-  matrixClient.someMethod(arg1, arg2).then(function(result) {
-    ...
-  });
-```
-
-Alternatively, if you have a Node.js-style `callback(err, result)` function,
-you can pass the result of the promise into it with something like:
-
-```javascript
-matrixClient.someMethod(arg1, arg2).nodeify(callback);
-```
-
-The main thing to note is that it is problematic to discard the result of a
-promise-returning function, as that will cause exceptions to go unobserved.
-
-Methods which return a promise show this in their documentation.
-
-Many methods in the SDK support _both_ Node.js-style callbacks _and_ Promises,
-via an optional `callback` argument. The callback support is now deprecated:
-new methods do not include a `callback` argument, and in the future it may be
-removed from existing methods.
+| Entry point                    | Description                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `matrix-js-sdk`                | Primary entry point. High-level functionality, and lots of historical clutter in need of a cleanup. |
+| `matrix-js-sdk/lib/crypto-api` | Cryptography functionality.                                                                         |
+| `matrix-js-sdk/lib/types`      | Low-level types, reflecting data structures defined in the Matrix spec.                             |
+| `matrix-js-sdk/lib/testing`    | Test utilities, which may be useful in test code but should not be used in production code.         |
 
 ## Examples
 
 This section provides some useful code snippets which demonstrate the
-core functionality of the SDK. These examples assume the SDK is setup like this:
+core functionality of the SDK. These examples assume the SDK is set up like this:
 
 ```javascript
 import * as sdk from "matrix-js-sdk";
@@ -221,8 +179,8 @@ const matrixClient = sdk.createClient({
 ### Automatically join rooms when invited
 
 ```javascript
-matrixClient.on("RoomMember.membership", function (event, member) {
-    if (member.membership === "invite" && member.userId === myUserId) {
+matrixClient.on(RoomMemberEvent.Membership, function (event, member) {
+    if (member.membership === KnownMembership.Invite && member.userId === myUserId) {
         matrixClient.joinRoom(member.roomId).then(function () {
             console.log("Auto-joined %s", member.roomId);
         });
@@ -235,7 +193,7 @@ matrixClient.startClient();
 ### Print out messages for all rooms
 
 ```javascript
-matrixClient.on("Room.timeline", function (event, room, toStartOfTimeline) {
+matrixClient.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
@@ -267,7 +225,7 @@ Output:
 ### Print out membership lists whenever they are changed
 
 ```javascript
-matrixClient.on("RoomState.members", function (event, state, member) {
+matrixClient.on(RoomStateEvent.Members, function (event, state, member) {
     const room = matrixClient.getRoom(state.roomId);
     if (!room) {
         return;
@@ -304,13 +262,16 @@ host the API reference from the source files like this:
 
 ```
   $ yarn gendoc
-  $ cd _docs
+  $ cd docs
   $ python -m http.server 8005
 ```
 
 Then visit `http://localhost:8005` to see the API docs.
 
 # End-to-end encryption support
+
+**This section is outdated.** Use of `libolm` is deprecated and we are replacing it with support
+from the matrix-rust-sdk (https://github.com/element-hq/element-web/issues/21972).
 
 The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](https://gitlab.matrix.org/matrix-org/olm). It is left up to the
@@ -361,7 +322,7 @@ First, you need to pull in the right build tools:
 
 ## Building
 
-To build a browser version from scratch when developing::
+To build a browser version from scratch when developing:
 
 ```
  $ yarn build
@@ -372,9 +333,6 @@ To run tests (Jest):
 ```
  $ yarn test
 ```
-
-> **Note**
-> The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
 To run linting:
 

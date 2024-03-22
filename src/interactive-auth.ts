@@ -149,8 +149,12 @@ export type IAuthDict = AuthDict;
 export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-    public constructor(m: string, public readonly required_stages: string[], public readonly flows: UIAFlow[]) {
+    public constructor(
+        m: string,
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+        public readonly required_stages: string[],
+        public readonly flows: UIAFlow[],
+    ) {
         super(m);
     }
 }
@@ -345,10 +349,8 @@ export class InteractiveAuth<T> {
                     sid: this.emailSid,
                     client_secret: this.clientSecret,
                 };
-                if (await this.matrixClient.doesServerRequireIdServerParam()) {
-                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
-                    creds.id_server = idServerParsedUrl.host;
-                }
+                const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
+                creds.id_server = idServerParsedUrl.host;
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
                     // TODO: Remove `threepid_creds` once servers support proper UIA

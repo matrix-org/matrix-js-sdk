@@ -22,6 +22,13 @@ import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
 import type { ISendEventResponse } from "../@types/requests";
 
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
+
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
  * to a file (leaf) in the tree. Note that this is UNSTABLE and subject to breaking changes
@@ -162,9 +169,8 @@ export class MSC3089Branch {
 
         if (!event) throw new Error("Failed to find event");
 
-        // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
-        // to ensure that the relations system in the sdk will function.
-        await this.client.decryptEventIfNeeded(event, { emit: true, isRetry: true });
+        // Sometimes the event isn't decrypted for us, so do that.
+        await this.client.decryptEventIfNeeded(event);
 
         return event;
     }

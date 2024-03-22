@@ -31,6 +31,7 @@ import { RoomState } from "../../../src/models/room-state";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockGroupCallStateEvent, MockCallMatrixClient } from "../../test-utils/webrtc";
+import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_USER_ID = "@alice:test.dummy";
 const FAKE_DEVICE_ID = "AAAAAAA";
@@ -50,7 +51,7 @@ describe("Group Call Event Handler", function () {
 
         mockMember = {
             userId: FAKE_USER_ID,
-            membership: "join",
+            membership: KnownMembership.Join,
         } as unknown as RoomMember;
 
         const mockEvent = makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID);
@@ -71,7 +72,8 @@ describe("Group Call Event Handler", function () {
             getMember: (userId: string) => (userId === FAKE_USER_ID ? mockMember : null),
         } as unknown as Room;
 
-        (mockClient as any).getRoom = jest.fn().mockReturnValue(mockRoom);
+        mockClient.getRoom = jest.fn().mockReturnValue(mockRoom);
+        mockClient.getFoci.mockReturnValue([{}]);
     });
 
     describe("reacts to state changes", () => {

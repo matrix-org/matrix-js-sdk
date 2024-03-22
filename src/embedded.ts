@@ -29,7 +29,14 @@ import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
 import { ISendEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
-import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts, SendToDeviceContentMap } from "./client";
+import {
+    MatrixClient,
+    ClientEvent,
+    IMatrixClientCreateOpts,
+    IStartClientOpts,
+    SendToDeviceContentMap,
+    IOpenIDToken,
+} from "./client";
 import { SyncApi, SyncState } from "./sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { User } from "./models/user";
@@ -101,11 +108,22 @@ export class RoomWidgetClient extends MatrixClient {
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
+    /**
+     *
+     * @param widgetApi - The widget api to use for communication.
+     * @param capabilities - The capabilities the widget client will request.
+     * @param roomId - The room id the widget is associated with.
+     * @param opts - The configuration options for this client.
+     * @param sendContentLoaded - Whether to send a content loaded widget action immediately after initial setup.
+     *   Set to `false` if the widget uses `waitForIFrameLoad=true` (in this case the client does not expect a content loaded action at all),
+     *   or if the the widget wants to send the `ContentLoaded` action at a later point in time after the initial setup.
+     */
     public constructor(
         private readonly widgetApi: WidgetApi,
         private readonly capabilities: ICapabilities,
         private readonly roomId: string,
         opts: IMatrixClientCreateOpts,
+        sendContentLoaded: boolean,
     ) {
         super(opts);
 
@@ -153,6 +171,12 @@ export class RoomWidgetClient extends MatrixClient {
 
         // Open communication with the host
         widgetApi.start();
+        // Send a content loaded event now we've started the widget API
+        // Note that element-web currently does not use waitForIFrameLoad=false and so
+        // does *not* (yes, that is the right way around) wait for this event. Let's
+        // start sending this, then once this has rolled out, we can change element-web to
+        // use waitForIFrameLoad=false and have a widget API that's less racy.
+        if (sendContentLoaded) widgetApi.sendContentLoaded();
     }
 
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
@@ -197,6 +221,8 @@ export class RoomWidgetClient extends MatrixClient {
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
+        this.matrixRTC.start();
+
         // Watch for TURN servers, if requested
         if (this.capabilities.turnServers) this.watchTurnServers();
     }
@@ -239,6 +265,18 @@ export class RoomWidgetClient extends MatrixClient {
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {
         await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
         return {};
+    }
+
+    public async getOpenIdToken(): Promise<IOpenIDToken> {
+        const token = await this.widgetApi.requestOpenIDConnectToken();
+        // the IOpenIDCredentials from the widget-api and IOpenIDToken form the matrix-js-sdk are compatible.
+        // we still recreate the token to make this transparent and catch'able by the linter in case the types change in the future.
+        return <IOpenIDToken>{
+            access_token: token.access_token,
+            expires_in: token.expires_in,
+            matrix_server_name: token.matrix_server_name,
+            token_type: token.token_type,
+        };
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {

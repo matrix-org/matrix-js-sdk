@@ -16,13 +16,14 @@ limitations under the License.
 
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
 
-import { logger, PrefixedLogger } from "../logger";
+import { logger, Logger } from "../logger";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
 import { IMessage } from "./algorithms/olm";
+import { DecryptionFailureCode } from "../crypto-api";
+import { DecryptionError } from "../common-crypto/CryptoBackend";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -55,7 +56,14 @@ function checkPayloadLength(payloadString: string): void {
 }
 
 interface IInitOpts {
+    /**
+     * (Optional) data from exported device that must be re-created.
+     * If present, opts.pickleKey is ignored (exported data already provides a pickle key)
+     */
     fromExportedDevice?: IExportedDevice;
+    /**
+     * (Optional) pickle key to set instead of default one
+     */
     pickleKey?: string;
 }
 
@@ -64,7 +72,7 @@ export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
     /** pickled Olm.InboundGroupSession */
     session: string;
-    keysClaimed: Record<string, string>;
+    keysClaimed?: Record<string, string>;
     /** Devices involved in forwarding this session to us (normally empty). */
     forwardingCurve25519KeyChain: string[];
     /** whether this session is untrusted. */
@@ -174,11 +182,7 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param fromExportedDevice - (Optional) data from exported device
-     *     that must be re-created.
-     *     If present, opts.pickleKey is ignored
-     *     (exported data already provides a pickle key)
-     * @param pickleKey - (Optional) pickle key to set instead of default one
+     * @param IInitOpts - opts to initialise the OlmAccount with
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
@@ -531,7 +535,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[createOutboundSession]"),
+            logger.getChild("[createOutboundSession]"),
         );
         return newSessionId!;
     }
@@ -588,7 +592,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[createInboundSession]"),
+            logger.getChild("[createInboundSession]"),
         );
 
         return result!;
@@ -602,7 +606,7 @@ export class OlmDevice {
      * @returns  a list of known session ids for the device
      */
     public async getSessionIdsForDevice(theirDeviceIdentityKey: string): Promise<string[]> {
-        const log = logger.withPrefix("[getSessionIdsForDevice]");
+        const log = logger.getChild("[getSessionIdsForDevice]");
 
         if (theirDeviceIdentityKey in this.sessionsInProgress) {
             log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
@@ -642,7 +646,7 @@ export class OlmDevice {
     public async getSessionIdForDevice(
         theirDeviceIdentityKey: string,
         nowait = false,
-        log?: PrefixedLogger,
+        log?: Logger,
     ): Promise<string | null> {
         const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey, nowait, log);
 
@@ -686,9 +690,9 @@ export class OlmDevice {
     public async getSessionInfoForDevice(
         deviceIdentityKey: string,
         nowait = false,
-        log = logger,
+        log: Logger = logger,
     ): Promise<{ sessionId: string; lastReceivedMessageTs: number; hasReceivedMessage: boolean }[]> {
-        log = log.withPrefix("[getSessionInfoForDevice]");
+        log = log.getChild("[getSessionInfoForDevice]");
 
         if (deviceIdentityKey in this.sessionsInProgress && !nowait) {
             log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
@@ -764,7 +768,7 @@ export class OlmDevice {
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
-            logger.withPrefix("[encryptMessage]"),
+            logger.getChild("[encryptMessage]"),
         );
         return res!;
     }
@@ -806,7 +810,7 @@ export class OlmDevice {
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
-            logger.withPrefix("[decryptMessage]"),
+            logger.getChild("[decryptMessage]"),
         );
         return payloadString!;
     }
@@ -842,7 +846,7 @@ export class OlmDevice {
                     matches = sessionInfo.session.matches_inbound(ciphertext);
                 });
             },
-            logger.withPrefix("[matchesSession]"),
+            logger.getChild("[matchesSession]"),
         );
         return matches!;
     }
@@ -1142,7 +1146,7 @@ export class OlmDevice {
                     },
                 );
             },
-            logger.withPrefix("[addInboundGroupSession]"),
+            logger.getChild("[addInboundGroupSession]"),
         );
     }
 
@@ -1217,8 +1221,8 @@ export class OlmDevice {
                 this.getInboundGroupSession(roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null || sessionData === null) {
                         if (withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            error = new DecryptionError(
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,
@@ -1233,8 +1237,8 @@ export class OlmDevice {
                         res = session.decrypt(body);
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            error = new DecryptionError(
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,
@@ -1282,7 +1286,7 @@ export class OlmDevice {
                     };
                 });
             },
-            logger.withPrefix("[decryptGroupMessage]"),
+            logger.getChild("[decryptGroupMessage]"),
         );
 
         if (error!) {
@@ -1328,7 +1332,7 @@ export class OlmDevice {
                     }
                 });
             },
-            logger.withPrefix("[hasInboundSessionKeys]"),
+            logger.getChild("[hasInboundSessionKeys]"),
         );
 
         return result!;
@@ -1398,7 +1402,7 @@ export class OlmDevice {
                     };
                 });
             },
-            logger.withPrefix("[getInboundGroupSessionKey]"),
+            logger.getChild("[getInboundGroupSessionKey]"),
         );
 
         return result;
@@ -1443,7 +1447,7 @@ export class OlmDevice {
             (txn) => {
                 result = this.cryptoStore.getSharedHistoryInboundGroupSessions(roomId, txn);
             },
-            logger.withPrefix("[getSharedHistoryInboundGroupSessionsForRoom]"),
+            logger.getChild("[getSharedHistoryInboundGroupSessionsForRoom]"),
         );
         return result!;
     }
