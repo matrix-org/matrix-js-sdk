@@ -122,11 +122,5 @@ module.exports = {
                 "@typescript-eslint/explicit-member-accessibility": "off",
             },
         },
-        {
-            files: ["src/@types/matrix-client-server.d.ts"],
-            rules: {
-                "tsdoc/syntax": "off",
-            },
-        },
     ],
 };

@@ -21,8 +21,7 @@
         "test:watch": "jest --watch",
         "coverage": "yarn test --coverage",
         "prepack": "yarn build",
-        "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
-        "fetch-openapi": "openapi-typescript https://spec.matrix.org/latest/client-server-api/api.json --output src/@types/matrix-client-server.d.ts"
+        "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'"
     },
     "repository": {
         "type": "git",
@@ -120,7 +119,6 @@
         "typedoc-plugin-mdn-links": "^3.0.3",
         "typedoc-plugin-missing-exports": "^2.0.0",
         "typescript": "^5.3.3",
-        "openapi-typescript": "v5",
         "node-fetch": "^2.7.0",
         "lint-staged": "^15.0.2",
         "husky": "^9.0.0",

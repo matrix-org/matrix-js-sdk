@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { operations } from "@matrix-org/spec/client-server";
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -22,7 +23,6 @@ import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
 import { EventType, RelationType } from "./event";
-import { operations } from "./matrix-client-server";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -77,7 +77,7 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export type IPresenceOpts = operations["setPresence"]["parameters"]["body"]["presenceState"];
+export type IPresenceOpts = operations["setPresence"]["requestBody"]["content"]["application/json"];
 
 export interface IPaginateOpts {
     // true to fill backwards, false to go forwards
@@ -157,7 +157,7 @@ export interface ICreateRoomOpts {
     room_version?: string;
 }
 
-export type IRoomDirectoryOptions = operations["queryPublicRooms"]["parameters"]["body"]["body"] &
+export type IRoomDirectoryOptions = operations["queryPublicRooms"]["requestBody"]["content"]["application/json"] &
     operations["queryPublicRooms"]["parameters"]["query"];
 
 export interface IAddThreePidOnlyBody {
@@ -220,9 +220,9 @@ export interface INotificationsResponse {
     notifications: INotification[];
 }
 
-export type IFilterResponse = operations["defineFilter"]["responses"]["200"]["schema"];
+export type IFilterResponse = operations["defineFilter"]["responses"]["200"]["content"]["application/json"];
 
-export type ITagsResponse = operations["getRoomTags"]["responses"]["200"]["schema"];
+export type ITagsResponse = operations["getRoomTags"]["responses"]["200"]["content"]["application/json"];
 
 export interface IStatusResponse extends IPresenceOpts {
     currently_active?: boolean;
