@@ -27,6 +27,7 @@ import {
     UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_SHARED_ROOMS,
 } from "../../src";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("RoomMember", function () {
     const roomId = "!foo:bar";
@@ -50,7 +51,7 @@ describe("RoomMember", function () {
                 room: roomId,
                 user: userA,
                 content: {
-                    membership: "join",
+                    membership: KnownMembership.Join,
                     avatar_url: "mxc://flibble/wibble",
                 },
             });
@@ -282,11 +283,11 @@ describe("RoomMember", function () {
     describe("isKicked", () => {
         it("should return false if membership is not `leave`", () => {
             const member1 = new RoomMember(roomId, userA);
-            member1.membership = "join";
+            member1.membership = KnownMembership.Join;
             expect(member1.isKicked()).toBeFalsy();
 
             const member2 = new RoomMember(roomId, userA);
-            member2.membership = "invite";
+            member2.membership = KnownMembership.Invite;
             expect(member2.isKicked()).toBeFalsy();
 
             const member3 = new RoomMember(roomId, userA);
@@ -295,17 +296,17 @@ describe("RoomMember", function () {
 
         it("should return false if the membership event is unknown", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             expect(member.isKicked()).toBeFalsy();
         });
 
         it("should return false if the member left of their own accord", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userA,
-                mship: "leave",
+                mship: KnownMembership.Leave,
                 skey: userA,
             });
             expect(member.isKicked()).toBeFalsy();
@@ -313,11 +314,11 @@ describe("RoomMember", function () {
 
         it("should return true if the member's leave was sent by another user", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "leave",
+                mship: KnownMembership.Leave,
                 skey: userA,
             });
             expect(member.isKicked()).toBeTruthy();
@@ -327,11 +328,11 @@ describe("RoomMember", function () {
     describe("getDMInviter", () => {
         it("should return userId of the sender of the invite if is_direct=true", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "invite";
+            member.membership = KnownMembership.Invite;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 skey: userA,
             });
             member.events.member.event.content!.is_direct = true;
@@ -340,11 +341,11 @@ describe("RoomMember", function () {
 
         it("should not return userId of the sender of the invite if is_direct=false", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "invite";
+            member.membership = KnownMembership.Invite;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 skey: userA,
             });
             member.events.member.event.content!.is_direct = false;
@@ -355,7 +356,7 @@ describe("RoomMember", function () {
     describe("setMembershipEvent", function () {
         const joinEvent = utils.mkMembership({
             event: true,
-            mship: "join",
+            mship: KnownMembership.Join,
             user: userA,
             room: roomId,
             name: "Alice",
@@ -363,7 +364,7 @@ describe("RoomMember", function () {
 
         const inviteEvent = utils.mkMembership({
             event: true,
-            mship: "invite",
+            mship: KnownMembership.Invite,
             user: userB,
             skey: userA,
             room: roomId,
@@ -371,10 +372,10 @@ describe("RoomMember", function () {
 
         it("should set 'membership' and assign the event to 'events.member'.", function () {
             member.setMembershipEvent(inviteEvent);
-            expect(member.membership).toEqual("invite");
+            expect(member.membership).toEqual(KnownMembership.Invite);
             expect(member.events.member).toEqual(inviteEvent);
             member.setMembershipEvent(joinEvent);
-            expect(member.membership).toEqual("join");
+            expect(member.membership).toEqual(KnownMembership.Join);
             expect(member.events.member).toEqual(joinEvent);
         });
 
@@ -387,13 +388,13 @@ describe("RoomMember", function () {
                     return [
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userB,
                         }),
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userC,
                             name: "Alice",
@@ -443,7 +444,7 @@ describe("RoomMember", function () {
         it("should set 'name' to user_id if it is just whitespace", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userA,
                 room: roomId,
                 name: " \u200b ",
@@ -457,7 +458,7 @@ describe("RoomMember", function () {
         it("should disambiguate users on a fuzzy displayname match", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userA,
                 room: roomId,
                 name: "Alíce\u200b", // note diacritic and zero width char
@@ -471,7 +472,7 @@ describe("RoomMember", function () {
                     return [
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userC,
                             name: "Alice",

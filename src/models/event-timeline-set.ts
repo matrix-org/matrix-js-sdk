@@ -159,7 +159,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param client - the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param thread - the thread to which this timeline set relates.
-     * @param isThreadTimeline - Whether this timeline set relates to a thread list timeline
+     * @param threadListType - the type of thread list represented, if any
      * (e.g., All threads or My threads)
      */
     public constructor(
@@ -674,6 +674,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
+     * @param event - the event to add
+     * @param timeline - the timeline onto which to add it
      * @param options - addEventToTimeline options
      *
      * @remarks
@@ -770,8 +772,6 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Will fire "Room.timeline" for each event added.
      *
      * @internal
-     *
-     * @param options - addEventToTimeline options
      *
      * @remarks
      * Fires {@link RoomEvent.Timeline}

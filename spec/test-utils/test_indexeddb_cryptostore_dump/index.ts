@@ -18,11 +18,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 /**
- * Populate an IndexedDB store with the test data from this directory.
+ * Populate an IndexedDB store with a set of test data.
  *
  * @param name - Name of the IndexedDB database to create.
+ * @param dumpPath - The path to the dump file to import.
  */
-export async function populateStore(name: string): Promise<IDBDatabase> {
+export async function populateStore(name: string, dumpPath: string): Promise<IDBDatabase> {
     const req = indexedDB.open(name, 11);
 
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -42,7 +43,7 @@ export async function populateStore(name: string): Promise<IDBDatabase> {
         };
     });
 
-    await importData(db);
+    await importData(db, dumpPath);
 
     return db;
 }
@@ -100,8 +101,8 @@ function upgradeDatabase(oldVersion: number, db: IDBDatabase) {
     }
 }
 
-async function importData(db: IDBDatabase) {
-    const path = resolve("spec/test-utils/test_indexeddb_cryptostore_dump/dump.json");
+async function importData(db: IDBDatabase, dumpPath: string) {
+    const path = resolve(dumpPath);
     const json: Record<string, Array<{ key?: any; value: any }>> = JSON.parse(
         await readFile(path, { encoding: "utf8" }),
     );
@@ -133,4 +134,21 @@ async function importData(db: IDBDatabase) {
             putEntry(0);
         });
     }
+}
+
+export interface DumpDataSetInfo {
+    /** The user ID to use for the test.*/
+    userId: string;
+    /** The device ID to use for the test.*/
+    deviceId: string;
+    /** The path to the dump file to import via {@link populateStore}.*/
+    dumpPath: string;
+    /** The pickle key to use for the dumped account.*/
+    pickleKey: string;
+    /** The response to use for the keys query. */
+    keyQueryResponse: any;
+    /** The response to use for the backup query.*/
+    backupResponse?: any;
+    /** Additional dump info specific for some tests.*/
+    [key: string]: any;
 }

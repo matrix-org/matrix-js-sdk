@@ -61,6 +61,7 @@ import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
 import { Crypto } from "./crypto";
+import { KnownMembership } from "./@types/membership";
 
 const DEBUG = true;
 
@@ -1354,11 +1355,11 @@ export class SyncApi {
             const unreadThreadNotifications =
                 joinObj[UNREAD_THREAD_NOTIFICATIONS.name] ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
             if (unreadThreadNotifications) {
-                // Only partially reset unread notification
-                // We want to keep the client-generated count. Particularly important
-                // for encrypted room that refresh their notification count on event
-                // decryption
-                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                // This mirrors the logic above for rooms: take the *total* notification count from
+                // the server for unencrypted rooms or is it's zero. Any threads not present in this
+                // object implicitly have zero notifications, so start by clearing the total counts
+                // for all such threads.
+                room.resetThreadUnreadNotificationCountFromSync(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
                         room.setThreadUnreadNotificationCount(
@@ -1379,7 +1380,7 @@ export class SyncApi {
                     }
                 }
             } else {
-                room.resetThreadUnreadNotificationCount();
+                room.resetThreadUnreadNotificationCountFromSync();
             }
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
@@ -1720,7 +1721,7 @@ export class SyncApi {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -1740,7 +1741,7 @@ export class SyncApi {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member;
-                    if (inviteEvent?.getContent().membership !== "invite") {
+                    if (inviteEvent?.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }

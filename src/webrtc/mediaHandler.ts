@@ -31,6 +31,9 @@ export type MediaHandlerEventHandlerMap = {
 };
 
 export interface IScreensharingOpts {
+    /**
+     * sourceId for Electron DesktopCapturer
+     */
     desktopCapturerSourceId?: string;
     audio?: boolean;
     // For electron screen capture, there are very few options for detecting electron
@@ -351,7 +354,7 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     /**
-     * @param desktopCapturerSourceId - sourceId for Electron DesktopCapturer
+     * @param opts - screensharing stream options
      * @param reusable - is allowed to be reused by the MediaHandler
      * @returns based on passed parameters
      */

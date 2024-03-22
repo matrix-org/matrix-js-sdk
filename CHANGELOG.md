@@ -1,3 +1,33 @@
+Changes in [31.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.5.0) (2024-03-12)
+==================================================================================================
+## ✨ Features
+
+* Update MSC2965 OIDC Discovery implementation ([#4064](https://github.com/matrix-org/matrix-js-sdk/pull/4064)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Add basic retry for rust crypto outgoing requests ([#4061](https://github.com/matrix-org/matrix-js-sdk/pull/4061)). Contributed by @BillCarsonFr.
+
+
+Changes in [31.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.4.0) (2024-02-27)
+==================================================================================================
+## ✨ Features
+
+* Validate `account_management_uri` and `account_management_actions_supported` from OIDC Issuer well-known ([#4074](https://github.com/matrix-org/matrix-js-sdk/pull/4074)). Contributed by @t3chguy.
+* Allow specifying OIDC url state parameter for passing data to callback ([#4068](https://github.com/matrix-org/matrix-js-sdk/pull/4068)). Contributed by @t3chguy.
+* Add getAuthIssuer method for MSC2965 ([#4071](https://github.com/matrix-org/matrix-js-sdk/pull/4071)). Contributed by @t3chguy.
+* Allow specifying more OIDC client metadata for dynamic registration ([#4070](https://github.com/matrix-org/matrix-js-sdk/pull/4070)). Contributed by @t3chguy.
+* Add unread marker event type ([#4069](https://github.com/matrix-org/matrix-js-sdk/pull/4069)). Contributed by @dbkr.
+* Add "AsJson" forms of the key import/export methods ([#4057](https://github.com/matrix-org/matrix-js-sdk/pull/4057)). Contributed by @andybalaam.
+
+## 🐛 Bug Fixes
+
+* Ignore memberships of users that are not in the call ([#4065](https://github.com/matrix-org/matrix-js-sdk/pull/4065)). Contributed by @toger5.
+* Await encrypted messages ([#4063](https://github.com/matrix-org/matrix-js-sdk/pull/4063)). Contributed by @toger5.
+* ElementR | Ensure own user and device trust are updated after migration before giving back control to the app. ([#4059](https://github.com/matrix-org/matrix-js-sdk/pull/4059)). Contributed by @BillCarsonFr.
+* Bump matrix-sdk-crypto-wasm to 4.5.0 ([#4060](https://github.com/matrix-org/matrix-js-sdk/pull/4060)). Contributed by @andybalaam.
+
+
 Changes in [31.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.3.0) (2024-02-13)
 ==================================================================================================
 ## ✨ Features

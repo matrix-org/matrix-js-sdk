@@ -107,8 +107,8 @@ describe("SlidingSync", () => {
                 onRequest: (initial) => {
                     return { initial: initial };
                 },
-                onResponse: (res) => {
-                    return {};
+                onResponse: async (res) => {
+                    return;
                 },
                 when: () => ExtensionState.PreProcess,
             };
@@ -1572,7 +1572,7 @@ describe("SlidingSync", () => {
             onPreExtensionRequest = () => {
                 return extReq;
             };
-            onPreExtensionResponse = (resp) => {
+            onPreExtensionResponse = async (resp) => {
                 extensionOnResponseCalled = true;
                 callbackOrder.push("onPreExtensionResponse");
                 expect(resp).toEqual(extResp);
@@ -1613,7 +1613,7 @@ describe("SlidingSync", () => {
                 return undefined;
             };
             let responseCalled = false;
-            onPreExtensionResponse = (resp) => {
+            onPreExtensionResponse = async (resp) => {
                 responseCalled = true;
             };
             httpBackend!
@@ -1649,7 +1649,7 @@ describe("SlidingSync", () => {
             };
             let responseCalled = false;
             const callbackOrder: string[] = [];
-            onPostExtensionResponse = (resp) => {
+            onPostExtensionResponse = async (resp) => {
                 expect(resp).toEqual(extResp);
                 responseCalled = true;
                 callbackOrder.push("onPostExtensionResponse");

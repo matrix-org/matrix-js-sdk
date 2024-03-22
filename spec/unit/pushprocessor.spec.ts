@@ -29,147 +29,150 @@ describe("NotificationService", function () {
         actions: ["notify", { set_tweak: "sound", value: "default" }],
     };
 
-    // These would be better if individual rules were configured in the tests themselves.
-    const matrixClient = {
-        getRoom: function () {
-            return {
-                currentState: {
-                    getMember: function () {
-                        return {
-                            name: testDisplayName,
-                        };
-                    },
-                    getJoinedMemberCount: function () {
-                        return 0;
-                    },
-                    members: {},
-                },
-            };
-        },
-        ...mockClientMethodsUser(testUserId),
-        supportsIntentionalMentions: () => true,
-        pushRules: {
-            device: {},
-            global: {
-                content: [
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "ali",
-                        rule_id: ".m.rule.contains_user_name",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "coffee",
-                        rule_id: "coffee",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        enabled: true,
-                        pattern: "foo*bar",
-                        rule_id: "foobar",
-                    },
-                ],
-                override: [
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                            {
-                                set_tweak: "highlight",
-                            },
-                        ],
-                        conditions: [
-                            {
-                                kind: "contains_display_name",
-                            },
-                        ],
-                        enabled: true,
-                        rule_id: ".m.rule.contains_display_name",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "sound",
-                                value: "default",
-                            },
-                        ],
-                        conditions: [
-                            {
-                                is: "2",
-                                kind: "room_member_count",
-                            },
-                        ],
-                        enabled: true,
-                        rule_id: ".m.rule.room_one_to_one",
-                    },
-                ],
-                room: [],
-                sender: [],
-                underride: [
-                    msc3914RoomCallRule,
-                    {
-                        actions: ["dont-notify"],
-                        conditions: [
-                            {
-                                key: "content.msgtype",
-                                kind: "event_match",
-                                pattern: "m.notice",
-                            },
-                        ],
-                        enabled: true,
-                        rule_id: ".m.rule.suppress_notices",
-                    },
-                    {
-                        actions: [
-                            "notify",
-                            {
-                                set_tweak: "highlight",
-                                value: false,
-                            },
-                        ],
-                        conditions: [],
-                        enabled: true,
-                        rule_id: ".m.rule.fallback",
-                    },
-                ],
-            },
-        },
-    } as unknown as MatrixClient;
+    let matrixClient: MatrixClient;
 
     beforeEach(function () {
+        // These would be better if individual rules were configured in the tests themselves.
+        matrixClient = {
+            getRoom: function () {
+                return {
+                    currentState: {
+                        getMember: function () {
+                            return {
+                                name: testDisplayName,
+                            };
+                        },
+                        getJoinedMemberCount: function () {
+                            return 0;
+                        },
+                        members: {},
+                    },
+                };
+            },
+            ...mockClientMethodsUser(testUserId),
+            supportsIntentionalMentions: () => true,
+            pushRules: {
+                device: {},
+                global: {
+                    content: [
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "sound",
+                                    value: "default",
+                                },
+                                {
+                                    set_tweak: "highlight",
+                                },
+                            ],
+                            enabled: true,
+                            pattern: "ali",
+                            rule_id: ".m.rule.contains_user_name",
+                        },
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "sound",
+                                    value: "default",
+                                },
+                                {
+                                    set_tweak: "highlight",
+                                },
+                            ],
+                            enabled: true,
+                            pattern: "coffee",
+                            rule_id: "coffee",
+                        },
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "sound",
+                                    value: "default",
+                                },
+                                {
+                                    set_tweak: "highlight",
+                                },
+                            ],
+                            enabled: true,
+                            pattern: "foo*bar",
+                            rule_id: "foobar",
+                        },
+                    ],
+                    override: [
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "sound",
+                                    value: "default",
+                                },
+                                {
+                                    set_tweak: "highlight",
+                                },
+                            ],
+                            conditions: [
+                                {
+                                    kind: "contains_display_name",
+                                },
+                            ],
+                            enabled: true,
+                            default: true,
+                            rule_id: ".m.rule.contains_display_name",
+                        },
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "sound",
+                                    value: "default",
+                                },
+                            ],
+                            conditions: [
+                                {
+                                    is: "2",
+                                    kind: "room_member_count",
+                                },
+                            ],
+                            enabled: true,
+                            rule_id: ".m.rule.room_one_to_one",
+                        },
+                    ],
+                    room: [],
+                    sender: [],
+                    underride: [
+                        msc3914RoomCallRule,
+                        {
+                            actions: ["dont-notify"],
+                            conditions: [
+                                {
+                                    key: "content.msgtype",
+                                    kind: "event_match",
+                                    pattern: "m.notice",
+                                },
+                            ],
+                            enabled: true,
+                            rule_id: ".m.rule.suppress_notices",
+                        },
+                        {
+                            actions: [
+                                "notify",
+                                {
+                                    set_tweak: "highlight",
+                                    value: false,
+                                },
+                            ],
+                            conditions: [],
+                            enabled: true,
+                            rule_id: ".m.rule.fallback",
+                        },
+                    ],
+                },
+            },
+        } as unknown as MatrixClient;
+
         testEvent = utils.mkEvent({
             type: "m.room.message",
             room: testRoomId,
@@ -182,6 +185,26 @@ describe("NotificationService", function () {
         });
         matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules!);
         pushProcessor = new PushProcessor(matrixClient);
+    });
+
+    it("should add default rules in the correct order", () => {
+        // By the time we get here, we expect the PushProcessor to have merged the new .m.rule.is_room_mention rule into the existing list of rules.
+        // Check that has happened, and that it is in the right place.
+        const containsDisplayNameRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
+            (rule) => rule.rule_id === RuleId.ContainsDisplayName,
+        );
+        expect(containsDisplayNameRuleIdx).toBeGreaterThan(-1);
+        const isRoomMentionRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
+            (rule) => rule.rule_id === RuleId.IsRoomMention,
+        );
+        expect(isRoomMentionRuleIdx).toBeGreaterThan(-1);
+        const mReactionRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
+            (rule) => rule.rule_id === ".m.rule.reaction",
+        );
+        expect(mReactionRuleIdx).toBeGreaterThan(-1);
+
+        expect(containsDisplayNameRuleIdx).toBeLessThan(isRoomMentionRuleIdx!);
+        expect(isRoomMentionRuleIdx).toBeLessThan(mReactionRuleIdx!);
     });
 
     // User IDs

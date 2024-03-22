@@ -17,9 +17,8 @@ limitations under the License.
 import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
 import { AccessTokens } from "../http-api";
-import { IDelegatedAuthConfig } from "../client";
 import { generateScope } from "./authorize";
-import { discoverAndValidateAuthenticationConfig } from "./discovery";
+import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery";
 import { logger } from "../logger";
 
 /**
@@ -42,9 +41,9 @@ export class OidcTokenRefresher {
 
     public constructor(
         /**
-         * Delegated auth config as found in matrix client .well-known
+         * The OIDC issuer as returned by the /auth_issuer API
          */
-        authConfig: IDelegatedAuthConfig,
+        issuer: string,
         /**
          * id of this client as registered with the OP
          */
@@ -63,17 +62,17 @@ export class OidcTokenRefresher {
          */
         private readonly idTokenClaims: IdTokenClaims,
     ) {
-        this.oidcClientReady = this.initialiseOidcClient(authConfig, clientId, deviceId, redirectUri);
+        this.oidcClientReady = this.initialiseOidcClient(issuer, clientId, deviceId, redirectUri);
     }
 
     private async initialiseOidcClient(
-        authConfig: IDelegatedAuthConfig,
+        issuer: string,
         clientId: string,
         deviceId: string,
         redirectUri: string,
     ): Promise<void> {
         try {
-            const config = await discoverAndValidateAuthenticationConfig(authConfig);
+            const config = await discoverAndValidateOIDCIssuerWellKnown(issuer);
 
             const scope = generateScope(deviceId);
 
@@ -114,10 +113,10 @@ export class OidcTokenRefresher {
      *
      * This function is intended to be overriden by the consumer when persistence is necessary.
      *
-     * @param accessToken - new access token
-     * @param refreshToken - OPTIONAL new refresh token
+     * @param tokens.accessToken - new access token
+     * @param tokens.refreshToken - OPTIONAL new refresh token
      */
-    public async persistTokens(_tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
+    public async persistTokens(tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
         // NOOP
     }
 

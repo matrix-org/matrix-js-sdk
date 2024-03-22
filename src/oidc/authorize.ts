@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
 import { subtleCrypto, TextEncoder } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
@@ -129,6 +128,7 @@ export const generateAuthorizationUrl = async (
  * @param nonce - state
  * @param prompt - indicates to the OP which flow the user should see - eg login or registration
  *          See https://openid.net/specs/openid-connect-prompt-create-1_0.html#name-prompt-parameter
+ * @param urlState - value to append to the opaque state identifier to uniquely identify the callback
  * @returns a Promise with the url as a string
  */
 export const generateOidcAuthorizationUrl = async ({
@@ -139,6 +139,7 @@ export const generateOidcAuthorizationUrl = async ({
     identityServerUrl,
     nonce,
     prompt,
+    urlState,
 }: {
     clientId: string;
     metadata: ValidatedIssuerMetadata;
@@ -147,8 +148,9 @@ export const generateOidcAuthorizationUrl = async ({
     redirectUri: string;
     nonce: string;
     prompt?: string;
+    urlState?: string;
 }): Promise<string> => {
-    const scope = await generateScope();
+    const scope = generateScope();
     const oidcClient = new OidcClient({
         ...metadata,
         client_id: clientId,
@@ -164,6 +166,7 @@ export const generateOidcAuthorizationUrl = async ({
         state: userState,
         nonce,
         prompt,
+        url_state: urlState,
     });
 
     return request.url;
@@ -205,7 +208,7 @@ export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
 ): Promise<{
-    oidcClientSettings: IDelegatedAuthConfig & { clientId: string };
+    oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
     homeserverUrl: string;
     idTokenClaims: IdTokenClaims;
@@ -235,7 +238,7 @@ export const completeAuthorizationCodeGrant = async (
 
         // hydrate the sign in state and create a client
         // the stored sign in state includes oidc configuration we set at the start of the oidc login flow
-        const signInState = SigninState.fromStorageString(stateString);
+        const signInState = await SigninState.fromStorageString(stateString);
         const client = new OidcClient({ ...signInState, stateStore });
 
         // validate the code and state, and attempt to swap the code for tokens

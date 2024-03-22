@@ -294,15 +294,15 @@ jobs:
                   remove-labels: X-Upcoming-Release-Blocker
                   add-labels: X-Release-Blocker
 
-            - name: Wait for master->develop gitflow merge
-              if: inputs.final
-              uses: t3chguy/wait-on-check-action@18541021811b56544d90e0f073401c2b99e249d6 # fork
-              with:
-                  ref: master
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-                  wait-interval: 10
-                  check-name: merge
-                  allowed-conclusions: success
+    #            - name: Wait for master->develop gitflow merge
+    #              if: inputs.final
+    #              uses: t3chguy/wait-on-check-action@18541021811b56544d90e0f073401c2b99e249d6 # fork
+    #              with:
+    #                  ref: master
+    #                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+    #                  wait-interval: 10
+    #                  check-name: merge
+    #                  allowed-conclusions: success
 
     bump-downstreams:
         name: Update npm dependency in downstream projects

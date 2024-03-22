@@ -15,12 +15,12 @@ limitations under the License.
 */
 
 import {
-    OlmMachine,
-    PutDehydratedDeviceRequest,
     KeysBackupRequest,
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
+    OlmMachine,
+    PutDehydratedDeviceRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
@@ -28,8 +28,8 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { logDuration, QueryDict } from "../utils";
+import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
+import { logDuration, QueryDict, sleep } from "../utils";
 import { IAuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
@@ -73,15 +73,15 @@ export class OutgoingRequestProcessor {
          * for the complete list of request types
          */
         if (msg instanceof KeysUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
         } else if (msg instanceof KeysQueryRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
         } else if (msg instanceof KeysClaimRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
         } else if (msg instanceof SignatureUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
+            resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
         } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(
+            resp = await this.requestWithRetry(
                 Method.Put,
                 "/_matrix/client/v3/room_keys/keys",
                 { version: msg.version },
@@ -93,7 +93,7 @@ export class OutgoingRequestProcessor {
             const path =
                 `/_matrix/client/v3/rooms/${encodeURIComponent(msg.room_id)}/send/` +
                 `${encodeURIComponent(msg.event_type)}/${encodeURIComponent(msg.txn_id)}`;
-            resp = await this.rawJsonRequest(Method.Put, path, {}, msg.body);
+            resp = await this.requestWithRetry(Method.Put, path, {}, msg.body);
         } else if (msg instanceof UploadSigningKeysRequest) {
             await this.makeRequestWithUIA(
                 Method.Post,
@@ -161,7 +161,7 @@ export class OutgoingRequestProcessor {
         const path =
             `/_matrix/client/v3/sendToDevice/${encodeURIComponent(request.event_type)}/` +
             encodeURIComponent(request.txn_id);
-        return await this.rawJsonRequest(Method.Put, path, {}, request.body);
+        return await this.requestWithRetry(Method.Put, path, {}, request.body);
     }
 
     private async makeRequestWithUIA<T>(
@@ -172,7 +172,7 @@ export class OutgoingRequestProcessor {
         uiaCallback: UIAuthCallback<T> | undefined,
     ): Promise<string> {
         if (!uiaCallback) {
-            return await this.rawJsonRequest(method, path, queryParams, body);
+            return await this.requestWithRetry(method, path, queryParams, body);
         }
 
         const parsedBody = JSON.parse(body);
@@ -183,12 +183,37 @@ export class OutgoingRequestProcessor {
             if (auth !== null) {
                 newBody.auth = auth;
             }
-            const resp = await this.rawJsonRequest(method, path, queryParams, JSON.stringify(newBody));
+            const resp = await this.requestWithRetry(method, path, queryParams, JSON.stringify(newBody));
             return JSON.parse(resp) as T;
         };
 
         const resp = await uiaCallback(makeRequest);
         return JSON.stringify(resp);
+    }
+
+    private async requestWithRetry(
+        method: Method,
+        path: string,
+        queryParams: QueryDict,
+        body: string,
+    ): Promise<string> {
+        let currentRetryCount = 0;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            try {
+                return await this.rawJsonRequest(method, path, queryParams, body);
+            } catch (e) {
+                currentRetryCount++;
+                const backoff = calculateRetryBackoff(e, currentRetryCount, true);
+                if (backoff < 0) {
+                    // Max number of retries reached, or error is not retryable. rethrow the error
+                    throw e;
+                }
+                // wait for the specified time and then retry the request
+                await sleep(backoff);
+            }
+        }
     }
 
     private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {

@@ -22,6 +22,13 @@ import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
 import type { ISendEventResponse } from "../@types/requests";
 
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
+
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
  * to a file (leaf) in the tree. Note that this is UNSTABLE and subject to breaking changes
