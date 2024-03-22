@@ -131,7 +131,7 @@ export async function mkEncryptedMatrixEvent(opts: {
 }
 
 /**
- * Create a `MatrixEvent` representing a successfully-decrypted `m.room.encrypted` event.
+ * Create a `MatrixEvent` representing a `m.room.encrypted` event which could not be decrypted.
  *
  * @param opts - Values for the event.
  */
