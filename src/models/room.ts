@@ -68,6 +68,7 @@ import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
 import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
+import * as utils from "../utils";
 import { KnownMembership, Membership } from "../@types/membership";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -473,6 +474,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.name = roomId;
         this.normalizedName = roomId;
+
+        // Listen to our own receipt event as a more modular way of processing our own
+        // receipts. No need to remove the listener: it's on ourself anyway.
+        this.on(RoomEvent.Receipt, this.onReceipt);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -1306,6 +1311,98 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    private onReceipt(event: MatrixEvent): void {
+        if (this.hasEncryptionStateEvent()) {
+            this.clearNotificationsOnReceipt(event);
+        }
+    }
+
+    private clearNotificationsOnReceipt(event: MatrixEvent): void {
+        // Like above, we have to listen for read receipts from ourselves in order to
+        // correctly handle notification counts on encrypted rooms.
+        // This fixes https://github.com/vector-im/element-web/issues/9421
+
+        // Figure out if we've read something or if it's just informational
+        // We need to work out what threads we've just recieved receipts for, so we
+        // know which ones to update. If we've received an unthreaded receipt, we'll
+        // need to update all threads.
+        let threadIds: string[] = [];
+        let hasUnthreadedReceipt = false;
+
+        const content = event.getContent();
+
+        for (const receiptGroup of Object.values(content)) {
+            for (const [receiptType, userReceipt] of Object.entries(receiptGroup)) {
+                if (!utils.isSupportedReceiptType(receiptType)) continue;
+                if (!userReceipt) continue;
+
+                for (const [userId, singleReceipt] of Object.entries(userReceipt)) {
+                    if (!singleReceipt || typeof singleReceipt !== "object") continue;
+                    const typedSingleReceipt = singleReceipt as Record<string, any>;
+                    if (userId !== this.client.getUserId()) continue;
+                    if (typedSingleReceipt.thread_id === undefined) {
+                        hasUnthreadedReceipt = true;
+                    } else if (typeof typedSingleReceipt.thread_id === "string") {
+                        threadIds.push(typedSingleReceipt.thread_id);
+                    }
+                }
+            }
+        }
+
+        if (hasUnthreadedReceipt) {
+            // If we have an unthreaded receipt, we need to update any threads that have a notification
+            // in them (because we know the receipt can't go backwards so we don't need to check any with
+            // no notifications: the number can only decrease from a receipt).
+            threadIds = this.getThreads()
+                .filter(
+                    (thread) =>
+                        this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Total) > 0 ||
+                        this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Highlight) > 0,
+                )
+                .map((thread) => thread.id);
+            threadIds.push("main");
+        }
+
+        for (const threadId of threadIds) {
+            // Work backwards to determine how many events are unread. We also set
+            // a limit for how back we'll look to avoid spinning CPU for too long.
+            // If we hit the limit, we assume the count is unchanged.
+            const maxHistory = 20;
+            const timeline = threadId === "main" ? this.getLiveTimeline() : this.getThread(threadId)?.liveTimeline;
+
+            if (!timeline) {
+                logger.warn(`Couldn't find timeline for thread ID ${threadId} in room ${this.roomId}`);
+                continue;
+            }
+
+            const events = timeline.getEvents();
+
+            let highlightCount = 0;
+
+            for (let i = events.length - 1; i >= 0; i--) {
+                if (i === events.length - maxHistory) return; // limit reached
+
+                const event = events[i];
+
+                if (this.hasUserReadEvent(this.client.getUserId()!, event.getId()!)) {
+                    // If the user has read the event, then the counting is done.
+                    break;
+                }
+
+                const pushActions = this.client.getPushActionsForEvent(event);
+                highlightCount += pushActions?.tweaks?.highlight ? 1 : 0;
+            }
+
+            // Note: we don't need to handle 'total' notifications because the counts
+            // will come from the server.
+            if (threadId === "main") {
+                this.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
+            } else {
+                this.setThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight, highlightCount);
+            }
+        }
+    }
+
     /**
      * Returns whether there are any devices in the room that are unverified
      *
@@ -1512,18 +1609,31 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Resets the thread notifications for this room
+     * Resets the total thread notifications for all threads in this room to zero,
+     * excluding any threads whose IDs are given in `exceptThreadIds`.
+     *
+     * If the room is not encrypted, also resets the highlight notification count to zero
+     * for the same set of threads.
+     *
+     * This is intended for use from the sync code since we calculate highlight notification
+     * counts locally from decrypted messages. We want to partially trust the total from the
+     * server such that we clear notifications when read receipts arrive. The weird name is
+     * intended to reflect this. You probably do not want to use this.
+     *
+     * @param exceptThreadIds - The thread IDs to exclude from the reset.
      */
-    public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
-        if (notificationsToKeep) {
-            for (const [threadId] of this.threadNotifications) {
-                if (!notificationsToKeep.includes(threadId)) {
-                    this.threadNotifications.delete(threadId);
+    public resetThreadUnreadNotificationCountFromSync(exceptThreadIds: string[] = []): void {
+        const isEncrypted = this.hasEncryptionStateEvent();
+
+        for (const [threadId, notifs] of this.threadNotifications) {
+            if (!exceptThreadIds.includes(threadId)) {
+                notifs.total = 0;
+                if (!isEncrypted) {
+                    notifs.highlight = 0;
                 }
             }
-        } else {
-            this.threadNotifications.clear();
         }
+
         this.emit(RoomEvent.UnreadNotifications);
     }
 
