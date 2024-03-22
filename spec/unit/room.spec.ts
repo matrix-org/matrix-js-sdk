@@ -3548,7 +3548,7 @@ describe("Room", function () {
 
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.threadsAggregateNotificationType).toBe(null);
 
@@ -3565,16 +3565,6 @@ describe("Room", function () {
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
         });
 
-        it("partially resets room notifications", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
-            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
-
-            room.resetThreadUnreadNotificationCount(["123"]);
-
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
-            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
-        });
-
         it("emits event on notifications reset", () => {
             const cb = jest.fn();
 
@@ -3583,7 +3573,7 @@ describe("Room", function () {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
             room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(cb).toHaveBeenLastCalledWith();
         });
@@ -3605,10 +3595,10 @@ describe("Room", function () {
         });
 
         it("lets you reset", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 1);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
             expect(room.hasThreadUnreadNotification()).toBe(true);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.hasThreadUnreadNotification()).toBe(false);
         });
@@ -3636,12 +3626,38 @@ describe("Room", function () {
         it("allows reset", () => {
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.resetThreadUnreadNotificationCountFromSync();
+
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+
+        it("retains highlight for encrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
-            expect(room.threadsAggregateNotificationType).toBeNull();
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+        });
+
+        it("resets highlight for unencrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(false);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCountFromSync();
+
+            expect(room.threadsAggregateNotificationType).toBe(null);
+            expect(room.getThreadUnreadNotificationCount("$123", NotificationCountType.Highlight)).toBe(0);
         });
     });
 
