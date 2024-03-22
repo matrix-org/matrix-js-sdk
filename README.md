@@ -115,7 +115,6 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
 -   Handles room initial sync on accepting invites.
 -   Handles WebRTC calling.
 
-
 # Usage
 
 ## Supported platforms
@@ -150,9 +149,16 @@ client.on(RoomMemberEvent.Typing, function (event, member) {
 client.startClient();
 ```
 
-## Low level types
+## Entry points
 
-There are some low level TypeScript types exported via the `matrix-js-sdk/lib/types` entrypoint to not bloat the main entrypoint.
+As well as the primary entry point (`matrix-js-sdk`), there are several other entry points which may be useful:
+
+| Entry point                    | Description                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `matrix-js-sdk`                | Primary entry point. High-level functionality, and lots of historical clutter in need of a cleanup. |
+| `matrix-js-sdk/lib/crypto-api` | Cryptography functionality.                                                                         |
+| `matrix-js-sdk/lib/types`      | Low-level types, reflecting data structures defined in the Matrix spec.                             |
+| `matrix-js-sdk/lib/testing`    | Test utilities, which may be useful in test code but should not be used in production code.         |
 
 ## Examples
 
