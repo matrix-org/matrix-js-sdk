@@ -73,8 +73,14 @@ import { encodeBase64 } from "../base64";
 import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
+import { VerificationMethod } from "../types";
 
-const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+const ALL_VERIFICATION_METHODS = [
+    VerificationMethod.Sas,
+    VerificationMethod.ScanQrCode,
+    VerificationMethod.ShowQrCode,
+    VerificationMethod.Reciprocate,
+];
 
 interface ISignableObject {
     signatures?: ISignatures;
