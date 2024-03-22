@@ -2831,9 +2831,39 @@ describe("Room", function () {
             // XXX: If we add the relation to the thread response before the thread finishes fetching via /relations
             // then the test will fail
             await emitPromise(room, ThreadEvent.Update);
-            await emitPromise(room, ThreadEvent.Update);
             await Promise.all([emitPromise(room, ThreadEvent.Update), room.addLiveEvents([threadResponseEdit])]);
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
+        });
+
+        it("emits event for the first event added to a thread", async () => {
+            room.client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+
+            await room.addLiveEvents([threadRoot]);
+
+            const onEvent = jest.fn();
+            room.on(RoomEvent.Timeline, onEvent);
+
+            await room.addLiveEvents([threadResponse1]);
+
+            expect(onEvent).toHaveBeenCalled();
+        });
+
+        it("contains the events added as soon as it's created", async () => {
+            room.client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+
+            const newThreadEventPromise = emitPromise(room, ThreadEvent.New);
+            await room.addLiveEvents([threadRoot, threadResponse1]);
+            const thread = await newThreadEventPromise;
+
+            expect(thread.timeline).toContain(threadResponse1);
         });
 
         it("Redactions to thread responses decrement the length", async () => {
@@ -2864,7 +2894,6 @@ describe("Room", function () {
             let prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
             const thread = await prom;
-            await emitPromise(room, ThreadEvent.Update);
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
@@ -2929,6 +2958,10 @@ describe("Room", function () {
                     },
                 });
 
+            room.client.fetchRelations = jest.fn().mockResolvedValue({
+                chunk: [threadResponse2Reaction.event, threadResponse2.event, threadResponse1.event],
+            });
+
             const prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
@@ -2969,18 +3002,20 @@ describe("Room", function () {
                     },
                 });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             await room.addLiveEvents([threadRoot, threadResponse1, threadResponse2, threadResponse2Reaction]);
             const thread = await prom;
-            await emitPromise(room, ThreadEvent.Update);
 
             expect(thread).toHaveLength(2);
             expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
 
-            prom = emitPromise(room, ThreadEvent.Update);
             const threadRootRedaction = mkRedaction(threadRoot);
             await room.addLiveEvents([threadRootRedaction]);
-            await prom;
+
+            // We can't wait for a thread update here because there shouldn't be one (which is
+            // what we're asserting). Flush any promises to try to get more certainty that an
+            // update is not happening some time after the event is added.
+            await flushPromises();
             expect(thread).toHaveLength(2);
         });
 
@@ -3058,7 +3093,6 @@ describe("Room", function () {
 
             await emitPromise(room, ThreadEvent.Update);
             const threadResponse2Redaction = mkRedaction(threadResponse2);
-            await emitPromise(room, ThreadEvent.Update);
             await room.addLiveEvents([threadResponse2Redaction]);
             expect(thread).toHaveLength(1);
             expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());
@@ -3514,7 +3548,7 @@ describe("Room", function () {
 
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.threadsAggregateNotificationType).toBe(null);
 
@@ -3531,16 +3565,6 @@ describe("Room", function () {
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
         });
 
-        it("partially resets room notifications", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
-            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
-
-            room.resetThreadUnreadNotificationCount(["123"]);
-
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
-            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
-        });
-
         it("emits event on notifications reset", () => {
             const cb = jest.fn();
 
@@ -3549,7 +3573,7 @@ describe("Room", function () {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
             room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(cb).toHaveBeenLastCalledWith();
         });
@@ -3571,10 +3595,10 @@ describe("Room", function () {
         });
 
         it("lets you reset", () => {
-            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 1);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
             expect(room.hasThreadUnreadNotification()).toBe(true);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
             expect(room.hasThreadUnreadNotification()).toBe(false);
         });
@@ -3602,12 +3626,38 @@ describe("Room", function () {
         it("allows reset", () => {
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.resetThreadUnreadNotificationCountFromSync();
+
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+
+        it("retains highlight for encrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
-            room.resetThreadUnreadNotificationCount();
+            room.resetThreadUnreadNotificationCountFromSync();
 
-            expect(room.threadsAggregateNotificationType).toBeNull();
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+        });
+
+        it("resets highlight for unencrypted rooms on reset", () => {
+            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(false);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCountFromSync();
+
+            expect(room.threadsAggregateNotificationType).toBe(null);
+            expect(room.getThreadUnreadNotificationCount("$123", NotificationCountType.Highlight)).toBe(0);
         });
     });
 

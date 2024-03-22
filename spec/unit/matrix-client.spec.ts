@@ -38,30 +38,31 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
-    ContentHelpers,
     ClientPrefix,
+    ConditionKind,
+    ContentHelpers,
     Direction,
     EventTimeline,
+    EventTimelineSet,
+    getHttpUriForMxc,
     ICreateRoomOpts,
+    IPushRule,
     IRequestOpts,
     MatrixError,
     MatrixHttpApi,
     MatrixScheduler,
     Method,
-    Room,
-    EventTimelineSet,
     PushRuleActionName,
-    TweakName,
+    Room,
     RuleId,
-    IPushRule,
-    ConditionKind,
-    getHttpUriForMxc,
+    TweakName,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
     IGNORE_INVITES_ACCOUNT_EVENT_KEY,
     POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
@@ -2082,10 +2083,10 @@ describe("MatrixClient", function () {
             await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
 
             // Add a rule in the new source room.
-            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, PolicyScope.User, {
+            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, EventType.PolicyRuleUser, {
                 entity: "*:example.org",
                 reason: "just a test",
-                recommendation: "m.ban",
+                recommendation: PolicyRecommendation.Ban,
             });
 
             // We should reject this invite.
@@ -2172,8 +2173,8 @@ describe("MatrixClient", function () {
             // Check where it shows up.
             const targetRoomId = ignoreInvites2.target;
             const targetRoom = client.getRoom(targetRoomId) as WrappedRoom;
-            expect(targetRoom._state.get(PolicyScope.User)[eventId]).toBeTruthy();
-            expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
+            expect(targetRoom._state.get(EventType.PolicyRuleUser)[eventId]).toBeTruthy();
+            expect(newSourceRoom._state.get(EventType.PolicyRuleUser)?.[eventId]).toBeFalsy();
         });
     });
 
