@@ -93,6 +93,7 @@ describe("initRustCrypto", () => {
             registerUserIdentityUpdatedCallback: jest.fn(),
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
+            dehydratedDevices: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
             registerDevicesUpdatedCallback: jest.fn(),
             outgoingRequests: jest.fn(),
@@ -662,6 +663,7 @@ describe("RustCrypto", () => {
             // returns objects from outgoingRequestQueue
             outgoingRequestQueue = [];
             olmMachine = {
+                dehydratedDevices: jest.fn(),
                 outgoingRequests: jest.fn().mockImplementation(() => {
                     return Promise.resolve(outgoingRequestQueue.shift() ?? []);
                 }),
@@ -814,6 +816,7 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
+                dehydratedDevices: jest.fn(),
                 getRoomEventEncryptionInfo: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
@@ -1009,6 +1012,7 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
+                dehydratedDevices: jest.fn(),
                 getDevice: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
@@ -1253,6 +1257,7 @@ describe("RustCrypto", () => {
         beforeEach(() => {
             olmMachine = {
                 getIdentity: jest.fn(),
+                dehydratedDevices: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
                 logger,
@@ -1302,6 +1307,7 @@ describe("RustCrypto", () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             const olmMachine = {
+                dehydratedDevices: jest.fn(),
                 getIdentity: jest.fn(),
                 // Force the backup to be trusted by the olmMachine
                 verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(true) }),
@@ -1401,8 +1407,6 @@ describe("RustCrypto", () => {
 
     describe("dehydration", () => {
         it("should rehydrate and dehydrate a device", async () => {
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
                     return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
@@ -1473,6 +1477,80 @@ describe("RustCrypto", () => {
             );
 
             expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(true);
+        });
+
+        it("should schedule regular creation of dehydrated devices", async () => {
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+            const rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+                undefined,
+                secretStorage,
+            );
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+            rustCrypto["checkKeyBackupAndEnable"] = async () => {
+                return null;
+            };
+
+            const outgoingRequestProcessor = {
+                makeOutgoingRequest: jest.fn(),
+            } as unknown as OutgoingRequestProcessor;
+            rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            (rustCrypto["dehydrationManager"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            // create initial secret storage
+            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            // when we schedule dehydration, it should create a dehydrated
+            // device immediately
+            const makeDehydrationRequest = (outgoingRequestProcessor.makeOutgoingRequest = jest.fn(
+                async (req, uiaCallback) => {
+                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+                },
+            ));
+            await rustCrypto.scheduleDeviceDehydration(30000);
+
+            expect(makeDehydrationRequest).toHaveBeenCalled();
+
+            // after we advance the timer, it should create another dehydrated device
+            const secondDehydrationPromise = new Promise<void>((resolve, reject) => {
+                outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (req, uiaCallback) => {
+                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+                    resolve();
+                });
+            });
+            jest.advanceTimersByTime(35000);
+
+            await secondDehydrationPromise;
+
+            rustCrypto.stop();
         });
     });
 });

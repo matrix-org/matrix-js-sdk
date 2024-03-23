@@ -46,7 +46,6 @@ const SECRET_STORAGE_NAME = new UnstableValue("m.dehydrated_device", "org.matrix
  * Manages dehydrated devices
  */
 export class RustDehydrationManager {
-    private readonly dehydratedDevices: RustSdkCryptoJs.DehydratedDevices;
     private key?: Uint8Array;
     private intervalId?: ReturnType<typeof setInterval>;
     private timeoutId?: ReturnType<typeof setTimeout>;
@@ -54,13 +53,11 @@ export class RustDehydrationManager {
     public constructor(
         private readonly logger: Logger,
         private readonly rustCrypto: RustCrypto,
-        olmMachine: RustSdkCryptoJs.OlmMachine,
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly secretStorage: ServerSideSecretStorage,
-    ) {
-        this.dehydratedDevices = olmMachine.dehydratedDevices();
-    }
+    ) {}
 
     /** Return whether the server supports dehydrated devices
      */
@@ -158,11 +155,13 @@ export class RustDehydrationManager {
 
         this.logger.info("dehydration: device found");
 
-        const rehydratedDevice = await this.dehydratedDevices.rehydrate(
-            this.key!,
-            new RustSdkCryptoJs.DeviceId(dehydratedDeviceResp.device_id),
-            JSON.stringify(dehydratedDeviceResp.device_data),
-        );
+        const rehydratedDevice = await this.olmMachine
+            .dehydratedDevices()
+            .rehydrate(
+                this.key!,
+                new RustSdkCryptoJs.DeviceId(dehydratedDeviceResp.device_id),
+                JSON.stringify(dehydratedDeviceResp.device_data),
+            );
 
         this.logger.info("dehydration: device rehydrated");
 
@@ -210,9 +209,9 @@ export class RustDehydrationManager {
     public async createAndUploadDehydratedDevice(): Promise<void> {
         await this.getKey(true);
 
-        // FIXME: should raise error if server doesn't support dehydration
+        // FIXME: should raise error if server doesn't support dehydration?
 
-        const dehydratedDevice = await this.dehydratedDevices.create();
+        const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
         // FIXME: should the device display name be localised? passed as a
         // parameter?
         const request = await dehydratedDevice.keysForUpload("Dehydrated device", this.key!);
@@ -220,8 +219,6 @@ export class RustDehydrationManager {
         await this.outgoingRequestProcessor.makeOutgoingRequest(request);
 
         this.logger.info("dehydration: uploaded device");
-
-        // FIXME: emit event when done
     }
 
     /**
@@ -242,7 +239,7 @@ export class RustDehydrationManager {
             }, delay);
         } else {
             await this.createAndUploadDehydratedDevice();
-            // FIXME: should we randomize the time?
+            // FIXME: should we randomize the time a bit?
             this.intervalId = setInterval(this.createAndUploadDehydratedDevice.bind(this), interval);
         }
     }

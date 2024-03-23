@@ -52,6 +52,7 @@ describe("Upload keys to backup", () => {
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys),
             backupRoomKeys: jest.fn(),
+            dehydratedDevices: jest.fn(),
             isBackupEnabled: jest.fn().mockResolvedValue(true),
             enableBackupV1: jest.fn(),
             verifyBackup: jest.fn().mockResolvedValue({
