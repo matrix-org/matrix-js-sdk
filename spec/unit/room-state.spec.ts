@@ -25,10 +25,11 @@ import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@typ
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { MatrixClient } from "../../src/client";
-import { DecryptionError } from "../../src/crypto/algorithms";
 import { defer } from "../../src/utils";
 import { Room } from "../../src/models/room";
 import { KnownMembership } from "../../src/@types/membership";
+import { DecryptionFailureCode } from "../../src/crypto-api";
+import { DecryptionError } from "../../src/common-crypto/CryptoBackend";
 
 describe("RoomState", function () {
     const roomId = "!foo:bar";
@@ -1040,7 +1041,9 @@ describe("RoomState", function () {
                     content: beacon1RelationContent,
                 });
                 jest.spyOn(failedDecryptionRelatedEvent, "isDecryptionFailure").mockReturnValue(true);
-                mockClient.decryptEventIfNeeded.mockRejectedValue(new DecryptionError("ERR", "msg"));
+                mockClient.decryptEventIfNeeded.mockRejectedValue(
+                    new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, "msg"),
+                );
                 // spy on event.once
                 const eventOnceSpy = jest.spyOn(failedDecryptionRelatedEvent, "once");
 

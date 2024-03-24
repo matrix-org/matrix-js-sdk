@@ -14,25 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum InvalidStoreState {
-    ToggledLazyLoading,
-}
-
-export class InvalidStoreError extends Error {
-    public static TOGGLED_LAZY_LOADING = InvalidStoreState.ToggledLazyLoading;
-
-    public constructor(
-        public readonly reason: InvalidStoreState,
-        public readonly value: any,
-    ) {
-        const message =
-            `Store is invalid because ${reason}, ` +
-            `please stop the client, delete all data and start the client again`;
-        super(message);
-        this.name = "InvalidStoreError";
-    }
-}
-
 export enum InvalidCryptoStoreState {
     TooNew = "TOO_NEW",
 }

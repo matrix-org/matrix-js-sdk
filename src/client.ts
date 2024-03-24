@@ -83,7 +83,6 @@ import {
     ICryptoCallbacks,
     IRoomKeyRequestBody,
     isCryptoAvailable,
-    VerificationMethod,
 } from "./crypto";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
@@ -378,8 +377,10 @@ export interface ICreateClientOpts {
      * Verification methods we should offer to the other side when performing an interactive verification.
      * If unset, we will offer all known methods. Currently these are: showing a QR code, scanning a QR code, and SAS
      * (aka "emojis").
+     *
+     * See {@link types.VerificationMethod} for a set of useful constants for this parameter.
      */
-    verificationMethods?: Array<VerificationMethod>;
+    verificationMethods?: Array<string>;
 
     /**
      * Whether relaying calls through a TURN server should be forced. Default false.
@@ -1271,7 +1272,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
     protected cryptoStore?: CryptoStore;
-    protected verificationMethods?: VerificationMethod[];
+    protected verificationMethods?: string[];
     protected fallbackICEServerAllowed = false;
     protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
@@ -2777,11 +2778,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     // deprecated: use requestVerification instead
-    public legacyDeviceVerification(
-        userId: string,
-        deviceId: string,
-        method: VerificationMethod,
-    ): Promise<VerificationRequest> {
+    public legacyDeviceVerification(userId: string, deviceId: string, method: string): Promise<VerificationRequest> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
