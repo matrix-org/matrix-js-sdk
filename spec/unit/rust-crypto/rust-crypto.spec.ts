@@ -93,7 +93,6 @@ describe("initRustCrypto", () => {
             registerUserIdentityUpdatedCallback: jest.fn(),
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
-            dehydratedDevices: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
             registerDevicesUpdatedCallback: jest.fn(),
             outgoingRequests: jest.fn(),
@@ -663,7 +662,6 @@ describe("RustCrypto", () => {
             // returns objects from outgoingRequestQueue
             outgoingRequestQueue = [];
             olmMachine = {
-                dehydratedDevices: jest.fn(),
                 outgoingRequests: jest.fn().mockImplementation(() => {
                     return Promise.resolve(outgoingRequestQueue.shift() ?? []);
                 }),
@@ -816,7 +814,6 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
-                dehydratedDevices: jest.fn(),
                 getRoomEventEncryptionInfo: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
@@ -1012,7 +1009,6 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
-                dehydratedDevices: jest.fn(),
                 getDevice: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
@@ -1257,7 +1253,6 @@ describe("RustCrypto", () => {
         beforeEach(() => {
             olmMachine = {
                 getIdentity: jest.fn(),
-                dehydratedDevices: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
                 logger,
@@ -1307,7 +1302,6 @@ describe("RustCrypto", () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             const olmMachine = {
-                dehydratedDevices: jest.fn(),
                 getIdentity: jest.fn(),
                 // Force the backup to be trusted by the olmMachine
                 verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(true) }),
