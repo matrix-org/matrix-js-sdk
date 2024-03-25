@@ -212,7 +212,13 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
+import {
+    BootstrapCrossSigningOpts,
+    CrossSigningKeyInfo,
+    CryptoApi,
+    ImportRoomKeyProgressData,
+    ImportRoomKeysOpts,
+} from "./crypto-api";
 import { DeviceInfoMap } from "./crypto/DeviceList";
 import {
     AddSecretStorageKeyOpts,
@@ -3916,11 +3922,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     async (chunk) => {
                         // We have a chunk of decrypted keys: import them
                         try {
-                            const backupVersion = backupInfo.version!;
-                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, backupVersion, {
+                            let success = 0;
+                            let failures = 0;
+                            const partialProgress = (stage: ImportRoomKeyProgressData): void => {
+                                success = stage.successes ?? 0;
+                                failures = stage.failures ?? 0;
+                            };
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
                                 untrusted,
+                                progressCallback: partialProgress,
                             });
-                            totalImported += chunk.length;
+                            totalImported += success;
+                            totalFailures += failures;
                         } catch (e) {
                             totalFailures += chunk.length;
                             // We failed to import some keys, but we should still try to import the rest?
@@ -3947,11 +3960,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
-                await this.cryptoBackend.importBackedUpRoomKeys(keys, backupVersion, {
-                    progressCallback,
-                    untrusted,
-                });
-                totalImported = keys.length;
+                try {
+                    let success = 0;
+                    let failures = 0;
+                    const partialProgress = (stage: ImportRoomKeyProgressData): void => {
+                        success = stage.successes ?? 0;
+                        failures = stage.failures ?? 0;
+                    };
+                    await this.cryptoBackend!.importBackedUpRoomKeys(keys, {
+                        untrusted,
+                        progressCallback: partialProgress,
+                    });
+                    totalImported += success;
+                    totalFailures += failures;
+                } catch (e) {
+                    totalFailures += keys.length;
+                    // We failed to import some keys, but we should still try to import the rest?
+                    // Log the error and continue
+                    logger.error("Error importing keys from backup", e);
+                }
             } else {
                 totalKeyCount = 1;
                 try {
@@ -3967,6 +3994,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     });
                     totalImported = 1;
                 } catch (e) {
+                    totalFailures = 1;
                     this.logger.debug("Failed to decrypt megolm session from backup", e);
                 }
             }
