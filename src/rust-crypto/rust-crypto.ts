@@ -174,7 +174,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
         try {
-            const secretsBundle = await this.olmMachine.exportSecretsBundle();
+            const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
             const secrets = secretsBundle.to_json();
             secretsBundle.free();
             return secrets;
@@ -186,8 +186,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
     public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
         const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
-        await this.olmMachine.importSecretsBundle(secretsBundle);
-        secretsBundle.free();
+        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
     }
 
     /**
