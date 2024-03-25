@@ -28,9 +28,10 @@ import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
 import { MatrixEvent } from "../../models/event";
 import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification";
+import { VerificationMethod } from "../../types";
 
-export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
-export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
+export const SHOW_QR_CODE_METHOD = VerificationMethod.ShowQrCode;
+export const SCAN_QR_CODE_METHOD = VerificationMethod.ScanQrCode;
 
 /** @deprecated use VerifierEvent */
 export type QrCodeEvent = VerifierEvent;

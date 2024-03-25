@@ -83,7 +83,6 @@ import {
     ICryptoCallbacks,
     IRoomKeyRequestBody,
     isCryptoAvailable,
-    VerificationMethod,
 } from "./crypto";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from "./crypto/recoverykey";
@@ -151,15 +150,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import {
-    GuestAccess,
-    HistoryVisibility,
-    IdServerUnbindResult,
-    IImageInfo,
-    JoinRule,
-    Preset,
-    Visibility,
-} from "./@types/partials";
+import { GuestAccess, HistoryVisibility, IdServerUnbindResult, JoinRule, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -381,8 +372,10 @@ export interface ICreateClientOpts {
      * Verification methods we should offer to the other side when performing an interactive verification.
      * If unset, we will offer all known methods. Currently these are: showing a QR code, scanning a QR code, and SAS
      * (aka "emojis").
+     *
+     * See {@link types.VerificationMethod} for a set of useful constants for this parameter.
      */
-    verificationMethods?: Array<VerificationMethod>;
+    verificationMethods?: Array<string>;
 
     /**
      * Whether relaying calls through a TURN server should be forced. Default false.
@@ -510,11 +503,6 @@ export interface IStartClientOpts {
      * This should be in the order of hours. Default: undefined.
      */
     clientWellKnownPollPeriod?: number;
-
-    /**
-     * @deprecated use `threadSupport` instead
-     */
-    experimentalThreadSupport?: boolean;
 
     /**
      * Will organises events in threaded conversations when
@@ -1274,7 +1262,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
     protected cryptoStore?: CryptoStore;
-    protected verificationMethods?: VerificationMethod[];
+    protected verificationMethods?: string[];
     protected fallbackICEServerAllowed = false;
     protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
@@ -1536,19 +1524,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         } else {
             this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        }
-
-        if (this.clientOpts.hasOwnProperty("experimentalThreadSupport")) {
-            this.logger.warn("`experimentalThreadSupport` has been deprecated, use `threadSupport` instead");
-        }
-
-        // If `threadSupport` is omitted and the deprecated `experimentalThreadSupport` has been passed
-        // We should fallback to that value for backwards compatibility purposes
-        if (
-            !this.clientOpts.hasOwnProperty("threadSupport") &&
-            this.clientOpts.hasOwnProperty("experimentalThreadSupport")
-        ) {
-            this.clientOpts.threadSupport = this.clientOpts.experimentalThreadSupport;
         }
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
@@ -2780,11 +2755,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     // deprecated: use requestVerification instead
-    public legacyDeviceVerification(
-        userId: string,
-        deviceId: string,
-        method: VerificationMethod,
-    ): Promise<VerificationRequest> {
+    public legacyDeviceVerification(userId: string, deviceId: string, method: string): Promise<VerificationRequest> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -4512,7 +4483,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomId - the room to update power levels in
      * @param userId - the ID of the user or users to update power levels of
      * @param powerLevel - the numeric power level to update given users to
-     * @param event - deprecated and no longer used.
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4520,10 +4490,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         userId: string | string[],
         powerLevel: number | undefined,
-        /**
-         * @deprecated no longer needed, unused.
-         */
-        event?: MatrixEvent | null,
     ): Promise<ISendEventResponse> {
         let content: IPowerLevelsContent | undefined;
         if (this.clientRunning && this.isInitialSyncComplete()) {
@@ -5094,24 +5060,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
-    public sendImageMessage(roomId: string, url: string, info?: IImageInfo, text?: string): Promise<ISendEventResponse>;
+    public sendImageMessage(roomId: string, url: string, info?: ImageInfo, text?: string): Promise<ISendEventResponse>;
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
         url: string,
-        info?: IImageInfo,
+        info?: ImageInfo,
         text?: string,
     ): Promise<ISendEventResponse>;
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
-        url?: string | IImageInfo,
-        info?: IImageInfo | string,
+        url?: string | ImageInfo,
+        info?: ImageInfo | string,
         text = "Image",
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             text = (info as string) || "Image";
-            info = url as IImageInfo;
+            info = url as ImageInfo;
             url = threadId as string;
             threadId = null;
         }
@@ -5131,26 +5097,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendStickerMessage(
         roomId: string,
         url: string,
-        info?: IImageInfo,
+        info?: ImageInfo,
         text?: string,
     ): Promise<ISendEventResponse>;
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
         url: string,
-        info?: IImageInfo,
+        info?: ImageInfo,
         text?: string,
     ): Promise<ISendEventResponse>;
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
-        url?: string | IImageInfo,
-        info?: IImageInfo | string,
+        url?: string | ImageInfo,
+        info?: ImageInfo | string,
         text = "Sticker",
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             text = (info as string) || "Sticker";
-            info = url as IImageInfo;
+            info = url as ImageInfo;
             url = threadId as string;
             threadId = null;
         }
@@ -8538,17 +8504,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves: Object with room_id and servers.
-     * @returns Rejects: with an error response.
-     * @deprecated use `getRoomIdForAlias` instead
-     */
-    // eslint-disable-next-line camelcase
-    public resolveRoomAlias(roomAlias: string): Promise<{ room_id: string; servers: string[] }> {
-        const path = utils.encodeUri("/directory/room/$alias", { $alias: roomAlias });
-        return this.http.request(Method.Get, path);
-    }
-
-    /**
      * Get the visibility of a room in the current HS's room directory
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
@@ -8561,7 +8516,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set the visbility of a room in the current HS's room directory
+     * Set the visibility of a room in the current HS's room directory
      * @param visibility - "public" to make the room visible
      *                 in the public directory, or "private" to make
      *                 it invisible.
@@ -9806,14 +9761,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             localTimeoutMs: clientTimeout,
             abortSignal,
         });
-    }
-
-    /**
-     * @deprecated use supportsThreads() instead
-     */
-    public supportsExperimentalThreads(): boolean {
-        this.logger.warn(`supportsExperimentalThreads() is deprecated, use supportThreads() instead`);
-        return this.clientOpts?.experimentalThreadSupport || false;
     }
 
     /**

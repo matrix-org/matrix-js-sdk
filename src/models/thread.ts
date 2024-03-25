@@ -47,11 +47,6 @@ export type ThreadEventHandlerMap = {
     [ThreadEvent.Delete]: (thread: Thread) => void;
 } & EventTimelineSetHandlerMap;
 
-/**
- * @deprecated please use ThreadEventHandlerMap instead
- */
-export type EventHandlerMap = ThreadEventHandlerMap;
-
 interface IThreadOpts {
     room: Room;
     client: MatrixClient;

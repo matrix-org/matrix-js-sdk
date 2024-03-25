@@ -14,13 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ImageInfo } from "./media";
-
-/**
- * @deprecated use {@link ImageInfo} instead.
- */
-export type IImageInfo = ImageInfo;
-
 export enum Visibility {
     Public = "public",
     Private = "private",

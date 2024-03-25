@@ -73,7 +73,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
@@ -90,6 +90,7 @@ import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -97,8 +98,8 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    VerificationRequest as CryptoApiVerificationRequest,
     OwnDeviceKeys,
+    VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -4209,8 +4210,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
-            throw new algorithms.DecryptionError(
-                "UNKNOWN_ENCRYPTION_ALGORITHM",
+            throw new DecryptionError(
+                DecryptionFailureCode.UNKNOWN_ENCRYPTION_ALGORITHM,
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }

@@ -27,6 +27,8 @@ import {
     THREAD_RELATION_TYPE,
     TweakName,
 } from "../../../src";
+import { DecryptionFailureCode } from "../../../src/crypto-api";
+import { DecryptionError } from "../../../src/common-crypto/CryptoBackend";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
@@ -360,20 +362,50 @@ describe("MatrixEvent", () => {
             });
         });
 
-        it("should report decryption errors", async () => {
+        it("should report unknown decryption errors", async () => {
+            const decryptionListener = jest.fn();
+            encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
+
+            const testError = new Error("test error");
             const crypto = {
-                decryptEvent: jest.fn().mockRejectedValue(new Error("test error")),
+                decryptEvent: jest.fn().mockRejectedValue(testError),
             } as unknown as Crypto;
 
             await encryptedEvent.attemptDecryption(crypto);
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_ERROR);
             expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
             });
+            expect(decryptionListener).toHaveBeenCalledWith(encryptedEvent, testError);
+        });
+
+        it("should report known decryption errors", async () => {
+            const decryptionListener = jest.fn();
+            encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
+
+            const testError = new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, "uisi");
+            const crypto = {
+                decryptEvent: jest.fn().mockRejectedValue(testError),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.isEncrypted()).toBeTruthy();
+            expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
+            expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.decryptionFailureReason).toEqual(
+                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
+            );
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
+            expect(encryptedEvent.getContent()).toEqual({
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: DecryptionError: uisi **",
+            });
+            expect(decryptionListener).toHaveBeenCalledWith(encryptedEvent, testError);
         });
 
         it(`should report "DecryptionError: The sender has disabled encrypting to unverified devices."`, async () => {
@@ -423,6 +455,8 @@ describe("MatrixEvent", () => {
             expect(eventAttemptDecryptionSpy).toHaveBeenCalledTimes(2);
             expect(crypto.decryptEvent).toHaveBeenCalledTimes(2);
             expect(encryptedEvent.getType()).toEqual("m.room.message");
+            expect(encryptedEvent.isDecryptionFailure()).toBe(false);
+            expect(encryptedEvent.decryptionFailureReason).toBe(null);
         });
     });
 
@@ -469,52 +503,6 @@ describe("MatrixEvent", () => {
             default: false,
             enabled: true,
         } as IAnnotatedPushRule;
-        describe("setPushActions()", () => {
-            it("sets actions on event", () => {
-                const actions = { notify: false, tweaks: {} };
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushActions(actions);
-
-                expect(event.getPushActions()).toBe(actions);
-            });
-
-            it("sets actions to undefined", () => {
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushActions(null);
-
-                // undefined is set on state
-                expect(event.getPushDetails().actions).toBe(undefined);
-                // but pushActions getter returns null when falsy
-                expect(event.getPushActions()).toBe(null);
-            });
-
-            it("clears existing push rule", () => {
-                const prevActions = { notify: true, tweaks: { highlight: true } };
-                const actions = { notify: false, tweaks: {} };
-                const event = new MatrixEvent({
-                    type: "com.example.test",
-                    content: {
-                        isTest: true,
-                    },
-                });
-                event.setPushDetails(prevActions, pushRule);
-
-                event.setPushActions(actions);
-
-                // rule is not in event push cache
-                expect(event.getPushDetails()).toEqual({ actions });
-            });
-        });
 
         describe("setPushDetails()", () => {
             it("sets actions and rule on event", () => {
@@ -543,7 +531,7 @@ describe("MatrixEvent", () => {
                 });
                 event.setPushDetails(prevActions, pushRule);
 
-                event.setPushActions(actions);
+                event.setPushDetails(actions);
 
                 // rule is not in event push cache
                 expect(event.getPushDetails()).toEqual({ actions });

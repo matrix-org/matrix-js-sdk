@@ -41,13 +41,13 @@ import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
-import { DecryptionError } from "../crypto/algorithms";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend";
 import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 import { IAnnotatedPushRule } from "../@types/PushRules";
 import { Room } from "./room";
 import { EventTimeline } from "./event-timeline";
 import { Membership } from "../@types/membership";
+import { DecryptionFailureCode } from "../crypto-api";
 
 export { EventStatus } from "./event-status";
 
@@ -227,7 +227,18 @@ export interface IMessageVisibilityHidden {
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
 
 export enum MatrixEventEvent {
+    /**
+     * An event has been decrypted, or we have failed to decrypt it.
+     *
+     * The payload consists of:
+     *
+     *  * `event` - The {@link MatrixEvent} which we attempted to decrypt.
+     *
+     *  * `err` - The error that occurred during decryption, or `undefined` if no error occurred.
+     *     Avoid use of this: {@link MatrixEvent.decryptionFailureReason} is more useful.
+     */
     Decrypted = "Event.decrypted",
+
     BeforeRedaction = "Event.beforeRedaction",
     VisibilityChange = "Event.visibilityChange",
     LocalEventIdReplaced = "Event.localEventIdReplaced",
@@ -239,12 +250,6 @@ export enum MatrixEventEvent {
 export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
 
 export type MatrixEventHandlerMap = {
-    /**
-     * Fires when an event is decrypted
-     *
-     * @param event - The matrix event which has been decrypted
-     * @param err - The error that occurred during decryption, or `undefined` if no error occurred.
-     */
     [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
     [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
     [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
@@ -273,6 +278,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     // a public getter to decide if the cache is valid.
     private _hasCachedExtEv = false;
     private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
+
+    /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
+    private _decryptionFailureReason: DecryptionFailureCode | null = null;
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
@@ -771,7 +779,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *     couldn't decrypt.
      */
     public isDecryptionFailure(): boolean {
-        return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
+        return this._decryptionFailureReason !== null;
+    }
+
+    /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
+    public get decryptionFailureReason(): DecryptionFailureCode | null {
+        return this._decryptionFailureReason;
     }
 
     /*
@@ -884,17 +897,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         while (true) {
             this.retryDecryption = false;
 
-            let res: IEventDecryptionResult;
             let err: Error | undefined = undefined;
             try {
-                if (!crypto) {
-                    res = this.badEncryptedMessage("Encryption not enabled");
-                } else {
-                    res = await crypto.decryptEvent(this);
-                    if (options.isRetry === true) {
-                        logger.info(`Decrypted event on retry (${this.getDetails()})`);
-                    }
+                const res = await crypto.decryptEvent(this);
+                if (options.isRetry === true) {
+                    logger.info(`Decrypted event on retry (${this.getDetails()})`);
                 }
+                this.setClearData(res);
+                this._decryptionFailureReason = null;
             } catch (e) {
                 const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
@@ -927,14 +937,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 // so we don't bother to log `e` separately.
                 logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage(String(e));
+                this.setClearDataForDecryptionFailure(String(e));
+                this._decryptionFailureReason =
+                    e instanceof DecryptionError ? (<DecryptionError>e).code : DecryptionFailureCode.UNKNOWN_ERROR;
             }
 
-            // at this point, we've either successfully decrypted the event, or have given up
-            // (and set res to a 'badEncryptedMessage'). Either way, we can now set the
-            // cleartext of the event and raise Event.decrypted.
-            //
-            // make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
+            // Make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
             // otherwise the app will be confused to see `isBeingDecrypted` still set when
             // there isn't an `Event.decrypted` on the way.
             //
@@ -942,7 +950,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             //
             this.decryptionPromise = null;
             this.retryDecryption = false;
-            this.setClearData(res);
 
             // Before we emit the event, clear the push actions so that they can be recalculated
             // by relevant code. We do this because the clear event has now changed, making it
@@ -960,19 +967,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         }
     }
 
-    private badEncryptedMessage(reason: string): IEventDecryptionResult {
-        return {
-            clearEvent: {
-                type: EventType.RoomMessage,
-                content: {
-                    msgtype: "m.bad.encrypted",
-                    body: "** Unable to decrypt: " + reason + " **",
-                },
-            },
-            encryptedDisabledForUnverifiedDevices: reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`,
-        };
-    }
-
     /**
      * Update the cleartext data on this event.
      *
@@ -981,9 +975,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @internal
      *
      * @param decryptionResult - the decryption result, including the plaintext and some key info
-     *
-     * @remarks
-     * Fires {@link MatrixEventEvent.Decrypted}
      */
     private setClearData(decryptionResult: IEventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
@@ -991,7 +982,28 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
-        this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
+        this.encryptedDisabledForUnverifiedDevices = false;
+        this.invalidateExtensibleEvent();
+    }
+
+    /**
+     * Update the cleartext data on this event after a decryption failure.
+     *
+     * @param reason - the textual reason for the failure
+     */
+    private setClearDataForDecryptionFailure(reason: string): void {
+        this.clearEvent = {
+            type: EventType.RoomMessage,
+            content: {
+                msgtype: "m.bad.encrypted",
+                body: `** Unable to decrypt: ${reason} **`,
+            },
+        };
+        this.senderCurve25519Key = null;
+        this.claimedEd25519Key = null;
+        this.forwardingCurve25519KeyChain = [];
+        this.untrusted = false;
+        this.encryptedDisabledForUnverifiedDevices = reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`;
         this.invalidateExtensibleEvent();
     }
 
@@ -1161,18 +1173,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @deprecated In favor of the overload that includes a Room argument
-     */
-    public makeRedacted(redactionEvent: MatrixEvent): void;
-    /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
      * @param redactionEvent - event causing the redaction
      * @param room - the room in which the event exists
      */
-    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void;
-    public makeRedacted(redactionEvent: MatrixEvent, room?: Room): void {
+    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void {
         // quick sanity-check
         if (!redactionEvent.event) {
             throw new Error("invalid redactionEvent in makeRedacted");
@@ -1218,7 +1225,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         // If the redacted event was in a thread (but not thread root), move it
         // to the main timeline. This will change if MSC3389 is merged.
-        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
+        if (!this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
             this.moveAllRelatedToMainTimeline(room);
             redactionEvent.moveToMainTimeline(room);
         }
@@ -1353,19 +1360,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getPushDetails(): PushDetails {
         return this.pushDetails;
-    }
-
-    /**
-     * Set the push actions for this event.
-     * Clears rule from push details if present
-     * @deprecated use `setPushDetails`
-     *
-     * @param pushActions - push actions
-     */
-    public setPushActions(pushActions: IActionsObject | null): void {
-        this.pushDetails = {
-            actions: pushActions || undefined,
-        };
     }
 
     /**
@@ -1566,14 +1560,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         } else if (this.isRedaction()) {
             return this.event.redacts;
         }
-    }
-
-    /**
-     * Checks if this event is associated with another event. See `getAssociatedId`.
-     * @deprecated use hasAssociation instead.
-     */
-    public hasAssocation(): boolean {
-        return !!this.getAssociatedId();
     }
 
     /**
