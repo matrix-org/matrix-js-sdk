@@ -179,10 +179,10 @@ const matrixClient = sdk.createClient({
 ### Automatically join rooms when invited
 
 ```javascript
-matrixClient.on(RoomMemberEvent.Membership, function (event, member) {
-    if (member.membership === KnownMembership.Invite && member.userId === myUserId) {
-        matrixClient.joinRoom(member.roomId).then(function () {
-            console.log("Auto-joined %s", member.roomId);
+matrixClient.on(RoomEvent.MyMembership, function (room, membership, prevMembership) {
+    if (membership === KnownMembership.Invite) {
+        matrixClient.joinRoom(room.roomId).then(function () {
+            console.log("Auto-joined %s", room.roomId);
         });
     }
 });
