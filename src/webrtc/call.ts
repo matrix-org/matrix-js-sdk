@@ -26,8 +26,8 @@ import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger";
 import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils";
-import { IContent, MatrixEvent } from "../models/event";
-import { EventType, ToDeviceMessageId } from "../@types/event";
+import { MatrixEvent } from "../models/event";
+import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event";
 import { RoomMember } from "../models/room-member";
 import { randomString } from "../randomstring";
 import {
@@ -293,13 +293,24 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     return mods;
 }
 
+type CallEventType =
+    | EventType.CallReplaces
+    | EventType.CallAnswer
+    | EventType.CallSelectAnswer
+    | EventType.CallNegotiate
+    | EventType.CallInvite
+    | EventType.CallCandidates
+    | EventType.CallHangup
+    | EventType.CallReject
+    | EventType.CallSDPStreamMetadataChangedPrefix;
+
 export interface VoipEvent {
     type: "toDevice" | "sendEvent";
     eventType: string;
     userId?: string;
     opponentDeviceId?: string;
     roomId?: string;
-    content: Record<string, unknown>;
+    content: TimelineEvents[CallEventType];
 }
 
 /**
@@ -406,7 +417,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // If candidates arrive before we've picked an opponent (which, in particular,
     // will happen if the opponent sends candidates eagerly before the user answers
     // the call) we buffer them up here so we can then add the ones from the party we pick
-    private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
+    private remoteCandidateBuffer = new Map<string, MCallCandidates["candidates"]>();
 
     private remoteAssertedIdentity?: AssertedIdentity;
     private remoteSDPStreamMetadata?: SDPStreamMetadata;
@@ -1156,7 +1167,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
         if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
-        const content: IContent = {};
+        const content: Omit<MCallHangupReject, "version" | "call_id" | "party_id" | "conf_id"> = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;
@@ -1916,7 +1927,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.opponentPartyId !== null) {
             try {
                 await this.sendVoipEvent(EventType.CallSelectAnswer, {
-                    selected_party_id: this.opponentPartyId,
+                    selected_party_id: this.opponentPartyId!,
                 });
             } catch (err) {
                 // This isn't fatal, and will just mean that if another party has raced to answer
@@ -2012,6 +2023,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.debug(`Call ${this.callId} onNegotiateReceived() create an answer`);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
+                    lifetime: CALL_TIMEOUT_MS,
                     description: this.peerConn!.localDescription?.toJSON(),
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
@@ -2444,13 +2456,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * @internal
      */
-    private async sendVoipEvent(eventType: string, content: object): Promise<void> {
-        const realContent = Object.assign({}, content, {
+    private async sendVoipEvent<K extends keyof Pick<TimelineEvents, CallEventType>>(
+        eventType: K,
+        content: Omit<TimelineEvents[K], "version" | "call_id" | "party_id" | "conf_id">,
+    ): Promise<void> {
+        const realContent = {
+            ...content,
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             party_id: this.ourPartyId,
             conf_id: this.groupCallId,
-        });
+        } as TimelineEvents[K];
 
         if (this.opponentDeviceId) {
             const toDeviceSeq = this.toDeviceSeq++;
@@ -2729,7 +2745,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const candidates = this.candidateSendQueue;
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
-        const content = { candidates: candidates.map((candidate) => candidate.toJSON()) };
+        const content: Pick<MCallCandidates, "candidates"> = {
+            candidates: candidates.map((candidate) => candidate.toJSON()),
+        };
         if (this.candidatesEnded) {
             // If there are no more candidates, signal this by adding an empty string candidate
             content.candidates.push({
@@ -2923,7 +2941,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteCandidateBuffer.clear();
     }
 
-    private async addIceCandidates(candidates: RTCIceCandidate[]): Promise<void> {
+    private async addIceCandidates(candidates: RTCIceCandidate[] | MCallCandidates["candidates"]): Promise<void> {
         for (const candidate of candidates) {
             if (
                 (candidate.sdpMid === null || candidate.sdpMid === undefined) &&

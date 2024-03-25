@@ -145,6 +145,7 @@ import {
     RoomCreateTypeField,
     RoomType,
     StateEvents,
+    TimelineEvents,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
@@ -223,6 +224,7 @@ import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
 import { getRelationsThreadFilter } from "./thread-utils";
 import { KnownMembership, Membership } from "./@types/membership";
+import { RoomMessageEventContent, StickerEventContent } from "./@types/events";
 import { ImageInfo } from "./@types/media";
 
 export type Store = IStore;
@@ -4551,12 +4553,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
     }
 
-    public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
-    public sendEvent(
+    public sendEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        eventType: K,
+        content: TimelineEvents[K],
+        txnId?: string,
+    ): Promise<ISendEventResponse>;
+    public sendEvent<K extends keyof TimelineEvents>(
         roomId: string,
         threadId: string | null,
-        eventType: string,
-        content: IContent,
+        eventType: K,
+        content: TimelineEvents[K],
         txnId?: string,
     ): Promise<ISendEventResponse>;
     public sendEvent(
@@ -4943,27 +4950,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
      */
-    public sendMessage(roomId: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
+    public sendMessage(roomId: string, content: RoomMessageEventContent, txnId?: string): Promise<ISendEventResponse>;
     public sendMessage(
         roomId: string,
         threadId: string | null,
-        content: IContent,
+        content: RoomMessageEventContent,
         txnId?: string,
     ): Promise<ISendEventResponse>;
     public sendMessage(
         roomId: string,
-        threadId: string | null | IContent,
-        content?: IContent | string,
+        threadId: string | null | RoomMessageEventContent,
+        content?: RoomMessageEventContent | string,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (typeof threadId !== "string" && threadId !== null) {
             txnId = content as string;
-            content = threadId as IContent;
+            content = threadId as RoomMessageEventContent;
             threadId = null;
         }
 
-        const eventType: string = EventType.RoomMessage;
-        const sendContent: IContent = content as IContent;
+        const eventType = EventType.RoomMessage;
+        const sendContent = content as RoomMessageEventContent;
 
         return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
     }
@@ -5076,10 +5083,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         const content = {
             msgtype: MsgType.Image,
-            url: url,
-            info: info,
+            url: url as string,
+            info: info as ImageInfo,
             body: text,
-        };
+        } satisfies RoomMessageEventContent;
         return this.sendMessage(roomId, threadId, content);
     }
 
@@ -5114,10 +5121,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const content = {
-            url: url,
-            info: info,
+            url: url as string,
+            info: info as ImageInfo,
             body: text,
-        };
+        } satisfies StickerEventContent;
 
         return this.sendEvent(roomId, threadId, EventType.Sticker, content);
     }
