@@ -76,7 +76,11 @@ type Configuration = {
 export class PerSessionKeyBackupDownloader {
     private stopped = false;
 
-    /** The version and decryption key to use with current backup if all set up correctly */
+    /**
+     * The version and decryption key to use with current backup if all set up correctly.
+     *
+     * Will not be set unless `hasConfigurationProblem` is `false`.
+     */
     private configuration: Configuration | null = null;
 
     /** We remember when a session was requested and not found in backup to avoid query again too soon.
@@ -117,6 +121,15 @@ export class PerSessionKeyBackupDownloader {
         backupManager.on(CryptoEvent.KeyBackupStatus, this.onBackupStatusChanged);
         backupManager.on(CryptoEvent.KeyBackupFailed, this.onBackupStatusChanged);
         backupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, this.onBackupStatusChanged);
+    }
+
+    /**
+     * Check if key download is successfully configured and active.
+     *
+     * @return `true` if key download is correctly configured and active; otherwise `false`.
+     */
+    public isKeyBackupDownloadConfigured(): boolean {
+        return this.configuration !== null;
     }
 
     /**
