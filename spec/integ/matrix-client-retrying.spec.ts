@@ -16,7 +16,7 @@ limitations under the License.
 
 import HttpBackend from "matrix-mock-request";
 
-import { EventStatus, RoomEvent, MatrixClient, MatrixScheduler } from "../../src/matrix";
+import { EventStatus, MatrixClient, MatrixScheduler, MsgType, RoomEvent } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
 
@@ -60,7 +60,7 @@ describe("MatrixClient retrying", function () {
         // send a couple of events; the second will be queued
         const p1 = client!
             .sendMessage(roomId, {
-                msgtype: "m.text",
+                msgtype: MsgType.Text,
                 body: "m1",
             })
             .then(
@@ -77,7 +77,7 @@ describe("MatrixClient retrying", function () {
         // never gets resolved.
         // https://github.com/matrix-org/matrix-js-sdk/issues/496
         client!.sendMessage(roomId, {
-            msgtype: "m.text",
+            msgtype: MsgType.Text,
             body: "m2",
         });
 

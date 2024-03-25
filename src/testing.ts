@@ -17,7 +17,7 @@ limitations under the License.
 /**
  * This file is a secondary entrypoint for the js-sdk library, exposing utilities which might be useful for writing tests.
  *
- * In general it should not be included in runtime applications.
+ * In general, it should not be included in runtime applications.
  *
  * @packageDocumentation
  */
@@ -25,9 +25,9 @@ limitations under the License.
 import { IContent, IEvent, IUnsigned, MatrixEvent } from "./models/event";
 import { RoomMember } from "./models/room-member";
 import { EventType } from "./@types/event";
-import { IEventDecryptionResult } from "./@types/crypto";
 import { DecryptionError } from "./crypto/algorithms";
 import { DecryptionFailureCode } from "./crypto-api";
+import { EventDecryptionResult } from "./common-crypto/CryptoBackend";
 
 /**
  * Create a {@link MatrixEvent}.
@@ -102,32 +102,19 @@ export async function mkEncryptedMatrixEvent(opts: {
 
     /** The content the event will have, once it has been decrypted. */
     plainContent: IContent;
-}): Promise<MatrixEvent> {
-    // we construct an event which has been decrypted by stubbing out CryptoBackend.decryptEvent and then
-    // calling MatrixEvent.attemptDecryption.
 
+    /** Optional `event_id` for the event. If provided will be used as event ID; else an ID is generated. */
+    eventId?: string;
+}): Promise<MatrixEvent> {
     const mxEvent = mkMatrixEvent({
         type: EventType.RoomMessageEncrypted,
         roomId: opts.roomId,
         sender: opts.sender,
         content: { algorithm: "m.megolm.v1.aes-sha2" },
+        eventId: opts.eventId,
     });
 
-    const decryptionResult: IEventDecryptionResult = {
-        claimedEd25519Key: "",
-        clearEvent: {
-            type: opts.plainType,
-            content: opts.plainContent,
-        },
-        forwardingCurve25519KeyChain: [],
-        senderCurve25519Key: "",
-        untrusted: false,
-    };
-
-    const mockCrypto = {
-        decryptEvent: async (_ev): Promise<IEventDecryptionResult> => decryptionResult,
-    } as Parameters<MatrixEvent["attemptDecryption"]>[0];
-    await mxEvent.attemptDecryption(mockCrypto);
+    await decryptExistingEvent(mxEvent, { plainType: opts.plainType, plainContent: opts.plainContent });
     return mxEvent;
 }
 
@@ -148,19 +135,57 @@ export async function mkDecryptionFailureMatrixEvent(opts: {
 
     /** A textual reason for the failure */
     msg: string;
+
+    /** Optional `event_id` for the event. If provided will be used as event ID; else an ID is generated. */
+    eventId?: string;
 }): Promise<MatrixEvent> {
     const mxEvent = mkMatrixEvent({
         type: EventType.RoomMessageEncrypted,
         roomId: opts.roomId,
         sender: opts.sender,
         content: { algorithm: "m.megolm.v1.aes-sha2" },
+        eventId: opts.eventId,
     });
 
     const mockCrypto = {
-        decryptEvent: async (_ev): Promise<IEventDecryptionResult> => {
+        decryptEvent: async (_ev): Promise<EventDecryptionResult> => {
             throw new DecryptionError(opts.code, opts.msg);
         },
     } as Parameters<MatrixEvent["attemptDecryption"]>[0];
     await mxEvent.attemptDecryption(mockCrypto);
     return mxEvent;
+}
+
+/**
+ * Given an event previously returned by {@link mkDecryptionFailureMatrixEvent}, simulate a successful re-decryption
+ * attempt.
+ *
+ * @param mxEvent - The event that will be decrypted.
+ * @param opts - New data for the successful decryption.
+ */
+export async function decryptExistingEvent(
+    mxEvent: MatrixEvent,
+    opts: {
+        /** The type the event will have, once it has been decrypted. */
+        plainType: EventType | string;
+
+        /** The content the event will have, once it has been decrypted. */
+        plainContent: IContent;
+    },
+): Promise<void> {
+    const decryptionResult: EventDecryptionResult = {
+        claimedEd25519Key: "",
+        clearEvent: {
+            type: opts.plainType,
+            content: opts.plainContent,
+        },
+        forwardingCurve25519KeyChain: [],
+        senderCurve25519Key: "",
+        untrusted: false,
+    };
+
+    const mockCrypto = {
+        decryptEvent: async (_ev): Promise<EventDecryptionResult> => decryptionResult,
+    } as Parameters<MatrixEvent["attemptDecryption"]>[0];
+    await mxEvent.attemptDecryption(mockCrypto);
 }

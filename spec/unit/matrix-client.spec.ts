@@ -22,6 +22,7 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    MsgType,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -73,6 +74,7 @@ import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { KnownMembership } from "../../src/@types/membership";
+import { RoomMessageEventContent } from "../../src/@types/events";
 
 jest.useFakeTimers();
 
@@ -567,7 +569,7 @@ describe("MatrixClient", function () {
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
-        const content = { body };
+        const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
 
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
@@ -662,12 +664,13 @@ describe("MatrixClient", function () {
 
             const content = {
                 body,
+                "msgtype": MsgType.Text,
                 "m.relates_to": {
                     "m.in_reply_to": {
                         event_id: "$other:event",
                     },
                 },
-            };
+            } satisfies RoomMessageEventContent;
 
             const room = new Room(roomId, client, userId);
             mocked(store.getRoom).mockReturnValue(room);
@@ -1528,8 +1531,6 @@ describe("MatrixClient", function () {
             { startOpts: {}, hasThreadSupport: false },
             { startOpts: { threadSupport: true }, hasThreadSupport: true },
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
-            { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
-            { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
         ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);
