@@ -1173,18 +1173,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @deprecated In favor of the overload that includes a Room argument
-     */
-    public makeRedacted(redactionEvent: MatrixEvent): void;
-    /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
      * @param redactionEvent - event causing the redaction
      * @param room - the room in which the event exists
      */
-    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void;
-    public makeRedacted(redactionEvent: MatrixEvent, room?: Room): void {
+    public makeRedacted(redactionEvent: MatrixEvent, room: Room): void {
         // quick sanity-check
         if (!redactionEvent.event) {
             throw new Error("invalid redactionEvent in makeRedacted");
@@ -1230,7 +1225,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         // If the redacted event was in a thread (but not thread root), move it
         // to the main timeline. This will change if MSC3389 is merged.
-        if (room && !this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
+        if (!this.isThreadRoot && this.threadRootId && this.threadRootId !== this.getId()) {
             this.moveAllRelatedToMainTimeline(room);
             redactionEvent.moveToMainTimeline(room);
         }
@@ -1365,19 +1360,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getPushDetails(): PushDetails {
         return this.pushDetails;
-    }
-
-    /**
-     * Set the push actions for this event.
-     * Clears rule from push details if present
-     * @deprecated use `setPushDetails`
-     *
-     * @param pushActions - push actions
-     */
-    public setPushActions(pushActions: IActionsObject | null): void {
-        this.pushDetails = {
-            actions: pushActions || undefined,
-        };
     }
 
     /**
@@ -1578,14 +1560,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         } else if (this.isRedaction()) {
             return this.event.redacts;
         }
-    }
-
-    /**
-     * Checks if this event is associated with another event. See `getAssociatedId`.
-     * @deprecated use hasAssociation instead.
-     */
-    public hasAssocation(): boolean {
-        return !!this.getAssociatedId();
     }
 
     /**
