@@ -41,8 +41,23 @@ import {
     IGroupCallRoomState,
 } from "../webrtc/groupCall";
 import { MSC3089EventContent } from "../models/MSC3089Branch";
-import { M_BEACON_INFO, MBeaconInfoEventContent } from "./beacon";
+import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon";
 import { XOR } from "./common";
+import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events";
+import {
+    MCallAnswer,
+    MCallBase,
+    MCallCandidates,
+    MCallHangupReject,
+    MCallInviteNegotiate,
+    MCallReplacesEvent,
+    MCallSelectAnswer,
+    SDPStreamMetadata,
+    SDPStreamMetadataKey,
+} from "../webrtc/callEventTypes";
+import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types";
+import { EncryptedFile } from "./media";
+import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls";
 
 export enum EventType {
     // Room state events
@@ -283,21 +298,37 @@ export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
  */
 export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matrix.msc4023.thread_id");
 
-export interface IEncryptedFile {
-    url: string;
-    mimetype?: string;
-    key: {
-        alg: string;
-        key_ops: string[]; // eslint-disable-line camelcase
-        kty: string;
-        k: string;
-        ext: boolean;
-    };
-    iv: string;
-    hashes: { [alg: string]: string };
-    v: string;
+/**
+ * @deprecated in favour of {@link EncryptedFile}
+ */
+export type IEncryptedFile = EncryptedFile;
+
+/**
+ * Mapped type from event type to content type for all specified non-state room events.
+ */
+export interface TimelineEvents {
+    [EventType.RoomMessage]: RoomMessageEventContent;
+    [EventType.Sticker]: StickerEventContent;
+    [EventType.Reaction]: ReactionEventContent;
+    [EventType.CallReplaces]: MCallReplacesEvent;
+    [EventType.CallAnswer]: MCallAnswer;
+    [EventType.CallSelectAnswer]: MCallSelectAnswer;
+    [EventType.CallNegotiate]: Omit<MCallInviteNegotiate, "offer">;
+    [EventType.CallInvite]: MCallInviteNegotiate;
+    [EventType.CallCandidates]: MCallCandidates;
+    [EventType.CallHangup]: MCallHangupReject;
+    [EventType.CallReject]: MCallHangupReject;
+    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase & { [SDPStreamMetadataKey]: SDPStreamMetadata };
+    [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
+    [EventType.CallNotify]: ICallNotifyContent;
+    [M_BEACON.name]: MBeaconEventContent;
+    [M_POLL_START.name]: PollStartEventContent;
+    [M_POLL_END.name]: PollEndEventContent;
 }
 
+/**
+ * Mapped type from event type to content type for all specified room state events.
+ */
 export interface StateEvents {
     [EventType.RoomCanonicalAlias]: RoomCanonicalAliasEventContent;
     [EventType.RoomCreate]: RoomCreateEventContent;

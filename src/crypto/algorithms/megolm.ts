@@ -26,7 +26,6 @@ import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
     DecryptionClassParams,
-    DecryptionError,
     EncryptionAlgorithm,
     IParams,
     registerAlgorithm,
@@ -45,6 +44,8 @@ import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
 import { immediate, MapWithDefault } from "../../utils";
 import { KnownMembership } from "../../@types/membership";
+import { DecryptionFailureCode } from "../../crypto-api";
+import { DecryptionError } from "../../common-crypto/CryptoBackend";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -1313,7 +1314,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
 
         if (!content.sender_key || !content.session_id || !content.ciphertext) {
-            throw new DecryptionError("MEGOLM_MISSING_FIELDS", "Missing fields in input");
+            throw new DecryptionError(DecryptionFailureCode.MEGOLM_MISSING_FIELDS, "Missing fields in input");
         }
 
         // we add the event to the pending list *before* we start decryption.
@@ -1339,12 +1340,12 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 throw e;
             }
 
-            let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+            let errorCode = DecryptionFailureCode.OLM_DECRYPT_GROUP_MESSAGE_ERROR;
 
             if ((<MatrixError>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX") {
                 this.requestKeysForEvent(event);
 
-                errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
+                errorCode = DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX;
             }
 
             throw new DecryptionError(errorCode, e instanceof Error ? e.message : "Unknown Error: Error is undefined", {
@@ -1377,13 +1378,13 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 if (problem.fixed) {
                     problemDescription += " Trying to create a new secure channel and re-requesting the keys.";
                 }
-                throw new DecryptionError("MEGOLM_UNKNOWN_INBOUND_SESSION_ID", problemDescription, {
+                throw new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, problemDescription, {
                     session: content.sender_key + "|" + content.session_id,
                 });
             }
 
             throw new DecryptionError(
-                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                 "The sender's device has not sent us the keys for this message.",
                 {
                     session: content.sender_key + "|" + content.session_id,
@@ -1405,7 +1406,10 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         // (this is somewhat redundant, since the megolm session is scoped to the
         // room, so neither the sender nor a MITM can lie about the room_id).
         if (payload.room_id !== event.getRoomId()) {
-            throw new DecryptionError("MEGOLM_BAD_ROOM", "Message intended for room " + payload.room_id);
+            throw new DecryptionError(
+                DecryptionFailureCode.MEGOLM_BAD_ROOM,
+                "Message intended for room " + payload.room_id,
+            );
         }
 
         return {

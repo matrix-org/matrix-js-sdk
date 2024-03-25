@@ -29,7 +29,7 @@ import {
 import { logger } from "../logger";
 import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { logDuration, QueryDict, sleep } from "../utils";
-import { IAuthDict, UIAuthCallback } from "../interactive-auth";
+import { AuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
 
@@ -169,7 +169,7 @@ export class OutgoingRequestProcessor {
         }
 
         const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: IAuthDict | null): Promise<UIAResponse<T>> => {
+        const makeRequest = async (auth: AuthDict | null): Promise<UIAResponse<T>> => {
             const newBody: Record<string, any> = {
                 ...parsedBody,
             };

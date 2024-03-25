@@ -34,6 +34,7 @@ import { IContent, MatrixEvent } from "../../models/event";
 import { generateDecimalSas } from "./SASDecimal";
 import { EventType } from "../../@types/event";
 import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification";
+import { VerificationMethod } from "../../types";
 
 // backwards-compatibility exports
 export type {
@@ -233,7 +234,7 @@ export class SAS extends Base {
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {
-        return "m.sas.v1";
+        return VerificationMethod.Sas;
     }
 
     public get events(): string[] {

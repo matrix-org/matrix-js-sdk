@@ -50,6 +50,7 @@ import {
     ClientEvent,
     createClient,
     CryptoEvent,
+    HistoryVisibility,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -59,11 +60,11 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    MsgType,
     PendingEventOrdering,
     Room,
     RoomMember,
     RoomStateEvent,
-    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -80,12 +81,12 @@ import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
+    DecryptionFailureCode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
@@ -470,9 +471,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
 
             const awaitUISI = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
-                    if (error.code == "MEGOLM_UNKNOWN_INBOUND_SESSION_ID") {
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
+                    if (ev.decryptionFailureReason === DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID) {
                         resolve();
                     }
                 });
@@ -499,9 +499,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
 
             const awaitUnknownIndex = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
-                    if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
+                    if (ev.decryptionFailureReason === DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX) {
                         resolve();
                     }
                 });
@@ -532,13 +531,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await aliceClient.getCrypto()!.importRoomKeys([testData.MEGOLM_SESSION_DATA]);
 
             const awaitDecryptionError = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
                     // rust and libolm can't have an exact 1:1 mapping for all errors,
                     // but some errors are part of API and should match
                     if (
-                        error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" &&
-                        error.code != "OLM_UNKNOWN_MESSAGE_INDEX"
+                        ev.decryptionFailureReason !== DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID &&
+                        ev.decryptionFailureReason !== DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX
                     ) {
                         resolve();
                     }
@@ -1928,7 +1926,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery({ device_keys: { "@other:user": {} }, failures: {} });
         aliceClient.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
             if (member.userId == "@other:user") {
-                aliceClient.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
+                aliceClient.sendMessage(testRoomId, { msgtype: MsgType.Text, body: "Hello, World" });
             }
         });
 

@@ -17,7 +17,7 @@ limitations under the License.
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import { IClearEvent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
-import { CryptoApi, ImportRoomKeysOpts } from "../crypto-api";
+import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api";
 import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
 import { IEncryptedEventInfo } from "../crypto/api";
 import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
@@ -226,10 +226,6 @@ export interface EventDecryptionResult {
      * restored from backup)
      */
     untrusted?: boolean;
-    /**
-     * The sender doesn't authorize the unverified devices to decrypt his messages
-     */
-    encryptedDisabledForUnverifiedDevices?: boolean;
 }
 
 /**
@@ -262,4 +258,44 @@ export interface BackupDecryptor {
      * Should be called once the decryptor is no longer needed.
      */
     free(): void;
+}
+
+/**
+ * Exception thrown when decryption fails
+ *
+ * @param code - Reason code for the failure.
+ *
+ * @param msg - user-visible message describing the problem
+ *
+ * @param details - key/value pairs reported in the logs but not shown
+ *   to the user.
+ */
+export class DecryptionError extends Error {
+    public readonly detailedString: string;
+
+    public constructor(
+        public readonly code: DecryptionFailureCode,
+        msg: string,
+        details?: Record<string, string | Error>,
+    ) {
+        super(msg);
+        this.name = "DecryptionError";
+        this.detailedString = detailedStringForDecryptionError(this, details);
+    }
+}
+
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
+    let result = err.name + "[msg: " + err.message;
+
+    if (details) {
+        result +=
+            ", " +
+            Object.keys(details)
+                .map((k) => k + ": " + details[k])
+                .join(", ");
+    }
+
+    result += "]";
+
+    return result;
 }

@@ -26,6 +26,7 @@ import {
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MatrixError } from "../../../src/http-api";
 import { KnownMembership } from "../../../src/@types/membership";
+import { EncryptedFile } from "../../../src/@types/media";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
@@ -947,7 +948,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
@@ -1007,7 +1008,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
