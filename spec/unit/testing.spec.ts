@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mkDecryptionFailureMatrixEvent, mkEncryptedMatrixEvent, mkMatrixEvent } from "../../src/testing";
+import {
+    decryptExistingEvent,
+    mkDecryptionFailureMatrixEvent,
+    mkEncryptedMatrixEvent,
+    mkMatrixEvent,
+} from "../../src/testing";
 import { EventType } from "../../src";
 import { DecryptionFailureCode } from "../../src/crypto-api";
 
@@ -86,6 +91,30 @@ describe("testing", () => {
             });
             expect(event.getType()).toEqual("m.room.message");
             expect(event.isState()).toBe(false);
+        });
+    });
+
+    describe("decryptExistingEvent", () => {
+        it("decrypts an event", async () => {
+            const event = await mkDecryptionFailureMatrixEvent({
+                sender: "@alice:test",
+                roomId: "!test:room",
+                code: DecryptionFailureCode.UNKNOWN_ERROR,
+                msg: "blah",
+            });
+
+            expect(event.isEncrypted()).toBe(true);
+            expect(event.isDecryptionFailure()).toBe(true);
+            await decryptExistingEvent(event, {
+                plainContent: { body: "blah" },
+                plainType: "m.room.test",
+            });
+
+            expect(event.isEncrypted()).toBe(true);
+            expect(event.isDecryptionFailure()).toBe(false);
+            expect(event.decryptionFailureReason).toBe(null);
+            expect(event.getContent()).toEqual({ body: "blah" });
+            expect(event.getType()).toEqual("m.room.test");
         });
     });
 });
