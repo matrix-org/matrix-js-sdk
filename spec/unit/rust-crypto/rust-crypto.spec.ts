@@ -1443,6 +1443,7 @@ describe("RustCrypto", () => {
             });
 
             // there isn't any dehydrated device yet
+            fetchMock.config.overwriteRoutes = true;
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
