@@ -79,6 +79,7 @@ export class RustDehydrationManager {
             if (err.errcode === "M_UNRECOGNIZED") {
                 return false;
             }
+            throw error;
         }
         return true;
     }

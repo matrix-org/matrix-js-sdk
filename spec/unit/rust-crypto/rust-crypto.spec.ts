@@ -1409,11 +1409,7 @@ describe("RustCrypto", () => {
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
 
             const rustCrypto = await makeTestRustCrypto(
-                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                    baseUrl: "http://server/",
-                    prefix: "",
-                    onlyData: true,
-                }),
+                makeMatrixHttpApi(),
                 testData.TEST_USER_ID,
                 undefined,
                 secretStorage,
@@ -1428,7 +1424,6 @@ describe("RustCrypto", () => {
             } as unknown as OutgoingRequestProcessor;
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
             (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
-            (rustCrypto["dehydrationManager"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
             const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
             rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
 
@@ -1447,17 +1442,25 @@ describe("RustCrypto", () => {
                 setupNewKeyBackup: false,
             });
 
-            let dehydratedDeviceBody: any;
-            const makeDehydrationRequest = (outgoingRequestProcessor.makeOutgoingRequest = jest.fn(
-                async (req, uiaCallback) => {
-                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
-                    dehydratedDeviceBody = JSON.parse((req as RustSdkCryptoJs.PutDehydratedDeviceRequest).body);
+            // there isn't any dehydrated device yet
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
                 },
-            ));
+            });
+            expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(false);
+
+            // create a dehydrated device
+            let dehydratedDeviceBody: any;
+            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
+                dehydratedDeviceBody = JSON.parse(opts.body as string);
+                return {};
+            });
             await rustCrypto.createAndUploadDehydratedDevice();
 
-            expect(makeDehydrationRequest).toHaveBeenCalled();
-
+            // rehydrate the device that we just created
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 device_id: dehydratedDeviceBody.device_id,
                 device_data: dehydratedDeviceBody.device_data,
@@ -1484,11 +1487,7 @@ describe("RustCrypto", () => {
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
 
             const rustCrypto = await makeTestRustCrypto(
-                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                    baseUrl: "http://server/",
-                    prefix: "",
-                    onlyData: true,
-                }),
+                makeMatrixHttpApi(),
                 testData.TEST_USER_ID,
                 undefined,
                 secretStorage,
@@ -1545,6 +1544,56 @@ describe("RustCrypto", () => {
             await secondDehydrationPromise;
 
             rustCrypto.stop();
+        });
+
+        it("should detect if dehydration is supported", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            fetchMock.config.overwriteRoutes = true;
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(false);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: "DEVICE_ID",
+                device_data: "data",
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+        });
+
+        it("should detect if dehydration key is stored", async () => {
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+            const rustCrypto = await makeTestRustCrypto(
+                makeMatrixHttpApi(),
+                testData.TEST_USER_ID,
+                undefined,
+                secretStorage,
+            );
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            expect(await rustCrypto.isDehydrationKeyStored()).toBe(false);
+
+            await rustCrypto.resetDehydrationKey();
+            expect(await rustCrypto.isDehydrationKeyStored()).toBe(true);
         });
     });
 });
