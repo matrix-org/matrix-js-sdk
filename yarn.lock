@@ -5147,9 +5147,10 @@ object.values@^1.1.7:
     define-properties "^1.2.0"
     es-abstract "^1.22.1"
 
-"oidc-client-ts@github:hughns/oidc-client-ts#hughns/device-flow":
+oidc-client-ts@^3.0.1:
   version "3.0.1"
-  resolved "https://codeload.github.com/hughns/oidc-client-ts/tar.gz/456bdee9ca3c284e6626480e905987bfb79acbaf"
+  resolved "https://registry.yarnpkg.com/oidc-client-ts/-/oidc-client-ts-3.0.1.tgz#be264fb87c89f74f73863646431c32cd06f5ceb7"
+  integrity sha512-xX8unZNtmtw3sOz4FPSqDhkLFnxCDsdo2qhFEH2opgWnF/iXMFoYdBQzkwCxAZVgt3FT3DnuBY3k80EZHT0RYg==
   dependencies:
     jwt-decode "^4.0.0"
 

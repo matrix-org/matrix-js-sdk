@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceAccessTokenResponse, DeviceAuthorizationResponse, OidcClient } from "oidc-client-ts";
+import { OidcClient } from "oidc-client-ts";
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
@@ -78,8 +78,6 @@ export class MSC4108SignInWithQR {
     private ourIntent: QrCodeMode;
     private _code?: Uint8Array;
     public protocol?: string;
-    private oidcClient?: OidcClient;
-    private deviceAuthorizationResponse?: DeviceAuthorizationResponse;
 
     /**
      * @param channel - The secure channel used for communication
@@ -167,36 +165,7 @@ export class MSC4108SignInWithQR {
     }> {
         logger.info("loginStep2And3()");
         if (this.isNewDevice) {
-            if (!oidcClient) {
-                throw new Error("No oidc client");
-            }
-            this.oidcClient = oidcClient;
-            // start device grant
-            this.deviceAuthorizationResponse = await oidcClient.startDeviceAuthorization({});
-
-            const {
-                verification_uri: verificationUri,
-                verification_uri_complete: verificationUriComplete,
-                user_code: userCode,
-            } = this.deviceAuthorizationResponse;
-            const protocol: DeviceAuthorizationGrantProtocolPayload = {
-                type: PayloadType.Protocol,
-                protocol: "device_authorization_grant",
-                device_authorization_grant: {
-                    verification_uri: verificationUri,
-                    verification_uri_complete: verificationUriComplete,
-                },
-            };
-            if (this.didScanCode) {
-                // MSC4108-Flow: NewScanned
-                // send immediately
-                await this.send(protocol);
-            } else {
-                // MSC4108-Flow: ExistingScanned
-                // we will send it later
-            }
-
-            return { userCode: userCode };
+            throw new Error("New device flows around OIDC are not yet implemented");
         } else {
             // The user needs to do step 7 for the out of band confirmation
             // but, first we receive the protocol chosen by the other device so that
@@ -219,74 +188,8 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    public async loginStep4(): Promise<DeviceAccessTokenResponse> {
-        if (this.isExistingDevice) {
-            throw new Error("loginStep4() is not valid for existing devices");
-        }
-
-        logger.info("loginStep4()");
-
-        if (this.didScanCode) {
-            // MSC4108-Flow: NewScanned
-            // we already sent the protocol message
-        } else {
-            // MSC4108-Flow: ExistingScanned
-            // send it now
-            if (!this.deviceAuthorizationResponse) {
-                throw new Error("No device authorization response");
-            }
-            const protocol: DeviceAuthorizationGrantProtocolPayload = {
-                type: PayloadType.Protocol,
-                protocol: "device_authorization_grant",
-                device_authorization_grant: {
-                    verification_uri: this.deviceAuthorizationResponse.verification_uri,
-                    verification_uri_complete: this.deviceAuthorizationResponse.verification_uri_complete,
-                },
-            };
-            await this.send(protocol);
-        }
-
-        // wait for accepted message
-        const message = await this.receive();
-
-        if (message.type === PayloadType.Failure) {
-            throw new RendezvousError("Failed", (message as FailurePayload).reason);
-        }
-        if (message.type !== PayloadType.Accepted) {
-            throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
-        }
-
-        if (!this.deviceAuthorizationResponse) {
-            throw new Error("No device authorization response");
-        }
-        if (!this.oidcClient) {
-            throw new Error("No oidc client");
-        }
-        // poll for DAG
-        const res = await this.oidcClient.waitForDeviceAuthorization(this.deviceAuthorizationResponse);
-
-        if (!res) {
-            throw new RendezvousError(
-                "No response from device authorization endpoint",
-                RendezvousFailureReason.UnexpectedMessage,
-            );
-        }
-
-        if ("error" in res) {
-            let reason = RendezvousFailureReason.Unknown;
-            if (res.error === "expired_token") {
-                reason = RendezvousFailureReason.Expired;
-            } else if (res.error === "access_denied") {
-                reason = RendezvousFailureReason.UserDeclined;
-            }
-            const payload: FailurePayload = {
-                type: PayloadType.Failure,
-                reason,
-            };
-            await this.send(payload);
-        }
-
-        return res as DeviceAccessTokenResponse;
+    public async loginStep4(): Promise<unknown> {
+        throw new Error("New device flows around OIDC are not yet implemented");
     }
 
     public async loginStep5(deviceId?: string): Promise<{ secrets?: QRSecretsBundle }> {

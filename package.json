@@ -60,7 +60,7 @@
         "loglevel": "^1.7.1",
         "matrix-events-sdk": "0.0.1",
         "matrix-widget-api": "^1.6.0",
-        "oidc-client-ts": "github:hughns/oidc-client-ts#hughns/device-flow",
+        "oidc-client-ts": "^3.0.1",
         "p-retry": "4",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",

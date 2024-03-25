@@ -83,6 +83,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
         requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
         optionalStringProperty(wellKnown, "account_management_uri"),
+        optionalStringProperty(wellKnown, "device_authorization_endpoint"),
         optionalStringArrayProperty(wellKnown, "account_management_actions_supported"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
@@ -118,7 +119,7 @@ export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
-        | "device_authorization_endpoint" // PROTOTYPE: this is actually optional, but the typings are wrong
+        | "device_authorization_endpoint"
     > & {
         // MSC2965 extensions to the OIDC spec
         account_management_uri?: string;
