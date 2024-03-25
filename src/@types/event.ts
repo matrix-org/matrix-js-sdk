@@ -299,6 +299,9 @@ export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matr
  */
 export type IEncryptedFile = EncryptedFile;
 
+/**
+ * Mapped type from event type to content type for all specified non-state room events.
+ */
 export interface TimelineEvents {
     [EventType.RoomMessage]: RoomMessageEventContent;
     [EventType.Sticker]: StickerEventContent;
@@ -319,41 +322,9 @@ export interface TimelineEvents {
     [M_POLL_END.name]: PollEndEventContent;
 }
 
-export interface StateEvents {
-    [EventType.RoomCanonicalAlias]: RoomCanonicalAliasEventContent;
-    [EventType.RoomCreate]: RoomCreateEventContent;
-    [EventType.RoomJoinRules]: RoomJoinRulesEventContent;
-    [EventType.RoomMember]: RoomMemberEventContent;
-    // XXX: Spec says this event has 3 required fields but kicking such an invitation requires sending `{}`
-    [EventType.RoomThirdPartyInvite]: XOR<RoomThirdPartyInviteEventContent, {}>;
-    [EventType.RoomPowerLevels]: RoomPowerLevelsEventContent;
-    [EventType.RoomName]: RoomNameEventContent;
-    [EventType.RoomTopic]: RoomTopicEventContent;
-    [EventType.RoomAvatar]: RoomAvatarEventContent;
-    [EventType.RoomPinnedEvents]: RoomPinnedEventsEventContent;
-    [EventType.RoomEncryption]: RoomEncryptionEventContent;
-    [EventType.RoomHistoryVisibility]: RoomHistoryVisibilityEventContent;
-    [EventType.RoomGuestAccess]: RoomGuestAccessEventContent;
-    [EventType.RoomServerAcl]: RoomServerAclEventContent;
-    [EventType.RoomTombstone]: RoomTombstoneEventContent;
-    [EventType.SpaceChild]: SpaceChildEventContent;
-    [EventType.SpaceParent]: SpaceParentEventContent;
-
-    [EventType.PolicyRuleUser]: XOR<PolicyRuleEventContent, {}>;
-    [EventType.PolicyRuleRoom]: XOR<PolicyRuleEventContent, {}>;
-    [EventType.PolicyRuleServer]: XOR<PolicyRuleEventContent, {}>;
-
-    // MSC3401
-    [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>;
-
-    // MSC3089
-    [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
-
-    // MSC3672
-    [M_BEACON_INFO.name]: MBeaconInfoEventContent;
-}
-
+/**
+ * Mapped type from event type to content type for all specified room state events.
+ */
 export interface StateEvents {
     [EventType.RoomCanonicalAlias]: RoomCanonicalAliasEventContent;
     [EventType.RoomCreate]: RoomCreateEventContent;
