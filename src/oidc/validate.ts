@@ -20,12 +20,6 @@ import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 import { logger } from "../logger";
 import { OidcError } from "./error";
 
-/**
- * re-export for backwards compatibility
- * @deprecated use OidcError
- */
-export { OidcError as OidcDiscoveryError };
-
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;

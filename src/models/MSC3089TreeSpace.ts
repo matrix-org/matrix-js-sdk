@@ -17,7 +17,7 @@ limitations under the License.
 import promiseRetry from "p-retry";
 
 import { MatrixClient } from "../client";
-import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
+import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
 import { Room } from "./room";
 import { logger } from "../logger";
 import { IContent, MatrixEvent } from "./event";
@@ -35,6 +35,7 @@ import { ISendEventResponse } from "../@types/requests";
 import { FileType } from "../http-api";
 import { KnownMembership } from "../@types/membership";
 import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events";
+import { EncryptedFile, FileContent } from "../@types/media";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -77,6 +78,12 @@ export enum TreePermissions {
     Viewer = "viewer", // Default
     Editor = "editor", // "Moderator" or ~PL50
     Owner = "owner", // "Admin" or PL100
+}
+
+declare module "../@types/media" {
+    interface FileContent {
+        [UNSTABLE_MSC3089_LEAF.name]?: {};
+    }
 }
 
 /**
@@ -502,7 +509,7 @@ export class MSC3089TreeSpace {
     public async createFile(
         name: string,
         encryptedContents: FileType,
-        info: Partial<IEncryptedFile>,
+        info: EncryptedFile,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
         const { content_uri: mxc } = await this.client.uploadContent(encryptedContents, {
@@ -510,7 +517,7 @@ export class MSC3089TreeSpace {
         });
         info.url = mxc;
 
-        const fileContent = {
+        const fileContent: FileContent = {
             msgtype: MsgType.File,
             body: name,
             url: mxc,
@@ -529,7 +536,7 @@ export class MSC3089TreeSpace {
             ...additionalContent,
             ...fileContent,
             [UNSTABLE_MSC3089_LEAF.name]: {},
-        });
+        } as FileContent);
 
         await this.client.sendStateEvent(
             this.roomId,

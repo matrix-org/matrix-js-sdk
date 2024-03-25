@@ -81,6 +81,12 @@ declare module "../../src/types" {
             hello: string;
         };
     }
+
+    interface TimelineEvents {
+        "org.matrix.rageshake_request": {
+            request_id: number;
+        };
+    }
 }
 
 describe("RoomWidgetClient", () => {

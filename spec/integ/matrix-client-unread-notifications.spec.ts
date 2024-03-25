@@ -152,7 +152,7 @@ describe("MatrixClient syncing", () => {
         await client!.sendEvent(roomId, EventType.Reaction, {
             "m.relates_to": {
                 rel_type: RelationType.Annotation,
-                event_id: threadReply.getId(),
+                event_id: threadReply.getId()!,
                 key: "",
             },
         });
