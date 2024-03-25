@@ -50,24 +50,36 @@ interface OidcRegistrationRequestBody {
 }
 
 /**
- * Make the client registration request
- * @param registrationEndpoint - URL as returned from issuer ./well-known/openid-configuration
- * @param clientMetadata - registration metadata
- * @returns resolves to the registered client id when registration is successful
- * @throws An `Error` with `message` set to an entry in {@link OidcError},
- *      when the registration request fails, or the response is invalid.
+ * Attempts dynamic registration against the configured registration endpoint
+ * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}
+ * @param clientMetadata - The metadata for the client which to register
+ * @returns Promise<string> resolved with registered clientId
+ * @throws when registration is not supported, on failed request or invalid response
  */
-const doRegistration = async (
-    registrationEndpoint: string,
+export const registerOidcClient = async (
+    delegatedAuthConfig: OidcClientConfig,
     clientMetadata: OidcRegistrationClientMetadata,
 ): Promise<string> => {
+    if (!delegatedAuthConfig.registrationEndpoint) {
+        throw new Error(OidcError.DynamicRegistrationNotSupported);
+    }
+
+    const grantTypes: NonEmptyArray<string> = ["authorization_code", "refresh_token"];
+    if (grantTypes.some((scope) => !delegatedAuthConfig.metadata.grant_types_supported.includes(scope))) {
+        throw new Error(OidcError.DynamicRegistrationNotSupported);
+    }
+
+    const deviceCodeScope = "urn:ietf:params:oauth:grant-type:device_code";
+    if (delegatedAuthConfig.metadata.grant_types_supported.includes(deviceCodeScope)) {
+        grantTypes.push(deviceCodeScope);
+    }
+
     // https://openid.net/specs/openid-connect-registration-1_0.html
-    // PROTOTYPE: should check which scopes are supported by the OP
     const metadata: OidcRegistrationRequestBody = {
         client_name: clientMetadata.clientName,
         client_uri: clientMetadata.clientUri,
         response_types: ["code"],
-        grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
+        grant_types: grantTypes,
         redirect_uris: clientMetadata.redirectUris,
         id_token_signed_response_alg: "RS256",
         token_endpoint_auth_method: "none",
@@ -83,7 +95,7 @@ const doRegistration = async (
     };
 
     try {
-        const response = await fetch(registrationEndpoint, {
+        const response = await fetch(delegatedAuthConfig.registrationEndpoint, {
             method: Method.Post,
             headers,
             body: JSON.stringify(metadata),
@@ -108,21 +120,4 @@ const doRegistration = async (
             throw new Error(OidcError.DynamicRegistrationFailed);
         }
     }
-};
-
-/**
- * Attempts dynamic registration against the configured registration endpoint
- * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}
- * @param clientMetadata - The metadata for the client which to register
- * @returns Promise<string> resolved with registered clientId
- * @throws when registration is not supported, on failed request or invalid response
- */
-export const registerOidcClient = async (
-    delegatedAuthConfig: OidcClientConfig,
-    clientMetadata: OidcRegistrationClientMetadata,
-): Promise<string> => {
-    if (!delegatedAuthConfig.registrationEndpoint) {
-        throw new Error(OidcError.DynamicRegistrationNotSupported);
-    }
-    return doRegistration(delegatedAuthConfig.registrationEndpoint, clientMetadata);
 };
