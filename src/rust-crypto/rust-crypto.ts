@@ -1683,10 +1683,20 @@ class EventDecryptor {
                 forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
             };
         } catch (err) {
-            // We need to map back to regular decryption errors (used for analytics for example)
-            // The DecryptionErrors are used by react-sdk so is implicitly part of API, but poorly typed
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
                 const content = event.getWireContent();
+
+                // If the error looks like it might be recoverable from backup, queue up a request to try that.
+                if (
+                    err.code === RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey ||
+                    err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
+                ) {
+                    this.perSessionBackupDownloader.onDecryptionKeyMissingError(
+                        event.getRoomId()!,
+                        content.session_id!,
+                    );
+                }
+
                 let jsError;
                 switch (err.code) {
                     case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey: {
@@ -1697,10 +1707,6 @@ class EventDecryptor {
                                 session: content.sender_key + "|" + content.session_id,
                             },
                         );
-                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
-                            event.getRoomId()!,
-                            event.getWireContent().session_id!,
-                        );
                         break;
                     }
                     case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex: {
@@ -1710,10 +1716,6 @@ class EventDecryptor {
                             {
                                 session: content.sender_key + "|" + content.session_id,
                             },
-                        );
-                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
-                            event.getRoomId()!,
-                            event.getWireContent().session_id!,
                         );
                         break;
                     }
