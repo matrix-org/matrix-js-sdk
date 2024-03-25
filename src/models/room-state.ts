@@ -53,6 +53,7 @@ enum OobStatus {
 export interface IPowerLevelsContent {
     users?: Record<string, number>;
     events?: Record<string, number>;
+    notifications?: Partial<Record<"room", number>>;
     // eslint-disable-next-line camelcase
     users_default?: number;
     // eslint-disable-next-line camelcase
@@ -60,6 +61,7 @@ export interface IPowerLevelsContent {
     // eslint-disable-next-line camelcase
     state_default?: number;
     ban?: number;
+    invite?: number;
     kick?: number;
     redact?: number;
 }
@@ -129,6 +131,8 @@ export type RoomStateEventHandlerMap = {
 
 type EmittedEvents = RoomStateEvent | BeaconEvent;
 type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
+
+type KeysMatching<T, V> = { [K in keyof T]-?: T[K] extends V ? K : never }[keyof T];
 
 export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
@@ -800,7 +804,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @param powerLevel - The power level of the member
      * @returns true if the given power level is sufficient
      */
-    public hasSufficientPowerLevelFor(action: "ban" | "kick" | "redact", powerLevel: number): boolean {
+    public hasSufficientPowerLevelFor(
+        action: KeysMatching<Required<IPowerLevelsContent>, number>,
+        powerLevel: number,
+    ): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let powerLevels: IPowerLevelsContent = {};
