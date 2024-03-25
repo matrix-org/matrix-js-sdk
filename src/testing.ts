@@ -102,6 +102,9 @@ export async function mkEncryptedMatrixEvent(opts: {
 
     /** The content the event will have, once it has been decrypted. */
     plainContent: IContent;
+
+    /** Optional `event_id` for the event. If provided will be used as event ID; else an ID is generated. */
+    eventId?: string;
 }): Promise<MatrixEvent> {
     // we construct an event which has been decrypted by stubbing out CryptoBackend.decryptEvent and then
     // calling MatrixEvent.attemptDecryption.
@@ -111,6 +114,7 @@ export async function mkEncryptedMatrixEvent(opts: {
         roomId: opts.roomId,
         sender: opts.sender,
         content: { algorithm: "m.megolm.v1.aes-sha2" },
+        eventId: opts.eventId,
     });
 
     const decryptionResult: EventDecryptionResult = {
@@ -148,12 +152,16 @@ export async function mkDecryptionFailureMatrixEvent(opts: {
 
     /** A textual reason for the failure */
     msg: string;
+
+    /** Optional `event_id` for the event. If provided will be used as event ID; else an ID is generated. */
+    eventId?: string;
 }): Promise<MatrixEvent> {
     const mxEvent = mkMatrixEvent({
         type: EventType.RoomMessageEncrypted,
         roomId: opts.roomId,
         sender: opts.sender,
         content: { algorithm: "m.megolm.v1.aes-sha2" },
+        eventId: opts.eventId,
     });
 
     const mockCrypto = {
