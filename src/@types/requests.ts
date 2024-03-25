@@ -73,9 +73,7 @@ export interface IRedactOpts {
     with_rel_types?: Array<RelationType | "*">;
 }
 
-export interface ISendEventResponse {
-    event_id: string;
-}
+export type ISendEventResponse = operations["sendMessage"]["responses"]["200"]["content"]["application/json"];
 
 export type IPresenceOpts = operations["setPresence"]["requestBody"]["content"]["application/json"];
 
@@ -160,22 +158,8 @@ export interface ICreateRoomOpts {
 export type IRoomDirectoryOptions = operations["queryPublicRooms"]["requestBody"]["content"]["application/json"] &
     operations["queryPublicRooms"]["parameters"]["query"];
 
-export interface IAddThreePidOnlyBody {
-    auth?: {
-        type: string;
-        session?: string;
-    };
-    client_secret: string;
-    sid: string;
-}
-
-export interface IBindThreePidBody {
-    client_secret: string;
-    id_server: string;
-    // Some older identity servers have no auth enabled
-    id_access_token: string | null;
-    sid: string;
-}
+export type IAddThreePidOnlyBody = operations["add3PID"]["requestBody"]["content"]["application/json"];
+export type IBindThreePidBody = operations["bind3PID"]["requestBody"]["content"]["application/json"];
 
 export interface IRelationsRequestOpts {
     from?: string;
@@ -224,9 +208,6 @@ export type IFilterResponse = operations["defineFilter"]["responses"]["200"]["co
 
 export type ITagsResponse = operations["getRoomTags"]["responses"]["200"]["content"]["application/json"];
 
-export interface IStatusResponse extends IPresenceOpts {
-    currently_active?: boolean;
-    last_active_ago?: number;
-}
+export type IStatusResponse = operations["getPresence"]["responses"]["200"]["content"]["application/json"];
 
 /* eslint-enable camelcase */
