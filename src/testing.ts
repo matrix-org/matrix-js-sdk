@@ -25,9 +25,9 @@ limitations under the License.
 import { IContent, IEvent, IUnsigned, MatrixEvent } from "./models/event";
 import { RoomMember } from "./models/room-member";
 import { EventType } from "./@types/event";
-import { IEventDecryptionResult } from "./@types/crypto";
 import { DecryptionError } from "./crypto/algorithms";
 import { DecryptionFailureCode } from "./crypto-api";
+import { EventDecryptionResult } from "./common-crypto/CryptoBackend";
 
 /**
  * Create a {@link MatrixEvent}.
@@ -113,7 +113,7 @@ export async function mkEncryptedMatrixEvent(opts: {
         content: { algorithm: "m.megolm.v1.aes-sha2" },
     });
 
-    const decryptionResult: IEventDecryptionResult = {
+    const decryptionResult: EventDecryptionResult = {
         claimedEd25519Key: "",
         clearEvent: {
             type: opts.plainType,
@@ -157,7 +157,7 @@ export async function mkDecryptionFailureMatrixEvent(opts: {
     });
 
     const mockCrypto = {
-        decryptEvent: async (_ev): Promise<IEventDecryptionResult> => {
+        decryptEvent: async (_ev): Promise<EventDecryptionResult> => {
             throw new DecryptionError(opts.code, opts.msg);
         },
     } as Parameters<MatrixEvent["attemptDecryption"]>[0];
