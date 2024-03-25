@@ -66,6 +66,8 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { isPollEvent, Poll, PollEvent } from "./poll";
+import { BreakoutRooms, BreakoutRoomsEvent, BreakoutRoomsEventHandlerMap } from "./breakoutRooms";
+import { BreakoutRoomWithSummary } from "../@types/breakout";
 import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
 import * as utils from "../utils";
@@ -169,7 +171,8 @@ export type RoomEmittedEvents =
     | BeaconEvent.Update
     | BeaconEvent.Destroy
     | BeaconEvent.LivenessChange
-    | PollEvent.New;
+    | PollEvent.New
+    | BreakoutRoomsEvent.RoomsChanged;
 
 export type RoomEventHandlerMap = {
     /**
@@ -322,7 +325,8 @@ export type RoomEventHandlerMap = {
         | RoomStateEvent.Marker
         | BeaconEvent.New
     > &
-    Pick<BeaconEventHandlerMap, BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange>;
+    Pick<BeaconEventHandlerMap, BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange> &
+    BreakoutRoomsEventHandlerMap;
 
 export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
@@ -429,6 +433,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private visibilityEvents = new Map<string, MatrixEvent[]>();
 
+    private breakoutRooms: BreakoutRooms;
+
     /**
      * The latest receipts (synthetic and real) for each user in each thread
      * (and unthreaded).
@@ -508,6 +514,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.membersPromise = undefined;
         }
+
+        this.breakoutRooms = new BreakoutRooms(this);
+        this.reEmitter.reEmit(this.breakoutRooms, [BreakoutRoomsEvent.RoomsChanged]);
+    }
+
+    public getBreakoutRooms(): BreakoutRoomWithSummary[] | null {
+        return this.breakoutRooms.getCurrentBreakoutRooms();
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;

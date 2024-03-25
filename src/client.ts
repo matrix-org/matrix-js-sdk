@@ -229,6 +229,7 @@ import {
 } from "./secret-storage";
 import { RegisterRequest, RegisterResponse } from "./@types/registration";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
+import { BreakoutEventContentRooms, BreakoutRoom } from "./@types/breakout";
 import { getRelationsThreadFilter } from "./thread-utils";
 import { KnownMembership, Membership } from "./@types/membership";
 
@@ -875,7 +876,7 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+export interface IRoomSummaryAPIResponse extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
     room_type?: RoomType;
     membership?: Membership;
     is_encrypted: boolean;
@@ -4579,6 +4580,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         beaconInfoContent: MBeaconInfoEventContent,
     ): Promise<ISendEventResponse> {
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
+    }
+
+    public async createBreakoutRooms(parentRoomId: string, rooms: BreakoutRoom[]): Promise<ISendEventResponse> {
+        if (rooms.length === 0) {
+            throw new Error("Called with an empty array of rooms");
+        }
+
+        const breakoutContentRooms: BreakoutEventContentRooms = {};
+        for (const room of rooms) {
+            const roomId = room.roomId;
+            const domain = this.getDomain();
+            breakoutContentRooms[roomId] = {
+                via: domain ? [domain] : [],
+                users: room.users,
+            };
+        }
+
+        return await this.sendStateEvent(parentRoomId, EventType.PrefixedBreakout, {
+            "m.breakout": breakoutContentRooms,
+        });
     }
 
     public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
@@ -9828,7 +9849,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
      * @param via - The list of servers which know about the room if only an ID was provided.
      */
-    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
+    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummaryAPIResponse> {
         const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
         return this.http.authedRequest(Method.Get, path, { via }, undefined, {
             prefix: "/_matrix/client/unstable/im.nheko.summary",
