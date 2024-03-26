@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { QRSecretsBundle } from "../crypto-api";
 
 declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface OlmMachine {
@@ -25,6 +24,17 @@ declare module "@matrix-org/matrix-sdk-crypto-wasm" {
 
     interface SecretsBundle {
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        to_json(): Promise<QRSecretsBundle>;
+        to_json(): Promise<{
+            cross_signing?: {
+                master_key: string;
+                self_signing_key: string;
+                user_signing_key: string;
+            };
+            backup?: {
+                algorithm: string;
+                key: string;
+                backup_version: string;
+            };
+        }>;
     }
 }
