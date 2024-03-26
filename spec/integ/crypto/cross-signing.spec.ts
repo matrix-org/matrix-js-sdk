@@ -81,33 +81,37 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         };
     }
 
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+    beforeEach(
+        async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
 
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: TEST_USER_ID,
-            accessToken: "akjgkrgjs",
-            deviceId: TEST_DEVICE_ID,
-            cryptoCallbacks: createCryptoCallbacks(),
-        });
+            const homeserverUrl = "https://alice-server.com";
+            aliceClient = createClient({
+                baseUrl: homeserverUrl,
+                userId: TEST_USER_ID,
+                accessToken: "akjgkrgjs",
+                deviceId: TEST_DEVICE_ID,
+                cryptoCallbacks: createCryptoCallbacks(),
+            });
 
-        syncResponder = new SyncResponder(homeserverUrl);
-        e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
-        /** an object which intercepts `/keys/upload` requests on the test homeserver */
-        new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl);
+            e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
+            /** an object which intercepts `/keys/upload` requests on the test homeserver */
+            new E2EKeyReceiver(homeserverUrl);
 
-        // Silence warnings from the backup manager
-        fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
-            status: 404,
-            body: { errcode: "M_NOT_FOUND" },
-        });
+            // Silence warnings from the backup manager
+            fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
+                status: 404,
+                body: { errcode: "M_NOT_FOUND" },
+            });
 
-        await initCrypto(aliceClient);
-    });
+            await initCrypto(aliceClient);
+        },
+        /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+        10000,
+    );
 
     afterEach(async () => {
         await aliceClient.stopClient();
