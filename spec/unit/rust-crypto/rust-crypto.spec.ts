@@ -766,7 +766,7 @@ describe("RustCrypto", () => {
                     request instanceof RustSdkCryptoJs.UploadSigningKeysRequest ||
                     request instanceof RustSdkCryptoJs.PutDehydratedDeviceRequest
                 ) {
-                    // These request types does not implement OutgoingRequest and does not need to be marked as sent.
+                    // These request types do not implement OutgoingRequest and do not need to be marked as sent.
                     return;
                 }
                 if (request.id) {
