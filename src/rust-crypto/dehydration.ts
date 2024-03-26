@@ -191,7 +191,7 @@ export class RustDehydrationManager {
             const roomKeyInfos: RustSdkCryptoJs.RoomKeyInfo[] = await rehydratedDevice.receiveEvents(
                 JSON.stringify(eventResp.events),
             );
-            roomKeyCount += eventResp.events.length;
+            roomKeyCount += roomKeyInfos.length;
 
             // FIXME: is this actually needed?  It looks like the OlmMachine
             // automatically re-tries decryption

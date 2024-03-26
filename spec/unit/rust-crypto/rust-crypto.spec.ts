@@ -1466,15 +1466,27 @@ describe("RustCrypto", () => {
                 device_id: dehydratedDeviceBody.device_id,
                 device_data: dehydratedDeviceBody.device_data,
             });
+            const eventsResponse = jest.fn((url, opts) => {
+                // rehydrating should make two calls to the /events endpoint.
+                // The first time will return a single event, and the second
+                // time will return no events (which will signal to the
+                // rehydration function that it can stop)
+                const body = JSON.parse(opts.body as string);
+                const nextBatch = body.next_batch ?? "0";
+                const events =
+                    nextBatch === "0" ? [{ sender: testData.TEST_USER_ID, type: "m.dummy", content: {} }] : [];
+                return {
+                    events,
+                    next_batch: nextBatch + "1",
+                };
+            });
             fetchMock.post(
                 `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
-                {
-                    events: [],
-                    next_batch: "token",
-                },
+                eventsResponse,
             );
 
             expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(true);
+            expect(eventsResponse.mock.calls).toHaveLength(2);
         });
 
         it("should schedule regular creation of dehydrated devices", async () => {
@@ -1522,18 +1534,18 @@ describe("RustCrypto", () => {
                 setupNewKeyBackup: false,
             });
 
-            // when we schedule dehydration, it should create a dehydrated
-            // device immediately
-            const makeDehydrationRequest = (outgoingRequestProcessor.makeOutgoingRequest = jest.fn(
-                async (req, uiaCallback) => {
-                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
-                },
-            ));
+            // when we schedule dehydration with no delay, it should create a
+            // dehydrated device immediately
+            outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (req, uiaCallback) => {
+                expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+            });
             await rustCrypto.scheduleDeviceDehydration(30000);
 
-            expect(makeDehydrationRequest).toHaveBeenCalled();
+            expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalled();
 
             // after we advance the timer, it should create another dehydrated device
+            // we make this a promise so that we can await it to make sure it gets
+            // called
             const secondDehydrationPromise = new Promise<void>((resolve, reject) => {
                 outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (req, uiaCallback) => {
                     expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
@@ -1544,7 +1556,28 @@ describe("RustCrypto", () => {
 
             await secondDehydrationPromise;
 
+            // when we schedule dehydration with a delay, it should not create
+            // a dehydrated device immediately
+            const thirdDehydrationPromise = new Promise<void>((resolve, reject) => {
+                outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (req, uiaCallback) => {
+                    expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+                    resolve();
+                });
+            });
+            await rustCrypto.scheduleDeviceDehydration(30000, 10000);
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+            jest.advanceTimersByTime(15000);
+            await thirdDehydrationPromise;
+
+            // when we stop rustCrypto, any pending device dehydration tasks
+            // should be cancelled
+            outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (req, uiaCallback) => {
+                expect(req).toBeInstanceOf(RustSdkCryptoJs.PutDehydratedDeviceRequest);
+            });
+            await rustCrypto.scheduleDeviceDehydration(30000, 10000);
             rustCrypto.stop();
+            jest.advanceTimersByTime(15000);
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
         });
 
         it("should detect if dehydration is supported", async () => {
@@ -1595,6 +1628,21 @@ describe("RustCrypto", () => {
 
             await rustCrypto.resetDehydrationKey();
             expect(await rustCrypto.isDehydrationKeyStored()).toBe(true);
+
+            // rehydrateDeviceIfAvailable should check the server to see if a
+            // dehydrated device is present, because the dehydration key is set
+            const response = jest.fn(() => {
+                return {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "Not found",
+                    },
+                };
+            });
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", response);
+            expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(false);
+            expect(response).toHaveBeenCalled();
         });
     });
 });
