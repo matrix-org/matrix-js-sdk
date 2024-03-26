@@ -1592,6 +1592,14 @@ describe("RustCrypto", () => {
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(false);
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Unknown endpoint",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 device_id: "DEVICE_ID",
                 device_data: "data",
             });

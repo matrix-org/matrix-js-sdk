@@ -63,7 +63,9 @@ export class RustDehydrationManager {
      */
     public async isSupported(): Promise<boolean> {
         // call the endpoint to get a dehydrated device.  If it returns an
-        // M_UNRECOGNIZED error, then dehydration is unsupported
+        // M_UNRECOGNIZED error, then dehydration is unsupported.  If it returns
+        // a successful response, or an M_NOT_FOUND, then dehydration is supported.
+        // Any other exceptions are passed through.
         try {
             await this.http.authedRequest<IDehydratedDeviceResp>(
                 Method.Get,
@@ -78,6 +80,8 @@ export class RustDehydrationManager {
             const err = error as MatrixError;
             if (err.errcode === "M_UNRECOGNIZED") {
                 return false;
+            } else if (err.errcode === "M_NOT_FOUND") {
+                return true;
             }
             throw error;
         }
