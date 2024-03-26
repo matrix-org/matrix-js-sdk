@@ -29,7 +29,7 @@ export enum PayloadType {
     Failure = "m.login.failure",
     Success = "m.login.success",
     Secrets = "m.login.secrets",
-    Accepted = "m.login.accepted",
+    ProtocolAccepted = "m.login.protocol_accepted",
 }
 
 export interface MSC4108Payload {
@@ -67,7 +67,7 @@ interface SuccessPayload extends MSC4108Payload {
 }
 
 interface AcceptedPayload extends MSC4108Payload {
-    type: PayloadType.Accepted;
+    type: PayloadType.ProtocolAccepted;
 }
 
 interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
@@ -252,7 +252,7 @@ export class MSC4108SignInWithQR {
         if (message.type === PayloadType.Failure) {
             throw new RendezvousError("Failed", (message as FailurePayload).reason);
         }
-        if (message.type !== PayloadType.Accepted) {
+        if (message.type !== PayloadType.ProtocolAccepted) {
             throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
         }
 
@@ -311,7 +311,7 @@ export class MSC4108SignInWithQR {
             // then done?
         } else {
             const payload: AcceptedPayload = {
-                type: PayloadType.Accepted,
+                type: PayloadType.ProtocolAccepted,
             };
             await this.send(payload);
 
