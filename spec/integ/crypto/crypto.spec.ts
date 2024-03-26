@@ -26,6 +26,7 @@ import * as testUtils from "../../test-utils/test-utils";
 import {
     advanceTimersUntil,
     CRYPTO_BACKENDS,
+    emitPromise,
     getSyncResponse,
     InitCrypto,
     mkEventCustom,
@@ -466,19 +467,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("Unable to decrypt error codes", function () {
-        it("Encryption fails with expected UISI error", async () => {
+        it("Decryption fails with UISI error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
-            const awaitUISI = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
-                    if (ev.decryptionFailureReason === DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID) {
-                        resolve();
-                    }
-                });
-            });
+            // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+            const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
-            // Alice gets both the events in a single sync
             const syncResponse = {
                 next_batch: 1,
                 rooms: {
@@ -490,21 +485,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
-
-            await awaitUISI;
+            const ev = await awaitDecryption;
+            expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID);
         });
 
-        it("Encryption fails with expected Unknown Index error", async () => {
+        it("Decryption fails with Unknown Index error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
-            const awaitUnknownIndex = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
-                    if (ev.decryptionFailureReason === DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX) {
-                        resolve();
-                    }
-                });
-            });
+            // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+            const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
             await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
 
@@ -521,10 +511,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
-            await awaitUnknownIndex;
+            const ev = await awaitDecryption;
+            expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX);
         });
 
-        it("Encryption fails with Unable to decrypt for other errors", async () => {
+        it("Decryption fails with Unable to decrypt for other errors", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
