@@ -81,6 +81,9 @@ export class MSC4108SignInWithQR {
     private oidcClient?: OidcClient;
     private deviceAuthorizationResponse?: DeviceAuthorizationResponse;
 
+    // PROTOTYPE: this is mocked for now
+    public checkCode: string | undefined = "99";
+
     /**
      * @param channel - The secure channel used for communication
      * @param client - The Matrix client in used on the device already logged in
