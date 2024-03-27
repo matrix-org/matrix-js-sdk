@@ -230,7 +230,7 @@ export class MSC4108SignInWithQR {
             // then wait for secrets
             logger.info("Waiting for secrets message");
             const secrets = await this.receive<SecretsPayload>();
-            if (secrets.type !== PayloadType.Secrets) {
+            if (secrets?.type !== PayloadType.Secrets) {
                 throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
             }
             return { secrets };
@@ -247,12 +247,12 @@ export class MSC4108SignInWithQR {
             logger.info("Waiting for outcome message");
             const res = await this.receive();
 
-            if (res.type === PayloadType.Failure) {
+            if (res?.type === PayloadType.Failure) {
                 const { reason } = res as FailurePayload;
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (res.type != PayloadType.Success) {
+            if (res?.type !== PayloadType.Success) {
                 throw new RendezvousError("Unexpected message", RendezvousFailureReason.UnexpectedMessage);
             }
 
@@ -275,8 +275,8 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    private async receive<T extends MSC4108Payload>(): Promise<T> {
-        return (await this.channel.secureReceive()) as T;
+    private async receive<T extends MSC4108Payload>(): Promise<T | undefined> {
+        return (await this.channel.secureReceive()) as T | undefined;
     }
 
     private async send(payload: MSC4108Payload): Promise<void> {
