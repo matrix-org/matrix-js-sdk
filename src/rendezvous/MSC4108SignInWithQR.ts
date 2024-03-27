@@ -22,6 +22,7 @@ import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
 import { QRSecretsBundle } from "../crypto-api";
+import { MatrixError } from "../http-api";
 
 export enum PayloadType {
     Protocols = "m.login.protocols",
@@ -45,6 +46,7 @@ interface ProtocolsPayload extends MSC4108Payload {
 interface ProtocolPayload extends MSC4108Payload {
     type: PayloadType.Protocol;
     protocol: string;
+    device_id: string;
 }
 
 interface DeviceAuthorizationGrantProtocolPayload extends ProtocolPayload {
@@ -63,7 +65,6 @@ interface FailurePayload extends MSC4108Payload {
 
 interface SuccessPayload extends MSC4108Payload {
     type: PayloadType.Success;
-    device_id: string;
 }
 
 interface AcceptedPayload extends MSC4108Payload {
@@ -74,12 +75,21 @@ interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
     type: PayloadType.Secrets;
 }
 
+// PROTOTYPE: this should probably sit in a wrapper around OidcClient or be accesible through some other means
+function getDeviceId(oidcClient: OidcClient): string | undefined {
+    return oidcClient.settings.scope
+        .split(" ")
+        .find((s) => s.startsWith("urn:matrix:org.matrix.msc2967.client:device:"))
+        ?.replace("urn:matrix:org.matrix.msc2967.client:device:", "");
+}
+
 export class MSC4108SignInWithQR {
     private ourIntent: QrCodeMode;
     private _code?: Uint8Array;
     public protocol?: string;
     private oidcClient?: OidcClient;
     private deviceAuthorizationResponse?: DeviceAuthorizationResponse;
+    private expectingNewDeviceId?: string;
 
     // PROTOTYPE: this is mocked for now
     public checkCode: string | undefined = "99";
@@ -174,6 +184,12 @@ export class MSC4108SignInWithQR {
                 throw new Error("No oidc client");
             }
             this.oidcClient = oidcClient;
+
+            const deviceIdFromScope = getDeviceId(oidcClient);
+
+            if (!deviceIdFromScope) {
+                throw new Error("No device ID set in oidc client scope");
+            }
             // start device grant
             this.deviceAuthorizationResponse = await oidcClient.startDeviceAuthorization({});
 
@@ -189,6 +205,7 @@ export class MSC4108SignInWithQR {
                     verification_uri: verificationUri,
                     verification_uri_complete: verificationUriComplete,
                 },
+                device_id: deviceIdFromScope,
             };
             if (this.didScanCode) {
                 // MSC4108-Flow: NewScanned
@@ -210,10 +227,32 @@ export class MSC4108SignInWithQR {
             if (message && message.type === PayloadType.Protocol) {
                 const protocolMessage = message as ProtocolPayload;
                 if (protocolMessage.protocol === "device_authorization_grant") {
-                    const { device_authorization_grant: dag } =
+                    const { device_authorization_grant: dag, device_id: expectingNewDeviceId } =
                         protocolMessage as DeviceAuthorizationGrantProtocolPayload;
                     const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } =
                         dag;
+
+                    // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
+                    // check if there is already a device online with that device ID
+
+                    let deviceAlreadyExists = true;
+                    try {
+                        await this.client?.getDevice(expectingNewDeviceId);
+                    } catch (err: MatrixError | unknown) {
+                        if (err instanceof MatrixError && err.httpStatus === 404) {
+                            deviceAlreadyExists = false;
+                        }
+                    }
+
+                    if (deviceAlreadyExists) {
+                        throw new RendezvousError(
+                            "Specified device ID already exists",
+                            RendezvousFailureReason.DataMismatch,
+                        );
+                    }
+
+                    this.expectingNewDeviceId = expectingNewDeviceId;
+
                     return { verificationUri: verificationUriComplete ?? verificationUri };
                 }
             }
@@ -235,8 +274,15 @@ export class MSC4108SignInWithQR {
         } else {
             // MSC4108-Flow: ExistingScanned
             // send it now
+            if (!this.oidcClient) {
+                throw new Error("No oidc client");
+            }
             if (!this.deviceAuthorizationResponse) {
                 throw new Error("No device authorization response");
+            }
+            const deviceIdFromScope = getDeviceId(this.oidcClient);
+            if (!deviceIdFromScope) {
+                throw new Error("No device ID set in oidc client scope");
             }
             const protocol: DeviceAuthorizationGrantProtocolPayload = {
                 type: PayloadType.Protocol,
@@ -245,6 +291,7 @@ export class MSC4108SignInWithQR {
                     verification_uri: this.deviceAuthorizationResponse.verification_uri,
                     verification_uri_complete: this.deviceAuthorizationResponse.verification_uri_complete,
                 },
+                device_id: deviceIdFromScope,
             };
             await this.send(protocol);
         }
@@ -292,16 +339,12 @@ export class MSC4108SignInWithQR {
         return res as DeviceAccessTokenResponse;
     }
 
-    public async loginStep5(deviceId?: string): Promise<{ secrets?: QRSecretsBundle }> {
+    public async loginStep5(): Promise<{ secrets?: QRSecretsBundle }> {
         logger.info("loginStep5()");
 
         if (this.isNewDevice) {
-            if (!deviceId) {
-                throw new Error("No new device id");
-            }
             const payload: SuccessPayload = {
                 type: PayloadType.Success,
-                device_id: deviceId,
             };
             await this.send(payload);
             // then wait for secrets
@@ -313,6 +356,9 @@ export class MSC4108SignInWithQR {
             return { secrets };
             // then done?
         } else {
+            if (!this.expectingNewDeviceId) {
+                throw new Error("No new device ID expected");
+            }
             const payload: AcceptedPayload = {
                 type: PayloadType.ProtocolAccepted,
             };
@@ -330,8 +376,12 @@ export class MSC4108SignInWithQR {
                 throw new RendezvousError("Unexpected message", RendezvousFailureReason.UnexpectedMessage);
             }
 
-            // PROTOTYPE: we should be validating that the device on the other end of the rendezvous did actually successfully authenticate as this device once we decide how that should be done
-            // const { device_id: deviceId } = res as SuccessPayload;
+            // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
+            const device = await this.client?.getDevice(this.expectingNewDeviceId);
+
+            if (!device) {
+                throw new RendezvousError("New device not found", RendezvousFailureReason.DataMismatch);
+            }
 
             const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
             // send secrets
