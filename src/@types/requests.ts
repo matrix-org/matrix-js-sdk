@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { operations } from "@matrix-org/spec/client-server";
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -21,7 +22,7 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
-import { EventType, RelationType, RoomType } from "./event";
+import { EventType, RelationType } from "./event";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -72,16 +73,9 @@ export interface IRedactOpts {
     with_rel_types?: Array<RelationType | "*">;
 }
 
-export interface ISendEventResponse {
-    event_id: string;
-}
+export type ISendEventResponse = operations["sendMessage"]["responses"]["200"]["content"]["application/json"];
 
-export interface IPresenceOpts {
-    // One of "online", "offline" or "unavailable"
-    presence: "online" | "offline" | "unavailable";
-    // The status message to attach.
-    status_msg?: string;
-}
+export type IPresenceOpts = operations["setPresence"]["requestBody"]["content"]["application/json"];
 
 export interface IPaginateOpts {
     // true to fill backwards, false to go forwards
@@ -161,47 +155,11 @@ export interface ICreateRoomOpts {
     room_version?: string;
 }
 
-export interface IRoomDirectoryOptions {
-    /**
-     * The remote server to query for the room list.
-     * Optional. If unspecified, get the local homeserver's public room list.
-     */
-    server?: string;
-    /**
-     * Maximum number of entries to return
-     */
-    limit?: number;
-    /**
-     * Token to paginate from
-     */
-    since?: string;
+export type IRoomDirectoryOptions = operations["queryPublicRooms"]["requestBody"]["content"]["application/json"] &
+    operations["queryPublicRooms"]["parameters"]["query"];
 
-    /** Filter parameters */
-    filter?: {
-        // String to search for
-        generic_search_term?: string;
-        room_types?: Array<RoomType | null>;
-    };
-    include_all_networks?: boolean;
-    third_party_instance_id?: string;
-}
-
-export interface IAddThreePidOnlyBody {
-    auth?: {
-        type: string;
-        session?: string;
-    };
-    client_secret: string;
-    sid: string;
-}
-
-export interface IBindThreePidBody {
-    client_secret: string;
-    id_server: string;
-    // Some older identity servers have no auth enabled
-    id_access_token: string | null;
-    sid: string;
-}
+export type IAddThreePidOnlyBody = operations["add3PID"]["requestBody"]["content"]["application/json"];
+export type IBindThreePidBody = operations["bind3PID"]["requestBody"]["content"]["application/json"];
 
 export interface IRelationsRequestOpts {
     from?: string;
@@ -246,21 +204,10 @@ export interface INotificationsResponse {
     notifications: INotification[];
 }
 
-export interface IFilterResponse {
-    filter_id: string;
-}
+export type IFilterResponse = operations["defineFilter"]["responses"]["200"]["content"]["application/json"];
 
-export interface ITagsResponse {
-    tags: {
-        [tagId: string]: {
-            order: number;
-        };
-    };
-}
+export type ITagsResponse = operations["getRoomTags"]["responses"]["200"]["content"]["application/json"];
 
-export interface IStatusResponse extends IPresenceOpts {
-    currently_active?: boolean;
-    last_active_ago?: number;
-}
+export type IStatusResponse = operations["getPresence"]["responses"]["200"]["content"]["application/json"];
 
 /* eslint-enable camelcase */
