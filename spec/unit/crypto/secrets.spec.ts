@@ -686,4 +686,14 @@ describe("Secrets", function () {
             alice.stopClient();
         });
     });
+
+    it("should throw Not Implemented for importSecretsForQRLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        await expect(alice.getCrypto()?.importSecretsForQRLogin({})).rejects.toThrow("Method not implemented.");
+    });
+
+    it("should throw Not Implemented for exportSecretsForQRLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        await expect(alice.getCrypto()?.exportSecretsForQRLogin()).rejects.toThrow("Method not implemented.");
+    });
 });
