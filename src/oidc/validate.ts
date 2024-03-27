@@ -118,6 +118,7 @@ export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
+        | "device_authorization_endpoint" // PROTOTYPE: this is actually optional, but the typings are wrong
     > & {
         // MSC2965 extensions to the OIDC spec
         account_management_uri?: string;
@@ -176,11 +177,17 @@ const decodeIdToken = (token: string): IdTokenClaims => {
  * @param nonce - nonce used in the authentication request
  * @throws when id token is invalid
  */
-export const validateIdToken = (idToken: string | undefined, issuer: string, clientId: string, nonce: string): void => {
+export const validateIdToken = (
+    idToken: string | undefined,
+    issuer: string,
+    clientId: string,
+    nonce: string | undefined,
+): IdTokenClaims => {
     try {
         if (!idToken) {
             throw new Error("No ID token");
         }
+
         const claims = decodeIdToken(idToken);
 
         // The Issuer Identifier for the OpenID Provider MUST exactly match the value of the iss (issuer) Claim.
@@ -201,7 +208,7 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
          * If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked
          * to verify that it is the same value as the one that was sent in the Authentication Request.
          */
-        if (claims.nonce !== nonce) {
+        if (nonce && claims.nonce !== nonce) {
             throw new Error("Invalid nonce");
         }
 
@@ -212,6 +219,8 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
         if (!claims.exp || Date.now() > claims.exp * 1000) {
             throw new Error("Invalid expiry");
         }
+
+        return claims;
     } catch (error) {
         logger.error("Invalid ID token", error);
         throw new Error(OidcError.InvalidIdToken);

@@ -100,6 +100,7 @@ import {
     KeyBackupInfo,
     OwnDeviceKeys,
     VerificationRequest as CryptoApiVerificationRequest,
+    QRSecretsBundle,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
@@ -580,6 +581,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 return CrossSigningInfo.getFromSecretStorage(type, this.secretStorage);
             };
         }
+    }
+
+    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
+        throw new Error("Method not implemented.");
+    }
+
+    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
+        throw new Error("Method not implemented.");
     }
 
     /**

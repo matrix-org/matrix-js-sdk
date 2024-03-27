@@ -24,12 +24,29 @@ import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/key
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
 
+export interface QRSecretsBundle {
+    cross_signing?: {
+        master_key: string;
+        self_signing_key: string;
+        user_signing_key: string;
+    };
+    backup?: {
+        algorithm: string;
+        key: string;
+        backup_version: string;
+    };
+}
+
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
+    exportSecretsForQRLogin(): Promise<QRSecretsBundle>;
+
+    importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void>;
+
     /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
