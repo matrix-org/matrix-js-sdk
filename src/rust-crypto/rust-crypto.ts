@@ -49,6 +49,7 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     OwnDeviceKeys,
+    QRSecretsBundle,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -169,6 +170,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
+    }
+
+    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
+        try {
+            const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
+            const secrets = secretsBundle.to_json();
+            secretsBundle.free();
+            return secrets;
+        } catch (e) {
+            // No keys to export
+            return {};
+        }
+    }
+
+    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
+        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
+        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
     }
 
     /**

@@ -1395,6 +1395,42 @@ describe("RustCrypto", () => {
             });
         });
     });
+
+    describe("exportSecretsForQRLogin", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+        });
+
+        it("should return an empty object if there is nothing to export", async () => {
+            await expect(rustCrypto.exportSecretsForQRLogin()).resolves.toEqual({});
+        });
+
+        it("should return a JSON secrets bundle if there is something to export", async () => {
+            const bundle = {
+                cross_signing: {
+                    master_key: "bMnVpkHI4S2wXRxy+IpaKM5PIAUUkl6DE+n0YLIW/qs",
+                    user_signing_key: "8tlgLjUrrb/zGJo4YKGhDTIDCEjtJTAS/Sh2AGNLuIo",
+                    self_signing_key: "pfDknmP5a0fVVRE54zhkUgJfzbNmvKcNfIWEW796bQs",
+                },
+                backup: {
+                    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+                    key: "bYYv3aFLQ49jMNcOjuTtBY9EKDby2x1m3gfX81nIKRQ",
+                    backup_version: "9",
+                },
+            };
+            await rustCrypto.importSecretsForQRLogin(bundle);
+            await expect(rustCrypto.exportSecretsForQRLogin()).resolves.toEqual(expect.objectContaining(bundle));
+        });
+    });
 });
 
 /** Build a MatrixHttpApi instance */

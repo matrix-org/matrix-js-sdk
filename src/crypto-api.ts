@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "./@types/crypto";
 import { Room } from "./models/room";
 import { DeviceMap } from "./models/device";
@@ -24,12 +25,18 @@ import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/key
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
 
+export type QRSecretsBundle = Awaited<ReturnType<SecretsBundle["to_json"]>>;
+
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
+    exportSecretsForQRLogin(): Promise<QRSecretsBundle>;
+
+    importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void>;
+
     /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
