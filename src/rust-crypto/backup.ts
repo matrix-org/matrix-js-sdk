@@ -223,7 +223,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             }
             keysByRoom.get(roomId)!.set(key.session_id, key);
         }
-        await this.olmMachine.importBackedUpRoomKeys(
+        const result: RustSdkCryptoJs.RoomKeyImportResult = await this.olmMachine.importBackedUpRoomKeys(
             keysByRoom,
             (progress: BigInt, total: BigInt, failures: BigInt): void => {
                 const importOpt: ImportRoomKeyProgressData = {
@@ -235,6 +235,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 opts?.progressCallback?.(importOpt);
             },
         );
+        // call the progress callback one last time with the final state
+        if (opts?.progressCallback) {
+            // We use total count here and not imported count.
+            // Imported count could be 0 if all the keys were already imported.
+            opts.progressCallback({
+                total: result.totalCount,
+                successes: result.totalCount,
+                stage: "load_keys",
+                failures: keys.length - result.totalCount,
+            });
+        }
     }
 
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
