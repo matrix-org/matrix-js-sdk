@@ -33,7 +33,7 @@ import { logDuration, QueryDict, sleep } from "../utils";
 import { AuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
-import { UnstablePrefix as DehydrationUnstablePrefix } from "./dehydration";
+import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.

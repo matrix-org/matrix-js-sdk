@@ -506,41 +506,60 @@ export interface CryptoApi {
     /**
      * Returns whether MSC3814 dehydrated devices are supported by the crypto
      * backend and by the server.
+     *
+     * This should be called before any of the other dehydrated device
+     * functions are called, and if it returns `false`, none of the other
+     * dehydrated device functions should be called.
      */
     isDehydrationSupported(): Promise<boolean>;
 
     /**
-     * Rehydrate the dehydrated device stored on the server
+     * Rehydrate the dehydrated device stored on the server.
      *
      * Checks if there is a dehydrated device on the server.  If so, rehydrates
-     * the device and processes the to-device events.
+     * the device and processes the to-device events sent to it.  This function
+     * should be called before a dehydrated device is created for the first
+     * time after the client logs in.
      *
-     * Returns whether or not a dehydrated device was found.
+     * @returns `true` if a dehydrated device was found; otherwise, `false`.
      */
     rehydrateDeviceIfAvailable(): Promise<boolean>;
 
     /**
-     * Creates and uploads a new dehydrated device
+     * Creates and uploads a new dehydrated device.
      *
-     * Creates and stores a new key in secret storage if none is available.
+     * If now dehydration key is available in secret storage, a new key is
+     * created.  Most applications should call `scheduleDeviceDehydration` so
+     * that the dehydrated device gets replaced periodically with a new one, to
+     * avoid to-device events stacking up on the server.  However, clients that
+     * want to have more control over the dehydration process may use this
+     * function instead.
      */
     createAndUploadDehydratedDevice(): Promise<void>;
 
     /**
-     * Schedule periodic creation of dehydrated devices
+     * Schedule periodic creation of dehydrated devices.
      *
-     * @param interval - the time to wait between creating dehydrated devices
+     * If the delay is omitted or 0, this function's promise will resolve after
+     * the first dehydrated device is created.
+     *
+     * @param interval - the time to wait between creating dehydrated devices.
      * @param delay - how long to wait before creating the first dehydrated device.
      *     Defaults to creating the device immediately.
      */
     scheduleDeviceDehydration(interval: number, delay?: number): Promise<void>;
 
-    /** Return whether the dehydration key is stored in Secret Storage
+    /**
+     * Return whether the dehydration key is stored in Secret Storage.
      */
     isDehydrationKeyStored(): Promise<boolean>;
 
     /**
-     * Reset the dehydration key
+     * Reset the dehydration key.
+     *
+     * Creates a new dehydration key and stores it in secret storage.  This
+     * function should be called, for example, if the user's secret storage is
+     * reset.
      *
      * Note: this does not create a new dehydrated device.  This will need to
      * be done either by calling `createAndUploadDehydratedDevice` or

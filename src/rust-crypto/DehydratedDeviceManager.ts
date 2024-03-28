@@ -16,50 +16,71 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RustCrypto } from "./rust-crypto";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { encodeUri } from "../utils";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { IToDeviceEvent } from "../sync-accumulator";
 import { ServerSideSecretStorage } from "../secret-storage";
 import { crypto } from "../crypto/crypto";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 import { Logger } from "../logger";
-import { UnstableValue } from "../NamespacedValue";
 
-// schema for the API response bodies
-interface IDehydratedDeviceResp {
+/**
+ * The response body of `GET /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device`.
+ */
+interface DehydratedDeviceResp {
     device_id: string;
     device_data: {
         algorithm: string;
     };
 }
-interface IDehydratedDeviceEventsResp {
+/**
+ * The response body of `POST /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/events`.
+ */
+interface DehydratedDeviceEventsResp {
     events: IToDeviceEvent[];
     next_batch: string;
 }
 
-export const UnstablePrefix = ClientPrefix.Unstable + "/org.matrix.msc3814.v1";
-const SECRET_STORAGE_NAME = new UnstableValue("m.dehydrated_device", "org.matrix.msc3814");
+/**
+ * The unstable URL prefix for dehydrated device endpoints
+ */
+export const UnstablePrefix = "/_matrix/client/unstable/org.matrix.msc3814.v1";
+/**
+ * The name used for the dehydration key in Secret Storage
+ */
+const SECRET_STORAGE_NAME = "org.matrix.msc3814";
 
 /**
  * Manages dehydrated devices
+ *
+ * We have one of these per `RustCrypto`.  It's responsible for
+ *
+ * * determining server support for dehydrated devices
+ * * creating new dehydrated devices when requested, including periodically
+ *   replacing the dehydrated device with a new one
+ * * rehydrating a device when requested, and when present
+ *
+ * @internal
  */
-export class RustDehydrationManager {
+export class DehydratedDeviceManager {
+    /** the secret key used for dehydrating and rehydrating */
     private key?: Uint8Array;
+    /** the ID of the interval for periodically replacing the dehydrated device */
     private intervalId?: ReturnType<typeof setInterval>;
+    /** the ID of the timeout for creating a new dehydrated device */
     private timeoutId?: ReturnType<typeof setTimeout>;
 
     public constructor(
         private readonly logger: Logger,
-        private readonly rustCrypto: RustCrypto,
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly secretStorage: ServerSideSecretStorage,
     ) {}
 
-    /** Return whether the server supports dehydrated devices
+    /**
+     * Return whether the server supports dehydrated devices.
      */
     public async isSupported(): Promise<boolean> {
         // call the endpoint to get a dehydrated device.  If it returns an
@@ -67,7 +88,7 @@ export class RustDehydrationManager {
         // a successful response, or an M_NOT_FOUND, then dehydration is supported.
         // Any other exceptions are passed through.
         try {
-            await this.http.authedRequest<IDehydratedDeviceResp>(
+            await this.http.authedRequest<DehydratedDeviceResp>(
                 Method.Get,
                 "/dehydrated_device",
                 undefined,
@@ -88,42 +109,49 @@ export class RustDehydrationManager {
         return true;
     }
 
-    /** Return whether the dehydration key is stored in Secret Storage
+    /**
+     * Return whether the dehydration key is stored in Secret Storage.
      */
     public async isKeyStored(): Promise<boolean> {
-        return Boolean(await this.secretStorage.isStored(SECRET_STORAGE_NAME.name));
+        return Boolean(await this.secretStorage.isStored(SECRET_STORAGE_NAME));
     }
 
-    /** Reset the dehydration key
+    /**
+     * Reset the dehydration key.
+     *
+     * Creates a new key and stores it in secret storage.
      */
     public async resetKey(): Promise<void> {
         const key = new Uint8Array(32);
         crypto.getRandomValues(key);
-        await this.secretStorage.store(SECRET_STORAGE_NAME.name, encodeUnpaddedBase64(key));
+        await this.secretStorage.store(SECRET_STORAGE_NAME, encodeUnpaddedBase64(key));
         this.key = key;
     }
 
-    /** Get and cache the encryption key from secret storage
+    /**
+     * Get and cache the encryption key from secret storage.
      *
      * If `create` is `true`, creates a new key if no existing key is present.
+     *
+     * @returns the key, if available, or `null` if no key is available
      */
-    private async getKey(create: boolean): Promise<boolean> {
+    private async getKey(create: boolean): Promise<Uint8Array | null> {
         if (this.key === undefined) {
-            const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME.name);
+            const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
             if (keyB64 === undefined) {
                 if (!create) {
-                    return false;
+                    return null;
                 }
                 await this.resetKey();
             } else {
                 this.key = decodeBase64(keyB64);
             }
         }
-        return true;
+        return this.key!;
     }
 
     /**
-     * Rehydrate the dehydrated device stored on the server
+     * Rehydrate the dehydrated device stored on the server.
      *
      * Checks if there is a dehydrated device on the server.  If so, rehydrates
      * the device and processes the to-device events.
@@ -131,13 +159,14 @@ export class RustDehydrationManager {
      * Returns whether or not a dehydrated device was found.
      */
     public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        if (!(await this.getKey(false))) {
+        const key = await this.getKey(false);
+        if (!key) {
             return false;
         }
 
         let dehydratedDeviceResp;
         try {
-            dehydratedDeviceResp = await this.http.authedRequest<IDehydratedDeviceResp>(
+            dehydratedDeviceResp = await this.http.authedRequest<DehydratedDeviceResp>(
                 Method.Get,
                 "/dehydrated_device",
                 undefined,
@@ -163,7 +192,7 @@ export class RustDehydrationManager {
         const rehydratedDevice = await this.olmMachine
             .dehydratedDevices()
             .rehydrate(
-                this.key!,
+                key,
                 new RustSdkCryptoJs.DeviceId(dehydratedDeviceResp.device_id),
                 JSON.stringify(dehydratedDeviceResp.device_data),
             );
@@ -173,11 +202,12 @@ export class RustDehydrationManager {
         let nextBatch: string | undefined = undefined;
         let toDeviceCount = 0;
         let roomKeyCount = 0;
-        for (;;) {
-            const path = encodeUri("/dehydrated_device/$device_id/events", {
-                $device_id: dehydratedDeviceResp.device_id,
-            });
-            const eventResp: IDehydratedDeviceEventsResp = await this.http.authedRequest<IDehydratedDeviceEventsResp>(
+        const path = encodeUri("/dehydrated_device/$device_id/events", {
+            $device_id: dehydratedDeviceResp.device_id,
+        });
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
                 Method.Post,
                 path,
                 undefined,
@@ -187,19 +217,13 @@ export class RustDehydrationManager {
                 },
             );
 
-            if (eventResp.events.length == 0) {
+            if (eventResp.events.length === 0) {
                 break;
             }
             toDeviceCount += eventResp.events.length;
             nextBatch = eventResp.next_batch;
-            const roomKeyInfos: RustSdkCryptoJs.RoomKeyInfo[] = await rehydratedDevice.receiveEvents(
-                JSON.stringify(eventResp.events),
-            );
+            const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
             roomKeyCount += roomKeyInfos.length;
-
-            // FIXME: is this actually needed?  It looks like the OlmMachine
-            // automatically re-tries decryption
-            await this.rustCrypto.onRoomKeysUpdated(roomKeyInfos);
         }
         this.logger.info(`dehydration: received ${roomKeyCount} room keys from ${toDeviceCount} to-device events`);
 
@@ -207,19 +231,15 @@ export class RustDehydrationManager {
     }
 
     /**
-     * Creates and uploads a new dehydrated device
+     * Creates and uploads a new dehydrated device.
      *
      * Creates and stores a new key in secret storage if none is available.
      */
     public async createAndUploadDehydratedDevice(): Promise<void> {
-        await this.getKey(true);
-
-        // FIXME: should raise error if server doesn't support dehydration?
+        const key = (await this.getKey(true))!;
 
         const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
-        // FIXME: should the device display name be localised? passed as a
-        // parameter?
-        const request = await dehydratedDevice.keysForUpload("Dehydrated device", this.key!);
+        const request = await dehydratedDevice.keysForUpload("Dehydrated device", key);
 
         await this.outgoingRequestProcessor.makeOutgoingRequest(request);
 
@@ -227,7 +247,7 @@ export class RustDehydrationManager {
     }
 
     /**
-     * Schedule periodic creation of dehydrated devices
+     * Schedule periodic creation of dehydrated devices.
      *
      * @param interval - the time to wait between creating dehydrated devices
      * @param delay - how long to wait before creating the first dehydrated device.
@@ -239,16 +259,26 @@ export class RustDehydrationManager {
 
         if (delay) {
             this.timeoutId = setTimeout(() => {
-                this.scheduleDeviceDehydration(interval);
                 this.timeoutId = undefined;
+                this.scheduleDeviceDehydration(interval).catch((error) => {
+                    this.logger.error("Error scheduling device dehydration:", error);
+                });
             }, delay);
         } else {
             await this.createAndUploadDehydratedDevice();
-            // FIXME: should we randomize the time a bit?
-            this.intervalId = setInterval(this.createAndUploadDehydratedDevice.bind(this), interval);
+            this.intervalId = setInterval(() => {
+                this.createAndUploadDehydratedDevice().catch((error) => {
+                    this.logger.error("Error creating dehydrated device:", error);
+                });
+            }, interval);
         }
     }
 
+    /**
+     * Stop the dehydrated device manager.
+     *
+     * Cancels any scheduled dehydration tasks.
+     */
     public stop(): void {
         if (this.intervalId) {
             clearInterval(this.intervalId);

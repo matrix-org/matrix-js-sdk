@@ -73,7 +73,7 @@ import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
-import { RustDehydrationManager } from "./dehydration";
+import { DehydratedDeviceManager } from "./DehydratedDeviceManager";
 import { VerificationMethod } from "../types";
 
 const ALL_VERIFICATION_METHODS = [
@@ -108,12 +108,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private crossSigningIdentity: CrossSigningIdentity;
     private readonly backupManager: RustBackupManager;
     private outgoingRequestsManager: OutgoingRequestsManager;
-
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
-
+    private readonly dehydratedDeviceManager: DehydratedDeviceManager;
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
-
-    private readonly dehydrationManager: RustDehydrationManager;
 
     public constructor(
         private readonly logger: Logger,
@@ -151,23 +148,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
-
-        this.dehydrationManager = new RustDehydrationManager(
-            this.logger,
-            this,
-            olmMachine,
-            http,
-            this.outgoingRequestProcessor,
-            secretStorage,
-        );
-
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             this.logger,
             this.olmMachine,
             this.http,
             this.backupManager,
         );
-
+        this.dehydratedDeviceManager = new DehydratedDeviceManager(
+            this.logger,
+            olmMachine,
+            http,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
 
         this.reemitter.reEmit(this.backupManager, [
@@ -224,7 +217,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
         this.perSessionBackupDownloader.stop();
-        this.dehydrationManager.stop();
+        this.dehydratedDeviceManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -1225,6 +1218,48 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.backupManager.importBackedUpRoomKeys(keys, opts);
     }
 
+    /**
+     * Implementation of {@link CryptoBackend#isDehydrationSupported}.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isSupported();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#rehydrateDeviceIfAvailable}.
+     */
+    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.rehydrateDeviceIfAvailable();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#createAndUploadDehydratedDevice}.
+     */
+    public async createAndUploadDehydratedDevice(): Promise<void> {
+        return await this.dehydratedDeviceManager.createAndUploadDehydratedDevice();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#isDehydrationKeyStored}.
+     */
+    public async isDehydrationKeyStored(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isKeyStored();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#scheduleDeviceDehydration}.
+     */
+    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
+        return await this.dehydratedDeviceManager.scheduleDeviceDehydration(interval, delay);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#resetDehydrationKey}.
+     */
+    public async resetDehydrationKey(): Promise<void> {
+        return await this.dehydratedDeviceManager.resetKey();
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -1653,63 +1688,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
         return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
-    }
-
-    /**
-     * Returns whether dehydrated devices are supported by the crypto backend
-     * and by the server.
-     */
-    public async isDehydrationSupported(): Promise<boolean> {
-        return await this.dehydrationManager.isSupported();
-    }
-
-    /**
-     * Rehydrate the dehydrated device stored on the server
-     *
-     * Checks if there is a dehydrated device on the server.  If so, rehydrates
-     * the device and processes the to-device events.
-     *
-     * Returns whether or not a dehydrated device was found.
-     */
-    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        return await this.dehydrationManager.rehydrateDeviceIfAvailable();
-    }
-
-    /**
-     * Creates and uploads a new dehydrated device
-     *
-     * Creates and stores a new key in secret storage if none is available.
-     */
-    public async createAndUploadDehydratedDevice(): Promise<void> {
-        return await this.dehydrationManager.createAndUploadDehydratedDevice();
-    }
-
-    /** Return whether the dehydration key is stored in Secret Storage
-     */
-    public async isDehydrationKeyStored(): Promise<boolean> {
-        return await this.dehydrationManager.isKeyStored();
-    }
-
-    /**
-     * Schedule periodic creation of dehydrated devices
-     *
-     * @param interval - the time to wait between creating dehydrated devices
-     * @param delay - how long to wait before creating the first dehydrated device.
-     *     Defaults to creating the device immediately.
-     */
-    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
-        return await this.dehydrationManager.scheduleDeviceDehydration(interval, delay);
-    }
-
-    /**
-     * Reset the dehydration key
-     *
-     * Note: this does not create a new dehydrated device.  This will need to
-     * be done either by calling `createAndUploadDehydratedDevice` or
-     * `scheduleDeviceDehydration`.
-     */
-    public async resetDehydrationKey(): Promise<void> {
-        return await this.dehydrationManager.resetKey();
     }
 }
 
