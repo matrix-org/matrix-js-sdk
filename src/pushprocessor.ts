@@ -172,7 +172,7 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
  * @param kind - the kind of push rule set being merged.
  * @param incomingRules - the existing set of known push rules for the user.
  * @param defaultRules - a lookup table for the default definitions of push rules.
- * @param defaultRuleIds - the IDs of the expected push rules, in order.
+ * @param orderedRuleIds - the IDs of the expected push rules, in order.
  *
  * @returns A copy of `incomingRules`, with any missing default rules inserted in the right place.
  */
@@ -180,7 +180,7 @@ function mergeRulesWithDefaults(
     kind: PushRuleKind,
     incomingRules: IPushRule[],
     defaultRules: Record<string, IPushRule>,
-    defaultRuleIds: OrderedRules,
+    orderedRuleIds: OrderedRules,
 ): IPushRule[] {
     // Find the indices of the edges of the user-defined rules in the incoming rules
     const mappedIncomingRules = incomingRules.map((rule) => rule.default);
@@ -194,10 +194,10 @@ function mergeRulesWithDefaults(
             // Re-insert any user-defined rules that were in `incomingRules`
             newRules.push(...incomingRules.slice(...userDefinedRulesRange));
         } else if (ruleId in defaultRules) {
-            logger.warn(`Adding default global push rule ${ruleId}`);
+            logger.warn(`Adding default global ${kind} push rule ${ruleId}`);
             newRules.push(defaultRules[ruleId]);
         } else {
-            logger.warn(`Missing default global push rule ${ruleId}`);
+            logger.warn(`Missing default global ${kind} push rule ${ruleId}`);
         }
     }
 
@@ -208,7 +208,7 @@ function mergeRulesWithDefaults(
         ...incomingRules.slice(0, userDefinedRulesRange[0]),
         ...incomingRules.slice(userDefinedRulesRange[1]),
     ]) {
-        const ruleIndex = defaultRuleIds.indexOf(rule.rule_id);
+        const ruleIndex = orderedRuleIds.indexOf(rule.rule_id);
         if (ruleIndex === -1) {
             // an unrecognised rule; copy it over
             newRules.push(rule);
@@ -216,7 +216,7 @@ function mergeRulesWithDefaults(
         }
         while (ruleIndex > nextExpectedRuleIdIndex) {
             // insert new rules
-            const defaultRuleId = defaultRuleIds[nextExpectedRuleIdIndex];
+            const defaultRuleId = orderedRuleIds[nextExpectedRuleIdIndex];
             insertDefaultPushRule(defaultRuleId);
             nextExpectedRuleIdIndex += 1;
         }
@@ -226,7 +226,7 @@ function mergeRulesWithDefaults(
     }
 
     // Now copy over any remaining default rules
-    for (const ruleId of defaultRuleIds.slice(nextExpectedRuleIdIndex)) {
+    for (const ruleId of orderedRuleIds.slice(nextExpectedRuleIdIndex)) {
         insertDefaultPushRule(ruleId);
     }
 
