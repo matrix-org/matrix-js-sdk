@@ -849,4 +849,158 @@ describe("rewriteDefaultRules", () => {
             ".m.rule.fallback",
         ]);
     });
+
+    it("should add missing msc3914 rule in correct place", () => {
+        const pushRules = PushProcessor.rewriteDefaultRules({
+            device: {},
+            global: {
+                // Sample push rules from a Synapse user.
+                // Note that rules 2 and 3 are backwards, this will trigger a warning in the console.
+                underride: [
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "m.call.invite",
+                            },
+                        ],
+                        actions: [
+                            "notify",
+                            {
+                                set_tweak: "sound",
+                                value: "ring",
+                            },
+                            {
+                                set_tweak: "highlight",
+                                value: false,
+                            },
+                        ],
+                        rule_id: ".m.rule.call",
+                        default: true,
+                        enabled: true,
+                    },
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "m.room.message",
+                            },
+                            {
+                                kind: "room_member_count",
+                                is: "2",
+                            },
+                        ],
+                        actions: [
+                            "notify",
+                            {
+                                set_tweak: "sound",
+                                value: "TEST1",
+                            },
+                            {
+                                set_tweak: "highlight",
+                                value: false,
+                            },
+                        ],
+                        rule_id: ".m.rule.room_one_to_one",
+                        default: true,
+                        enabled: true,
+                    },
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "m.room.encrypted",
+                            },
+                            {
+                                kind: "room_member_count",
+                                is: "2",
+                            },
+                        ],
+                        actions: [
+                            "notify",
+                            {
+                                set_tweak: "sound",
+                                value: "TEST2",
+                            },
+                            {
+                                set_tweak: "highlight",
+                                value: false,
+                            },
+                        ],
+                        rule_id: ".m.rule.encrypted_room_one_to_one",
+                        default: true,
+                        enabled: true,
+                    },
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "m.room.message",
+                            },
+                        ],
+                        actions: ["dont_notify"],
+                        rule_id: ".m.rule.message",
+                        default: true,
+                        enabled: true,
+                    },
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "m.room.encrypted",
+                            },
+                        ],
+                        actions: ["dont_notify"],
+                        rule_id: ".m.rule.encrypted",
+                        default: true,
+                        enabled: true,
+                    },
+                    {
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "im.vector.modular.widgets",
+                            },
+                            {
+                                kind: "event_match",
+                                key: "content.type",
+                                pattern: "jitsi",
+                            },
+                            {
+                                kind: "event_match",
+                                key: "state_key",
+                                pattern: "*",
+                            },
+                        ],
+                        actions: [
+                            "notify",
+                            {
+                                set_tweak: "highlight",
+                                value: false,
+                            },
+                        ],
+                        rule_id: ".im.vector.jitsi",
+                        default: true,
+                        enabled: true,
+                    },
+                ] as IPushRule[],
+            },
+        });
+
+        expect(pushRules.global.underride?.map((r) => r.rule_id)).toEqual([
+            ".m.rule.call",
+            ".org.matrix.msc3914.rule.room.call",
+            ".m.rule.room_one_to_one",
+            ".m.rule.encrypted_room_one_to_one",
+            ".m.rule.message",
+            ".m.rule.encrypted",
+            ".im.vector.jitsi",
+        ]);
+    });
 });
