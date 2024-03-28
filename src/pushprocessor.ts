@@ -49,10 +49,6 @@ const RULEKINDS_IN_ORDER = [
     PushRuleKind.Underride,
 ];
 
-const UserDefinedRules = Symbol("UserDefinedRules");
-
-type OrderedRules = Array<string | typeof UserDefinedRules>;
-
 // The default override rules to apply to the push rules that arrive from the server.
 // We do this for two reasons:
 //   1. Synapse is unlikely to send us the push rule in an incremental sync - see
@@ -119,6 +115,11 @@ const DEFAULT_OVERRIDE_RULES: Record<string, IPushRule> = {
     },
 };
 
+// A special rule id for `EXPECTED_DEFAULT_OVERRIDE_RULE_IDS` and friends.
+const UserDefinedRules = Symbol("UserDefinedRules");
+
+type OrderedRules = Array<string | typeof UserDefinedRules>;
+
 const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS: OrderedRules = [
     RuleId.Master,
     UserDefinedRules,
@@ -171,7 +172,7 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
  * @param kind - the kind of push rule set being merged.
  * @param incomingRules - the existing set of known push rules for the user.
  * @param defaultRules - a lookup table for the default definitions of push rules.
- * @param defaultRuleIds - the IDs of the expected default push rules, in order.
+ * @param defaultRuleIds - the IDs of the expected push rules, in order.
  *
  * @returns A copy of `incomingRules`, with any missing default rules inserted in the right place.
  */
@@ -182,10 +183,10 @@ function mergeRulesWithDefaults(
     defaultRuleIds: OrderedRules,
 ): IPushRule[] {
     // Find the indices of the edges of the user-defined rules in the incoming rules
-    const incomingRulesEnabled = incomingRules.map((rule) => rule.enabled);
+    const mappedIncomingRules = incomingRules.map((rule) => rule.default);
     const userDefinedRulesRange: [number, number] = [
-        incomingRulesEnabled.indexOf(false),
-        incomingRulesEnabled.lastIndexOf(false),
+        mappedIncomingRules.indexOf(false),
+        mappedIncomingRules.lastIndexOf(false),
     ];
 
     function insertDefaultPushRule(ruleId: OrderedRules[number]): void {
@@ -202,7 +203,7 @@ function mergeRulesWithDefaults(
 
     let nextExpectedRuleIdIndex = 0;
     const newRules: IPushRule[] = [];
-    // Process the default rules by merging them with defaults
+    // Merge our expected rules (including the incoming custom rules) into the incoming default rules.
     for (const rule of [
         ...incomingRules.slice(0, userDefinedRulesRange[0]),
         ...incomingRules.slice(userDefinedRulesRange[1]),

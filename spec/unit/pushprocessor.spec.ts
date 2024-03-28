@@ -198,11 +198,12 @@ describe("NotificationService", function () {
     });
 
     it("should add default rules in the correct order", () => {
-        matrixClient.pushRules = PushProcessor.rewriteDefaultRules({
+        const pushRules = PushProcessor.rewriteDefaultRules({
             device: {},
             global: {
                 content: [],
                 override: [
+                    // Include user-defined push rules inbetween .m.rule.master and other default rules to assert they are maintained in-order.
                     {
                         rule_id: ".m.rule.master",
                         default: true,
@@ -298,27 +299,24 @@ describe("NotificationService", function () {
                 ],
             },
         });
-        pushProcessor = new PushProcessor(matrixClient);
 
         // By the time we get here, we expect the PushProcessor to have merged the new .m.rule.is_room_mention rule into the existing list of rules.
         // Check that has happened, and that it is in the right place.
-        const containsDisplayNameRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
+        const containsDisplayNameRuleIdx = pushRules.global.override?.findIndex(
             (rule) => rule.rule_id === RuleId.ContainsDisplayName,
         );
         expect(containsDisplayNameRuleIdx).toBeGreaterThan(-1);
-        const isRoomMentionRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
+        const isRoomMentionRuleIdx = pushRules.global.override?.findIndex(
             (rule) => rule.rule_id === RuleId.IsRoomMention,
         );
         expect(isRoomMentionRuleIdx).toBeGreaterThan(-1);
-        const mReactionRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
-            (rule) => rule.rule_id === ".m.rule.reaction",
-        );
+        const mReactionRuleIdx = pushRules.global.override?.findIndex((rule) => rule.rule_id === ".m.rule.reaction");
         expect(mReactionRuleIdx).toBeGreaterThan(-1);
 
         expect(containsDisplayNameRuleIdx).toBeLessThan(isRoomMentionRuleIdx!);
         expect(isRoomMentionRuleIdx).toBeLessThan(mReactionRuleIdx!);
 
-        expect(matrixClient.pushRules?.global.override?.map((r) => r.rule_id)).toEqual([
+        expect(pushRules.global.override?.map((r) => r.rule_id)).toEqual([
             ".m.rule.master",
             "coffee",
             ".m.rule.contains_display_name",
@@ -327,7 +325,7 @@ describe("NotificationService", function () {
             ".m.rule.reaction",
             ".org.matrix.msc3786.rule.room.server_acl",
         ]);
-        expect(matrixClient.pushRules?.global.underride?.map((r) => r.rule_id)).toEqual([
+        expect(pushRules.global.underride?.map((r) => r.rule_id)).toEqual([
             "user-defined",
             ".org.matrix.msc3914.rule.room.call",
             // Assert that unknown default rules are maintained
