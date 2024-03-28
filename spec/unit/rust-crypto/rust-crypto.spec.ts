@@ -1417,48 +1417,7 @@ describe("RustCrypto", () => {
                 secretStorage,
             );
 
-            // set up various fetch-mocks to handle account setup
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                status: 404,
-                body: {
-                    errcode: "M_NOT_FOUND",
-                    error: "Not found",
-                },
-            });
-            let deviceKeys: { device_id: string };
-            fetchMock.post("path:/_matrix/client/v3/keys/upload", (_, opts) => {
-                deviceKeys = JSON.parse(opts.body as string).device_keys;
-                return { one_time_key_counts: { signed_curve25519: 100 } };
-            });
-            fetchMock.post("path:/_matrix/client/v3/keys/query", (_, opts) => {
-                if (deviceKeys) {
-                    return {
-                        device_keys: {
-                            [testData.TEST_USER_ID]: {
-                                [deviceKeys["device_id"]]: deviceKeys,
-                            },
-                        },
-                    };
-                } else {
-                    return {};
-                }
-            });
-            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
-            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
-
-            // create initial secret storage
-            async function createSecretStorageKey() {
-                return {
-                    keyInfo: {} as AddSecretStorageKeyOpts,
-                    privateKey: new Uint8Array(32),
-                };
-            }
-            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
-            await rustCrypto.bootstrapSecretStorage({
-                createSecretStorageKey,
-                setupNewSecretStorage: true,
-                setupNewKeyBackup: false,
-            });
+            await initializeSecretStorage(rustCrypto, testData.TEST_USER_ID);
 
             fetchMock.config.overwriteRoutes = true;
 
@@ -1663,4 +1622,48 @@ class DummyAccountDataClient
 /** Pad a string to 43 characters long */
 function pad43(x: string): string {
     return x + ".".repeat(43 - x.length);
+}
+
+/** create a new secret storage and cross-signing keys */
+async function initializeSecretStorage(rustCrypto: RustCrypto, userId: string): Promise<void> {
+    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+        status: 404,
+        body: {
+            errcode: "M_NOT_FOUND",
+            error: "Not found",
+        },
+    });
+    let deviceKeys: { device_id: string };
+    fetchMock.post("path:/_matrix/client/v3/keys/upload", (_, opts) => {
+        deviceKeys = JSON.parse(opts.body as string).device_keys;
+        return { one_time_key_counts: { signed_curve25519: 100 } };
+    });
+    fetchMock.post("path:/_matrix/client/v3/keys/query", (_, opts) => {
+        if (deviceKeys) {
+            return {
+                device_keys: {
+                    [userId]: {
+                        [deviceKeys["device_id"]]: deviceKeys,
+                    },
+                },
+            };
+        } else {
+            return {};
+        }
+    });
+    fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
+    fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
+
+    async function createSecretStorageKey() {
+        return {
+            keyInfo: {} as AddSecretStorageKeyOpts,
+            privateKey: new Uint8Array(32),
+        };
+    }
+    await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+    await rustCrypto.bootstrapSecretStorage({
+        createSecretStorageKey,
+        setupNewSecretStorage: true,
+        setupNewKeyBackup: false,
+    });
 }
