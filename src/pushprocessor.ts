@@ -115,7 +115,7 @@ const DEFAULT_OVERRIDE_RULES: Record<string, IPushRule> = {
     },
 };
 
-// A special rule id for `EXPECTED_DEFAULT_OVERRIDE_RULE_IDS` and friends.
+// A special rule id for `EXPECTED_DEFAULT_OVERRIDE_RULE_IDS` and friends which denotes where user-defined rules live in the order.
 const UserDefinedRules = Symbol("UserDefinedRules");
 
 type OrderedRules = Array<string | typeof UserDefinedRules>;
@@ -160,6 +160,7 @@ const DEFAULT_UNDERRIDE_RULES: Record<string, IPushRule> = {
 const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
     UserDefinedRules,
     RuleId.IncomingCall,
+    ".org.matrix.msc3914.rule.room.call",
     RuleId.EncryptedDM,
     RuleId.DM,
     RuleId.Message,
@@ -182,17 +183,14 @@ function mergeRulesWithDefaults(
     defaultRules: Record<string, IPushRule>,
     orderedRuleIds: OrderedRules,
 ): IPushRule[] {
-    // Find the indices of the edges of the user-defined rules in the incoming rules
-    const mappedIncomingRules = incomingRules.map((rule) => rule.default);
-    const userDefinedRulesRange: [number, number] = [
-        mappedIncomingRules.indexOf(false),
-        mappedIncomingRules.lastIndexOf(false),
-    ];
+    // Split the incomingRules into defaults and custom
+    const incomingDefaultRules = incomingRules.filter((rule) => rule.default);
+    const incomingCustomRules = incomingRules.filter((rule) => !rule.default);
 
     function insertDefaultPushRule(ruleId: OrderedRules[number]): void {
         if (ruleId === UserDefinedRules) {
             // Re-insert any user-defined rules that were in `incomingRules`
-            newRules.push(...incomingRules.slice(...userDefinedRulesRange));
+            newRules.push(...incomingCustomRules);
         } else if (ruleId in defaultRules) {
             logger.warn(`Adding default global ${kind} push rule ${ruleId}`);
             newRules.push(defaultRules[ruleId]);
@@ -204,10 +202,7 @@ function mergeRulesWithDefaults(
     let nextExpectedRuleIdIndex = 0;
     const newRules: IPushRule[] = [];
     // Merge our expected rules (including the incoming custom rules) into the incoming default rules.
-    for (const rule of [
-        ...incomingRules.slice(0, userDefinedRulesRange[0]),
-        ...incomingRules.slice(userDefinedRulesRange[1]),
-    ]) {
+    for (const rule of incomingDefaultRules) {
         const ruleIndex = orderedRuleIds.indexOf(rule.rule_id);
         if (ruleIndex === -1) {
             // an unrecognised rule; copy it over
