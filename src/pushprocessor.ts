@@ -25,8 +25,8 @@ import {
     ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
-    IEventPropertyIsCondition,
     IEventPropertyContainsCondition,
+    IEventPropertyIsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -115,8 +115,14 @@ const DEFAULT_OVERRIDE_RULES: Record<string, IPushRule> = {
     },
 };
 
-const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS = [
+// A special rule id for `EXPECTED_DEFAULT_OVERRIDE_RULE_IDS` and friends which denotes where user-defined rules live in the order.
+const UserDefinedRules = Symbol("UserDefinedRules");
+
+type OrderedRules = Array<string | typeof UserDefinedRules>;
+
+const EXPECTED_DEFAULT_OVERRIDE_RULE_IDS: OrderedRules = [
     RuleId.Master,
+    UserDefinedRules,
     RuleId.SuppressNotices,
     RuleId.InviteToSelf,
     RuleId.MemberEvent,
@@ -151,8 +157,10 @@ const DEFAULT_UNDERRIDE_RULES: Record<string, IPushRule> = {
     },
 };
 
-const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS = [
+const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
+    UserDefinedRules,
     RuleId.IncomingCall,
+    ".org.matrix.msc3914.rule.room.call",
     RuleId.EncryptedDM,
     RuleId.DM,
     RuleId.Message,
@@ -162,35 +170,40 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS = [
 /**
  * Make sure that each of the rules listed in `defaultRuleIds` is listed in the given set of push rules.
  *
+ * @param kind - the kind of push rule set being merged.
  * @param incomingRules - the existing set of known push rules for the user.
  * @param defaultRules - a lookup table for the default definitions of push rules.
- * @param defaultRuleIds - the IDs of the expected default push rules, in order.
+ * @param orderedRuleIds - the IDs of the expected push rules, in order.
  *
  * @returns A copy of `incomingRules`, with any missing default rules inserted in the right place.
  */
 function mergeRulesWithDefaults(
+    kind: PushRuleKind,
     incomingRules: IPushRule[],
     defaultRules: Record<string, IPushRule>,
-    defaultRuleIds: string[],
+    orderedRuleIds: OrderedRules,
 ): IPushRule[] {
-    // Calculate the index after the last default rule in `incomingRules`
-    // to allow us to split the incomingRules into defaults and custom
-    let firstCustomRuleIndex = incomingRules.findIndex((r) => !r.default);
-    if (firstCustomRuleIndex < 0) firstCustomRuleIndex = incomingRules.length;
+    // Split the incomingRules into defaults and custom
+    const incomingDefaultRules = incomingRules.filter((rule) => rule.default);
+    const incomingCustomRules = incomingRules.filter((rule) => !rule.default);
 
-    function insertDefaultPushRule(ruleId: string): void {
-        if (ruleId in defaultRules) {
-            logger.warn(`Adding default global push rule ${ruleId}`);
+    function insertDefaultPushRule(ruleId: OrderedRules[number]): void {
+        if (ruleId === UserDefinedRules) {
+            // Re-insert any user-defined rules that were in `incomingRules`
+            newRules.push(...incomingCustomRules);
+        } else if (ruleId in defaultRules) {
+            logger.warn(`Adding default global ${kind} push rule ${ruleId}`);
             newRules.push(defaultRules[ruleId]);
         } else {
-            logger.warn(`Missing default global push rule ${ruleId}`);
+            logger.warn(`Missing default global ${kind} push rule ${ruleId}`);
         }
     }
 
     let nextExpectedRuleIdIndex = 0;
     const newRules: IPushRule[] = [];
-    for (const rule of incomingRules.slice(0, firstCustomRuleIndex)) {
-        const ruleIndex = defaultRuleIds.indexOf(rule.rule_id);
+    // Merge our expected rules (including the incoming custom rules) into the incoming default rules.
+    for (const rule of incomingDefaultRules) {
+        const ruleIndex = orderedRuleIds.indexOf(rule.rule_id);
         if (ruleIndex === -1) {
             // an unrecognised rule; copy it over
             newRules.push(rule);
@@ -198,7 +211,7 @@ function mergeRulesWithDefaults(
         }
         while (ruleIndex > nextExpectedRuleIdIndex) {
             // insert new rules
-            const defaultRuleId = defaultRuleIds[nextExpectedRuleIdIndex];
+            const defaultRuleId = orderedRuleIds[nextExpectedRuleIdIndex];
             insertDefaultPushRule(defaultRuleId);
             nextExpectedRuleIdIndex += 1;
         }
@@ -208,12 +221,10 @@ function mergeRulesWithDefaults(
     }
 
     // Now copy over any remaining default rules
-    for (const ruleId of defaultRuleIds.slice(nextExpectedRuleIdIndex)) {
+    for (const ruleId of orderedRuleIds.slice(nextExpectedRuleIdIndex)) {
         insertDefaultPushRule(ruleId);
     }
 
-    // Finally any non-default rules that were in `incomingRules`
-    newRules.push(...incomingRules.slice(firstCustomRuleIndex));
     return newRules;
 }
 
@@ -281,12 +292,14 @@ export class PushProcessor {
 
         // Merge the client-level defaults with the ones from the server
         newRules.global.override = mergeRulesWithDefaults(
+            PushRuleKind.Override,
             newRules.global.override,
             DEFAULT_OVERRIDE_RULES,
             EXPECTED_DEFAULT_OVERRIDE_RULE_IDS,
         );
 
         newRules.global.underride = mergeRulesWithDefaults(
+            PushRuleKind.Underride,
             newRules.global.underride,
             DEFAULT_UNDERRIDE_RULES,
             EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS,
