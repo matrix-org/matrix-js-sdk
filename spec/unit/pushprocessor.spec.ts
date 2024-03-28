@@ -1,6 +1,16 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent, PushRuleActionName, RuleId } from "../../src";
+import {
+    ConditionKind,
+    EventType,
+    IContent,
+    IPushRule,
+    MatrixClient,
+    MatrixEvent,
+    PushRuleActionName,
+    RuleId,
+    TweakName,
+} from "../../src";
 import { mockClientMethodsUser } from "../test-utils/client";
 
 describe("NotificationService", function () {
@@ -12,21 +22,21 @@ describe("NotificationService", function () {
 
     let pushProcessor: PushProcessor;
 
-    const msc3914RoomCallRule = {
+    const msc3914RoomCallRule: IPushRule = {
         rule_id: ".org.matrix.msc3914.rule.room.call",
         default: true,
         enabled: true,
         conditions: [
             {
-                kind: "event_match",
+                kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "org.matrix.msc3401.call",
             },
             {
-                kind: "call_started",
+                kind: ConditionKind.CallStarted,
             },
         ],
-        actions: ["notify", { set_tweak: "sound", value: "default" }],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
     };
 
     let matrixClient: MatrixClient;
@@ -188,6 +198,108 @@ describe("NotificationService", function () {
     });
 
     it("should add default rules in the correct order", () => {
+        matrixClient.pushRules = PushProcessor.rewriteDefaultRules({
+            device: {},
+            global: {
+                content: [],
+                override: [
+                    {
+                        rule_id: ".m.rule.master",
+                        default: true,
+                        enabled: false,
+                        conditions: [],
+                        actions: [],
+                    },
+                    {
+                        actions: [
+                            PushRuleActionName.Notify,
+                            {
+                                set_tweak: TweakName.Sound,
+                                value: "default",
+                            },
+                            {
+                                set_tweak: TweakName.Highlight,
+                            },
+                        ],
+                        enabled: true,
+                        pattern: "coffee",
+                        rule_id: "coffee",
+                        default: false,
+                    },
+                    {
+                        actions: [
+                            PushRuleActionName.Notify,
+                            {
+                                set_tweak: TweakName.Sound,
+                                value: "default",
+                            },
+                            {
+                                set_tweak: TweakName.Highlight,
+                            },
+                        ],
+                        conditions: [
+                            {
+                                kind: ConditionKind.ContainsDisplayName,
+                            },
+                        ],
+                        enabled: true,
+                        default: true,
+                        rule_id: ".m.rule.contains_display_name",
+                    },
+                    {
+                        actions: [
+                            PushRuleActionName.Notify,
+                            {
+                                set_tweak: TweakName.Sound,
+                                value: "default",
+                            },
+                        ],
+                        conditions: [
+                            {
+                                is: "2",
+                                kind: ConditionKind.RoomMemberCount,
+                            },
+                        ],
+                        enabled: true,
+                        rule_id: ".m.rule.room_one_to_one",
+                        default: true,
+                    },
+                ],
+                room: [],
+                sender: [],
+                underride: [
+                    {
+                        actions: [
+                            PushRuleActionName.Notify,
+                            {
+                                set_tweak: TweakName.Highlight,
+                                value: false,
+                            },
+                        ],
+                        conditions: [],
+                        enabled: true,
+                        rule_id: "user-defined",
+                        default: false,
+                    },
+                    msc3914RoomCallRule,
+                    {
+                        actions: [
+                            PushRuleActionName.Notify,
+                            {
+                                set_tweak: TweakName.Highlight,
+                                value: false,
+                            },
+                        ],
+                        conditions: [],
+                        enabled: true,
+                        rule_id: ".m.rule.fallback",
+                        default: true,
+                    },
+                ],
+            },
+        });
+        pushProcessor = new PushProcessor(matrixClient);
+
         // By the time we get here, we expect the PushProcessor to have merged the new .m.rule.is_room_mention rule into the existing list of rules.
         // Check that has happened, and that it is in the right place.
         const containsDisplayNameRuleIdx = matrixClient.pushRules?.global.override?.findIndex(
@@ -205,6 +317,22 @@ describe("NotificationService", function () {
 
         expect(containsDisplayNameRuleIdx).toBeLessThan(isRoomMentionRuleIdx!);
         expect(isRoomMentionRuleIdx).toBeLessThan(mReactionRuleIdx!);
+
+        expect(matrixClient.pushRules?.global.override?.map((r) => r.rule_id)).toEqual([
+            ".m.rule.master",
+            "coffee",
+            ".m.rule.contains_display_name",
+            ".m.rule.room_one_to_one",
+            ".m.rule.is_room_mention",
+            ".m.rule.reaction",
+            ".org.matrix.msc3786.rule.room.server_acl",
+        ]);
+        expect(matrixClient.pushRules?.global.underride?.map((r) => r.rule_id)).toEqual([
+            "user-defined",
+            ".org.matrix.msc3914.rule.room.call",
+            // Assert that unknown default rules are maintained
+            ".m.rule.fallback",
+        ]);
     });
 
     // User IDs
