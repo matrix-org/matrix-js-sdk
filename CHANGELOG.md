@@ -1,3 +1,10 @@
+Changes in [31.6.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.1) (2024-03-28)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix merging of default push rules ([#4136](https://github.com/matrix-org/matrix-js-sdk/pull/4136)).
+
+
 Changes in [31.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.0) (2024-03-26)
 ==================================================================================================
 ## ✨ Features
