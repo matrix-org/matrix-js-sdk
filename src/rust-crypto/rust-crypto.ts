@@ -73,6 +73,7 @@ import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
+import { DehydratedDeviceManager } from "./DehydratedDeviceManager";
 import { VerificationMethod } from "../types";
 
 const ALL_VERIFICATION_METHODS = [
@@ -107,9 +108,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private crossSigningIdentity: CrossSigningIdentity;
     private readonly backupManager: RustBackupManager;
     private outgoingRequestsManager: OutgoingRequestsManager;
-
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
-
+    private readonly dehydratedDeviceManager: DehydratedDeviceManager;
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
     public constructor(
@@ -148,14 +148,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
-
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             this.logger,
             this.olmMachine,
             this.http,
             this.backupManager,
         );
-
+        this.dehydratedDeviceManager = new DehydratedDeviceManager(
+            this.logger,
+            olmMachine,
+            http,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
 
         this.reemitter.reEmit(this.backupManager, [
@@ -212,6 +217,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
         this.perSessionBackupDownloader.stop();
+        this.dehydratedDeviceManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -1210,6 +1216,48 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
         return await this.backupManager.importBackedUpRoomKeys(keys, opts);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#isDehydrationSupported}.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isSupported();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#rehydrateDeviceIfAvailable}.
+     */
+    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.rehydrateDeviceIfAvailable();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#createAndUploadDehydratedDevice}.
+     */
+    public async createAndUploadDehydratedDevice(): Promise<void> {
+        return await this.dehydratedDeviceManager.createAndUploadDehydratedDevice();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#isDehydrationKeyStored}.
+     */
+    public async isDehydrationKeyStored(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isKeyStored();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#scheduleDeviceDehydration}.
+     */
+    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
+        return await this.dehydratedDeviceManager.scheduleDeviceDehydration(interval, delay);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#resetDehydrationKey}.
+     */
+    public async resetDehydrationKey(): Promise<void> {
+        return await this.dehydratedDeviceManager.resetKey();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
