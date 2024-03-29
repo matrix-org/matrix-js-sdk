@@ -90,12 +90,6 @@ export class MSC4108RendezvousSession {
     private async getPostEndpoint(): Promise<string | undefined> {
         if (this.client) {
             try {
-                // whilst prototyping we can use the MSC3886 endpoint if available
-                if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc3886")) {
-                    return this.client.http
-                        .getUrl("/org.matrix.msc3886/rendezvous", undefined, ClientPrefix.Unstable)
-                        .toString();
-                }
                 if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc4108")) {
                     return this.client.http
                         .getUrl("/org.matrix.msc4108/rendezvous", undefined, ClientPrefix.Unstable)
