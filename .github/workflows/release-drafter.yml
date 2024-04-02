@@ -1,3 +1,5 @@
+# Generates the draft release for the js-sdk
+# XXX: When would we run this via a dispatch?
 name: Release Drafter
 on:
     push:

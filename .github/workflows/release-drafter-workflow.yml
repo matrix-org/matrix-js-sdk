@@ -1,3 +1,4 @@
+# Workflow used by other workflows to generate draft releases.
 name: Release Drafter
 on:
     workflow_call:
