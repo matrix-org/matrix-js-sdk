@@ -193,23 +193,21 @@ export class MSC4108SignInWithQR {
             // start device grant
             this.deviceAuthorizationResponse = await oidcClient.startDeviceAuthorization({});
 
-            const {
-                verification_uri: verificationUri,
-                verification_uri_complete: verificationUriComplete,
-                user_code: userCode,
-            } = this.deviceAuthorizationResponse;
-            const protocol: DeviceAuthorizationGrantProtocolPayload = {
-                type: PayloadType.Protocol,
-                protocol: "device_authorization_grant",
-                device_authorization_grant: {
-                    verification_uri: verificationUri,
-                    verification_uri_complete: verificationUriComplete,
-                },
-                device_id: deviceIdFromScope,
-            };
+            const { user_code: userCode } = this.deviceAuthorizationResponse;
             if (this.didScanCode) {
                 // MSC4108-Flow: NewScanned
                 // send immediately
+                const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } =
+                    this.deviceAuthorizationResponse;
+                const protocol: DeviceAuthorizationGrantProtocolPayload = {
+                    type: PayloadType.Protocol,
+                    protocol: "device_authorization_grant",
+                    device_authorization_grant: {
+                        verification_uri: verificationUri,
+                        verification_uri_complete: verificationUriComplete,
+                    },
+                    device_id: deviceIdFromScope,
+                };
                 await this.send(protocol);
             } else {
                 // MSC4108-Flow: ExistingScanned
@@ -261,12 +259,12 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    public async loginStep4(): Promise<DeviceAccessTokenResponse> {
+    public async loginStep4a(): Promise<void> {
         if (this.isExistingDevice) {
-            throw new Error("loginStep4() is not valid for existing devices");
+            throw new Error("loginStep4a() is not valid for existing devices");
         }
 
-        logger.info("loginStep4()");
+        logger.info("loginStep4a()");
 
         if (this.didScanCode) {
             // MSC4108-Flow: NewScanned
@@ -305,7 +303,14 @@ export class MSC4108SignInWithQR {
         if (message?.type !== PayloadType.ProtocolAccepted) {
             throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
         }
+    }
 
+    public async loginStep4b(): Promise<DeviceAccessTokenResponse> {
+        if (this.isExistingDevice) {
+            throw new Error("loginStep4b() is not valid for existing devices");
+        }
+
+        logger.info("loginStep4b()");
         if (!this.deviceAuthorizationResponse) {
             throw new Error("No device authorization response");
         }
