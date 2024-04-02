@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+    CheckCode,
     Curve25519PublicKey,
     EstablishedSecureChannel,
     QrCodeData,
@@ -54,6 +55,10 @@ export class MSC4108SecureChannel {
             url,
             mode === QrCodeMode.Reciprocate ? homeserverBaseUrl : undefined,
         ).to_bytes();
+    }
+
+    public getCheckCode(): CheckCode | undefined {
+        return this.establishedChannel?.check_code();
     }
 
     public async connect(): Promise<void> {
