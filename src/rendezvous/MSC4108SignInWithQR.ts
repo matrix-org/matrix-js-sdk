@@ -215,7 +215,11 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    public async loginStep4(): Promise<unknown> {
+    public async loginStep4a(): Promise<unknown> {
+        throw new Error("New device flows around OIDC are not yet implemented");
+    }
+
+    public async loginStep4b(): Promise<unknown> {
         throw new Error("New device flows around OIDC are not yet implemented");
     }
 
