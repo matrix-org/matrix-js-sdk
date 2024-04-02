@@ -70,7 +70,7 @@ async function buildChannelFromCode(
     // need to validate the values
     const rendezvousSession = new MSC4108RendezvousSession({
         onFailure,
-        url: qrCodeData.rendevouz_url,
+        url: qrCodeData.rendezvous_url,
     });
 
     return {
