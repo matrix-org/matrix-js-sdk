@@ -91,8 +91,16 @@ export class MSC4108SignInWithQR {
     private deviceAuthorizationResponse?: DeviceAuthorizationResponse;
     private expectingNewDeviceId?: string;
 
-    // PROTOTYPE: this is mocked for now
-    public checkCode: string | undefined = "99";
+    public get checkCode(): string | undefined {
+        const x = this.channel?.getCheckCode();
+
+        if (!x) {
+            return undefined;
+        }
+        return Array.from(x.as_bytes())
+            .map((b) => `${b % 10}`)
+            .join("");
+    }
 
     /**
      * @param channel - The secure channel used for communication
