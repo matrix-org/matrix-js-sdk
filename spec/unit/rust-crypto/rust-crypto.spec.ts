@@ -45,6 +45,8 @@ import {
     TypedEventEmitter,
 } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -1417,16 +1419,14 @@ describe("RustCrypto", () => {
                 secretStorage,
             );
 
-            await initializeSecretStorage(rustCrypto, testData.TEST_USER_ID);
+            await initializeSecretStorage(rustCrypto, testData.TEST_USER_ID, "http://server");
 
             fetchMock.config.overwriteRoutes = true;
 
             // when we schedule dehydration with no delay, it should create a
             // dehydrated device immediately
-            const firstDehydrationRequest = jest.fn(() => {
-                return {};
-            });
-            fetchMock.put(
+            const firstDehydrationRequest = jest.fn().mockReturnValue({});
+            fetchMock.putOnce(
                 "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
                 firstDehydrationRequest,
             );
@@ -1434,11 +1434,11 @@ describe("RustCrypto", () => {
 
             expect(firstDehydrationRequest).toHaveBeenCalled();
 
-            // after we advance the timer, it should create another dehydrated device
-            // we make this a promise so that we can await it to make sure it gets
-            // called
+            // After we advance the timer, it should create another dehydrated device.
+            // We make this a promise so that we can await it to make sure it gets
+            // called.
             const secondDehydrationPromise = new Promise<void>((resolve, reject) => {
-                fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
+                fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
                     resolve();
                     return {};
                 });
@@ -1449,13 +1449,11 @@ describe("RustCrypto", () => {
 
             // when we schedule dehydration with a delay, it should not create
             // a dehydrated device immediately
-            const thirdDehydrationRequest = jest.fn(() => {
-                return {};
-            });
+            const thirdDehydrationRequest = jest.fn().mockReturnValue({});
             const thirdDehydrationPromise = new Promise<void>((resolve, reject) => {
-                fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
+                fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
                     resolve();
-                    return thirdDehydrationRequest;
+                    return thirdDehydrationRequest();
                 });
             });
             await rustCrypto.scheduleDeviceDehydration(30000, 10000);
@@ -1465,10 +1463,8 @@ describe("RustCrypto", () => {
 
             // when we stop rustCrypto, any pending device dehydration tasks
             // should be cancelled
-            const fourthDehydrationRequest = jest.fn(() => {
-                return {};
-            });
-            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
+            const fourthDehydrationRequest = jest.fn().mockReturnValue({});
+            fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
                 return fourthDehydrationRequest;
             });
             await rustCrypto.scheduleDeviceDehydration(30000, 10000);
@@ -1625,7 +1621,7 @@ function pad43(x: string): string {
 }
 
 /** create a new secret storage and cross-signing keys */
-async function initializeSecretStorage(rustCrypto: RustCrypto, userId: string): Promise<void> {
+async function initializeSecretStorage(rustCrypto: RustCrypto, userId: string, homeserverUrl: string): Promise<void> {
     fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
         status: 404,
         body: {
@@ -1633,24 +1629,9 @@ async function initializeSecretStorage(rustCrypto: RustCrypto, userId: string): 
             error: "Not found",
         },
     });
-    let deviceKeys: { device_id: string };
-    fetchMock.post("path:/_matrix/client/v3/keys/upload", (_, opts) => {
-        deviceKeys = JSON.parse(opts.body as string).device_keys;
-        return { one_time_key_counts: { signed_curve25519: 100 } };
-    });
-    fetchMock.post("path:/_matrix/client/v3/keys/query", (_, opts) => {
-        if (deviceKeys) {
-            return {
-                device_keys: {
-                    [userId]: {
-                        [deviceKeys["device_id"]]: deviceKeys,
-                    },
-                },
-            };
-        } else {
-            return {};
-        }
-    });
+    const e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
+    const e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
+    e2eKeyResponder.addKeyReceiver(userId, e2eKeyReceiver);
     fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
     fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
 

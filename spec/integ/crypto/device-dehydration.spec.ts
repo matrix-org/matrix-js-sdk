@@ -19,6 +19,8 @@ import fetchMock from "fetch-mock-jest";
 
 import { createClient, ClientEvent, MatrixClient, MatrixEvent } from "../../../src";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -33,7 +35,7 @@ describe("Device dehydration", () => {
             },
         });
 
-        await initializeSecretStorage(matrixClient, "@alice:localhost");
+        await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
 
         const crypto = matrixClient.getCrypto()!;
         fetchMock.config.overwriteRoutes = true;
@@ -85,7 +87,11 @@ describe("Device dehydration", () => {
 });
 
 /** create a new secret storage and cross-signing keys */
-async function initializeSecretStorage(matrixClient: MatrixClient, userId: string): Promise<void> {
+async function initializeSecretStorage(
+    matrixClient: MatrixClient,
+    userId: string,
+    homeserverUrl: string,
+): Promise<void> {
     fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
         status: 404,
         body: {
@@ -93,24 +99,9 @@ async function initializeSecretStorage(matrixClient: MatrixClient, userId: strin
             error: "Not found",
         },
     });
-    let deviceKeys: { device_id: string };
-    fetchMock.post("path:/_matrix/client/v3/keys/upload", (_, opts) => {
-        deviceKeys = JSON.parse(opts.body as string).deviceKeys;
-        return { one_time_key_counts: { signed_curve25519: 100 } };
-    });
-    fetchMock.post("path:/_matrix/client/v3/keys/query", (_, opts) => {
-        if (deviceKeys) {
-            return {
-                device_keys: {
-                    userId: {
-                        [deviceKeys["device_id"]]: deviceKeys,
-                    },
-                },
-            };
-        } else {
-            return {};
-        }
-    });
+    const e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
+    const e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
+    e2eKeyResponder.addKeyReceiver(userId, e2eKeyReceiver);
     fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
     fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
     const accountData: Map<string, object> = new Map();
