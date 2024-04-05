@@ -192,28 +192,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             }
         }
 
-        beforeEach(async () => {
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        beforeEach(
+            async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
-            // ignore requests to send room key requests
-            fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
+                // ignore requests to send room key requests
+                fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
 
-            aliceClient = await initTestClient();
-            const aliceCrypto = aliceClient.getCrypto()!;
-            await aliceCrypto.storeSessionBackupPrivateKey(
-                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
-            );
+                aliceClient = await initTestClient();
+                const aliceCrypto = aliceClient.getCrypto()!;
+                await aliceCrypto.storeSessionBackupPrivateKey(
+                    Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                    testData.SIGNED_BACKUP_DATA.version!,
+                );
 
-            // start after saving the private key
-            await aliceClient.startClient();
+                // start after saving the private key
+                await aliceClient.startClient();
 
-            // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
-            // XXX: should we automatically re-check after a device becomes verified?
-            await waitForDeviceList();
-            await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-        });
+                // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+                // XXX: should we automatically re-check after a device becomes verified?
+                await waitForDeviceList();
+                await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+                await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+            } /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */,
+            10000,
+        );
 
         it("Alice checks key backups when receiving a message she can't decrypt", async () => {
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
