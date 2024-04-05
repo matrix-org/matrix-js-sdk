@@ -178,7 +178,12 @@ const decodeIdToken = (token: string): IdTokenClaims => {
  * @param nonce - nonce used in the authentication request
  * @throws when id token is invalid
  */
-export const validateIdToken = (idToken: string | undefined, issuer: string, clientId: string, nonce: string): void => {
+export const validateIdToken = (
+    idToken: string | undefined,
+    issuer: string,
+    clientId: string,
+    nonce: string | undefined,
+): void => {
     try {
         if (!idToken) {
             throw new Error("No ID token");
@@ -203,7 +208,7 @@ export const validateIdToken = (idToken: string | undefined, issuer: string, cli
          * If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked
          * to verify that it is the same value as the one that was sent in the Authentication Request.
          */
-        if (claims.nonce !== nonce) {
+        if (nonce !== undefined && claims.nonce !== nonce) {
             throw new Error("Invalid nonce");
         }
 
