@@ -107,7 +107,7 @@ export async function migrateFromLegacyCrypto(args: {
 
     if (migrationState === MigrationState.NOT_STARTED) {
         logger.info("Migrating data from legacy crypto store. Step 1: base data");
-        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle);
+        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle, logger);
 
         migrationState = MigrationState.INITIAL_DATA_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
@@ -146,6 +146,7 @@ async function migrateBaseData(
     legacyStore: CryptoStore,
     pickleKey: Uint8Array,
     storeHandle: RustSdkCryptoJs.StoreHandle,
+    logger: Logger,
 ): Promise<void> {
     const migrationData = new RustSdkCryptoJs.BaseMigrationData();
     migrationData.userId = new RustSdkCryptoJs.UserId(userId);
@@ -169,6 +170,7 @@ async function migrateBaseData(
                 backupInfo = await requestKeyBackupVersion(http);
                 backupCallDone = true;
             } catch (e) {
+                logger.info("Failed to get backup version during migration, retrying in 2 seconds", e);
                 // Retry until successful, use simple constant delay
                 await sleep(2000);
             }
