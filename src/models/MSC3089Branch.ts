@@ -15,12 +15,27 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../client";
-import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
+import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
 import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
 import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
 import type { ISendEventResponse } from "../@types/requests";
+import { EncryptedFile } from "../@types/media";
+
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
+
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -131,7 +146,7 @@ export class MSC3089Branch {
      * Gets information about the file needed to download it.
      * @returns Information about the file.
      */
-    public async getFileInfo(): Promise<{ info: IEncryptedFile; httpUrl: string }> {
+    public async getFileInfo(): Promise<{ info: EncryptedFile; httpUrl: string }> {
         const event = await this.getFileEvent();
 
         const file = event.getOriginalContent()["file"];
@@ -179,7 +194,7 @@ export class MSC3089Branch {
     public async createNewVersion(
         name: string,
         encryptedContents: FileType,
-        info: Partial<IEncryptedFile>,
+        info: EncryptedFile,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
         const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {

@@ -140,12 +140,6 @@ export type AuthDict =
     | { type: Exclude<string, AuthType>; [key: string]: any }
     | {};
 
-/**
- * Backwards compatible export
- * @deprecated in favour of AuthDict
- */
-export type IAuthDict = AuthDict;
-
 export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
@@ -168,7 +162,7 @@ export class NoAuthFlowFoundError extends Error {
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
-export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
+export type UIAuthCallback<T> = (makeRequest: (authData: AuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
 
 interface IOpts<T> {
     /**
@@ -340,7 +334,7 @@ export class InteractiveAuth<T> {
         // another just to check what the status is
         if (this.submitPromise) return;
 
-        let authDict: IAuthDict = {};
+        let authDict: AuthDict = {};
         if (this.currentStage == EMAIL_STAGE_TYPE) {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
@@ -410,7 +404,7 @@ export class InteractiveAuth<T> {
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    public async submitAuthDict(authData: IAuthDict, background = false): Promise<void> {
+    public async submitAuthDict(authData: AuthDict, background = false): Promise<void> {
         if (!this.attemptAuthDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -431,7 +425,7 @@ export class InteractiveAuth<T> {
         }
 
         // use the sessionid from the last request, if one is present.
-        let auth: IAuthDict;
+        let auth: AuthDict;
         if ((this.data as IAuthData)?.session) {
             auth = {
                 session: (this.data as IAuthData).session,
@@ -515,7 +509,7 @@ export class InteractiveAuth<T> {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    private async doRequest(auth: IAuthDict | null, background = false): Promise<void> {
+    private async doRequest(auth: AuthDict | null, background = false): Promise<void> {
         try {
             const result = await this.requestCallback(auth, background);
             this.attemptAuthDeferred!.resolve(result);

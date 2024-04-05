@@ -30,7 +30,7 @@ import {
     LegacyLocationEventContent,
 } from "./@types/location";
 import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic";
-import { IContent } from "./models/event";
+import { RoomMessageEventContent } from "./@types/events";
 
 /**
  * Generates the content for a HTML Message event
@@ -38,7 +38,7 @@ import { IContent } from "./models/event";
  * @param htmlBody - the HTML representation of the message
  * @returns
  */
-export function makeHtmlMessage(body: string, htmlBody: string): IContent {
+export function makeHtmlMessage(body: string, htmlBody: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Text,
         format: "org.matrix.custom.html",
@@ -53,7 +53,7 @@ export function makeHtmlMessage(body: string, htmlBody: string): IContent {
  * @param htmlBody - the HTML representation of the notice
  * @returns
  */
-export function makeHtmlNotice(body: string, htmlBody: string): IContent {
+export function makeHtmlNotice(body: string, htmlBody: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Notice,
         format: "org.matrix.custom.html",
@@ -68,7 +68,7 @@ export function makeHtmlNotice(body: string, htmlBody: string): IContent {
  * @param htmlBody - the HTML representation of the emote
  * @returns
  */
-export function makeHtmlEmote(body: string, htmlBody: string): IContent {
+export function makeHtmlEmote(body: string, htmlBody: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Emote,
         format: "org.matrix.custom.html",
@@ -82,7 +82,7 @@ export function makeHtmlEmote(body: string, htmlBody: string): IContent {
  * @param body - the plaintext body of the emote
  * @returns
  */
-export function makeTextMessage(body: string): IContent {
+export function makeTextMessage(body: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Text,
         body: body,
@@ -94,7 +94,7 @@ export function makeTextMessage(body: string): IContent {
  * @param body - the plaintext body of the notice
  * @returns
  */
-export function makeNotice(body: string): IContent {
+export function makeNotice(body: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Notice,
         body: body,
@@ -106,7 +106,7 @@ export function makeNotice(body: string): IContent {
  * @param body - the plaintext body of the emote
  * @returns
  */
-export function makeEmoteMessage(body: string): IContent {
+export function makeEmoteMessage(body: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Emote,
         body: body,

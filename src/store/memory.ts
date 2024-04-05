@@ -32,6 +32,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 import { IStoredClientOpts } from "../client";
 import { MapWithDefault } from "../utils";
+import { KnownMembership } from "../@types/membership";
 
 function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr =
@@ -118,7 +119,7 @@ export class MemoryStore implements IStore {
      * updated.
      */
     private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember): void => {
-        if (member.membership === "invite") {
+        if (member.membership === KnownMembership.Invite) {
             // We do NOT add invited members because people love to typo user IDs
             // which would then show up in these lists (!)
             return;

@@ -73,7 +73,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
@@ -90,6 +90,7 @@ import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -97,13 +98,14 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    VerificationRequest as CryptoApiVerificationRequest,
     OwnDeviceKeys,
+    VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 import { ClientPrefix, MatrixError, Method } from "../http-api";
 import { decodeBase64, encodeBase64 } from "../base64";
+import { KnownMembership } from "../@types/membership";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -3504,7 +3506,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // ignore any rooms which we have left
             const myMembership = room.getMyMembership();
-            return myMembership === "join" || myMembership === "invite";
+            return myMembership === KnownMembership.Join || myMembership === KnownMembership.Invite;
         });
     }
 
@@ -3987,12 +3989,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the result of anyway, as we'll need to do a query again once all the members are fetched
         // by calling _trackRoomDevices
         if (roomId in this.roomDeviceTrackingState) {
-            if (member.membership == "join") {
+            if (member.membership == KnownMembership.Join) {
                 logger.log("Join event for " + member.userId + " in " + roomId);
                 // make sure we are tracking the deviceList for this user
                 this.deviceList.startTrackingDeviceList(member.userId);
             } else if (
-                member.membership == "invite" &&
+                member.membership == KnownMembership.Invite &&
                 this.clientStore.getRoom(roomId)?.shouldEncryptForInvitedMembers()
             ) {
                 logger.log("Invite event for " + member.userId + " in " + roomId);
@@ -4208,8 +4210,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
-            throw new algorithms.DecryptionError(
-                "UNKNOWN_ENCRYPTION_ALGORITHM",
+            throw new DecryptionError(
+                DecryptionFailureCode.UNKNOWN_ENCRYPTION_ALGORITHM,
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }
