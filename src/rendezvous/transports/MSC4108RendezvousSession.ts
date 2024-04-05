@@ -115,6 +115,12 @@ export class MSC4108RendezvousSession {
         }
 
         const headers: Record<string, string> = { "content-type": "text/plain" };
+
+        // if we didn't create the rendezvous channel, we need to fetch the first etag if needed
+        if (!this.etag && this.url) {
+            await this.receive();
+        }
+
         if (this.etag) {
             headers["if-match"] = this.etag;
         }
@@ -130,19 +136,16 @@ export class MSC4108RendezvousSession {
         logger.info(`Received etag: ${this.etag}`);
 
         if (method === "POST") {
-            const location = res.headers.get("location");
-            if (!location) {
-                throw new Error("No rendezvous URI given");
-            }
             const expires = res.headers.get("expires");
             if (expires) {
                 this.expiresAt = new Date(expires);
             }
-            // we would usually expect the final `url` to be set by a proper fetch implementation.
-            // however, if a polyfill based on XHR is used it won't be set, we we use existing URI as fallback
-            const baseUrl = res.url ?? uri;
-            // resolve location header which could be relative or absolute
-            this.url = new URL(location, `${baseUrl}${baseUrl.endsWith("/") ? "" : "/"}`).href;
+            // MSC4108: we expect a JSON response with a rendezvous URL
+            const json = await res.json();
+            if (typeof json.url !== "string") {
+                throw new Error("No rendezvous URL given");
+            }
+            this.url = json.url;
             this._ready = true;
         }
     }
