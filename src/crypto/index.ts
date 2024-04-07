@@ -4297,37 +4297,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Stub function -- dehydration is not implemented here, so always return false
-     */
-    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        return false;
-    }
-
-    /**
      * Stub function -- dehydration is not implemented here, so throw error
      */
-    public async createAndUploadDehydratedDevice(): Promise<void> {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * Stub function -- dehydration is not implemented here, so throw error
-     */
-    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * Stub function -- dehydration is not implemented here, so throw error
-     */
-    public async isDehydrationKeyStored(): Promise<boolean> {
-        return false;
-    }
-
-    /**
-     * Stub function -- dehydration is not implemented here, so throw error
-     */
-    public async resetDehydrationKey(): Promise<void> {
+    public async startDehydration(createNewKey?: boolean): Promise<void> {
         throw new Error("Not implemented");
     }
 }

@@ -1226,38 +1226,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoBackend#rehydrateDeviceIfAvailable}.
+     * Implementation of {@link CryptoBackend#startDehydration}.
      */
-    public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        return await this.dehydratedDeviceManager.rehydrateDeviceIfAvailable();
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#createAndUploadDehydratedDevice}.
-     */
-    public async createAndUploadDehydratedDevice(): Promise<void> {
-        return await this.dehydratedDeviceManager.createAndUploadDehydratedDevice();
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#isDehydrationKeyStored}.
-     */
-    public async isDehydrationKeyStored(): Promise<boolean> {
-        return await this.dehydratedDeviceManager.isKeyStored();
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#scheduleDeviceDehydration}.
-     */
-    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
-        return await this.dehydratedDeviceManager.scheduleDeviceDehydration(interval, delay);
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#resetDehydrationKey}.
-     */
-    public async resetDehydrationKey(): Promise<void> {
-        return await this.dehydratedDeviceManager.resetKey();
+    public async startDehydration(createNewKey?: boolean): Promise<void> {
+        return await this.dehydratedDeviceManager.start(createNewKey);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

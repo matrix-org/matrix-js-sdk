@@ -24,6 +24,8 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
         const matrixClient = createClient({
             baseUrl: "http://test.server",
             userId: "@alice:localhost",
@@ -37,10 +39,19 @@ describe("Device dehydration", () => {
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
 
+        // count the number of times the dehydration key gets set
+        let setDehydrationCount = 0;
+        matrixClient.on(ClientEvent.AccountData, (event: MatrixEvent) => {
+            if (event.getType() === "org.matrix.msc3814") {
+                setDehydrationCount++;
+            }
+        });
+
         const crypto = matrixClient.getCrypto()!;
         fetchMock.config.overwriteRoutes = true;
 
-        // try to rehydrate, but there isn't any dehydrated device yet
+        // start dehydration -- we start with no dehydrated device, and we
+        // store the dehydrated device that we create
         fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
             status: 404,
             body: {
@@ -48,17 +59,32 @@ describe("Device dehydration", () => {
                 error: "Not found",
             },
         });
-        expect(await crypto.rehydrateDeviceIfAvailable()).toBe(false);
-
-        // create a dehydrated device
         let dehydratedDeviceBody: any;
+        let dehydrationCount = 0;
+        let resolveDehydrationPromise: () => void;
         fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
             dehydratedDeviceBody = JSON.parse(opts.body as string);
+            dehydrationCount++;
+            if (resolveDehydrationPromise) {
+                resolveDehydrationPromise();
+            }
             return {};
         });
-        await crypto.createAndUploadDehydratedDevice();
+        await crypto.startDehydration();
 
-        // rehydrate the device that we just created
+        expect(dehydrationCount).toEqual(1);
+
+        // a week later, we should have created another dehydrated device
+        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        const dehydrationPromise = new Promise((resolve, reject) => {
+            resolveDehydrationPromise = resolve;
+        });
+        await dehydrationPromise;
+        expect(dehydrationCount).toEqual(2);
+
+        // restart dehydration -- rehydrate the device that we created above,
+        // and create a new dehydrated device.  We also set `createNewKey`, so
+        // a new dehydration key will be set
         fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
             device_id: dehydratedDeviceBody.device_id,
             device_data: dehydratedDeviceBody.device_data,
@@ -80,9 +106,13 @@ describe("Device dehydration", () => {
             `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
             eventsResponse,
         );
+        await crypto.startDehydration(true);
+        expect(dehydrationCount).toEqual(3);
 
-        expect(await crypto.rehydrateDeviceIfAvailable()).toBe(true);
+        expect(setDehydrationCount).toEqual(2);
         expect(eventsResponse.mock.calls).toHaveLength(2);
+
+        matrixClient.stopClient();
     });
 });
 

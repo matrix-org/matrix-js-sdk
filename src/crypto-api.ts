@@ -507,65 +507,31 @@ export interface CryptoApi {
      * Returns whether MSC3814 dehydrated devices are supported by the crypto
      * backend and by the server.
      *
-     * This should be called before any of the other dehydrated device
-     * functions are called, and if it returns `false`, none of the other
-     * dehydrated device functions should be called.
+     * This should be called before calling `startDehydration`, and if this
+     * returns `false`, `startDehydration` should not be called.
      */
     isDehydrationSupported(): Promise<boolean>;
 
     /**
-     * Rehydrate the dehydrated device stored on the server.
+     * Start using device dehydration.
      *
-     * Checks if there is a dehydrated device on the server.  If so, rehydrates
-     * the device and processes the to-device events sent to it.  This function
-     * should be called before a dehydrated device is created for the first
-     * time after the client logs in.
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and store it in Secret
+     *   Storage.
+     *   - If `createNewKey` is set to true, always create a new key.
+     *   - If a dehydration key is not available, create a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
      *
-     * @returns `true` if a dehydrated device was found; otherwise, `false`.
+     * This function must not be called unless `isDehydrationSupported` returns
+     * `true`, and must not be called until after cross-signing and secret
+     * storage have been set up.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.  Defaults
+     *   to false.
      */
-    rehydrateDeviceIfAvailable(): Promise<boolean>;
-
-    /**
-     * Creates and uploads a new dehydrated device.
-     *
-     * If now dehydration key is available in secret storage, a new key is
-     * created.  Most applications should call `scheduleDeviceDehydration` so
-     * that the dehydrated device gets replaced periodically with a new one, to
-     * avoid to-device events stacking up on the server.  However, clients that
-     * want to have more control over the dehydration process may use this
-     * function instead.
-     */
-    createAndUploadDehydratedDevice(): Promise<void>;
-
-    /**
-     * Schedule periodic creation of dehydrated devices.
-     *
-     * If the delay is omitted or 0, this function's promise will resolve after
-     * the first dehydrated device is created.
-     *
-     * @param interval - the time to wait between creating dehydrated devices.
-     * @param delay - how long to wait before creating the first dehydrated device.
-     *     Defaults to creating the device immediately.
-     */
-    scheduleDeviceDehydration(interval: number, delay?: number): Promise<void>;
-
-    /**
-     * Return whether the dehydration key is stored in Secret Storage.
-     */
-    isDehydrationKeyStored(): Promise<boolean>;
-
-    /**
-     * Reset the dehydration key.
-     *
-     * Creates a new dehydration key and stores it in secret storage.  This
-     * function should be called, for example, if the user's secret storage is
-     * reset.
-     *
-     * Note: this does not create a new dehydrated device.  This will need to
-     * be done either by calling `createAndUploadDehydratedDevice` or
-     * `scheduleDeviceDehydration`.
-     */
-    resetDehydrationKey(): Promise<void>;
+    startDehydration(createNewKey?: boolean): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */
@@ -839,6 +805,11 @@ export interface CreateSecretStorageOpts {
      * Reset even if keys already exist.
      */
     setupNewSecretStorage?: boolean;
+
+    /**
+     * Create a dehydrated device if no dehydrated device is already present.
+     */
+    initialiseDeviceDehydration?: boolean;
 
     /**
      * Function called to get the user's

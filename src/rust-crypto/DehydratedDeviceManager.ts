@@ -52,6 +52,11 @@ export const UnstablePrefix = "/_matrix/client/unstable/org.matrix.msc3814.v1";
 const SECRET_STORAGE_NAME = "org.matrix.msc3814";
 
 /**
+ * The interval between creating dehydrated devices. (one week)
+ */
+const DEHYDRATION_INTERVAL = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Manages dehydrated devices
  *
  * We have one of these per `RustCrypto`.  It's responsible for
@@ -68,8 +73,6 @@ export class DehydratedDeviceManager {
     private key?: Uint8Array;
     /** the ID of the interval for periodically replacing the dehydrated device */
     private intervalId?: ReturnType<typeof setInterval>;
-    /** the ID of the timeout for creating a new dehydrated device */
-    private timeoutId?: ReturnType<typeof setTimeout>;
 
     public constructor(
         private readonly logger: Logger,
@@ -107,6 +110,35 @@ export class DehydratedDeviceManager {
             throw error;
         }
         return true;
+    }
+
+    /**
+     * Start using device dehydration.
+     *
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and store it in Secret
+     *   Storage.
+     *   - If `createNewKey` is set to true, always create a new key.
+     *   - If a dehydration key is not available, create a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.
+     */
+    public async start(createNewKey?: boolean): Promise<void> {
+        this.stop();
+        try {
+            await this.rehydrateDeviceIfAvailable();
+        } catch (e) {
+            // If rehydration fails, there isn't much we can do about it.  Log
+            // the error, and create a new device.
+            this.logger.info("dehydration: Error rehydrating device:", e);
+        }
+        if (createNewKey) {
+            await this.resetKey();
+        }
+        await this.scheduleDeviceDehydration();
     }
 
     /**
@@ -187,7 +219,7 @@ export class DehydratedDeviceManager {
             throw err;
         }
 
-        this.logger.info("dehydration: device found");
+        this.logger.info("dehydration: dehydrated device found");
 
         const rehydratedDevice = await this.olmMachine
             .dehydratedDevices()
@@ -250,28 +282,17 @@ export class DehydratedDeviceManager {
      * Schedule periodic creation of dehydrated devices.
      *
      * @param interval - the time to wait between creating dehydrated devices
-     * @param delay - how long to wait before creating the first dehydrated device.
-     *     Defaults to creating the device immediately.
      */
-    public async scheduleDeviceDehydration(interval: number, delay?: number): Promise<void> {
+    public async scheduleDeviceDehydration(): Promise<void> {
         // cancel any previously-scheduled tasks
         this.stop();
 
-        if (delay) {
-            this.timeoutId = setTimeout(() => {
-                this.timeoutId = undefined;
-                this.scheduleDeviceDehydration(interval).catch((error) => {
-                    this.logger.error("Error scheduling device dehydration:", error);
-                });
-            }, delay);
-        } else {
-            await this.createAndUploadDehydratedDevice();
-            this.intervalId = setInterval(() => {
-                this.createAndUploadDehydratedDevice().catch((error) => {
-                    this.logger.error("Error creating dehydrated device:", error);
-                });
-            }, interval);
-        }
+        await this.createAndUploadDehydratedDevice();
+        this.intervalId = setInterval(() => {
+            this.createAndUploadDehydratedDevice().catch((error) => {
+                this.logger.error("Error creating dehydrated device:", error);
+            });
+        }, DEHYDRATION_INTERVAL);
     }
 
     /**
@@ -283,10 +304,6 @@ export class DehydratedDeviceManager {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = undefined;
-        }
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = undefined;
         }
     }
 }

@@ -45,8 +45,6 @@ import {
     TypedEventEmitter,
 } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
-import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -1402,77 +1400,6 @@ describe("RustCrypto", () => {
     });
 
     describe("device dehydration", () => {
-        it("should schedule regular creation of dehydrated devices", async () => {
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            const secretStorageCallbacks = {
-                getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
-                },
-            } as SecretStorageCallbacks;
-            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
-
-            const rustCrypto = await makeTestRustCrypto(
-                makeMatrixHttpApi(),
-                testData.TEST_USER_ID,
-                undefined,
-                secretStorage,
-            );
-
-            await initializeSecretStorage(rustCrypto, testData.TEST_USER_ID, "http://server");
-
-            fetchMock.config.overwriteRoutes = true;
-
-            // when we schedule dehydration with no delay, it should create a
-            // dehydrated device immediately
-            const firstDehydrationRequest = jest.fn().mockReturnValue({});
-            fetchMock.putOnce(
-                "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
-                firstDehydrationRequest,
-            );
-            await rustCrypto.scheduleDeviceDehydration(30000);
-
-            expect(firstDehydrationRequest).toHaveBeenCalled();
-
-            // After we advance the timer, it should create another dehydrated device.
-            // We make this a promise so that we can await it to make sure it gets
-            // called.
-            const secondDehydrationPromise = new Promise<void>((resolve, reject) => {
-                fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
-                    resolve();
-                    return {};
-                });
-            });
-            jest.advanceTimersByTime(35000);
-
-            await secondDehydrationPromise;
-
-            // when we schedule dehydration with a delay, it should not create
-            // a dehydrated device immediately
-            const thirdDehydrationRequest = jest.fn().mockReturnValue({});
-            const thirdDehydrationPromise = new Promise<void>((resolve, reject) => {
-                fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
-                    resolve();
-                    return thirdDehydrationRequest();
-                });
-            });
-            await rustCrypto.scheduleDeviceDehydration(30000, 10000);
-            expect(thirdDehydrationRequest).not.toHaveBeenCalled();
-            jest.advanceTimersByTime(15000);
-            await thirdDehydrationPromise;
-
-            // when we stop rustCrypto, any pending device dehydration tasks
-            // should be cancelled
-            const fourthDehydrationRequest = jest.fn().mockReturnValue({});
-            fetchMock.putOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
-                return fourthDehydrationRequest;
-            });
-            await rustCrypto.scheduleDeviceDehydration(30000, 10000);
-            rustCrypto.stop();
-            jest.advanceTimersByTime(15000);
-            expect(fourthDehydrationRequest).not.toHaveBeenCalled();
-        });
-
         it("should detect if dehydration is supported", async () => {
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
             fetchMock.config.overwriteRoutes = true;
@@ -1497,53 +1424,6 @@ describe("RustCrypto", () => {
                 device_data: "data",
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(true);
-        });
-
-        it("should detect if dehydration key is stored", async () => {
-            const secretStorageCallbacks = {
-                getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
-                },
-            } as SecretStorageCallbacks;
-            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
-
-            const rustCrypto = await makeTestRustCrypto(
-                makeMatrixHttpApi(),
-                testData.TEST_USER_ID,
-                undefined,
-                secretStorage,
-            );
-            async function createSecretStorageKey() {
-                return {
-                    keyInfo: {} as AddSecretStorageKeyOpts,
-                    privateKey: new Uint8Array(32),
-                };
-            }
-            await rustCrypto.bootstrapSecretStorage({
-                createSecretStorageKey,
-                setupNewSecretStorage: true,
-                setupNewKeyBackup: false,
-            });
-
-            expect(await rustCrypto.isDehydrationKeyStored()).toBe(false);
-
-            await rustCrypto.resetDehydrationKey();
-            expect(await rustCrypto.isDehydrationKeyStored()).toBe(true);
-
-            // rehydrateDeviceIfAvailable should check the server to see if a
-            // dehydrated device is present, because the dehydration key is set
-            const response = jest.fn(() => {
-                return {
-                    status: 404,
-                    body: {
-                        errcode: "M_NOT_FOUND",
-                        error: "Not found",
-                    },
-                };
-            });
-            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", response);
-            expect(await rustCrypto.rehydrateDeviceIfAvailable()).toBe(false);
-            expect(response).toHaveBeenCalled();
         });
     });
 });
@@ -1618,33 +1498,4 @@ class DummyAccountDataClient
 /** Pad a string to 43 characters long */
 function pad43(x: string): string {
     return x + ".".repeat(43 - x.length);
-}
-
-/** create a new secret storage and cross-signing keys */
-async function initializeSecretStorage(rustCrypto: RustCrypto, userId: string, homeserverUrl: string): Promise<void> {
-    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-        status: 404,
-        body: {
-            errcode: "M_NOT_FOUND",
-            error: "Not found",
-        },
-    });
-    const e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
-    const e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
-    e2eKeyResponder.addKeyReceiver(userId, e2eKeyReceiver);
-    fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
-    fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
-
-    async function createSecretStorageKey() {
-        return {
-            keyInfo: {} as AddSecretStorageKeyOpts,
-            privateKey: new Uint8Array(32),
-        };
-    }
-    await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
-    await rustCrypto.bootstrapSecretStorage({
-        createSecretStorageKey,
-        setupNewSecretStorage: true,
-        setupNewKeyBackup: false,
-    });
 }
