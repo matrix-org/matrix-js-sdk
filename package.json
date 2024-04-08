@@ -6,6 +6,7 @@
         "node": ">=18.0.0"
     },
     "scripts": {
+        "prepack": "yarn build",
         "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
         "clean": "rimraf lib",
         "build": "yarn build:dev",
@@ -18,11 +19,10 @@
         "lint:js-fix": "prettier --log-level=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
+        "lint:knip": "knip",
         "test": "jest",
         "test:watch": "jest --watch",
-        "coverage": "yarn test --coverage",
-        "prepack": "yarn build",
-        "lint:knip": "knip"
+        "coverage": "yarn test --coverage"
     },
     "repository": {
         "type": "git",
