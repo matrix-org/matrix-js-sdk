@@ -75,10 +75,10 @@ describe("Device dehydration", () => {
         expect(dehydrationCount).toEqual(1);
 
         // a week later, we should have created another dehydrated device
-        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
-        const dehydrationPromise = new Promise((resolve, reject) => {
+        const dehydrationPromise = new Promise<void>((resolve, reject) => {
             resolveDehydrationPromise = resolve;
         });
+        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
         expect(dehydrationCount).toEqual(2);
 
