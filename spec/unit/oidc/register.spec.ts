@@ -90,4 +90,31 @@ describe("registerOidcClient()", () => {
             OidcError.DynamicRegistrationInvalid,
         );
     });
+
+    it("should throw when required endpoints are unavailable", async () => {
+        await expect(() =>
+            registerOidcClient(
+                {
+                    ...delegatedAuthConfig,
+                    registrationEndpoint: undefined,
+                },
+                metadata,
+            ),
+        ).rejects.toThrow(OidcError.DynamicRegistrationNotSupported);
+    });
+
+    it("should throw when required scopes are unavailable", async () => {
+        await expect(() =>
+            registerOidcClient(
+                {
+                    ...delegatedAuthConfig,
+                    metadata: {
+                        ...delegatedAuthConfig.metadata,
+                        grant_types_supported: [delegatedAuthConfig.metadata.grant_types_supported[0]],
+                    },
+                },
+                metadata,
+            ),
+        ).rejects.toThrow(OidcError.DynamicRegistrationNotSupported);
+    });
 });
