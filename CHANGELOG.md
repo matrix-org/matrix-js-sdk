@@ -1,3 +1,26 @@
+Changes in [31.6.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.1) (2024-03-28)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix merging of default push rules ([#4136](https://github.com/matrix-org/matrix-js-sdk/pull/4136)).
+
+
+Changes in [31.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.0) (2024-03-26)
+==================================================================================================
+## ✨ Features
+
+* Introduce Membership TS type (take 2) ([#4107](https://github.com/matrix-org/matrix-js-sdk/pull/4107)). Contributed by @andybalaam.
+* fix automatic DM avatar with functional members ([#4017](https://github.com/matrix-org/matrix-js-sdk/pull/4017)). Contributed by @HarHarLinks.
+* Export types describing all specced media event formats ([#4092](https://github.com/matrix-org/matrix-js-sdk/pull/4092)). Contributed by @t3chguy.
+* Add `.m.rule.is_room_mention` push rule to DEFAULT\_OVERRIDE\_RULES ([#4100](https://github.com/matrix-org/matrix-js-sdk/pull/4100)). Contributed by @t3chguy.
+* Make sending ContentLoaded optional for a widgetClient ([#4086](https://github.com/matrix-org/matrix-js-sdk/pull/4086)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Migrate own identity local trust to rust crypto ([#4090](https://github.com/matrix-org/matrix-js-sdk/pull/4090)). Contributed by @BillCarsonFr.
+* Fix race condition with sliding sync extensions ([#4089](https://github.com/matrix-org/matrix-js-sdk/pull/4089)). Contributed by @zzorba.
+
+
 Changes in [31.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.5.0) (2024-03-12)
 ==================================================================================================
 ## ✨ Features
