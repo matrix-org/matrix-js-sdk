@@ -188,7 +188,6 @@ export const validateIdToken = (
         if (!idToken) {
             throw new Error("No ID token");
         }
-
         const claims = decodeIdToken(idToken);
 
         // The Issuer Identifier for the OpenID Provider MUST exactly match the value of the iss (issuer) Claim.
@@ -209,7 +208,7 @@ export const validateIdToken = (
          * If a nonce value was sent in the Authentication Request, a nonce Claim MUST be present and its value checked
          * to verify that it is the same value as the one that was sent in the Authentication Request.
          */
-        if (nonce && claims.nonce !== nonce) {
+        if (nonce !== undefined && claims.nonce !== nonce) {
             throw new Error("Invalid nonce");
         }
 
