@@ -3,6 +3,7 @@ import { KnipConfig } from "knip";
 export default {
     entry: [
         "src/index.ts",
+        "src/types.ts",
         "src/browser-index.ts",
         "src/indexeddb-worker.ts",
         "scripts/**",
