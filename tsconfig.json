@@ -10,10 +10,5 @@
         "declaration": true,
         "strict": true
     },
-    "include": ["./src/**/*.ts", "./spec/**/*.ts"],
-    "typedocOptions": {
-        "entryPoints": ["src/matrix.ts"],
-        "excludeExternals": true,
-        "out": "_docs"
-    }
+    "include": ["./src/**/*.ts", "./spec/**/*.ts"]
 }

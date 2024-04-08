@@ -73,7 +73,10 @@ export class KeyClaimManager {
             throw new Error(`Cannot ensure Olm sessions: shutting down`);
         }
         logger.info("Checking for missing Olm sessions");
-        const claimRequest = await this.olmMachine.getMissingSessions(userList);
+        // By passing the userId array to rust we transfer ownership of the items to rust, causing
+        // them to be invalidated on the JS side as soon as the method is called.
+        // As we haven't created the `userList` let's clone the users, to not break the caller from re-using it.
+        const claimRequest = await this.olmMachine.getMissingSessions(userList.map((u) => u.clone()));
         if (claimRequest) {
             logger.info("Making /keys/claim request");
             await this.outgoingRequestProcessor.makeOutgoingRequest(claimRequest);

@@ -20,7 +20,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Notify matrix-react-sdk repo that a new SDK build is on develop so it can CI against it
-              uses: peter-evans/repository-dispatch@bf47d102fdb849e755b0b0023ea3e81a44b6f570 # v2
+              uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
               with:
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   repository: ${{ matrix.repo }}

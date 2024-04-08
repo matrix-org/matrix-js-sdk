@@ -22,6 +22,7 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    MsgType,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -38,38 +39,42 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
-    ContentHelpers,
     ClientPrefix,
+    ConditionKind,
+    ContentHelpers,
     Direction,
     EventTimeline,
+    EventTimelineSet,
+    getHttpUriForMxc,
     ICreateRoomOpts,
+    IPushRule,
     IRequestOpts,
     MatrixError,
     MatrixHttpApi,
     MatrixScheduler,
     Method,
-    Room,
-    EventTimelineSet,
     PushRuleActionName,
-    TweakName,
+    Room,
     RuleId,
-    IPushRule,
-    ConditionKind,
+    TweakName,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
     IGNORE_INVITES_ACCOUNT_EVENT_KEY,
     POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
-import { QueryDict } from "../../src/utils";
+import { defer, QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { KnownMembership } from "../../src/@types/membership";
+import { RoomMessageEventContent } from "../../src/@types/events";
 
 jest.useFakeTimers();
 
@@ -369,6 +374,21 @@ describe("MatrixClient", function () {
         client.stopClient();
     });
 
+    describe("mxcUrlToHttp", () => {
+        it("should call getHttpUriForMxc", () => {
+            const mxc = "mxc://server/example";
+            expect(client.mxcUrlToHttp(mxc)).toBe(getHttpUriForMxc(client.baseUrl, mxc));
+            expect(client.mxcUrlToHttp(mxc, 32)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32));
+            expect(client.mxcUrlToHttp(mxc, 32, 46)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32, 46));
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale")).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale"),
+            );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true),
+            );
+        });
+    });
+
     describe("timestampToEvent", () => {
         const roomId = "!room:server.org";
         const eventId = "$eventId:example.org";
@@ -549,7 +569,7 @@ describe("MatrixClient", function () {
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
-        const content = { body };
+        const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
 
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
@@ -644,12 +664,13 @@ describe("MatrixClient", function () {
 
             const content = {
                 body,
+                "msgtype": MsgType.Text,
                 "m.relates_to": {
                     "m.in_reply_to": {
                         event_id: "$other:event",
                     },
                 },
-            };
+            } satisfies RoomMessageEventContent;
 
             const room = new Room(roomId, client, userId);
             mocked(store.getRoom).mockReturnValue(room);
@@ -734,7 +755,7 @@ describe("MatrixClient", function () {
     it("should get (unstable) file trees with valid state", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -773,7 +794,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees if not joined", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "leave", // "not join"
+            getMyMembership: () => KnownMembership.Leave, // "not join"
         } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
@@ -796,7 +817,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -833,7 +854,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -1293,7 +1314,7 @@ describe("MatrixClient", function () {
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomEncryption) {
@@ -1432,26 +1453,12 @@ describe("MatrixClient", function () {
         const txnId = "m12345";
 
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomCreate) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({
-                            content: {
-                                [RoomCreateTypeField]: RoomType.Space,
-                            },
-                        });
-                    } else if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
+
+        let mockCrypto: Mocked<Crypto>;
 
         let event: MatrixEvent;
         beforeEach(async () => {
@@ -1467,11 +1474,12 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = client["cryptoBackend"] = {
-                // mock crypto
-                encryptEvent: () => new Promise(() => {}),
+            mockCrypto = {
+                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
+                encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Crypto;
+            } as unknown as Mocked<Crypto>;
+            client.crypto = client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -1488,11 +1496,20 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
+            const encryptEventDefer = defer();
+            mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
+
+            const statusPromise = testUtils.emitPromise(event, "Event.status");
             // @ts-ignore protected method access
-            client.encryptAndSendEvent(mockRoom, event);
-            await testUtils.emitPromise(event, "Event.status");
+            const encryptAndSendPromise = client.encryptAndSendEvent(mockRoom, event);
+            await statusPromise;
             expect(event.status).toBe(EventStatus.ENCRYPTING);
             client.cancelPendingEvent(event);
+            assertCancelled();
+
+            // now let the encryption complete, and check that the message is not sent.
+            encryptEventDefer.resolve();
+            await encryptAndSendPromise;
             assertCancelled();
         });
 
@@ -1514,8 +1531,6 @@ describe("MatrixClient", function () {
             { startOpts: {}, hasThreadSupport: false },
             { startOpts: { threadSupport: true }, hasThreadSupport: true },
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
-            { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
-            { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
         ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);
@@ -2069,10 +2084,10 @@ describe("MatrixClient", function () {
             await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
 
             // Add a rule in the new source room.
-            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, PolicyScope.User, {
+            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, EventType.PolicyRuleUser, {
                 entity: "*:example.org",
                 reason: "just a test",
-                recommendation: "m.ban",
+                recommendation: PolicyRecommendation.Ban,
             });
 
             // We should reject this invite.
@@ -2159,8 +2174,8 @@ describe("MatrixClient", function () {
             // Check where it shows up.
             const targetRoomId = ignoreInvites2.target;
             const targetRoom = client.getRoom(targetRoomId) as WrappedRoom;
-            expect(targetRoom._state.get(PolicyScope.User)[eventId]).toBeTruthy();
-            expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
+            expect(targetRoom._state.get(EventType.PolicyRuleUser)[eventId]).toBeTruthy();
+            expect(newSourceRoom._state.get(EventType.PolicyRuleUser)?.[eventId]).toBeFalsy();
         });
     });
 
@@ -2998,6 +3013,24 @@ describe("MatrixClient", function () {
                 kind: null,
             });
             expect(result).toEqual({});
+        });
+    });
+
+    describe("getAuthIssuer", () => {
+        it("should use unstable prefix", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_issuer`,
+                    data: {
+                        issuer: "https://issuer/",
+                    },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+
+            await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
+            expect(httpLookups.length).toEqual(0);
         });
     });
 });

@@ -73,7 +73,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MapWithDefault, recursiveMapToObject } from "../utils";
 import {
@@ -90,6 +90,7 @@ import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
     CrossSigningStatus,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -97,13 +98,14 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    VerificationRequest as CryptoApiVerificationRequest,
     OwnDeviceKeys,
+    VerificationRequest as CryptoApiVerificationRequest,
 } from "../crypto-api";
 import { Device, DeviceMap } from "../models/device";
 import { deviceInfoToDevice } from "./device-converter";
 import { ClientPrefix, MatrixError, Method } from "../http-api";
 import { decodeBase64, encodeBase64 } from "../base64";
+import { KnownMembership } from "../@types/membership";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -473,8 +475,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param cryptoStore - storage for the crypto layer.
      *
-     * @param roomList - An initialised RoomList object
-     *
      * @param verificationMethods - Array of verification methods to use.
      *    Each element can either be a string from MatrixClient.verificationMethods
      *    or a class that implements a verification method.
@@ -842,15 +842,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *   secret storage (if it has been setup)
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
-     *
-     * @param authUploadDeviceSigningKeys - Function
-     * called to await an interactive auth flow when uploading device signing keys.
-     * @param setupNewCrossSigning - Optional. Reset even if keys
-     * already exist.
-     * Args:
-     *     A function that makes the request requiring auth. Receives the
-     *     auth data as an object. Can be called multiple times, first with an empty
-     *     authDict, to obtain the flows.
      */
     public async bootstrapCrossSigning({
         authUploadDeviceSigningKeys,
@@ -964,20 +955,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
-     * @param createSecretStorageKey - Optional. Function
-     * called to await a secret storage key creation flow.
-     *     Returns a Promise which resolves to an object with public key metadata, encoded private
-     *     recovery key which should be disposed of after displaying to the user,
-     *     and raw private key to avoid round tripping if needed.
-     * @param keyBackupInfo - The current key backup object. If passed,
-     * the passphrase and recovery key from this backup will be used.
-     * @param setupNewKeyBackup - If true, a new key backup version will be
-     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
-     * is supplied.
-     * @param setupNewSecretStorage - Optional. Reset even if keys already exist.
-     * @param getKeyBackupPassphrase - Optional. Function called to get the user's
-     *     current key backup passphrase. Should return a promise that resolves with a Buffer
-     *     containing the key, or rejects if the key cannot be obtained.
      * Returns:
      *     A promise which resolves to key creation data for
      *     SecretStorage#addKey: an object with `passphrase` etc fields.
@@ -3143,6 +3120,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Get a JSON list containing all of the room keys
+     *
+     * @returns a JSON string encoding a list of session
+     *    export objects, each of which is an IMegolmSessionData
+     */
+    public async exportRoomKeysAsJson(): Promise<string> {
+        return JSON.stringify(await this.exportRoomKeys());
+    }
+
+    /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
@@ -3182,6 +3169,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 });
             }),
         ).then();
+    }
+
+    /**
+     * Import a JSON string encoding a list of room keys previously
+     * exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export
+     *    objects, each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void> {
+        return await this.importRoomKeys(JSON.parse(keys));
     }
 
     /**
@@ -3506,7 +3506,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // ignore any rooms which we have left
             const myMembership = room.getMyMembership();
-            return myMembership === "join" || myMembership === "invite";
+            return myMembership === KnownMembership.Join || myMembership === KnownMembership.Invite;
         });
     }
 
@@ -3989,12 +3989,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the result of anyway, as we'll need to do a query again once all the members are fetched
         // by calling _trackRoomDevices
         if (roomId in this.roomDeviceTrackingState) {
-            if (member.membership == "join") {
+            if (member.membership == KnownMembership.Join) {
                 logger.log("Join event for " + member.userId + " in " + roomId);
                 // make sure we are tracking the deviceList for this user
                 this.deviceList.startTrackingDeviceList(member.userId);
             } else if (
-                member.membership == "invite" &&
+                member.membership == KnownMembership.Invite &&
                 this.clientStore.getRoom(roomId)?.shouldEncryptForInvitedMembers()
             ) {
                 logger.log("Invite event for " + member.userId + " in " + roomId);
@@ -4210,8 +4210,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
-            throw new algorithms.DecryptionError(
-                "UNKNOWN_ENCRYPTION_ALGORITHM",
+            throw new DecryptionError(
+                DecryptionFailureCode.UNKNOWN_ENCRYPTION_ALGORITHM,
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }
@@ -4271,6 +4271,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public isRoomEncrypted(roomId: string): boolean {
         return this.roomList.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
+     */
+    public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        return this.isRoomEncrypted(roomId);
     }
 
     /**

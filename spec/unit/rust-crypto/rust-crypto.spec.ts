@@ -46,7 +46,7 @@ import {
 } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
-import { IEventDecryptionResult } from "../../../src/@types/crypto";
+import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import {
     AccountDataClient,
@@ -75,6 +75,12 @@ import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/b
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
 
+beforeAll(async () => {
+    // Load the WASM upfront, before any of the tests. This can take some time, and doing it here means that it gets
+    // a separate timeout.
+    await RustSdkCryptoJs.initAsync();
+}, 15000);
+
 afterEach(() => {
     fetchMock.reset();
     jest.restoreAllMocks();
@@ -88,10 +94,13 @@ describe("initRustCrypto", () => {
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
+            registerDevicesUpdatedCallback: jest.fn(),
             outgoingRequests: jest.fn(),
             isBackupEnabled: jest.fn().mockResolvedValue(false),
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
             getBackupKeys: jest.fn(),
+            getIdentity: jest.fn().mockResolvedValue(null),
+            trackedUsers: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
     }
 
@@ -100,7 +109,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -114,7 +123,7 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase");
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("suppresses the storePassphrase if storePrefix is unset", async () => {
@@ -122,7 +131,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -136,7 +145,7 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -144,7 +153,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -161,6 +170,22 @@ describe("initRustCrypto", () => {
     });
 
     describe("libolm migration", () => {
+        let mockStore: RustSdkCryptoJs.StoreHandle;
+
+        beforeEach(() => {
+            // Stub out a bunch of stuff in the Rust library
+            mockStore = { free: jest.fn() } as unknown as StoreHandle;
+            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
+            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
+
+            const testOlmMachine = makeTestOlmMachine();
+            testOlmMachine.trackedUsers.mockResolvedValue([]);
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        });
+
         it("migrates data from a legacy crypto store", async () => {
             const PICKLE_KEY = "pickle1234";
             const legacyStore = new MemoryCryptoStore();
@@ -179,17 +204,6 @@ describe("initRustCrypto", () => {
             createSessions(legacyStore, nDevices, nSessionsPerDevice);
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
-
-            // Stub out a bunch of stuff in the Rust library
-            const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
-
-            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
-
-            const testOlmMachine = makeTestOlmMachine();
-            jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
 
@@ -269,10 +283,57 @@ describe("initRustCrypto", () => {
                     expect(session.senderKey).toEqual(pad43(`device${i}`));
                     expect(session.pickle).toEqual("sessionPickle");
                     expect(session.roomId!.toString()).toEqual("!room:id");
+                    expect(session.senderSigningKey).toEqual("sender_signing_key");
+
                     // only one of the sessions needs backing up
                     expect(session.backedUp).toEqual(i !== 5 || j !== 5);
                 }
             }
+        }, 10000);
+
+        it("handles megolm sessions with no `keysClaimed`", async () => {
+            const legacyStore = new MemoryCryptoStore();
+            legacyStore.storeAccount({}, "not a real account");
+
+            legacyStore.storeEndToEndInboundGroupSession(
+                pad43(`device1`),
+                `session1`,
+                {
+                    forwardingCurve25519KeyChain: [],
+                    room_id: "!room:id",
+                    session: "sessionPickle",
+                },
+                undefined,
+            );
+
+            const PICKLE_KEY = "pickle1234";
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+            });
+
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledTimes(1);
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledWith(
+                expect.any(Array),
+                new Uint8Array(Buffer.from(PICKLE_KEY)),
+                mockStore,
+            );
+            const megolmSessions: PickledInboundGroupSession[] = mocked(Migration.migrateMegolmSessions).mock
+                .calls[0][0];
+            expect(megolmSessions.length).toEqual(1);
+            const session = megolmSessions[0];
+            expect(session.senderKey).toEqual(pad43(`device1`));
+            expect(session.pickle).toEqual("sessionPickle");
+            expect(session.roomId!.toString()).toEqual("!room:id");
+            expect(session.senderSigningKey).toBe(undefined);
         }, 10000);
 
         async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
@@ -325,7 +386,7 @@ describe("RustCrypto", () => {
         );
     });
 
-    describe(".importRoomKeys and .exportRoomKeys", () => {
+    describe("importing and exporting room keys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(
@@ -341,7 +402,7 @@ describe("RustCrypto", () => {
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (stage) => {
-                    importTotal = stage.total;
+                    importTotal = stage.total ?? 0;
                 },
             };
             await rustCrypto.importRoomKeys(someRoomKeys, opt);
@@ -349,6 +410,29 @@ describe("RustCrypto", () => {
             expect(importTotal).toBe(someRoomKeys.length);
 
             const keys = await rustCrypto.exportRoomKeys();
+            expect(Array.isArray(keys)).toBeTruthy();
+            expect(keys.length).toBe(someRoomKeys.length);
+
+            const aSession = someRoomKeys[0];
+
+            const exportedKey = keys.find((k) => k.session_id == aSession.session_id);
+
+            expect(aSession).toStrictEqual(exportedKey);
+        });
+
+        it("should import and export keys as JSON", async () => {
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            let importTotal = 0;
+            const opt: ImportRoomKeysOpts = {
+                progressCallback: (stage) => {
+                    importTotal = stage.total ?? 0;
+                },
+            };
+            await rustCrypto.importRoomKeysAsJson(JSON.stringify(someRoomKeys), opt);
+
+            expect(importTotal).toBe(someRoomKeys.length);
+
+            const keys: Array<IMegolmSessionData> = JSON.parse(await rustCrypto.exportRoomKeysAsJson());
             expect(Array.isArray(keys)).toBeTruthy();
             expect(keys.length).toBe(someRoomKeys.length);
 
@@ -638,6 +722,58 @@ describe("RustCrypto", () => {
             firstOutgoingRequestsDefer.resolve([]);
             await awaitCallToMakeOutgoingRequest();
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
+        });
+
+        it("should encode outgoing requests properly", async () => {
+            // we need a real OlmMachine, so replace the one created by beforeEach
+            rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            const outgoingRequestProcessor = {} as unknown as OutgoingRequestProcessor;
+            rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
+
+            // The second time we do a /keys/upload, the `device_keys` property
+            // should be absent from the request body
+            // cf. https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm/issues/57
+            //
+            // On the first upload, we pretend that there are no OTKs, so it will
+            // try to upload more keys
+            let keysUploadCount = 0;
+            let deviceKeys: object;
+            let deviceKeysAbsent = false;
+            outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (request, uiaCallback?) => {
+                let resp: any = {};
+                if (request instanceof RustSdkCryptoJs.KeysUploadRequest) {
+                    if (keysUploadCount == 0) {
+                        deviceKeys = JSON.parse(request.body).device_keys;
+                        resp = { one_time_key_counts: { signed_curve25519: 0 } };
+                    } else {
+                        deviceKeysAbsent = !("device_keys" in JSON.parse(request.body));
+                        resp = { one_time_key_counts: { signed_curve25519: 50 } };
+                    }
+                    keysUploadCount++;
+                } else if (request instanceof RustSdkCryptoJs.KeysQueryRequest) {
+                    resp = {
+                        device_keys: {
+                            [TEST_USER]: {
+                                [TEST_DEVICE_ID]: deviceKeys,
+                            },
+                        },
+                    };
+                } else if (request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) {
+                    // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+                    return;
+                }
+                if (request.id) {
+                    olmMachine.markRequestAsSent(request.id, request.type, JSON.stringify(resp));
+                }
+            });
+            await outgoingRequestsManager.doProcessOutgoingRequests();
+            await outgoingRequestsManager.doProcessOutgoingRequests();
+
+            expect(deviceKeysAbsent).toBe(true);
         });
     });
 
@@ -997,7 +1133,8 @@ describe("RustCrypto", () => {
     });
 
     it("should wait for a keys/query before returning devices", async () => {
-        jest.useFakeTimers();
+        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
@@ -1019,6 +1156,33 @@ describe("RustCrypto", () => {
         const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
         expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
         expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
+    });
+
+    it("should emit events on device changes", async () => {
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
+        const willUpdateCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
+        const devicesUpdatedCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
+
+        rustCrypto.onSyncCompleted({});
+
+        // wait for the devices to be updated
+        await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+        expect(willUpdateCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
+        expect(devicesUpdatedCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
         rustCrypto.stop();
     });
 
@@ -1200,6 +1364,34 @@ describe("RustCrypto", () => {
                         },
                     },
                 },
+            });
+        });
+
+        it("ignores invalid keys when restoring from backup", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            await olmMachine.enableBackupV1(
+                (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
+            // in addition to correct keys, we restore an invalid key
+            backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
+            const progressCallback = jest.fn();
+            await rustCrypto.importBackedUpRoomKeys(backup, { progressCallback });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 0,
+                stage: "load_keys",
+                failures: 1,
+            });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 1,
+                stage: "load_keys",
+                failures: 1,
             });
         });
     });

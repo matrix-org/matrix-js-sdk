@@ -14,36 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MetadataService, OidcClientSettingsStore, SigningKey } from "oidc-client-ts";
+import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
-import { isValidatedIssuerMetadata, ValidatedIssuerMetadata, validateWellKnownAuthentication } from "./validate";
+import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate";
+import { Method, timeoutSignal } from "../http-api";
+import { OidcClientConfig } from "./index";
 
 /**
  * @experimental
  * Discover and validate delegated auth configuration
- * - m.authentication config is present and valid
  * - delegated auth issuer openid-configuration is reachable
  * - delegated auth issuer openid-configuration is configured correctly for us
+ * Fetches https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
  * When successful, validated metadata is returned
- * @param wellKnown - configuration object as returned
- * by the .well-known auto-discovery endpoint
+ * @param issuer - the OIDC issuer as returned by the /auth_issuer API
  * @returns validated authentication metadata and optionally signing keys
  * @throws when delegated auth config is invalid or unreachable
  */
-export const discoverAndValidateAuthenticationConfig = async (
-    authenticationConfig?: IDelegatedAuthConfig,
-): Promise<
-    IDelegatedAuthConfig & {
-        metadata: ValidatedIssuerMetadata;
-        signingKeys?: SigningKey[];
-    }
-> => {
-    const homeserverAuthenticationConfig = validateWellKnownAuthentication(authenticationConfig);
+export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Promise<OidcClientConfig> => {
+    const issuerOpenIdConfigUrl = new URL(".well-known/openid-configuration", issuer);
+    const issuerWellKnownResponse = await fetch(issuerOpenIdConfigUrl, {
+        method: Method.Get,
+        signal: timeoutSignal(5000),
+    });
+    const issuerWellKnown = await issuerWellKnownResponse.json();
+    const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown);
 
-    // create a temporary settings store so we can use metadata service for discovery
+    // create a temporary settings store, so we can use metadata service for discovery
     const settings = new OidcClientSettingsStore({
-        authority: homeserverAuthenticationConfig.issuer,
+        authority: issuer,
         redirect_uri: "", // Not known yet, this is here to make the type checker happy
         client_id: "", // Not known yet, this is here to make the type checker happy
     });
@@ -54,7 +53,7 @@ export const discoverAndValidateAuthenticationConfig = async (
     isValidatedIssuerMetadata(metadata);
 
     return {
-        ...homeserverAuthenticationConfig,
+        ...validatedIssuerConfig,
         metadata,
         signingKeys,
     };

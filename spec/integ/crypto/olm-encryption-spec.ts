@@ -34,8 +34,9 @@ import { logger } from "../../../src/logger";
 import * as testUtils from "../../test-utils/test-utils";
 import { TestClient } from "../../TestClient";
 import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../../src/client";
-import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../../src/matrix";
+import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent, MsgType } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
+import { KnownMembership } from "../../../src/@types/membership";
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";
@@ -216,7 +217,7 @@ async function expectBobSendMessageRequest(): Promise<OlmPayload> {
 }
 
 function sendMessage(client: MatrixClient): Promise<ISendEventResponse> {
-    return client.sendMessage(roomId, { msgtype: "m.text", body: "Hello, World" });
+    return client.sendMessage(roomId, { msgtype: MsgType.Text, body: "Hello, World" });
 }
 
 async function expectSendMessageRequest(httpBackend: TestClient["httpBackend"]): Promise<IContent> {
@@ -316,11 +317,11 @@ function firstSync(testClient: TestClient): Promise<void> {
                     state: {
                         events: [
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: aliUserId,
                             }),
                             testUtils.mkMembership({
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: bobUserId,
                             }),
                         ],

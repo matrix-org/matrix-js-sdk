@@ -21,11 +21,14 @@ import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
 import { CallMembership, CallMembershipData } from "./CallMembership";
+import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
-import { MatrixError, MatrixEvent } from "../matrix";
 import { randomString, secureRandomBase64Url } from "../randomstring";
 import { EncryptionKeysEventContent } from "./types";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
+import { KnownMembership } from "../@types/membership";
+import { MatrixError } from "../http-api/errors";
+import { MatrixEvent } from "../models/event";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -133,7 +136,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         for (const memberEvent of callMemberEvents) {
             const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
             if (eventMemberships === undefined) {
-                logger.warn(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
+                logger.debug(`Ignoring malformed member event from ${memberEvent.getSender()}: no memberships section`);
                 continue;
             }
             if (!Array.isArray(eventMemberships)) {
@@ -152,9 +155,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     }
 
                     if (membership.isExpired()) {
-                        logger.info(
-                            `Ignoring expired device membership ${memberEvent.getSender()}/${membership.deviceId}`,
-                        );
+                        logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
+                        continue;
+                    }
+                    if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
+                        logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
                         continue;
                     }
                     callMemberships.push(membership);
@@ -176,7 +181,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Return a the MatrixRTC for the room, whether there are currently active members or not
+     * Return the MatrixRTC session for the room, whether there are currently active members or not
      */
     public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
         const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
@@ -191,6 +196,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     ) {
         super();
         this._callId = memberships[0]?.callId;
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.on(RoomStateEvent.Members, this.onMembershipUpdate);
         this.setExpiryTimer();
     }
 
@@ -214,6 +221,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
         }
+        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
 
     /**
@@ -506,7 +515,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        // We currently only handle callId = ""
+        // We currently only handle callId = "" (which is the default for room scoped calls)
         if (callId !== "") {
             logger.warn(
                 `Received m.call.encryption_keys with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
@@ -603,7 +612,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Constructs our own membership
-     * @param prevEvent - The previous version of our call membership, if any
+     * @param prevMembership - The previous value of our call membership, if any
      */
     private makeMyMembership(prevMembership?: CallMembership): CallMembershipData {
         if (this.relativeExpiry === undefined) {
@@ -624,6 +633,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         };
 
         if (prevMembership) m.created_ts = prevMembership.createdTs();
+        if (m.created_ts) m.expires_ts = m.created_ts + (m.expires ?? 0);
+        // TODO: Date.now() should be the origin_server_ts (now).
+        else m.expires_ts = Date.now() + (m.expires ?? 0);
 
         return m;
     }

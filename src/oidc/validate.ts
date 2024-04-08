@@ -14,48 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { OidcMetadata, SigninResponse } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
 import { logger } from "../logger";
 import { OidcError } from "./error";
-
-/**
- * re-export for backwards compatibility
- * @deprecated use OidcError
- */
-export { OidcError as OidcDiscoveryError };
 
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;
     tokenEndpoint: string;
     registrationEndpoint?: string;
-};
-
-/**
- * Validates MSC2965 m.authentication config
- * Returns valid configuration
- * @param wellKnown - client well known as returned from ./well-known/client/matrix
- * @returns config - when present and valid
- * @throws when config is not found or invalid
- */
-export const validateWellKnownAuthentication = (authentication?: IDelegatedAuthConfig): IDelegatedAuthConfig => {
-    if (!authentication) {
-        throw new Error(OidcError.NotSupported);
-    }
-
-    if (
-        typeof authentication.issuer === "string" &&
-        (!authentication.hasOwnProperty("account") || typeof authentication.account === "string")
-    ) {
-        return {
-            issuer: authentication.issuer,
-            account: authentication.account,
-        };
-    }
-
-    throw new Error(OidcError.Misconfigured);
+    accountManagementEndpoint?: string;
+    accountManagementActionsSupported?: string[];
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -69,6 +39,16 @@ const requiredStringProperty = (wellKnown: Record<string, unknown>, key: string)
 };
 const optionalStringProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
     if (!!wellKnown[key] && typeof wellKnown[key] !== "string") {
+        logger.error(`Invalid property: ${key}`);
+        return false;
+    }
+    return true;
+};
+const optionalStringArrayProperty = (wellKnown: Record<string, unknown>, key: string): boolean => {
+    if (
+        !!wellKnown[key] &&
+        (!Array.isArray(wellKnown[key]) || !(<unknown[]>wellKnown[key]).every((v) => typeof v === "string"))
+    ) {
         logger.error(`Invalid property: ${key}`);
         return false;
     }
@@ -102,6 +82,8 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
         requiredStringProperty(wellKnown, "token_endpoint"),
         requiredStringProperty(wellKnown, "revocation_endpoint"),
         optionalStringProperty(wellKnown, "registration_endpoint"),
+        optionalStringProperty(wellKnown, "account_management_uri"),
+        optionalStringArrayProperty(wellKnown, "account_management_actions_supported"),
         requiredArrayValue(wellKnown, "response_types_supported", "code"),
         requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
         requiredArrayValue(wellKnown, "code_challenge_methods_supported", "S256"),
@@ -109,10 +91,12 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 
     if (!isInvalid) {
         return {
-            authorizationEndpoint: wellKnown["authorization_endpoint"],
-            tokenEndpoint: wellKnown["token_endpoint"],
-            registrationEndpoint: wellKnown["registration_endpoint"],
-        } as ValidatedIssuerConfig;
+            authorizationEndpoint: <string>wellKnown["authorization_endpoint"],
+            tokenEndpoint: <string>wellKnown["token_endpoint"],
+            registrationEndpoint: <string>wellKnown["registration_endpoint"],
+            accountManagementEndpoint: <string>wellKnown["account_management_uri"],
+            accountManagementActionsSupported: <string[]>wellKnown["account_management_actions_supported"],
+        };
     }
 
     logger.error("Issuer configuration not valid");
@@ -134,7 +118,11 @@ export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
         | "response_types_supported"
         | "grant_types_supported"
         | "code_challenge_methods_supported"
-    >;
+    > & {
+        // MSC2965 extensions to the OIDC spec
+        account_management_uri?: string;
+        account_management_actions_supported?: string[];
+    };
 
 /**
  * Wraps validateOIDCIssuerWellKnown in a type assertion

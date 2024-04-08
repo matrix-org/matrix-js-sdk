@@ -34,9 +34,12 @@ function makeMockEvent(originTs = 0): MatrixEvent {
 }
 
 describe("CallMembership", () => {
-    it("rejects membership with no expiry", () => {
+    it("rejects membership with no expiry and no expires_ts", () => {
         expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: undefined }));
+            new CallMembership(
+                makeMockEvent(),
+                Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: undefined }),
+            );
         }).toThrow();
     });
 
@@ -57,6 +60,16 @@ describe("CallMembership", () => {
             new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
         }).toThrow();
     });
+    it("rejects with malformatted expires_ts", () => {
+        expect(() => {
+            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires_ts: "string" }));
+        }).toThrow();
+    });
+    it("rejects with malformatted expires", () => {
+        expect(() => {
+            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: "string" }));
+        }).toThrow();
+    });
 
     it("uses event timestamp if no created_ts", () => {
         const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
@@ -71,8 +84,16 @@ describe("CallMembership", () => {
         expect(membership.createdTs()).toEqual(67890);
     });
 
-    it("computes absolute expiry time", () => {
+    it("computes absolute expiry time based on expires", () => {
         const membership = new CallMembership(makeMockEvent(1000), membershipTemplate);
+        expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
+    });
+
+    it("computes absolute expiry time based on expires_ts", () => {
+        const membership = new CallMembership(
+            makeMockEvent(1000),
+            Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: 6000 }),
+        );
         expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
     });
 

@@ -14,11 +14,18 @@ jobs:
         name: Preview Changelog
         runs-on: ubuntu-latest
         steps:
-            - uses: matrix-org/allchange@main
+            - uses: mheap/github-action-required-labels@132879b972cb7f2ac593006455875098e73cc7f2 # v5
               if: github.event_name != 'merge_group'
               with:
-                  ghToken: ${{ secrets.GITHUB_TOKEN }}
-                  requireLabel: true
+                  labels: |
+                      X-Breaking-Change
+                      T-Deprecation
+                      T-Enhancement
+                      T-Defect
+                      T-Task
+                      Dependencies
+                  mode: minimum
+                  count: 1
 
     prevent-blocked:
         name: Prevent Blocked
@@ -39,7 +46,8 @@ jobs:
         if: github.event.action == 'opened'
         steps:
             - name: Check membership
-              uses: tspascoal/get-user-teams-membership@ba78054988f58bea69b7c6136d563236f8ed2fc0 # v3
+              if: github.event.pull_request.user.login != 'renovate[bot]'
+              uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3
               id: teams
               with:
                   username: ${{ github.event.pull_request.user.login }}
@@ -48,7 +56,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
             - name: Add label
-              if: ${{ steps.teams.outputs.isTeamMember == 'false' }}
+              if: steps.teams.outputs.isTeamMember == 'false'
               uses: actions/github-script@v7
               with:
                   script: |

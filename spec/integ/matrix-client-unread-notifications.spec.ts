@@ -34,6 +34,7 @@ import { TestClient } from "../TestClient";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { mkThread } from "../test-utils/thread";
 import { SyncState } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 const userA = "@alice:localhost";
 const userB = "@bob:localhost";
@@ -151,7 +152,7 @@ describe("MatrixClient syncing", () => {
         await client!.sendEvent(roomId, EventType.Reaction, {
             "m.relates_to": {
                 rel_type: RelationType.Annotation,
-                event_id: threadReply.getId(),
+                event_id: threadReply.getId()!,
                 key: "",
             },
         });
@@ -229,7 +230,7 @@ describe("MatrixClient syncing", () => {
                                     content: {
                                         avatar_url: "",
                                         displayname: userB,
-                                        membership: "join",
+                                        membership: KnownMembership.Join,
                                     },
                                     origin_server_ts: 2,
                                     sender: userB,
@@ -270,7 +271,7 @@ describe("MatrixClient syncing", () => {
                                 },
                                 {
                                     content: {
-                                        join_rule: "invite",
+                                        join_rule: KnownMembership.Invite,
                                     },
                                     origin_server_ts: 4,
                                     sender: userB,
@@ -316,7 +317,7 @@ describe("MatrixClient syncing", () => {
                                         avatar_url: "",
                                         displayname: userA,
                                         is_direct: true,
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                     origin_server_ts: 8,
                                     sender: userB,
@@ -338,7 +339,7 @@ describe("MatrixClient syncing", () => {
                                     content: {
                                         avatar_url: "",
                                         displayname: userA,
-                                        membership: "join",
+                                        membership: KnownMembership.Join,
                                     },
                                     origin_server_ts: 10,
                                     sender: userA,

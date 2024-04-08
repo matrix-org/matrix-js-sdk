@@ -34,6 +34,7 @@ import { RoomMember } from "../models/room-member";
 import { HistoryVisibility } from "../@types/partials";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { logDuration } from "../utils";
+import { KnownMembership } from "../@types/membership";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -88,7 +89,8 @@ export class RoomEncryptor {
      */
     public onCryptoEvent(config: IContent): void {
         if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
-            this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
+            // This should currently be unreachable, since the Rust SDK will reject any attempts to change config.
+            throw new Error("Cannot reconfigure an active RoomEncryptor");
         }
     }
 
@@ -99,8 +101,8 @@ export class RoomEncryptor {
      */
     public onRoomMembership(member: RoomMember): void {
         if (
-            member.membership == "join" ||
-            (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
+            member.membership == KnownMembership.Join ||
+            (member.membership == KnownMembership.Invite && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
             logDuration(this.prefixedLogger, "updateTrackedUsers", async () => {
@@ -258,6 +260,7 @@ export class RoomEncryptor {
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
             const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
                 new RoomId(this.room.roomId),
+                // safe to pass without cloning, as it's not reused here (before or after)
                 userList,
                 rustEncryptionSettings,
             );

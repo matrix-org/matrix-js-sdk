@@ -20,10 +20,8 @@ on:
                 description: Publish to npm
                 type: boolean
                 default: false
-            dependencies:
-                description: |
-                    List of dependencies to update in `npm-dep=version` format.
-                    `version` can be `"current"` to leave it at the current version.
+            downstreams:
+                description: List of github projects (owner/repo) which should have their dependency bumped to the newly released version (in JSON string array string syntax)
                 type: string
                 required: false
             include-changes:
@@ -60,7 +58,7 @@ jobs:
                   fingerprint: ${{ inputs.gpg-fingerprint }}
 
             - name: Get draft release
-              id: release
+              id: draft-release
               uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
               env:
                   GITHUB_TOKEN: ${{ github.token }}
@@ -88,18 +86,12 @@ jobs:
               id: prepare
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
-                  {
-                      echo "RELEASE_NOTES<<EOF"
-                      echo "$BODY"
-                      echo "EOF"
-                  } >> $GITHUB_ENV
 
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
               env:
-                  BODY: ${{ steps.release.outputs.body }}
-                  VERSION: ${{ steps.release.outputs.tag_name }}
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
 
             - name: Finalise version
               if: inputs.final
@@ -132,75 +124,22 @@ jobs:
             - name: Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: Update dependencies
-              id: update-dependencies
-              if: inputs.dependencies
-              run: |
-                  UPDATED=()
-                  while IFS= read -r DEPENDENCY; do
-                      [ -z "$DEPENDENCY" ] && continue
-                      IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
-
-                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
-                      echo "Current $PACKAGE version is $CURRENT_VERSION"
-
-                      if [ "$CURRENT_VERSION" == "null" ]
-                      then
-                          echo "Unable to find $PACKAGE in package.json"
-                          exit 1
-                      fi
-
-                      if [ "$UPDATE_VERSION" == "current" ] || [ "$UPDATE_VERSION" == "$CURRENT_VERSION" ]
-                      then
-                          echo "Not updating dependency $PACKAGE"
-                          continue
-                      fi
-
-                      echo "Upgrading $PACKAGE to $UPDATE_VERSION..."
-                      yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
-                      git add -u
-                      git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
-                      UPDATED+=("$PACKAGE")
-                  done <<< "$DEPENDENCIES"
-
-                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
-                  echo "updated=$JSON" >> $GITHUB_OUTPUT
-              env:
-                  DEPENDENCIES: ${{ inputs.dependencies }}
-
-            - name: Prevent develop dependencies
-              if: inputs.dependencies
+            - name: Handle develop dependencies
               run: |
                   ret=0
-                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-                  if [ "$ret" -eq 0 ]; then
-                      echo "package.json contains develop dependencies. Refusing to release."
-                      exit
-                  fi
+                  cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
+                      IFS=" "
+                      PACKAGE=${dep[0]}
+                      VERSION=${dep[1]}
+
+                      echo "::warning title=Develop dependency found::$DEPENDENCY will be kept at $VERSION"
+                      yarn upgrade "$PACKAGE@$VERSION" --exact
+                      git add -u
+                      git commit -m "Keep $PACKAGE at $VERSION"
+                  done
 
             - name: Bump package.json version
               run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
-
-            - name: Ingest upstream changes
-              if: |
-                  inputs.include-changes &&
-                  (!inputs.dependencies || contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes))
-              uses: actions/github-script@v7
-              env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
-                  DEPENDENCY: ${{ inputs.include-changes }}
-              with:
-                  retries: 3
-                  script: |
-                      const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
-                      const { owner, repo } = context.repo;
-                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
-                      const notes = await script({
-                          github,
-                          releaseId,
-                          dependencies: [DEPENDENCY.replace("$VERSION", VERSION)],
-                      });
-                      core.exportVariable("RELEASE_NOTES", notes);
 
             - name: Add to CHANGELOG.md
               if: inputs.final
@@ -219,6 +158,8 @@ jobs:
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
                   git add CHANGELOG.md
+              env:
+                  RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
 
             - name: Run pre-release script to update package.json fields
               run: |
@@ -237,7 +178,7 @@ jobs:
               uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
                   asset-path: ${{ inputs.asset-path }}
 
             - name: Create signed tag
@@ -252,7 +193,7 @@ jobs:
               uses: ./.action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
 
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
@@ -273,7 +214,7 @@ jobs:
               if: inputs.expected-asset-count
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
               with:
                   retries: 3
@@ -301,7 +242,7 @@ jobs:
             - name: Publish release
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   FINAL: ${{ inputs.final }}
               with:
                   retries: 3
@@ -335,15 +276,16 @@ jobs:
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-    update-labels:
-        name: Advance release blocker labels
+    post-release:
+        name: Post release steps
         needs: release
         runs-on: ubuntu-latest
         steps:
             - id: repository
               run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
 
-            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+            - name: Advance release blocker labels
+              uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
               with:
                   owner: ${{ github.repository_owner }}
                   repo: ${{ steps.repository.outputs.REPO }}
@@ -351,3 +293,39 @@ jobs:
                   filter-labels: X-Upcoming-Release-Blocker
                   remove-labels: X-Upcoming-Release-Blocker
                   add-labels: X-Release-Blocker
+
+    #            - name: Wait for master->develop gitflow merge
+    #              if: inputs.final
+    #              uses: t3chguy/wait-on-check-action@18541021811b56544d90e0f073401c2b99e249d6 # fork
+    #              with:
+    #                  ref: master
+    #                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+    #                  wait-interval: 10
+    #                  check-name: merge
+    #                  allowed-conclusions: success
+
+    bump-downstreams:
+        name: Update npm dependency in downstream projects
+        needs: npm
+        runs-on: ubuntu-latest
+        if: inputs.downstreams
+        strategy:
+            matrix:
+                repo: ${{ fromJSON(inputs.downstreams) }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ matrix.repo }}
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+
+            - name: Bump dependency
+              env:
+                  DEPENDENCY: ${{ needs.npm.outputs.id }}
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  yarn upgrade "$DEPENDENCY" --exact
+                  git add package.json yarn.lock
+                  git commit -am"Upgrade dependency to $DEPENDENCY"
+                  git push origin staging

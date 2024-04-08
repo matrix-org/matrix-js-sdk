@@ -25,6 +25,8 @@ import {
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MatrixError } from "../../../src/http-api";
+import { KnownMembership } from "../../../src/@types/membership";
+import { EncryptedFile } from "../../../src/@types/media";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
@@ -458,14 +460,14 @@ describe("MSC3089TreeSpace", () => {
                 expect(stateKey).toBeUndefined();
                 return [
                     // Partial implementations
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => joinMemberId },
-                    { getContent: () => ({ membership: "knock" }), getStateKey: () => knockMemberId },
-                    { getContent: () => ({ membership: "invite" }), getStateKey: () => inviteMemberId },
-                    { getContent: () => ({ membership: "leave" }), getStateKey: () => leaveMemberId },
-                    { getContent: () => ({ membership: "ban" }), getStateKey: () => banMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => joinMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Knock }), getStateKey: () => knockMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Invite }), getStateKey: () => inviteMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Leave }), getStateKey: () => leaveMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Ban }), getStateKey: () => banMemberId },
 
                     // ensure we don't kick ourselves
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => selfUserId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => selfUserId },
                 ];
             },
         };
@@ -946,7 +948,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
@@ -1006,7 +1008,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";

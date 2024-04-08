@@ -15,20 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SigningKey } from "oidc-client-ts";
-
-import { IClientWellKnown, IWellKnownConfig, IDelegatedAuthConfig, IServerVersions, M_AUTHENTICATION } from "./client";
+import { IClientWellKnown, IWellKnownConfig, IServerVersions } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
-import { discoverAndValidateAuthenticationConfig } from "./oidc/discovery";
-import {
-    ValidatedIssuerConfig,
-    ValidatedIssuerMetadata,
-    validateOIDCIssuerWellKnown,
-    validateWellKnownAuthentication,
-} from "./oidc/validate";
-import { OidcError } from "./oidc/error";
-import { MINIMUM_MATRIX_VERSION } from "./version-support";
+import { SUPPORTED_MATRIX_VERSIONS } from "./version-support";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -51,7 +41,10 @@ export enum AutoDiscoveryError {
     InvalidIs = "Invalid identity server discovery response",
     MissingWellknown = "No .well-known JSON file found",
     InvalidJson = "Invalid JSON",
-    HomeserverTooOld = "The homeserver does not meet the minimum version requirements",
+    UnsupportedHomeserverSpecVersion = "The homeserver does not meet the version requirements",
+
+    /** @deprecated Replaced by `UnsupportedHomeserverSpecVersion` */
+    HomeserverTooOld = UnsupportedHomeserverSpecVersion,
     // TODO: Implement when Sydent supports the `/versions` endpoint - https://github.com/matrix-org/sydent/issues/424
     //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
@@ -62,26 +55,9 @@ interface AutoDiscoveryState {
 }
 interface WellKnownConfig extends Omit<IWellKnownConfig, "error">, AutoDiscoveryState {}
 
-/**
- * @deprecated in favour of OidcClientConfig
- */
-interface DelegatedAuthConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig, AutoDiscoveryState {}
-
-/**
- * @experimental
- */
-export interface OidcClientConfig extends IDelegatedAuthConfig, ValidatedIssuerConfig {
-    metadata: ValidatedIssuerMetadata;
-    signingKeys?: SigningKey[];
-}
-
 export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
-    /**
-     * @experimental
-     */
-    "m.authentication"?: (OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState;
 }
 
 /**
@@ -112,7 +88,11 @@ export class AutoDiscovery {
 
     public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
 
-    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscoveryError.HomeserverTooOld;
+    public static readonly ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION =
+        AutoDiscoveryError.UnsupportedHomeserverSpecVersion;
+
+    /** @deprecated Replaced by ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION */
+    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
     public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError) as AutoDiscoveryError[];
 
@@ -216,10 +196,19 @@ export class AutoDiscovery {
             return Promise.resolve(clientConfig);
         }
 
-        // Step 3.1: Non-spec check to ensure the server will actually work for us
-        if (!hsVersions.raw!["versions"].includes(MINIMUM_MATRIX_VERSION)) {
-            logger.error("Homeserver does not meet minimum version requirements");
-            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_HOMESERVER_TOO_OLD;
+        // Step 3.1: Non-spec check to ensure the server will actually work for us. We need to check if
+        // any of the versions in `SUPPORTED_MATRIX_VERSIONS` are listed in the /versions response.
+        const hsVersionSet = new Set(hsVersions.raw!["versions"]);
+        let supportedVersionFound = false;
+        for (const version of SUPPORTED_MATRIX_VERSIONS) {
+            if (hsVersionSet.has(version)) {
+                supportedVersionFound = true;
+                break;
+            }
+        }
+        if (!supportedVersionFound) {
+            logger.error("Homeserver does not meet version requirements");
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
             // Supply the base_url to the caller because they may be ignoring liveliness
             // errors, like this one.
@@ -302,105 +291,8 @@ export class AutoDiscovery {
             }
         });
 
-        const authConfig = await this.discoverAndValidateAuthenticationConfig(wellknown);
-        clientConfig[M_AUTHENTICATION.stable!] = authConfig;
-
         // Step 8: Give the config to the caller (finally)
         return Promise.resolve(clientConfig);
-    }
-
-    /**
-     * Validate delegated auth configuration
-     * @deprecated use discoverAndValidateAuthenticationConfig
-     * - m.authentication config is present and valid
-     * - delegated auth issuer openid-configuration is reachable
-     * - delegated auth issuer openid-configuration is configured correctly for us
-     * When successful, DelegatedAuthConfig will be returned with endpoints used for delegated auth
-     * Any errors are caught, and AutoDiscoveryState returned with error
-     * @param wellKnown - configuration object as returned
-     * by the .well-known auto-discovery endpoint
-     * @returns Config or failure result
-     */
-    public static async validateDiscoveryAuthenticationConfig(
-        wellKnown: IClientWellKnown,
-    ): Promise<DelegatedAuthConfig | AutoDiscoveryState> {
-        try {
-            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
-            const homeserverAuthenticationConfig = validateWellKnownAuthentication(authentication);
-
-            const issuerOpenIdConfigUrl = `${this.sanitizeWellKnownUrl(
-                homeserverAuthenticationConfig.issuer,
-            )}/.well-known/openid-configuration`;
-            const issuerWellKnown = await this.fetchWellKnownObject<unknown>(issuerOpenIdConfigUrl);
-
-            if (issuerWellKnown.action !== AutoDiscoveryAction.SUCCESS) {
-                logger.error("Failed to fetch issuer openid configuration");
-                throw new Error(OidcError.General);
-            }
-
-            const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown.raw);
-
-            const delegatedAuthConfig: DelegatedAuthConfig = {
-                state: AutoDiscoveryAction.SUCCESS,
-                error: null,
-                ...homeserverAuthenticationConfig,
-                ...validatedIssuerConfig,
-            };
-            return delegatedAuthConfig;
-        } catch (error) {
-            const errorMessage = (error as Error).message as unknown as OidcError;
-            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
-
-            const state =
-                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
-
-            return {
-                state,
-                error: errorType,
-            };
-        }
-    }
-
-    /**
-     * Validate delegated auth configuration
-     * - m.authentication config is present and valid
-     * - delegated auth issuer openid-configuration is reachable
-     * - delegated auth issuer openid-configuration is configured correctly for us
-     * When successful, validated authentication metadata and optionally signing keys will be returned
-     * Any errors are caught, and AutoDiscoveryState returned with error
-     * @param wellKnown - configuration object as returned
-     * by the .well-known auto-discovery endpoint
-     * @returns Config or failure result
-     */
-    public static async discoverAndValidateAuthenticationConfig(
-        wellKnown: IClientWellKnown,
-    ): Promise<(OidcClientConfig & AutoDiscoveryState) | AutoDiscoveryState> {
-        try {
-            const authentication = M_AUTHENTICATION.findIn<IDelegatedAuthConfig>(wellKnown) || undefined;
-            const result = await discoverAndValidateAuthenticationConfig(authentication);
-
-            // include this for backwards compatibility
-            const validatedIssuerConfig = validateOIDCIssuerWellKnown(result.metadata);
-
-            const response = {
-                state: AutoDiscoveryAction.SUCCESS,
-                error: null,
-                ...validatedIssuerConfig,
-                ...result,
-            };
-            return response;
-        } catch (error) {
-            const errorMessage = (error as Error).message as unknown as OidcError;
-            const errorType = Object.values(OidcError).includes(errorMessage) ? errorMessage : OidcError.General;
-
-            const state =
-                errorType === OidcError.NotSupported ? AutoDiscoveryAction.IGNORE : AutoDiscoveryAction.FAIL_ERROR;
-
-            return {
-                state,
-                error: errorType,
-            };
-        }
     }
 
     /**

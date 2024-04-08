@@ -18,11 +18,12 @@ import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } 
 
 import { logger, Logger } from "../logger";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
 import { IMessage } from "./algorithms/olm";
+import { DecryptionFailureCode } from "../crypto-api";
+import { DecryptionError } from "../common-crypto/CryptoBackend";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -55,7 +56,14 @@ function checkPayloadLength(payloadString: string): void {
 }
 
 interface IInitOpts {
+    /**
+     * (Optional) data from exported device that must be re-created.
+     * If present, opts.pickleKey is ignored (exported data already provides a pickle key)
+     */
     fromExportedDevice?: IExportedDevice;
+    /**
+     * (Optional) pickle key to set instead of default one
+     */
     pickleKey?: string;
 }
 
@@ -64,7 +72,7 @@ export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
     /** pickled Olm.InboundGroupSession */
     session: string;
-    keysClaimed: Record<string, string>;
+    keysClaimed?: Record<string, string>;
     /** Devices involved in forwarding this session to us (normally empty). */
     forwardingCurve25519KeyChain: string[];
     /** whether this session is untrusted. */
@@ -174,11 +182,7 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param fromExportedDevice - (Optional) data from exported device
-     *     that must be re-created.
-     *     If present, opts.pickleKey is ignored
-     *     (exported data already provides a pickle key)
-     * @param pickleKey - (Optional) pickle key to set instead of default one
+     * @param IInitOpts - opts to initialise the OlmAccount with
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
@@ -1217,8 +1221,8 @@ export class OlmDevice {
                 this.getInboundGroupSession(roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null || sessionData === null) {
                         if (withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            error = new DecryptionError(
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,
@@ -1233,8 +1237,8 @@ export class OlmDevice {
                         res = session.decrypt(body);
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                            error = new DecryptionError(
+                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,

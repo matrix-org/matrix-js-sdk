@@ -1,0 +1,88 @@
+name: Release Drafter
+on:
+    workflow_call:
+        inputs:
+            include-changes:
+                description: Project to include changelog entries from in this release.
+                type: string
+                required: false
+concurrency: release-drafter-action
+jobs:
+    draft:
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🧮 Checkout code
+              uses: actions/checkout@v4
+              with:
+                  ref: staging
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: package.json
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - uses: t3chguy/release-drafter@105e541c2c3d857f032bd522c0764694758fabad
+              id: draft-release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  disable-autolabeler: true
+
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: .action-repo
+                  sparse-checkout: |
+                      .github/actions
+                      scripts/release
+
+            - name: Ingest upstream changes
+              if: inputs.include-changes
+              uses: actions/github-script@v7
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
+                  DEPENDENCY: ${{ inputs.include-changes }}
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
+              with:
+                  retries: 3
+                  script: |
+                      const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
+                      const { owner, repo } = context.repo;
+                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
+
+                      let deps = [];
+                      if (DEPENDENCY.includes("/")) {
+                          deps.push(DEPENDENCY.replace("$VERSION", VERSION))
+                      } else {
+                          const fromVersion = JSON.parse((await github.request(`https://raw.githubusercontent.com/${owner}/${repo}/master/package.json`)).data).dependencies[DEPENDENCY];
+                          const toVersion = require("./package.json").dependencies[DEPENDENCY];
+
+                          if (toVersion.endsWith("#develop")) {
+                              core.warning(`${DEPENDENCY} will be kept at ${fromVersion}`, { title: "Develop dependency found" });
+                          } else {
+                              deps.push([DEPENDENCY, fromVersion, toVersion]);
+                          }
+                      }
+
+                      if (deps.length) {
+                          const notes = await script({
+                              github,
+                              releaseId,
+                              dependencies: deps,
+                          });
+
+                          await github.rest.repos.updateRelease({
+                              owner,
+                              repo,
+                              release_id: releaseId,
+                              body: notes,
+                              tag_name: VERSION,
+                          });
+                      }

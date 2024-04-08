@@ -307,6 +307,13 @@ export interface ParkedSharedHistory {
 }
 
 /**
+ * Keys for the `account` object store to store the migration state.
+ * Values are defined in `MigrationState`.
+ * @internal
+ */
+export const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
+
+/**
  * A record of which steps have been completed in the libolm to Rust Crypto migration.
  *
  * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
@@ -325,6 +332,13 @@ export enum MigrationState {
 
     /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
     MEGOLM_SESSIONS_MIGRATED,
+
+    /** MEGOLM_SESSIONS_MIGRATED, and in addition, we have migrated all the room settings. */
+    ROOM_SETTINGS_MIGRATED,
+
+    /** ROOM_SETTINGS_MIGRATED, and in addition, we have done the first own keys query in order to
+     * load the public part of the keys that have been migrated */
+    INITIAL_OWN_KEY_QUERY_DONE,
 }
 
 /**

@@ -54,6 +54,18 @@ export interface CryptoApi {
     getOwnDeviceKeys(): Promise<OwnDeviceKeys>;
 
     /**
+     * Check if we believe the given room to be encrypted.
+     *
+     * This method returns true if the room has been configured with encryption. The setting is persistent, so that
+     * even if the encryption event is removed from the room state, it still returns true. This helps to guard against
+     * a downgrade attack wherein a server admin attempts to remove encryption.
+     *
+     * @returns `true` if the room with the supplied ID is encrypted. `false` if the room is not encrypted, or is unknown to
+     * us.
+     */
+    isEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
@@ -85,6 +97,17 @@ export interface CryptoApi {
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
 
     /**
+     * Get a JSON list containing all of the room keys
+     *
+     * This should be encrypted before returning it to the user.
+     *
+     * @returns a promise which resolves to a JSON string
+     *    encoding a list of session export objects,
+     *    each of which is an IMegolmSessionData
+     */
+    exportRoomKeysAsJson(): Promise<string>;
+
+    /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
@@ -92,6 +115,17 @@ export interface CryptoApi {
      * @returns a promise which resolves once the keys have been imported
      */
     importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
+
+    /**
+     * Import a JSON string encoding a list of room keys previously
+     * exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export
+     *    objects, each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void>;
 
     /**
      * Check if the given user has published cross-signing keys.
@@ -189,7 +223,7 @@ export interface CryptoApi {
      * Cross-signing a device indicates, to our other devices and to other users, that we have verified that it really
      * belongs to us.
      *
-     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}.
+     * Requires that cross-signing has been set up on this device (normally by calling {@link bootstrapCrossSigning}).
      *
      * *Note*: Do not call this unless you have verified, somehow, that the device is genuine!
      *
@@ -464,6 +498,57 @@ export interface CryptoApi {
     deleteKeyBackupVersion(version: string): Promise<void>;
 }
 
+/** A reason code for a failure to decrypt an event. */
+export enum DecryptionFailureCode {
+    /** Message was encrypted with a Megolm session whose keys have not been shared with us. */
+    MEGOLM_UNKNOWN_INBOUND_SESSION_ID = "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+
+    /** Message was encrypted with a Megolm session which has been shared with us, but in a later ratchet state. */
+    OLM_UNKNOWN_MESSAGE_INDEX = "OLM_UNKNOWN_MESSAGE_INDEX",
+
+    /** Unknown or unclassified error. */
+    UNKNOWN_ERROR = "UNKNOWN_ERROR",
+
+    /** @deprecated only used in legacy crypto */
+    MEGOLM_BAD_ROOM = "MEGOLM_BAD_ROOM",
+
+    /** @deprecated only used in legacy crypto */
+    MEGOLM_MISSING_FIELDS = "MEGOLM_MISSING_FIELDS",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_DECRYPT_GROUP_MESSAGE_ERROR = "OLM_DECRYPT_GROUP_MESSAGE_ERROR",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_ENCRYPTED_MESSAGE = "OLM_BAD_ENCRYPTED_MESSAGE",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_RECIPIENT = "OLM_BAD_RECIPIENT",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_RECIPIENT_KEY = "OLM_BAD_RECIPIENT_KEY",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_ROOM = "OLM_BAD_ROOM",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_SENDER_CHECK_FAILED = "OLM_BAD_SENDER_CHECK_FAILED",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_BAD_SENDER = "OLM_BAD_SENDER",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_FORWARDED_MESSAGE = "OLM_FORWARDED_MESSAGE",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_MISSING_CIPHERTEXT = "OLM_MISSING_CIPHERTEXT",
+
+    /** @deprecated only used in legacy crypto */
+    OLM_NOT_INCLUDED_IN_RECIPIENTS = "OLM_NOT_INCLUDED_IN_RECIPIENTS",
+
+    /** @deprecated only used in legacy crypto */
+    UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
+}
+
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
  */
@@ -581,18 +666,20 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys} or
+ * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
     stage: string; // TODO: Enum
-    successes: number;
-    failures: number;
-    total: number;
+    successes?: number;
+    failures?: number;
+    total?: number;
 }
 
 /**
- * Options object for {@link CryptoApi#importRoomKeys}.
+ * Options object for {@link CryptoApi#importRoomKeys} and
+ * {@link CryptoApi#importRoomKeysAsJson}.
  */
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */

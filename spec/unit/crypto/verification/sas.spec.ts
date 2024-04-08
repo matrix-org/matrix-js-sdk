@@ -189,10 +189,12 @@ describe("SAS verification", function () {
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = async (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map.get(alice.client.getUserId()!)?.get(alice.client.deviceId!)
-                        ?.message_authentication_code;
-                    keyAgreement = map.get(alice.client.getUserId()!)?.get(alice.client.deviceId!)
-                        ?.key_agreement_protocol;
+                    macMethod = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.message_authentication_code;
+                    keyAgreement = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };

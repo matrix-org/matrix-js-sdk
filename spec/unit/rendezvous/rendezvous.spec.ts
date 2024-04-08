@@ -23,7 +23,7 @@ import {
     MSC3903ECDHPayload,
     MSC3903ECDHv2RendezvousChannel as MSC3903ECDHRendezvousChannel,
 } from "../../../src/rendezvous/channels";
-import { MatrixClient } from "../../../src";
+import { Device, MatrixClient } from "../../../src";
 import {
     MSC3886SimpleHttpRendezvousTransport,
     MSC3886SimpleHttpRendezvousTransportDetails,
@@ -31,16 +31,57 @@ import {
 import { DummyTransport } from "./DummyTransport";
 import { decodeBase64 } from "../../../src/base64";
 import { logger } from "../../../src/logger";
-import { DeviceInfo } from "../../../src/crypto/deviceinfo";
+import { CrossSigningKey, OwnDeviceKeys } from "../../../src/crypto-api";
+
+type UserID = string;
+type DeviceID = string;
+type Fingerprint = string;
+type SimpleDeviceMap = Record<UserID, Record<DeviceID, Fingerprint>>;
+
+function mockDevice(userId: UserID, deviceId: DeviceID, fingerprint: Fingerprint): Device {
+    return {
+        deviceId,
+        userId,
+        getFingerprint: () => fingerprint,
+    } as unknown as Device;
+}
+
+function mockDeviceMap(
+    userId: UserID,
+    deviceId: DeviceID,
+    deviceKey?: Fingerprint,
+    otherDevices: SimpleDeviceMap = {},
+): Map<string, Map<string, Device>> {
+    const deviceMap: Map<string, Map<string, Device>> = new Map();
+
+    const myDevices: Map<string, Device> = new Map();
+    if (deviceKey) {
+        myDevices.set(deviceId, mockDevice(userId, deviceId, deviceKey));
+    }
+    deviceMap.set(userId, myDevices);
+
+    for (const u in otherDevices) {
+        let userDevices = deviceMap.get(u);
+        if (!userDevices) {
+            userDevices = new Map();
+            deviceMap.set(u, userDevices);
+        }
+        for (const d in otherDevices[u]) {
+            userDevices.set(d, mockDevice(u, d, otherDevices[u][d]));
+        }
+    }
+
+    return deviceMap;
+}
 
 function makeMockClient(opts: {
-    userId: string;
-    deviceId: string;
-    deviceKey?: string;
+    userId: UserID;
+    deviceId: DeviceID;
+    deviceKey?: Fingerprint;
     getLoginTokenEnabled: boolean;
     msc3882r0Only: boolean;
     msc3886Enabled: boolean;
-    devices?: Record<string, Partial<DeviceInfo>>;
+    devices?: SimpleDeviceMap;
     verificationFunction?: (
         userId: string,
         deviceId: string,
@@ -48,50 +89,77 @@ function makeMockClient(opts: {
         blocked: boolean,
         known: boolean,
     ) => void;
-    crossSigningIds?: Record<string, string>;
-}): MatrixClient {
-    return {
-        getVersions() {
-            return {
-                unstable_features: {
-                    "org.matrix.msc3882": opts.getLoginTokenEnabled,
-                    "org.matrix.msc3886": opts.msc3886Enabled,
-                },
-            };
-        },
-        getCapabilities() {
-            return opts.msc3882r0Only
-                ? {}
-                : {
-                      capabilities: {
-                          "m.get_login_token": {
-                              enabled: opts.getLoginTokenEnabled,
+    crossSigningIds?: Partial<Record<CrossSigningKey, string>>;
+}): [MatrixClient, Map<string, Map<string, Device>>] {
+    const deviceMap = mockDeviceMap(opts.userId, opts.deviceId, opts.deviceKey, opts.devices);
+    return [
+        {
+            doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
+                if (feature === "org.matrix.msc3886") {
+                    return opts.msc3886Enabled;
+                } else if (feature === "org.matrix.msc3882") {
+                    return opts.getLoginTokenEnabled;
+                } else {
+                    return false;
+                }
+            }),
+            getVersions() {
+                return {
+                    unstable_features: {
+                        "org.matrix.msc3882": opts.getLoginTokenEnabled,
+                        "org.matrix.msc3886": opts.msc3886Enabled,
+                    },
+                };
+            },
+            getCapabilities() {
+                return opts.msc3882r0Only
+                    ? {}
+                    : {
+                          capabilities: {
+                              "m.get_login_token": {
+                                  enabled: opts.getLoginTokenEnabled,
+                              },
                           },
-                      },
-                  };
-        },
-        getUserId() {
-            return opts.userId;
-        },
-        getDeviceId() {
-            return opts.deviceId;
-        },
-        getDeviceEd25519Key() {
-            return opts.deviceKey;
-        },
-        baseUrl: "https://example.com",
-        crypto: {
-            getStoredDevice(userId: string, deviceId: string) {
-                return opts.devices?.[deviceId] ?? null;
+                      };
             },
-            setDeviceVerification: opts.verificationFunction,
-            crossSigningInfo: {
-                getId(key: string) {
-                    return opts.crossSigningIds?.[key];
-                },
+            getUserId() {
+                return opts.userId;
             },
-        },
-    } as unknown as MatrixClient;
+            getSafeUserId() {
+                return opts.userId;
+            },
+            getDeviceId() {
+                return opts.deviceId;
+            },
+            baseUrl: "https://example.com",
+            getCrypto() {
+                return {
+                    getUserDeviceInfo(
+                        [userId]: string[],
+                        downloadUncached?: boolean,
+                    ): Promise<Map<string, Map<string, Device>>> {
+                        return Promise.resolve(deviceMap);
+                    },
+                    getCrossSigningKeyId(key: CrossSigningKey): string | null {
+                        return opts.crossSigningIds?.[key] ?? null;
+                    },
+                    setDeviceVerified(userId: string, deviceId: string, verified: boolean): Promise<void> {
+                        return Promise.resolve();
+                    },
+                    crossSignDevice(deviceId: string): Promise<void> {
+                        return Promise.resolve();
+                    },
+                    getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+                        return Promise.resolve({
+                            ed25519: opts.deviceKey!,
+                            curve25519: "aaaa",
+                        });
+                    },
+                };
+            },
+        } as unknown as MatrixClient,
+        deviceMap,
+    ];
 }
 
 function makeTransport(name: string, uri = "https://test.rz/123456") {
@@ -106,6 +174,7 @@ describe("Rendezvous", function () {
     let httpBackend: MockHttpBackend;
     let fetchFn: typeof global.fetch;
     let transports: DummyTransport<any, MSC3903ECDHPayload>[];
+    const userId: UserID = "@user:example.com";
 
     beforeEach(function () {
         httpBackend = new MockHttpBackend();
@@ -118,9 +187,9 @@ describe("Rendezvous", function () {
     });
 
     it("generate and cancel", async function () {
-        const alice = makeMockClient({
-            userId: "@alice:example.com",
-            deviceId: "DEVICEID",
+        const [alice] = makeMockClient({
+            userId,
+            deviceId: "ALICE",
             msc3886Enabled: false,
             getLoginTokenEnabled: true,
             msc3882r0Only: true,
@@ -194,8 +263,8 @@ describe("Rendezvous", function () {
 
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
+        const [alice] = makeMockClient({
+            userId,
             deviceId: "ALICE",
             msc3886Enabled: false,
             getLoginTokenEnabled,
@@ -257,8 +326,8 @@ describe("Rendezvous", function () {
 
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
+        const [alice] = makeMockClient({
+            userId,
             deviceId: "ALICE",
             getLoginTokenEnabled: true,
             msc3882r0Only: false,
@@ -316,8 +385,8 @@ describe("Rendezvous", function () {
 
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
+        const [alice] = makeMockClient({
+            userId,
             deviceId: "ALICE",
             getLoginTokenEnabled: true,
             msc3882r0Only: false,
@@ -375,7 +444,7 @@ describe("Rendezvous", function () {
 
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
+        const [alice] = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
             getLoginTokenEnabled: true,
@@ -436,7 +505,7 @@ describe("Rendezvous", function () {
 
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
-        const alice = makeMockClient({
+        const [alice] = makeMockClient({
             userId: "alice",
             deviceId: "ALICE",
             getLoginTokenEnabled: true,
@@ -495,7 +564,7 @@ describe("Rendezvous", function () {
         await bobCompleteProm;
     });
 
-    async function completeLogin(devices: Record<string, Partial<DeviceInfo>>) {
+    async function completeLogin(devices: SimpleDeviceMap) {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -505,8 +574,8 @@ describe("Rendezvous", function () {
         // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const aliceVerification = jest.fn();
-        const alice = makeMockClient({
-            userId: "alice",
+        const [alice, deviceMap] = makeMockClient({
+            userId,
             deviceId: "ALICE",
             getLoginTokenEnabled: true,
             msc3882r0Only: false,
@@ -575,13 +644,14 @@ describe("Rendezvous", function () {
             aliceRz,
             bobTransport,
             bobEcdh,
+            deviceMap,
         };
     }
 
     it("approve on existing device + verification", async function () {
         const { bobEcdh, aliceRz } = await completeLogin({
-            BOB: {
-                getFingerprint: () => "bbbb",
+            [userId]: {
+                BOB: "bbbb",
             },
         });
         const verifyProm = aliceRz.verifyNewDeviceOnExistingDevice();
@@ -607,33 +677,29 @@ describe("Rendezvous", function () {
     });
 
     it("device appears online within timeout", async function () {
-        const devices: Record<string, Partial<DeviceInfo>> = {};
-        const { aliceRz } = await completeLogin(devices);
-        // device appears after 1 second
+        const devices: SimpleDeviceMap = {};
+        const { aliceRz, deviceMap } = await completeLogin(devices);
+        // device appears before the timeout
         setTimeout(() => {
-            devices.BOB = {
-                getFingerprint: () => "bbbb",
-            };
+            deviceMap.get(userId)!.set("BOB", mockDevice(userId, "BOB", "bbbb"));
         }, 1000);
         await aliceRz.verifyNewDeviceOnExistingDevice(2000);
     });
 
     it("device appears online after timeout", async function () {
-        const devices: Record<string, Partial<DeviceInfo>> = {};
-        const { aliceRz } = await completeLogin(devices);
-        // device appears after 1 second
+        const devices: SimpleDeviceMap = {};
+        const { aliceRz, deviceMap } = await completeLogin(devices);
+        // device appears after the timeout
         setTimeout(() => {
-            devices.BOB = {
-                getFingerprint: () => "bbbb",
-            };
+            deviceMap.get(userId)!.set("BOB", mockDevice(userId, "BOB", "bbbb"));
         }, 1500);
         await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("mismatched device key", async function () {
         const { aliceRz } = await completeLogin({
-            BOB: {
-                getFingerprint: () => "XXXX",
+            [userId]: {
+                BOB: "XXXX",
             },
         });
         await expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow(/different key/);

@@ -32,7 +32,6 @@ import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsaf
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { logger } from "./logger";
-import { InvalidStoreError, InvalidStoreState } from "./errors";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
 import {
     IEphemeral,
@@ -61,6 +60,7 @@ import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
 import { Crypto } from "./crypto";
+import { KnownMembership } from "./@types/membership";
 
 const DEBUG = true;
 
@@ -592,25 +592,6 @@ export class SyncApi {
         await keepaliveProm;
     }
 
-    /**
-     * Is the lazy loading option different than in previous session?
-     * @param lazyLoadMembers - current options for lazy loading
-     * @returns whether or not the option has changed compared to the previous session */
-    private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
-        // assume it was turned off before
-        // if we don't know any better
-        let lazyLoadMembersBefore = false;
-        const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
-        if (!isStoreNewlyCreated) {
-            const prevClientOptions = await this.client.store.getClientOptions();
-            if (prevClientOptions) {
-                lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
-            }
-            return lazyLoadMembersBefore !== lazyLoadMembers;
-        }
-        return false;
-    }
-
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
@@ -648,9 +629,9 @@ export class SyncApi {
         return filter;
     };
 
-    private checkLazyLoadStatus = async (): Promise<void> => {
-        debuglog("Checking lazy load status...");
-        if (this.opts.lazyLoadMembers && this.client.isGuest()) {
+    private prepareLazyLoadingForSync = async (): Promise<void> => {
+        debuglog("Prepare lazy loading for sync...");
+        if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
@@ -660,23 +641,12 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        // need to vape the store when enabling LL and wasn't enabled before
-        debuglog("Checking whether lazy loading has changed in store...");
-        const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-        if (shouldClear) {
-            this.storeIsInvalid = true;
-            const error = new InvalidStoreError(InvalidStoreState.ToggledLazyLoading, !!this.opts.lazyLoadMembers);
-            this.updateSyncState(SyncState.Error, { error });
-            // bail out of the sync loop now: the app needs to respond to this error.
-            // we leave the state as 'ERROR' which isn't great since this normally means
-            // we're retrying. The client must be stopped before clearing the stores anyway
-            // so the app should stop the client, clear the store and start it again.
-            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
-            return;
-        }
         if (this.opts.lazyLoadMembers) {
             this.syncOpts.crypto?.enableLazyLoading();
         }
+    };
+
+    private storeClientOptions = async (): Promise<void> => {
         try {
             debuglog("Storing client options...");
             await this.client.storeClientOptions();
@@ -756,14 +726,16 @@ export class SyncApi {
         //   1) We need to get push rules so we can check if events should bing as we get
         //      them from /sync.
         //   2) We need to get/create a filter which we can use for /sync.
-        //   3) We need to check the lazy loading option matches what was used in the
-        //       stored sync. If it doesn't, we can't use the stored sync.
+        //   3) We need to prepare lazy loading for sync
+        //   4) We need to store the client options
 
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
         await this.getPushRules();
-        await this.checkLazyLoadStatus();
+        await this.prepareLazyLoadingForSync();
+        await this.storeClientOptions();
+
         const { filterId, filter } = await this.getFilter();
         if (!filter) return; // bail, getFilter failed
 
@@ -1354,11 +1326,11 @@ export class SyncApi {
             const unreadThreadNotifications =
                 joinObj[UNREAD_THREAD_NOTIFICATIONS.name] ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
             if (unreadThreadNotifications) {
-                // Only partially reset unread notification
-                // We want to keep the client-generated count. Particularly important
-                // for encrypted room that refresh their notification count on event
-                // decryption
-                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                // This mirrors the logic above for rooms: take the *total* notification count from
+                // the server for unencrypted rooms or is it's zero. Any threads not present in this
+                // object implicitly have zero notifications, so start by clearing the total counts
+                // for all such threads.
+                room.resetThreadUnreadNotificationCountFromSync(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
                         room.setThreadUnreadNotificationCount(
@@ -1379,7 +1351,7 @@ export class SyncApi {
                     }
                 }
             } else {
-                room.resetThreadUnreadNotificationCount();
+                room.resetThreadUnreadNotificationCountFromSync();
             }
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
@@ -1720,7 +1692,7 @@ export class SyncApi {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -1740,7 +1712,7 @@ export class SyncApi {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member;
-                    if (inviteEvent?.getContent().membership !== "invite") {
+                    if (inviteEvent?.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }
@@ -1760,11 +1732,11 @@ export class SyncApi {
         return events?.find((e) => e.getType() === EventType.RoomEncryption && e.getStateKey() === "");
     }
 
-    // When processing the sync response we cannot rely on MatrixClient::isRoomEncrypted before we actually
+    // When processing the sync response we cannot rely on Room.hasEncryptionStateEvent we actually
     // inject the events into the room object, so we have to inspect the events themselves.
     private isRoomEncrypted(room: Room, stateEventList: MatrixEvent[], timelineEventList?: MatrixEvent[]): boolean {
         return (
-            this.client.isRoomEncrypted(room.roomId) ||
+            room.hasEncryptionStateEvent() ||
             !!this.findEncryptionEvent(stateEventList) ||
             !!this.findEncryptionEvent(timelineEventList)
         );

@@ -98,7 +98,7 @@ export class RoomReceipts {
     /**
      * Look for dangling receipts for the given event ID,
      * and add them to the thread of unthread receipts if found.
-     * @param eventId - the event ID to look for
+     * @param event - the event to look for
      */
     private onTimelineEvent = (event: MatrixEvent): void => {
         const eventId = event.getId();
