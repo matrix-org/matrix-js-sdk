@@ -383,20 +383,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * The room summary.
      */
     public summary: RoomSummary | null = null;
-    /**
-     * oldState The state of the room at the time of the oldest event in the live timeline.
-     *
-     * @deprecated Present for backwards compatibility.
-     *             Use getLiveTimeline().getState(EventTimeline.BACKWARDS) instead
-     */
-    public oldState!: RoomState;
-    /**
-     * currentState The state of the room at the time of the newest event in the timeline.
-     *
-     * @deprecated Present for backwards compatibility.
-     *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
-     */
-    public currentState!: RoomState;
+
     public readonly relations = new RelationsContainer(this.client, this);
 
     /**
@@ -483,8 +470,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
         this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [RoomEvent.Timeline, RoomEvent.TimelineReset]);
-
-        this.fixUpLegacyTimelineFields();
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
@@ -800,6 +785,28 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public get timeline(): MatrixEvent[] {
         return this.getLiveTimeline().getEvents();
+    }
+
+    /**
+     * The state of the room at the time of the oldest event in the live timeline.
+     */
+    public get oldState(): RoomState {
+        const roomState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS);
+        if (!roomState) {
+            throw new Error("No oldState");
+        }
+        return roomState;
+    }
+
+    /**
+     * The state of the room at the time of the newest event in the timeline.
+     */
+    public get currentState(): RoomState {
+        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!roomState) {
+            throw new Error("No currentState");
+        }
+        return roomState;
     }
 
     /**
@@ -1217,9 +1224,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // Set our new fresh timeline as the live timeline to continue syncing
             // forwards and back paginating from.
             timelineSet.setLiveTimeline(newTimeline!);
-            // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
-            // available
-            this.fixUpLegacyTimelineFields();
         } else {
             logger.log(
                 `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
@@ -1253,61 +1257,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
         for (const thread of this.threads.values()) {
             thread.resetLiveTimeline(backPaginationToken, forwardPaginationToken);
-        }
-
-        this.fixUpLegacyTimelineFields();
-    }
-
-    /**
-     * Fix up this.timeline, this.oldState and this.currentState
-     *
-     * @internal
-     */
-    private fixUpLegacyTimelineFields(): void {
-        const previousOldState = this.oldState;
-        const previousCurrentState = this.currentState;
-
-        // maintain this.oldState and this.currentState as references to the
-        // state at the start and end of that timeline. These are more
-        // for backwards-compatibility than anything else.
-        this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
-        this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-
-        // Let people know to register new listeners for the new state
-        // references. The reference won't necessarily change every time so only
-        // emit when we see a change.
-        if (previousOldState !== this.oldState) {
-            this.emit(RoomEvent.OldStateUpdated, this, previousOldState, this.oldState);
-        }
-
-        if (previousCurrentState !== this.currentState) {
-            this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
-
-            // Re-emit various events on the current room state
-            // TODO: If currentState really only exists for backwards
-            // compatibility, shouldn't we be doing this some other way?
-            this.reEmitter.stopReEmitting(previousCurrentState, [
-                RoomStateEvent.Events,
-                RoomStateEvent.Members,
-                RoomStateEvent.NewMember,
-                RoomStateEvent.Update,
-                RoomStateEvent.Marker,
-                BeaconEvent.New,
-                BeaconEvent.Update,
-                BeaconEvent.Destroy,
-                BeaconEvent.LivenessChange,
-            ]);
-            this.reEmitter.reEmit(this.currentState, [
-                RoomStateEvent.Events,
-                RoomStateEvent.Members,
-                RoomStateEvent.NewMember,
-                RoomStateEvent.Update,
-                RoomStateEvent.Marker,
-                BeaconEvent.New,
-                BeaconEvent.Update,
-                BeaconEvent.Destroy,
-                BeaconEvent.LivenessChange,
-            ]);
         }
     }
 
