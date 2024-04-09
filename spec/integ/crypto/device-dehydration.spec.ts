@@ -18,6 +18,7 @@ import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
 import { createClient, ClientEvent, MatrixClient, MatrixEvent } from "../../../src";
+import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
@@ -159,6 +160,10 @@ async function initializeSecretStorage(
     });
 
     await matrixClient.initRustCrypto();
+    const crypto = matrixClient.getCrypto()! as RustCrypto;
+    // we need to process a sync so that the OlmMachine will upload keys
+    await crypto.preprocessToDeviceMessages([]);
+    await crypto.onSyncCompleted({});
 
     // create initial secret storage
     async function createSecretStorageKey() {

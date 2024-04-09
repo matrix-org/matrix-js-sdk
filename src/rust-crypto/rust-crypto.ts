@@ -1229,6 +1229,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoBackend#startDehydration}.
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
+        if (!(await this.isCrossSigningReady()) || !(await this.isSecretStorageReady())) {
+            throw new Error("Device dehydration requires cross-signing and secret storage to be set up");
+        }
         return await this.dehydratedDeviceManager.start(createNewKey);
     }
 
