@@ -516,10 +516,10 @@ export interface CryptoApi {
      * Start using device dehydration.
      *
      * - Rehydrates a dehydrated device, if one is available.
-     * - Creates a new dehydration key, if necessary, and store it in Secret
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     *   - If `createNewKey` is set to true, always create a new key.
-     *   - If a dehydration key is not available, create a new one.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
      *
@@ -805,11 +805,6 @@ export interface CreateSecretStorageOpts {
      * Reset even if keys already exist.
      */
     setupNewSecretStorage?: boolean;
-
-    /**
-     * Create a dehydrated device if no dehydrated device is already present.
-     */
-    initialiseDeviceDehydration?: boolean;
 
     /**
      * Function called to get the user's

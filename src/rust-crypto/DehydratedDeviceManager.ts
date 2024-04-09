@@ -116,10 +116,10 @@ export class DehydratedDeviceManager {
      * Start using device dehydration.
      *
      * - Rehydrates a dehydrated device, if one is available.
-     * - Creates a new dehydration key, if necessary, and store it in Secret
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     *   - If `createNewKey` is set to true, always create a new key.
-     *   - If a dehydration key is not available, create a new one.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
      *
@@ -280,8 +280,6 @@ export class DehydratedDeviceManager {
 
     /**
      * Schedule periodic creation of dehydrated devices.
-     *
-     * @param interval - the time to wait between creating dehydrated devices
      */
     public async scheduleDeviceDehydration(): Promise<void> {
         // cancel any previously-scheduled tasks
