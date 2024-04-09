@@ -42,22 +42,13 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
     private uri?: string;
     private etag?: string;
     private expiresAt?: Date;
-    private client?: MatrixClient;
+    private client: MatrixClient;
     private fallbackRzServer?: string;
     private fetchFn?: typeof global.fetch;
     private cancelled = false;
     private _ready = false;
     public onFailure?: RendezvousFailureListener;
 
-    public constructor({
-        onFailure,
-        details,
-        fetchFn,
-    }: {
-        fetchFn?: typeof global.fetch;
-        onFailure?: RendezvousFailureListener;
-        details: MSC3886SimpleHttpRendezvousTransportDetails;
-    });
     public constructor({
         onFailure,
         client,
@@ -68,25 +59,11 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
         onFailure?: RendezvousFailureListener;
         client: MatrixClient;
         fallbackRzServer?: string;
-    });
-    public constructor({
-        fetchFn,
-        onFailure,
-        details,
-        client,
-        fallbackRzServer,
-    }: {
-        fetchFn?: typeof global.fetch;
-        onFailure?: RendezvousFailureListener;
-        details?: MSC3886SimpleHttpRendezvousTransportDetails;
-        client?: MatrixClient;
-        fallbackRzServer?: string;
     }) {
         this.fetchFn = fetchFn;
         this.onFailure = onFailure;
         this.client = client;
         this.fallbackRzServer = fallbackRzServer;
-        this.uri = details?.uri;
     }
 
     public get ready(): boolean {
@@ -112,14 +89,12 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
     }
 
     private async getPostEndpoint(): Promise<string | undefined> {
-        if (this.client) {
-            try {
-                if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc3886")) {
-                    return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
-                }
-            } catch (err) {
-                logger.warn("Failed to get unstable features", err);
+        try {
+            if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc3886")) {
+                return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
             }
+        } catch (err) {
+            logger.warn("Failed to get unstable features", err);
         }
 
         return this.fallbackRzServer;
