@@ -871,6 +871,9 @@ export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
     [Aes256.algorithmName]: Aes256,
 };
 
+// the linter doesn't like this but knip does
+// eslint-disable-next-line tsdoc/syntax
+/** @alias */
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
 
 /**
