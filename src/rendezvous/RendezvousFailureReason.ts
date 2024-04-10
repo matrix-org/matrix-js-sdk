@@ -25,4 +25,6 @@ export enum RendezvousFailureReason {
     DataMismatch = "data_mismatch",
     HomeserverLacksSupport = "homeserver_lacks_support",
     UnexpectedMessage = "unexpected_message",
+    DeviceAlreadyExists = "device_already_exists",
+    DeviceNotFound = "device_not_found",
 }
