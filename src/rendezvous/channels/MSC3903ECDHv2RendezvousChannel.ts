@@ -23,7 +23,7 @@ import {
     RendezvousChannel,
     RendezvousTransportDetails,
     RendezvousTransport,
-    RendezvousFailureReason,
+    LegacyRendezvousFailureReason as RendezvousFailureReason,
 } from "..";
 import { encodeUnpaddedBase64, decodeBase64 } from "../../base64";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";

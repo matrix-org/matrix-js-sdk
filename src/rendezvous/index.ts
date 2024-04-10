@@ -18,7 +18,7 @@ import type { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { MatrixClient } from "../matrix";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR";
 import { RendezvousError } from "./RendezvousError";
-import { RendezvousFailureListener, RendezvousFailureReason } from "./RendezvousFailureReason";
+import { ClientRendezvousFailureReason, RendezvousFailureListener } from "./RendezvousFailureReason";
 import { MSC4108SecureChannel } from "./channels";
 import { MSC4108RendezvousSession } from "./transports";
 
@@ -62,8 +62,8 @@ async function buildChannelFromCode(
         throw new RendezvousError(
             "The scanned intent is the same as the scanner intent",
             scannerMode === RustCrypto.QrCodeMode.Login
-                ? RendezvousFailureReason.OtherDeviceNotSignedIn
-                : RendezvousFailureReason.OtherDeviceAlreadySignedIn,
+                ? ClientRendezvousFailureReason.OtherDeviceNotSignedIn
+                : ClientRendezvousFailureReason.OtherDeviceAlreadySignedIn,
         );
     }
 

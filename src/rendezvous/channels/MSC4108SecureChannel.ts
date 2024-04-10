@@ -23,7 +23,13 @@ import {
     SecureChannel,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { MSC4108Payload, RendezvousError, RendezvousFailureReason } from "..";
+import {
+    ClientRendezvousFailureReason,
+    MSC4108FailureReason,
+    MSC4108Payload,
+    RendezvousError,
+    RendezvousFailureReason,
+} from "..";
 import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession";
 import { logger } from "../../logger";
 
@@ -103,14 +109,17 @@ export class MSC4108SecureChannel {
                 const ciphertext = await this.rendezvousSession.receive();
 
                 if (!ciphertext) {
-                    throw new RendezvousError("No response from other device", RendezvousFailureReason.Unknown);
+                    throw new RendezvousError(
+                        "No response from other device",
+                        MSC4108FailureReason.UnexpectedMessageReceived,
+                    );
                 }
                 const candidateLoginOkMessage = await this.decrypt(ciphertext);
 
                 if (candidateLoginOkMessage !== "MATRIX_QR_CODE_LOGIN_OK") {
                     throw new RendezvousError(
                         "Invalid response from other device",
-                        RendezvousFailureReason.InsecureChannelDetected,
+                        ClientRendezvousFailureReason.InsecureChannelDetected,
                     );
                 }
 
@@ -142,7 +151,7 @@ export class MSC4108SecureChannel {
             if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
                 throw new RendezvousError(
                     "Invalid response from other device",
-                    RendezvousFailureReason.InsecureChannelDetected,
+                    ClientRendezvousFailureReason.InsecureChannelDetected,
                 );
             }
             logger.info("LoginInitiateMessage received");
