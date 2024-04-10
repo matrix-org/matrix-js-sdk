@@ -158,7 +158,17 @@ export class MSC4108SignInWithQR {
                 // wait for protocols message
                 logger.info("Waiting for protocols message");
                 const message = await this.receive();
+
+                if (message?.type === PayloadType.Failure) {
+                    const { reason } = message as FailurePayload;
+                    throw new RendezvousError("Failed", reason);
+                }
+
                 if (message?.type !== PayloadType.Protocols) {
+                    await this.send<FailurePayload>({
+                        type: PayloadType.Failure,
+                        reason: RendezvousFailureReason.UnexpectedMessage,
+                    });
                     throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
                 }
                 const protocolsMessage = message as ProtocolsPayload;
@@ -185,6 +195,11 @@ export class MSC4108SignInWithQR {
             logger.info("Waiting for protocol message");
             const message = await this.receive();
 
+            if (message?.type === PayloadType.Failure) {
+                const { reason } = message as FailurePayload;
+                throw new RendezvousError("Failed", reason);
+            }
+
             if (message && message.type === PayloadType.Protocol) {
                 const protocolMessage = message as ProtocolPayload;
                 if (protocolMessage.protocol === "device_authorization_grant") {
@@ -206,6 +221,10 @@ export class MSC4108SignInWithQR {
                     }
 
                     if (deviceAlreadyExists) {
+                        await this.send<FailurePayload>({
+                            type: PayloadType.Failure,
+                            reason: RendezvousFailureReason.DataMismatch,
+                        });
                         throw new RendezvousError(
                             "Specified device ID already exists",
                             RendezvousFailureReason.DataMismatch,
@@ -218,6 +237,10 @@ export class MSC4108SignInWithQR {
                 }
             }
 
+            await this.send<FailurePayload>({
+                type: PayloadType.Failure,
+                reason: RendezvousFailureReason.UnsupportedAlgorithm,
+            });
             throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnsupportedAlgorithm);
         }
     }
@@ -239,8 +262,17 @@ export class MSC4108SignInWithQR {
             });
             // then wait for secrets
             logger.info("Waiting for secrets message");
-            const secrets = await this.receive<SecretsPayload>();
+            const secrets = await this.receive<SecretsPayload | any>();
+            if (secrets?.type === PayloadType.Failure) {
+                const { reason } = secrets as FailurePayload;
+                throw new RendezvousError("Failed", reason);
+            }
+
             if (secrets?.type !== PayloadType.Secrets) {
+                await this.send<FailurePayload>({
+                    type: PayloadType.Failure,
+                    reason: RendezvousFailureReason.UnexpectedMessage,
+                });
                 throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
             }
             return { secrets };
@@ -295,6 +327,10 @@ export class MSC4108SignInWithQR {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
             } while (Date.now() < timeout);
 
+            await this.send<FailurePayload>({
+                type: PayloadType.Failure,
+                reason: RendezvousFailureReason.DataMismatch,
+            });
             throw new RendezvousError("New device not found", RendezvousFailureReason.DataMismatch);
         }
     }
