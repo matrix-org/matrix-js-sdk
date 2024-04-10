@@ -389,22 +389,37 @@ export class MSC4108SignInWithQR {
                 throw new RendezvousError("Unexpected message", RendezvousFailureReason.UnexpectedMessage);
             }
 
-            // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
-            const device = await this.client?.getDevice(this.expectingNewDeviceId);
+            // PROTOTYPE: this also needs to handle the case of the process being cancelled
+            // i.e. aborting the waiting and making sure not to share the secrets
+            const timeout = Date.now() + 10000; // wait up to 10 seconds
+            do {
+                // is the device visible via the Homeserver?
+                try {
+                    const device = await this.client?.getDevice(this.expectingNewDeviceId);
 
-            if (!device) {
-                throw new RendezvousError("New device not found", RendezvousFailureReason.DataMismatch);
-            }
+                    if (device) {
+                        // if so, return the secrets
+                        const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
+                        // send secrets
+                        await this.send({
+                            type: PayloadType.Secrets,
+                            ...secretsBundle,
+                        });
+                        return { secrets: secretsBundle };
+                        // done?
+                        // let the other side close the rendezvous session
+                    }
+                } catch (err: MatrixError | unknown) {
+                    if (err instanceof MatrixError && err.httpStatus === 404) {
+                        // not found, so keep waiting until timeout
+                    } else {
+                        throw err;
+                    }
+                }
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            } while (Date.now() < timeout);
 
-            const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
-            // send secrets
-            await this.send({
-                type: PayloadType.Secrets,
-                ...secretsBundle,
-            });
-            return {};
-            // done?
-            // let the other side close the rendezvous session
+            throw new RendezvousError("New device not found", RendezvousFailureReason.DataMismatch);
         }
     }
 
