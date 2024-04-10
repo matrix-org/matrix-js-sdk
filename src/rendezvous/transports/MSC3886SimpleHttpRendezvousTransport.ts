@@ -20,7 +20,7 @@ import { logger } from "../../logger";
 import { sleep } from "../../utils";
 import {
     RendezvousFailureListener,
-    RendezvousFailureReason,
+    LegacyRendezvousFailureReason as RendezvousFailureReason,
     RendezvousTransport,
     RendezvousTransportDetails,
 } from "..";

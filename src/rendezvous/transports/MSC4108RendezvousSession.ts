@@ -16,7 +16,7 @@ limitations under the License.
 
 import { logger } from "../../logger";
 import { sleep } from "../../utils";
-import { RendezvousFailureListener, RendezvousFailureReason } from "..";
+import { ClientRendezvousFailureReason, RendezvousFailureListener, RendezvousFailureReason } from "..";
 import { MatrixClient } from "../../matrix";
 import { ClientPrefix } from "../../http-api";
 
@@ -129,7 +129,7 @@ export class MSC4108RendezvousSession {
 
         const res = await this.fetch(uri, { method, headers, body: data });
         if (res.status === 404) {
-            return this.cancel(RendezvousFailureReason.Unknown);
+            return this.cancel(ClientRendezvousFailureReason.Unknown);
         }
         this.etag = res.headers.get("etag") ?? undefined;
 
@@ -169,7 +169,7 @@ export class MSC4108RendezvousSession {
             const poll = await this.fetch(this.url, { method: "GET", headers });
 
             if (poll.status === 404) {
-                this.cancel(RendezvousFailureReason.Unknown);
+                this.cancel(ClientRendezvousFailureReason.Unknown);
                 return undefined;
             }
 
@@ -188,15 +188,19 @@ export class MSC4108RendezvousSession {
     }
 
     public async cancel(reason: RendezvousFailureReason): Promise<void> {
-        if (reason === RendezvousFailureReason.Unknown && this.expiresAt && this.expiresAt.getTime() < Date.now()) {
-            reason = RendezvousFailureReason.Expired;
+        if (
+            reason === ClientRendezvousFailureReason.Unknown &&
+            this.expiresAt &&
+            this.expiresAt.getTime() < Date.now()
+        ) {
+            reason = ClientRendezvousFailureReason.Expired;
         }
 
         this.cancelled = true;
         this._ready = false;
         this.onFailure?.(reason);
 
-        if (this.url && reason === RendezvousFailureReason.UserDeclined) {
+        if (this.url && reason === ClientRendezvousFailureReason.UserDeclined) {
             try {
                 await this.fetch(this.url, { method: "DELETE" });
             } catch (e) {

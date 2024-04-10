@@ -17,7 +17,7 @@ limitations under the License.
 import { OidcClient } from "oidc-client-ts";
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
+import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
@@ -31,6 +31,7 @@ export enum PayloadType {
     Success = "m.login.success",
     Secrets = "m.login.secrets",
     ProtocolAccepted = "m.login.protocol_accepted",
+    Declined = "m.login.declined",
 }
 
 export interface MSC4108Payload {
@@ -59,8 +60,12 @@ interface DeviceAuthorizationGrantProtocolPayload extends ProtocolPayload {
 
 interface FailurePayload extends MSC4108Payload {
     type: PayloadType.Failure;
-    reason: RendezvousFailureReason;
+    reason: MSC4108FailureReason;
     homeserver?: string;
+}
+
+interface DeclinedPayload extends MSC4108Payload {
+    type: PayloadType.Declined;
 }
 
 interface SuccessPayload extends MSC4108Payload {
@@ -167,9 +172,12 @@ export class MSC4108SignInWithQR {
                 if (message?.type !== PayloadType.Protocols) {
                     await this.send<FailurePayload>({
                         type: PayloadType.Failure,
-                        reason: RendezvousFailureReason.UnexpectedMessage,
+                        reason: MSC4108FailureReason.UnexpectedMessageReceived,
                     });
-                    throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
+                    throw new RendezvousError(
+                        "Unexpected message received",
+                        MSC4108FailureReason.UnexpectedMessageReceived,
+                    );
                 }
                 const protocolsMessage = message as ProtocolsPayload;
                 return { homeserverBaseUrl: protocolsMessage.homeserver };
@@ -200,48 +208,59 @@ export class MSC4108SignInWithQR {
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (message && message.type === PayloadType.Protocol) {
-                const protocolMessage = message as ProtocolPayload;
-                if (protocolMessage.protocol === "device_authorization_grant") {
-                    const { device_authorization_grant: dag, device_id: expectingNewDeviceId } =
-                        protocolMessage as DeviceAuthorizationGrantProtocolPayload;
-                    const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } =
-                        dag;
+            if (message?.type !== PayloadType.Protocol) {
+                await this.send<FailurePayload>({
+                    type: PayloadType.Failure,
+                    reason: MSC4108FailureReason.UnexpectedMessageReceived,
+                });
+                throw new RendezvousError(
+                    "Unexpected message received",
+                    MSC4108FailureReason.UnexpectedMessageReceived,
+                );
+            }
 
-                    // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
-                    // check if there is already a device online with that device ID
+            const protocolMessage = message as ProtocolPayload;
+            if (protocolMessage.protocol === "device_authorization_grant") {
+                const { device_authorization_grant: dag, device_id: expectingNewDeviceId } =
+                    protocolMessage as DeviceAuthorizationGrantProtocolPayload;
+                const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } = dag;
 
-                    let deviceAlreadyExists = true;
-                    try {
-                        await this.client?.getDevice(expectingNewDeviceId);
-                    } catch (err: MatrixError | unknown) {
-                        if (err instanceof MatrixError && err.httpStatus === 404) {
-                            deviceAlreadyExists = false;
-                        }
+                // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
+                // check if there is already a device online with that device ID
+
+                let deviceAlreadyExists = true;
+                try {
+                    await this.client?.getDevice(expectingNewDeviceId);
+                } catch (err: MatrixError | unknown) {
+                    if (err instanceof MatrixError && err.httpStatus === 404) {
+                        deviceAlreadyExists = false;
                     }
-
-                    if (deviceAlreadyExists) {
-                        await this.send<FailurePayload>({
-                            type: PayloadType.Failure,
-                            reason: RendezvousFailureReason.DeviceAlreadyExists,
-                        });
-                        throw new RendezvousError(
-                            "Specified device ID already exists",
-                            RendezvousFailureReason.DeviceAlreadyExists,
-                        );
-                    }
-
-                    this.expectingNewDeviceId = expectingNewDeviceId;
-
-                    return { verificationUri: verificationUriComplete ?? verificationUri };
                 }
+
+                if (deviceAlreadyExists) {
+                    await this.send<FailurePayload>({
+                        type: PayloadType.Failure,
+                        reason: MSC4108FailureReason.DeviceAlreadyExists,
+                    });
+                    throw new RendezvousError(
+                        "Specified device ID already exists",
+                        MSC4108FailureReason.DeviceAlreadyExists,
+                    );
+                }
+
+                this.expectingNewDeviceId = expectingNewDeviceId;
+
+                return { verificationUri: verificationUriComplete ?? verificationUri };
             }
 
             await this.send<FailurePayload>({
                 type: PayloadType.Failure,
-                reason: RendezvousFailureReason.UnsupportedAlgorithm,
+                reason: MSC4108FailureReason.UnsupportedProtocol,
             });
-            throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnsupportedAlgorithm);
+            throw new RendezvousError(
+                "Received a request for an unsupported protocol",
+                MSC4108FailureReason.UnsupportedProtocol,
+            );
         }
     }
 
@@ -271,9 +290,12 @@ export class MSC4108SignInWithQR {
             if (secrets?.type !== PayloadType.Secrets) {
                 await this.send<FailurePayload>({
                     type: PayloadType.Failure,
-                    reason: RendezvousFailureReason.UnexpectedMessage,
+                    reason: MSC4108FailureReason.UnexpectedMessageReceived,
                 });
-                throw new RendezvousError("Unexpected message received", RendezvousFailureReason.UnexpectedMessage);
+                throw new RendezvousError(
+                    "Unexpected message received",
+                    MSC4108FailureReason.UnexpectedMessageReceived,
+                );
             }
             return { secrets };
             // then done?
@@ -294,7 +316,11 @@ export class MSC4108SignInWithQR {
             }
 
             if (res?.type !== PayloadType.Success) {
-                throw new RendezvousError("Unexpected message", RendezvousFailureReason.UnexpectedMessage);
+                await this.send<FailurePayload>({
+                    type: PayloadType.Failure,
+                    reason: MSC4108FailureReason.UnexpectedMessageReceived,
+                });
+                throw new RendezvousError("Unexpected message", MSC4108FailureReason.UnexpectedMessageReceived);
             }
 
             // PROTOTYPE: this also needs to handle the case of the process being cancelled
@@ -329,9 +355,9 @@ export class MSC4108SignInWithQR {
 
             await this.send<FailurePayload>({
                 type: PayloadType.Failure,
-                reason: RendezvousFailureReason.DeviceNotFound,
+                reason: MSC4108FailureReason.DeviceNotFound,
             });
-            throw new RendezvousError("New device not found", RendezvousFailureReason.DeviceNotFound);
+            throw new RendezvousError("New device not found", MSC4108FailureReason.DeviceNotFound);
         }
     }
 
@@ -345,9 +371,8 @@ export class MSC4108SignInWithQR {
 
     public async declineLoginOnExistingDevice(): Promise<void> {
         // logger.info("User declined sign in");
-        await this.send<FailurePayload>({
-            type: PayloadType.Failure,
-            reason: RendezvousFailureReason.UserDeclined,
+        await this.send<DeclinedPayload>({
+            type: PayloadType.Declined,
         });
     }
 

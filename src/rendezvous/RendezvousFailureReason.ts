@@ -16,15 +16,37 @@ limitations under the License.
 
 export type RendezvousFailureListener = (reason: RendezvousFailureReason) => void;
 
-export enum RendezvousFailureReason {
+export type RendezvousFailureReason =
+    | LegacyRendezvousFailureReason
+    | MSC4108FailureReason
+    | ClientRendezvousFailureReason;
+
+export enum LegacyRendezvousFailureReason {
     UserDeclined = "user_declined",
     Unknown = "unknown",
     Expired = "expired",
     UserCancelled = "user_cancelled",
     UnsupportedAlgorithm = "unsupported_algorithm",
-    InsecureChannelDetected = "insecure_channel_detected",
+    UnsupportedProtocol = "unsupported_protocol",
     HomeserverLacksSupport = "homeserver_lacks_support",
-    UnexpectedMessage = "unexpected_message",
+}
+
+export enum MSC4108FailureReason {
+    AuthorizationExpired = "authorization_expired",
     DeviceAlreadyExists = "device_already_exists",
     DeviceNotFound = "device_not_found",
+    UnexpectedMessageReceived = "unexpected_message_received",
+    UnsupportedProtocol = "unsupported_protocol",
+    UserCancelled = "user_cancelled",
+}
+
+export enum ClientRendezvousFailureReason {
+    Expired = "expired",
+    HomeserverLacksSupport = "homeserver_lacks_support",
+    InsecureChannelDetected = "insecure_channel_detected",
+    InvalidCode = "invalid_code",
+    OtherDeviceNotSignedIn = "other_device_not_signed_in",
+    OtherDeviceAlreadySignedIn = "other_device_already_signed_in",
+    Unknown = "unknown",
+    UserDeclined = "user_declined",
 }
