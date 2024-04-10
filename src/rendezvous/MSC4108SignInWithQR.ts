@@ -266,11 +266,11 @@ export class MSC4108SignInWithQR {
                     if (deviceAlreadyExists) {
                         await this.send<FailurePayload>({
                             type: PayloadType.Failure,
-                            reason: RendezvousFailureReason.DataMismatch,
+                            reason: RendezvousFailureReason.DeviceAlreadyExists,
                         });
                         throw new RendezvousError(
                             "Specified device ID already exists",
-                            RendezvousFailureReason.DataMismatch,
+                            RendezvousFailureReason.DeviceAlreadyExists,
                         );
                     }
 
@@ -455,9 +455,9 @@ export class MSC4108SignInWithQR {
 
             await this.send<FailurePayload>({
                 type: PayloadType.Failure,
-                reason: RendezvousFailureReason.DataMismatch,
+                reason: RendezvousFailureReason.DeviceNotFound,
             });
-            throw new RendezvousError("New device not found", RendezvousFailureReason.DataMismatch);
+            throw new RendezvousError("New device not found", RendezvousFailureReason.DeviceNotFound);
         }
     }
 
