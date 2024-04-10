@@ -156,12 +156,11 @@ export class MSC4108SignInWithQR {
                 // MSC4108-Flow: NewScanned
                 // send protocols message
                 // PROTOTYPE: we should be checking that the advertised protocol is available
-                const protocols: ProtocolsPayload = {
+                await this.send<ProtocolsPayload>({
                     type: PayloadType.Protocols,
                     protocols: ["device_authorization_grant"],
                     homeserver: this.client?.getHomeserverUrl() ?? "",
-                };
-                await this.send(protocols);
+                });
             }
         } else {
             if (this.isNewDevice) {
@@ -207,7 +206,7 @@ export class MSC4108SignInWithQR {
                 // send immediately
                 const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } =
                     this.deviceAuthorizationResponse;
-                const protocol: DeviceAuthorizationGrantProtocolPayload = {
+                await this.send<DeviceAuthorizationGrantProtocolPayload>({
                     type: PayloadType.Protocol,
                     protocol: "device_authorization_grant",
                     device_authorization_grant: {
@@ -215,8 +214,7 @@ export class MSC4108SignInWithQR {
                         verification_uri_complete: verificationUriComplete,
                     },
                     device_id: deviceIdFromScope,
-                };
-                await this.send(protocol);
+                });
             } else {
                 // MSC4108-Flow: ExistingScanned
                 // we will send it later
@@ -290,7 +288,7 @@ export class MSC4108SignInWithQR {
             if (!deviceIdFromScope) {
                 throw new Error("No device ID set in oidc client scope");
             }
-            const protocol: DeviceAuthorizationGrantProtocolPayload = {
+            await this.send<DeviceAuthorizationGrantProtocolPayload>({
                 type: PayloadType.Protocol,
                 protocol: "device_authorization_grant",
                 device_authorization_grant: {
@@ -298,8 +296,7 @@ export class MSC4108SignInWithQR {
                     verification_uri_complete: this.deviceAuthorizationResponse.verification_uri_complete,
                 },
                 device_id: deviceIdFromScope,
-            };
-            await this.send(protocol);
+            });
         }
 
         // wait for accepted message
@@ -342,11 +339,10 @@ export class MSC4108SignInWithQR {
             } else if (res.error === "access_denied") {
                 reason = RendezvousFailureReason.UserDeclined;
             }
-            const payload: FailurePayload = {
+            await this.send<FailurePayload>({
                 type: PayloadType.Failure,
                 reason,
-            };
-            await this.send(payload);
+            });
         }
 
         return res as DeviceAccessTokenResponse;
@@ -356,10 +352,9 @@ export class MSC4108SignInWithQR {
         logger.info("loginStep5()");
 
         if (this.isNewDevice) {
-            const payload: SuccessPayload = {
+            await this.send<SuccessPayload>({
                 type: PayloadType.Success,
-            };
-            await this.send(payload);
+            });
             // then wait for secrets
             logger.info("Waiting for secrets message");
             const secrets = await this.receive<SecretsPayload>();
@@ -372,10 +367,9 @@ export class MSC4108SignInWithQR {
             if (!this.expectingNewDeviceId) {
                 throw new Error("No new device ID expected");
             }
-            const payload: AcceptedPayload = {
+            await this.send<AcceptedPayload>({
                 type: PayloadType.ProtocolAccepted,
-            };
-            await this.send(payload);
+            });
 
             logger.info("Waiting for outcome message");
             const res = await this.receive();
@@ -401,7 +395,7 @@ export class MSC4108SignInWithQR {
                         // if so, return the secrets
                         const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
                         // send secrets
-                        await this.send({
+                        await this.send<SecretsPayload>({
                             type: PayloadType.Secrets,
                             ...secretsBundle,
                         });
@@ -427,17 +421,16 @@ export class MSC4108SignInWithQR {
         return (await this.channel.secureReceive()) as T | undefined;
     }
 
-    private async send(payload: MSC4108Payload): Promise<void> {
+    private async send<T extends MSC4108Payload>(payload: T): Promise<void> {
         await this.channel.secureSend(payload);
     }
 
     public async declineLoginOnExistingDevice(): Promise<void> {
         // logger.info("User declined sign in");
-        const payload: FailurePayload = {
+        await this.send<FailurePayload>({
             type: PayloadType.Failure,
             reason: RendezvousFailureReason.UserDeclined,
-        };
-        await this.send(payload);
+        });
     }
 
     public async cancel(reason: RendezvousFailureReason): Promise<void> {

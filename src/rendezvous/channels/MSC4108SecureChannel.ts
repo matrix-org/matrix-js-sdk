@@ -172,7 +172,7 @@ export class MSC4108SecureChannel {
         return this.establishedChannel.encrypt(plaintext);
     }
 
-    public async secureSend(payload: MSC4108Payload): Promise<void> {
+    public async secureSend<T extends MSC4108Payload>(payload: T): Promise<void> {
         if (!this.connected) {
             throw new Error("Channel closed");
         }
@@ -183,7 +183,7 @@ export class MSC4108SecureChannel {
         await this.rendezvousSession.send(await this.encrypt(stringifiedPayload));
     }
 
-    public async secureReceive(): Promise<Partial<MSC4108Payload> | undefined> {
+    public async secureReceive<T extends MSC4108Payload>(): Promise<Partial<T> | undefined> {
         if (!this.establishedChannel) {
             throw new Error("Channel closed");
         }
@@ -196,7 +196,7 @@ export class MSC4108SecureChannel {
         const json = JSON.parse(plaintext);
 
         logger.info(`<= ${JSON.stringify(json)}`);
-        return json as any as Partial<MSC4108Payload>;
+        return json as Partial<T> | undefined;
     }
 
     public async close(): Promise<void> {}
