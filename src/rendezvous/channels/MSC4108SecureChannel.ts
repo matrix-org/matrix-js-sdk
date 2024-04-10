@@ -110,7 +110,7 @@ export class MSC4108SecureChannel {
                 if (candidateLoginOkMessage !== "MATRIX_QR_CODE_LOGIN_OK") {
                     throw new RendezvousError(
                         "Invalid response from other device",
-                        RendezvousFailureReason.DataMismatch,
+                        RendezvousFailureReason.InsecureChannelDetected,
                     );
                 }
 
@@ -140,7 +140,10 @@ export class MSC4108SecureChannel {
             this.establishedChannel = channel;
 
             if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
-                throw new RendezvousError("Invalid response from other device", RendezvousFailureReason.DataMismatch);
+                throw new RendezvousError(
+                    "Invalid response from other device",
+                    RendezvousFailureReason.InsecureChannelDetected,
+                );
             }
             logger.info("LoginInitiateMessage received");
 

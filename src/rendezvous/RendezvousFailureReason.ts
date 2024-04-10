@@ -22,7 +22,7 @@ export enum RendezvousFailureReason {
     Expired = "expired",
     UserCancelled = "user_cancelled",
     UnsupportedAlgorithm = "unsupported_algorithm",
-    DataMismatch = "data_mismatch",
+    InsecureChannelDetected = "insecure_channel_detected",
     HomeserverLacksSupport = "homeserver_lacks_support",
     UnexpectedMessage = "unexpected_message",
     DeviceAlreadyExists = "device_already_exists",
