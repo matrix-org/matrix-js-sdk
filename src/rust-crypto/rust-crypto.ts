@@ -23,7 +23,7 @@ import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger, Logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { RoomEncryptor } from "./RoomEncryptor";
@@ -39,6 +39,7 @@ import {
     CrossSigningStatus,
     CryptoCallbacks,
     Curve25519AuthData,
+    DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
     EventShieldColour,
@@ -70,11 +71,17 @@ import { randomString } from "../randomstring";
 import { ClientStoppedError } from "../errors";
 import { ISignatures } from "../@types/signed";
 import { encodeBase64 } from "../base64";
-import { DecryptionError } from "../crypto/algorithms";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
+import { DehydratedDeviceManager } from "./DehydratedDeviceManager";
+import { VerificationMethod } from "../types";
 
-const ALL_VERIFICATION_METHODS = ["m.sas.v1", "m.qr_code.scan.v1", "m.qr_code.show.v1", "m.reciprocate.v1"];
+const ALL_VERIFICATION_METHODS = [
+    VerificationMethod.Sas,
+    VerificationMethod.ScanQrCode,
+    VerificationMethod.ShowQrCode,
+    VerificationMethod.Reciprocate,
+];
 
 interface ISignableObject {
     signatures?: ISignatures;
@@ -101,9 +108,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private crossSigningIdentity: CrossSigningIdentity;
     private readonly backupManager: RustBackupManager;
     private outgoingRequestsManager: OutgoingRequestsManager;
-
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
-
+    private readonly dehydratedDeviceManager: DehydratedDeviceManager;
     private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
 
     public constructor(
@@ -142,14 +148,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
 
         this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
-
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             this.logger,
             this.olmMachine,
             this.http,
             this.backupManager,
         );
-
+        this.dehydratedDeviceManager = new DehydratedDeviceManager(
+            this.logger,
+            olmMachine,
+            http,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
 
         this.reemitter.reEmit(this.backupManager, [
@@ -206,6 +217,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.backupManager.stop();
         this.outgoingRequestsManager.stop();
         this.perSessionBackupDownloader.stop();
+        this.dehydratedDeviceManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
@@ -1206,6 +1218,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return await this.backupManager.importBackedUpRoomKeys(keys, opts);
     }
 
+    /**
+     * Implementation of {@link CryptoBackend#isDehydrationSupported}.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isSupported();
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#startDehydration}.
+     */
+    public async startDehydration(createNewKey?: boolean): Promise<void> {
+        if (!(await this.isCrossSigningReady()) || !(await this.isSecretStorageReady())) {
+            throw new Error("Device dehydration requires cross-signing and secret storage to be set up");
+        }
+        return await this.dehydratedDeviceManager.start(createNewKey);
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -1677,52 +1706,50 @@ class EventDecryptor {
                 forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
             };
         } catch (err) {
-            // We need to map back to regular decryption errors (used for analytics for example)
-            // The DecryptionErrors are used by react-sdk so is implicitly part of API, but poorly typed
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
-                const content = event.getWireContent();
-                let jsError;
-                switch (err.code) {
-                    case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey: {
-                        jsError = new DecryptionError(
-                            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
-                            "The sender's device has not sent us the keys for this message.",
-                            {
-                                session: content.sender_key + "|" + content.session_id,
-                            },
-                        );
-                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
-                            event.getRoomId()!,
-                            event.getWireContent().session_id!,
-                        );
-                        break;
-                    }
-                    case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex: {
-                        jsError = new DecryptionError(
-                            "OLM_UNKNOWN_MESSAGE_INDEX",
-                            "The sender's device has not sent us the keys for this message at this index.",
-                            {
-                                session: content.sender_key + "|" + content.session_id,
-                            },
-                        );
-                        this.perSessionBackupDownloader.onDecryptionKeyMissingError(
-                            event.getRoomId()!,
-                            event.getWireContent().session_id!,
-                        );
-                        break;
-                    }
-                    // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
-                    // Just put it on the `UNABLE_TO_DECRYPT` bucket.
-                    default: {
-                        jsError = new DecryptionError("UNABLE_TO_DECRYPT", err.description, {
-                            session: content.sender_key + "|" + content.session_id,
-                        });
-                        break;
-                    }
-                }
-                throw jsError;
+                this.onMegolmDecryptionError(event, err);
+            } else {
+                throw new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, "Unknown error");
             }
-            throw new DecryptionError("UNABLE_TO_DECRYPT", "Unknown error");
+        }
+    }
+
+    /**
+     * Handle a `MegolmDecryptionError` returned by the rust SDK.
+     *
+     * Fires off a request to the `perSessionBackupDownloader`, if appropriate, and then throws a `DecryptionError`.
+     */
+    private onMegolmDecryptionError(event: MatrixEvent, err: RustSdkCryptoJs.MegolmDecryptionError): never {
+        const content = event.getWireContent();
+
+        // If the error looks like it might be recoverable from backup, queue up a request to try that.
+        if (
+            err.code === RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey ||
+            err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
+        ) {
+            this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
+        }
+
+        const errorDetails = { session: content.sender_key + "|" + content.session_id };
+        switch (err.code) {
+            case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey:
+                throw new DecryptionError(
+                    DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
+                    "The sender's device has not sent us the keys for this message.",
+                    errorDetails,
+                );
+
+            case RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex:
+                throw new DecryptionError(
+                    DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX,
+                    "The sender's device has not sent us the keys for this message at this index.",
+                    errorDetails,
+                );
+
+            // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
+            // Just put it on the `UNKNOWN_ERROR` bucket.
+            default:
+                throw new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, err.description, errorDetails);
         }
     }
 

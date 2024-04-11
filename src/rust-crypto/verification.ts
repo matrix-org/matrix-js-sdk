@@ -35,6 +35,7 @@ import { TypedReEmitter } from "../ReEmitter";
 import { MatrixEvent } from "../models/event";
 import { EventType, MsgType } from "../@types/event";
 import { defer, IDeferred } from "../utils";
+import { VerificationMethod } from "../types";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -230,9 +231,9 @@ export class RustVerificationRequest
 
         const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
         if (verification instanceof RustSdkCryptoJs.Sas) {
-            return "m.sas.v1";
+            return VerificationMethod.Sas;
         } else if (verification instanceof RustSdkCryptoJs.Qr) {
-            return "m.reciprocate.v1";
+            return VerificationMethod.Reciprocate;
         } else {
             return null;
         }
@@ -336,7 +337,7 @@ export class RustVerificationRequest
      * @param method - the name of the verification method to use.
      */
     public async startVerification(method: string): Promise<Verifier> {
-        if (method !== "m.sas.v1") {
+        if (method !== VerificationMethod.Sas) {
             throw new Error(`Unsupported verification method ${method}`);
         }
 
@@ -756,10 +757,10 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
 
 /** For each specced verification method, the rust-side `VerificationMethod` corresponding to it */
 const verificationMethodsByIdentifier: Record<string, RustSdkCryptoJs.VerificationMethod> = {
-    "m.sas.v1": RustSdkCryptoJs.VerificationMethod.SasV1,
-    "m.qr_code.scan.v1": RustSdkCryptoJs.VerificationMethod.QrCodeScanV1,
-    "m.qr_code.show.v1": RustSdkCryptoJs.VerificationMethod.QrCodeShowV1,
-    "m.reciprocate.v1": RustSdkCryptoJs.VerificationMethod.ReciprocateV1,
+    [VerificationMethod.Sas]: RustSdkCryptoJs.VerificationMethod.SasV1,
+    [VerificationMethod.ScanQrCode]: RustSdkCryptoJs.VerificationMethod.QrCodeScanV1,
+    [VerificationMethod.ShowQrCode]: RustSdkCryptoJs.VerificationMethod.QrCodeShowV1,
+    [VerificationMethod.Reciprocate]: RustSdkCryptoJs.VerificationMethod.ReciprocateV1,
 };
 
 /**

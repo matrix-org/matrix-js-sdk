@@ -141,7 +141,7 @@ export interface DumpDataSetInfo {
     userId: string;
     /** The device ID to use for the test.*/
     deviceId: string;
-    /** The path to the dump file to import {@link populateStore}.*/
+    /** The path to the dump file to import via {@link populateStore}.*/
     dumpPath: string;
     /** The pickle key to use for the dumped account.*/
     pickleKey: string;

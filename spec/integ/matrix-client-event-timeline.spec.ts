@@ -36,6 +36,7 @@ import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 import { Feature, ServerSupport } from "../../src/feature";
+import { KnownMembership } from "../../src/@types/membership";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -63,7 +64,7 @@ const buildRelationPaginationQuery = (params: QueryDict): string => {
 
 const USER_MEMBERSHIP_EVENT = utils.mkMembership({
     room: roomId,
-    mship: "join",
+    mship: KnownMembership.Join,
     user: userId,
     name: userName,
     event: false,
@@ -98,7 +99,7 @@ const INITIAL_SYNC_DATA = {
                     events: [
                         withoutRoomId(ROOM_NAME_EVENT),
                         utils.mkMembership({
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             user: otherUserId,
                             name: "Bob",
                             event: false,
@@ -1921,7 +1922,7 @@ describe("MatrixClient event timelines", function () {
 
         // a state event, followed by a redaction thereof
         const event = utils.mkMembership({
-            mship: "join",
+            mship: KnownMembership.Join,
             user: otherUserId,
         });
         const redaction = utils.mkEvent({

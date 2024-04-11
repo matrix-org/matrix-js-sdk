@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AuthDict, IAuthData } from "../interactive-auth";
+import "oidc-client-ts";
 
-/**
- * Helper type to represent HTTP request body for a UIA enabled endpoint
- */
-export type UIARequest<T> = T & {
-    auth?: AuthDict;
-};
-
-/**
- * Helper type to represent HTTP response body for a UIA enabled endpoint
- */
-export type UIAResponse<T> = T | IAuthData;
+declare module "oidc-client-ts" {
+    interface OidcMetadata {
+        // Add the missing device_authorization_endpoint field to the OidcMetadata interface
+        device_authorization_endpoint?: string;
+    }
+}

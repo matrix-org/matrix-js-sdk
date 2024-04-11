@@ -1,3 +1,53 @@
+Changes in [32.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v32.0.0) (2024-04-09)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Remove various deprecated methods \& re-exports ([#4125](https://github.com/matrix-org/matrix-js-sdk/pull/4125)). Contributed by @t3chguy.
+* Remove the logic that throws when the lazy loading options has changed. ([#4124](https://github.com/matrix-org/matrix-js-sdk/pull/4124)). Contributed by @langleyd.
+* Fix highlights from threads disappearing on new messages ([#4106](https://github.com/matrix-org/matrix-js-sdk/pull/4106)). Contributed by @dbkr.
+
+## ✨ Features
+
+* Add new `decryptExistingEvent` test helper ([#4133](https://github.com/matrix-org/matrix-js-sdk/pull/4133)). Contributed by @richvdh.
+* Improve types for `sendEvent` ([#4108](https://github.com/matrix-org/matrix-js-sdk/pull/4108)). Contributed by @t3chguy.
+* Remove various deprecated methods \& re-exports ([#4125](https://github.com/matrix-org/matrix-js-sdk/pull/4125)). Contributed by @t3chguy.
+* Add new enum for verification methods. ([#4129](https://github.com/matrix-org/matrix-js-sdk/pull/4129)). Contributed by @richvdh.
+* Add some test utils in a new entrypoint ([#4127](https://github.com/matrix-org/matrix-js-sdk/pull/4127)). Contributed by @richvdh.
+* Improve types for `sendStateEvent` ([#4105](https://github.com/matrix-org/matrix-js-sdk/pull/4105)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Improve types for `IPowerLevelsContent` and `hasSufficientPowerLevelFor` ([#4128](https://github.com/matrix-org/matrix-js-sdk/pull/4128)). Contributed by @galash13.
+* Remove the logic that throws when the lazy loading options has changed. ([#4124](https://github.com/matrix-org/matrix-js-sdk/pull/4124)). Contributed by @langleyd.
+* Fix highlights from threads disappearing on new messages ([#4106](https://github.com/matrix-org/matrix-js-sdk/pull/4106)). Contributed by @dbkr.
+* Extend logic for local notification processing to threads ([#4111](https://github.com/matrix-org/matrix-js-sdk/pull/4111)). Contributed by @dbkr.
+* Fix public rooms post request search params and body ([#4110](https://github.com/matrix-org/matrix-js-sdk/pull/4110)). Contributed by @ajbura.
+* Fix bugs with the first reply to a thread ([#4104](https://github.com/matrix-org/matrix-js-sdk/pull/4104)). Contributed by @dbkr.
+
+
+Changes in [31.6.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.1) (2024-03-28)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix merging of default push rules ([#4136](https://github.com/matrix-org/matrix-js-sdk/pull/4136)).
+
+
+Changes in [31.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.6.0) (2024-03-26)
+==================================================================================================
+## ✨ Features
+
+* Introduce Membership TS type (take 2) ([#4107](https://github.com/matrix-org/matrix-js-sdk/pull/4107)). Contributed by @andybalaam.
+* fix automatic DM avatar with functional members ([#4017](https://github.com/matrix-org/matrix-js-sdk/pull/4017)). Contributed by @HarHarLinks.
+* Export types describing all specced media event formats ([#4092](https://github.com/matrix-org/matrix-js-sdk/pull/4092)). Contributed by @t3chguy.
+* Add `.m.rule.is_room_mention` push rule to DEFAULT\_OVERRIDE\_RULES ([#4100](https://github.com/matrix-org/matrix-js-sdk/pull/4100)). Contributed by @t3chguy.
+* Make sending ContentLoaded optional for a widgetClient ([#4086](https://github.com/matrix-org/matrix-js-sdk/pull/4086)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Migrate own identity local trust to rust crypto ([#4090](https://github.com/matrix-org/matrix-js-sdk/pull/4090)). Contributed by @BillCarsonFr.
+* Fix race condition with sliding sync extensions ([#4089](https://github.com/matrix-org/matrix-js-sdk/pull/4089)). Contributed by @zzorba.
+
+
 Changes in [31.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v31.5.0) (2024-03-12)
 ==================================================================================================
 ## ✨ Features

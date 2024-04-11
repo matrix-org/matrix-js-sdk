@@ -90,3 +90,19 @@ jobs:
                   path: _docs
                   # We'll only use this in a workflow_run, then we're done with it
                   retention-days: 1
+
+    analyse_dead_code:
+        name: "Analyse Dead Code"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - name: Run linter
+              run: "yarn run lint:knip"

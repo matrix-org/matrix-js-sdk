@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
+import { KnownMembership } from "../../../src/@types/membership";
 import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
@@ -76,7 +77,7 @@ describe("MatrixRTCSession", () => {
 
     it("ignores memberships events of members not in the room", () => {
         const mockRoom = makeMockRoom([membershipTemplate]);
-        mockRoom.hasMembershipState = (state) => state === "join";
+        mockRoom.hasMembershipState = (state) => state === KnownMembership.Join;
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess?.memberships.length).toEqual(0);
     });

@@ -16,17 +16,19 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { logger, Logger } from "../logger";
+import { Logger } from "../logger";
 import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/store/base";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
-import { BackupManager } from "../crypto/backup";
 import { decodeBase64 } from "../base64";
-import { RustCrypto } from "./rust-crypto";
 import { CrossSigningKeyInfo } from "../crypto-api";
+import { RustCrypto } from "./rust-crypto";
+import { KeyBackupInfo } from "../crypto-api/keybackup";
+import { sleep } from "../utils";
+import { BackupManager } from "../crypto/backup";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -107,7 +109,7 @@ export async function migrateFromLegacyCrypto(args: {
 
     if (migrationState === MigrationState.NOT_STARTED) {
         logger.info("Migrating data from legacy crypto store. Step 1: base data");
-        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle);
+        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle, logger);
 
         migrationState = MigrationState.INITIAL_DATA_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
@@ -146,6 +148,7 @@ async function migrateBaseData(
     legacyStore: CryptoStore,
     pickleKey: Uint8Array,
     storeHandle: RustSdkCryptoJs.StoreHandle,
+    logger: Logger,
 ): Promise<void> {
     const migrationData = new RustSdkCryptoJs.BaseMigrationData();
     migrationData.userId = new RustSdkCryptoJs.UserId(userId);
@@ -162,7 +165,18 @@ async function migrateBaseData(
     // If we have a backup recovery key, we need to try to figure out which backup version it is for.
     // All we can really do is ask the server for the most recent version.
     if (recoveryKey) {
-        const backupInfo = await requestKeyBackupVersion(http);
+        let backupCallDone = false;
+        let backupInfo: KeyBackupInfo | null = null;
+        while (!backupCallDone) {
+            try {
+                backupInfo = await requestKeyBackupVersion(http);
+                backupCallDone = true;
+            } catch (e) {
+                logger.info("Failed to get backup version during migration, retrying in 2 seconds", e);
+                // Retry until successful, use simple constant delay
+                await sleep(2000);
+            }
+        }
         if (backupInfo) {
             // check if the recovery key matches, as the active backup version may have changed since the key was cached
             // and the migration started.
