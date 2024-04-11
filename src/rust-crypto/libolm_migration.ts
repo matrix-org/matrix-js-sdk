@@ -446,7 +446,6 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
 }): Promise<void> {
     const { legacyCryptoStore, rustCrypto, logger } = args;
     // Get the public cross-signing identity from rust.
-    // If this is null that means that there are no cross-signing keys published server side.
     const rustOwnIdentity = await rustCrypto.getOwnIdentity();
     if (!rustOwnIdentity) {
         // There are no cross-signing keys published server side, so nothing to do here.
