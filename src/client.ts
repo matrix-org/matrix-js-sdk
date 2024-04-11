@@ -865,7 +865,7 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+export interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
     membership?: Membership;
     "im.nheko.summary.room_version"?: string;
     "im.nheko.summary.encryption"?: boolean;
