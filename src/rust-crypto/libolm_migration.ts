@@ -23,12 +23,10 @@ import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
-import { decodeBase64 } from "../base64";
-import { CrossSigningKeyInfo } from "../crypto-api";
+import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api";
 import { RustCrypto } from "./rust-crypto";
 import { KeyBackupInfo } from "../crypto-api/keybackup";
 import { sleep } from "../utils";
-import { BackupManager } from "../crypto/backup";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -177,19 +175,13 @@ async function migrateBaseData(
                 await sleep(2000);
             }
         }
-        if (backupInfo) {
+        if (backupInfo && backupInfo.algorithm == "m.megolm_backup.v1.curve25519-aes-sha2") {
             // check if the recovery key matches, as the active backup version may have changed since the key was cached
             // and the migration started.
-            const privateKey = decodeBase64(recoveryKey);
-            // for that we need libolm to be initialized
-            if (!global.Olm) {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                global.Olm = require("@matrix-org/olm");
-                global.Olm.init();
-            }
             try {
-                const alg = await BackupManager.makeAlgorithm(backupInfo, async () => [0]);
-                const isValid = await alg.keyMatches(privateKey);
+                const decryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(recoveryKey);
+                const publicKey = (backupInfo.auth_data as Curve25519AuthData)?.public_key;
+                const isValid = decryptionKey.megolmV1PublicKey.publicKeyBase64 == publicKey;
                 if (isValid) {
                     migrationData.backupVersion = backupInfo.version;
                     migrationData.backupRecoveryKey = recoveryKey;

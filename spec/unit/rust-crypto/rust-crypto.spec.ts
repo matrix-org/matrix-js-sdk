@@ -71,7 +71,6 @@ import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import { encryptAES } from "../../../src/crypto/aes";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
-import { BackupManager } from "../../../src/crypto/backup";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -206,12 +205,20 @@ describe("initRustCrypto", () => {
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
 
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                auth_data: {
+                    public_key: "backup_key_public",
+                },
+                version: "45",
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            });
             // The cached key should ba valid for the backup c
-            const mockAlgorithm: any = {
-                keyMatches: jest.fn().mockReturnValue(true),
+            const mockBackupDecryptionKey: any = {
+                megolmV1PublicKey: {
+                    publicKeyBase64: "backup_key_public",
+                },
             };
-            jest.spyOn(BackupManager, "makeAlgorithm").mockResolvedValue(mockAlgorithm);
+            jest.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);
