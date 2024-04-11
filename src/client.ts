@@ -9787,7 +9787,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param via - The list of servers which know about the room if only an ID was provided.
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
-        const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
+        const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
         return this.http.authedRequest(Method.Get, path, { via }, undefined, {
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });
