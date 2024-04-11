@@ -212,7 +212,7 @@ describe("initRustCrypto", () => {
                 version: "45",
                 algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
             });
-            // The cached key should ba valid for the backup c
+            // The cached key should ba valid for the backup
             const mockBackupDecryptionKey: any = {
                 megolmV1PublicKey: {
                     publicKeyBase64: "backup_key_public",

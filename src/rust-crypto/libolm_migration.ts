@@ -187,7 +187,6 @@ async function migrateBaseData(
                     migrationData.backupRecoveryKey = recoveryKey;
                 }
             } catch (e) {
-                // Unknown algorithm, we cannot migrate
                 logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
             }
         }
