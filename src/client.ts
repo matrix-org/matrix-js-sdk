@@ -866,9 +866,9 @@ interface IThirdPartyUser {
 }
 
 interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    room_type?: RoomType;
     membership?: Membership;
-    is_encrypted: boolean;
+    "im.nheko.summary.room_version"?: string;
+    "im.nheko.summary.encryption"?: boolean;
 }
 
 interface IRoomKeysResponse {
