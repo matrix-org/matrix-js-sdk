@@ -20,6 +20,7 @@ import {
     KeysQueryRequest,
     KeysUploadRequest,
     OlmMachine,
+    PutDehydratedDeviceRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
     ToDeviceRequest,
@@ -32,6 +33,7 @@ import { logDuration, QueryDict, sleep } from "../utils";
 import { AuthDict, UIAuthCallback } from "../interactive-auth";
 import { UIAResponse } from "../@types/uia";
 import { ToDeviceMessageId } from "../@types/event";
+import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -62,7 +64,7 @@ export class OutgoingRequestProcessor {
     ) {}
 
     public async makeOutgoingRequest<T>(
-        msg: OutgoingRequest | UploadSigningKeysRequest,
+        msg: OutgoingRequest | UploadSigningKeysRequest | PutDehydratedDeviceRequest,
         uiaCallback?: UIAuthCallback<T>,
     ): Promise<void> {
         let resp: string;
@@ -101,6 +103,11 @@ export class OutgoingRequestProcessor {
                 uiaCallback,
             );
             // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+            return;
+        } else if (msg instanceof PutDehydratedDeviceRequest) {
+            const path = DehydrationUnstablePrefix + "/dehydrated_device";
+            await this.rawJsonRequest(Method.Put, path, {}, msg.body);
+            // PutDehydratedDeviceRequest does not implement OutgoingRequest and does not need to be marked as sent.
             return;
         } else {
             logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));

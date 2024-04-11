@@ -496,6 +496,42 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Dehydrated devices
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns whether MSC3814 dehydrated devices are supported by the crypto
+     * backend and by the server.
+     *
+     * This should be called before calling `startDehydration`, and if this
+     * returns `false`, `startDehydration` should not be called.
+     */
+    isDehydrationSupported(): Promise<boolean>;
+
+    /**
+     * Start using device dehydration.
+     *
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
+     *   Storage.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
+     *
+     * This function must not be called unless `isDehydrationSupported` returns
+     * `true`, and must not be called until after cross-signing and secret
+     * storage have been set up.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.  Defaults
+     *   to false.
+     */
+    startDehydration(createNewKey?: boolean): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */
