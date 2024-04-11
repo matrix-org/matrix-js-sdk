@@ -71,6 +71,7 @@ import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import { encryptAES } from "../../../src/crypto/aes";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
+import { BackupManager } from "../../../src/crypto/backup";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -206,6 +207,11 @@ describe("initRustCrypto", () => {
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
+            // The cached key should ba valid for the backup c
+            const mockAlgorithm: any = {
+                keyMatches: jest.fn().mockReturnValue(true),
+            };
+            jest.spyOn(BackupManager, "makeAlgorithm").mockResolvedValue(mockAlgorithm);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);
