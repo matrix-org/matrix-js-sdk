@@ -353,70 +353,56 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             // Complete initial sync, to get the 4S account_data events stored
             mockInitialApiRequests(aliceClient.getHomeserverUrl());
+
+            // For this test we need to have a well-formed 4S setup.
+            const mockSecretInfo = {
+                encrypted: {
+                    // Don't care about the actual values here, just need to be present for validation
+                    KeyId: {
+                        iv: "IVIVIVIVIVIVIV",
+                        ciphertext: "CIPHERTEXTB64",
+                        mac: "MACMACMAC",
+                    },
+                },
+            };
             syncResponder.sendOrQueueSyncResponse({
                 next_batch: 1,
                 account_data: {
                     events: [
                         {
-                            type: "m.secret_storage.key.lGZnUDzNKXGXR083k8JVKAtGSiBj5Dv1",
+                            type: "m.secret_storage.key.KeyId",
                             content: {
                                 algorithm: "m.secret_storage.v1.aes-hmac-sha2",
-                                passphrase: {
-                                    algorithm: "m.pbkdf2",
-                                    iterations: 500000,
-                                    salt: "W7O4C37CwdK5o6tvZtc7FYBYLBU5XJfN",
-                                },
-                                iv: "LGQi6b/F4qQCkXt2gLVwuw==",
-                                mac: "KdZHA+WyHxVSXuHeBD7LDioAbiw7M3ylhl5edGqyXNU=",
+                                // iv and mac not relevant for this test
                             },
                         },
                         {
                             type: "m.secret_storage.default_key",
                             content: {
-                                key: "lGZnUDzNKXGXR083k8JVKAtGSiBj5Dv1",
+                                key: "KeyId",
                             },
                         },
                         {
                             type: "m.cross_signing.master",
-                            content: {
-                                encrypted: {
-                                    lGZnUDzNKXGXR083k8JVKAtGSiBj5Dv1: {
-                                        iv: "6L66/iD9KZg6DVdOMfEXgQ==",
-                                        ciphertext: "S42Ez1Xpm29SWPb9gQAKzV4WkfX9B5xU+CXG4TzdsYi1bVEXQ5Eps+z6Pw==",
-                                        mac: "iwyUtX2wdGKF+ljiMa9Le0Ub0ci7qQLWXAsN8Qp6JDE=",
-                                    },
-                                },
-                            },
+                            content: mockSecretInfo,
                         },
                         {
                             type: "m.cross_signing.user_signing",
-                            content: {
-                                encrypted: {
-                                    lGZnUDzNKXGXR083k8JVKAtGSiBj5Dv1: {
-                                        iv: "MBt9eQi5O8UOPV7HRbr3rA==",
-                                        ciphertext: "eDRiI9nXa4kSZxwuW/j+JYlvSYqGbauffnlv3+Cyz6xbkWvZu3kcirhK8Q==",
-                                        mac: "f47JSj6piHEeaavTa03wqWouuNfhIHuSFX6HGatmu0k=",
-                                    },
-                                },
-                            },
+                            content: mockSecretInfo,
                         },
                         {
                             type: "m.cross_signing.self_signing",
-                            content: {
-                                encrypted: {
-                                    lGZnUDzNKXGXR083k8JVKAtGSiBj5Dv1: {
-                                        iv: "6YJA6EYa72xbttCd981DZw==",
-                                        ciphertext: "1ZVy5fWqLPCVsJPvi2L/Pw9uS1D02MkeZ8zNwh7knA8hveOMO2PBslf8EQ==",
-                                        mac: "2EXorwWE5unhdsLx+IO7hxhZwolHyKoLV2ZKaRJoBlQ=",
-                                    },
-                                },
-                            },
+                            content: mockSecretInfo,
                         },
                     ],
                 },
             });
             await aliceClient.startClient();
             await syncPromise(aliceClient);
+
+            // Sanity: ensure that the secrets are in 4S
+            const status = await aliceClient.getCrypto()!.getCrossSigningStatus();
+            expect(status.privateKeysInSecretStorage).toBeTruthy();
 
             const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
 
