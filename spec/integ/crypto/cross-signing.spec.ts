@@ -348,7 +348,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(isCrossSigningReady).toBeTruthy();
         });
 
-        it("should return false if identity is not trusted and secrets in 4S", async () => {
+        it("should return false if identity is not trusted, even if the secrets are in 4S", async () => {
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
             // Complete initial sync, to get the 4S account_data events stored
