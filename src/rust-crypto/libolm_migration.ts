@@ -187,9 +187,11 @@ async function migrateBaseData(
                     migrationData.backupVersion = backupInfo.version;
                     migrationData.backupRecoveryKey = recoveryKey;
                 } else {
-                    logger.debug("The backup key to migrate does not match the active backup version",
+                    logger.debug(
+                        "The backup key to migrate does not match the active backup version",
                         `Cached pub key: ${decryptionKey.megolmV1PublicKey.publicKeyBase64}`,
-                        `Active pub key: ${publicKey}`);
+                        `Active pub key: ${publicKey}`,
+                    );
                 }
             } catch (e) {
                 logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
