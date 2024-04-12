@@ -19,7 +19,7 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, KnockRoomOpts, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import { Filter, JoinRule, KnockRoomOpts, MemoryStore, Method, Room, RoomSummary, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -1708,6 +1708,38 @@ describe("MatrixClient", function () {
                 .respond(200, {});
 
             await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
+        });
+    });
+
+    describe("getRoomSummary", () => {
+        it("answers with a valid room summary object", () => {
+            const roomId = "!foo:bar";
+
+            const roomSummary: RoomSummary = {
+                room_id: roomId,
+                name: "My Room",
+                avatar_url: "",
+                topic: "My room topic",
+                world_readable: false,
+                guest_can_join: false,
+                num_joined_members: 1,
+                room_type: "",
+                join_rule: JoinRule.Public,
+                membership: "leave",
+                "im.nheko.summary.room_version": "6",
+                "im.nheko.summary.encryption": "algo",
+            };
+
+            httpBackend
+                .when("GET", "/_matrix/client/unstable/im.nheko.summary/summary/" + encodeURIComponent(roomId))
+                .respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then(response => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
         });
     });
 });
