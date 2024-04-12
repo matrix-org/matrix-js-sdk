@@ -161,7 +161,8 @@ async function migrateBaseData(
     const recoveryKey = await getAndDecryptCachedSecretKey(legacyStore, pickleKey, "m.megolm_backup.v1");
 
     // If we have a backup recovery key, we need to try to figure out which backup version it is for.
-    // All we can really do is ask the server for the most recent version.
+    // All we can really do is ask the server for the most recent version and check if the cached key we have matches.
+    // It is possible that the backup has changed since last time his session was opened.
     if (recoveryKey) {
         let backupCallDone = false;
         let backupInfo: KeyBackupInfo | null = null;
@@ -185,6 +186,10 @@ async function migrateBaseData(
                 if (isValid) {
                     migrationData.backupVersion = backupInfo.version;
                     migrationData.backupRecoveryKey = recoveryKey;
+                } else {
+                    logger.debug("The backup key to migrate does not match the active backup version",
+                        `Cached pub key: ${decryptionKey.megolmV1PublicKey.publicKeyBase64}`,
+                        `Active pub key: ${publicKey}`);
                 }
             } catch (e) {
                 logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
