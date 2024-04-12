@@ -17,7 +17,7 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Curve25519AuthData, KeyBackupSession } from "../crypto-api/keybackup";
+import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
 import { Logger } from "../logger";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
 import { RustBackupManager } from "./backup";
@@ -130,6 +130,15 @@ export class PerSessionKeyBackupDownloader {
      */
     public isKeyBackupDownloadConfigured(): boolean {
         return this.configuration !== null;
+    }
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This is just a convenience method to expose {@link RustBackupManager.getServerBackupInfo}.
+     */
+    public async getServerBackupInfo(): Promise<KeyBackupInfo | null | undefined> {
+        return await this.backupManager.getServerBackupInfo();
     }
 
     /**
@@ -423,7 +432,7 @@ export class PerSessionKeyBackupDownloader {
     private async internalCheckFromServer(): Promise<Configuration | null> {
         let currentServerVersion = null;
         try {
-            currentServerVersion = await this.backupManager.requestKeyBackupVersion();
+            currentServerVersion = await this.backupManager.getServerBackupInfo();
         } catch (e) {
             this.logger.debug(`Backup: error while checking server version: ${e}`);
             this.hasConfigurationProblem = true;
