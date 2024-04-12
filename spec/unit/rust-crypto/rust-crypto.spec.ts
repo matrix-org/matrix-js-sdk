@@ -762,8 +762,11 @@ describe("RustCrypto", () => {
                             },
                         },
                     };
-                } else if (request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) {
-                    // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+                } else if (
+                    request instanceof RustSdkCryptoJs.UploadSigningKeysRequest ||
+                    request instanceof RustSdkCryptoJs.PutDehydratedDeviceRequest
+                ) {
+                    // These request types do not implement OutgoingRequest and do not need to be marked as sent.
                     return;
                 }
                 if (request.id) {
@@ -1393,6 +1396,34 @@ describe("RustCrypto", () => {
                 stage: "load_keys",
                 failures: 1,
             });
+        });
+    });
+
+    describe("device dehydration", () => {
+        it("should detect if dehydration is supported", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            fetchMock.config.overwriteRoutes = true;
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(false);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: "DEVICE_ID",
+                device_data: "data",
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
         });
     });
 
