@@ -9801,10 +9801,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param via - The list of servers which know about the room if only an ID was provided.
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-        return this.http.authedRequest(Method.Get, path, { via }, undefined, {
+        const paramOpts = {
             prefix: "/_matrix/client/unstable/im.nheko.summary",
-        });
+        };
+        try {
+            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
+            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
+                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**
