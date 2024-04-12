@@ -865,9 +865,23 @@ interface IThirdPartyUser {
     fields: object;
 }
 
+/**
+ * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
+ * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+ */
 export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+    /**
+     * The current membership of this user in the room.
+     * Usually "leave" if the room is fetched over federation.
+     */
     "membership"?: Membership;
+    /**
+     * Version of the room.
+     */
     "im.nheko.summary.room_version"?: string;
+    /**
+     * The encryption algorithm used for this room, if the room is encrypted.
+     */
     "im.nheko.summary.encryption"?: string;
 }
 
