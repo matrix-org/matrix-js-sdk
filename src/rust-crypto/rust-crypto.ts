@@ -618,8 +618,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         const identity = await this.getOwnIdentity();
 
-        // The cross signing is ready if cross-signing is set up, the identity is trusted,
-        // and private keys are available somewhere.
+        // Cross-signing is ready if the public identity is trusted, and the private keys 
+        // are either cached, or accessible via secret-storage.
         return !!identity?.isVerified() && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
