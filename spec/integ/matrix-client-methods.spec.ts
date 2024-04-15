@@ -1743,10 +1743,16 @@ describe("MatrixClient", function () {
         const suffix = `summary/${encodedRoomId}`;
         const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
 
-        const errorStatus = 404;
-        const errorBody = {
+        const errorUnrecogStatus = 404;
+        const errorUnrecogBody = {
             errcode: "M_UNRECOGNIZED",
             error: "Unsupported endpoint",
+        };
+
+        const errorBadreqStatus = 400;
+        const errorBadreqBody = {
+            errcode: "M_UNKNOWN",
+            error: "Invalid request",
         };
 
         it("should respond with a valid room summary object", () => {
@@ -1761,7 +1767,7 @@ describe("MatrixClient", function () {
         });
 
         it("should allow fallback to the deprecated endpoint", () => {
-            httpBackend.when("GET", prefix + suffix).respond(errorStatus, errorBody);
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
             httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, roomSummary);
 
             const prom = client.getRoomSummary(roomId).then((response) => {
@@ -1772,18 +1778,36 @@ describe("MatrixClient", function () {
             return prom;
         });
 
-        it("should respond with error if unsupported", () => {
-            httpBackend.when("GET", prefix + suffix).respond(errorStatus, errorBody);
-            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorStatus, errorBody);
+        it("should respond to unsupported path with error", () => {
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
 
             const prom = client.getRoomSummary(roomId).then(
                 function (response) {
                     throw Error("request not failed");
                 },
                 function (error) {
-                    expect(error.httpStatus).toEqual(errorStatus);
-                    expect(error.errcode).toEqual(errorBody.errcode);
-                    expect(error.message).toEqual(`MatrixError: [${errorStatus}] ${errorBody.error}`);
+                    expect(error.httpStatus).toEqual(errorUnrecogStatus);
+                    expect(error.errcode).toEqual(errorUnrecogBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorUnrecogStatus}] ${errorUnrecogBody.error}`);
+                },
+            );
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond to invalid path arguments with error", () => {
+            httpBackend.when("GET", prefix).respond(errorBadreqStatus, errorBadreqBody);
+
+            const prom = client.getRoomSummary("notAroom").then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorBadreqStatus);
+                    expect(error.errcode).toEqual(errorBadreqBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorBadreqStatus}] ${errorBadreqBody.error}`);
                 },
             );
 
