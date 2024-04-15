@@ -1776,11 +1776,16 @@ describe("MatrixClient", function () {
             httpBackend.when("GET", prefix + suffix).respond(errorStatus, errorBody);
             httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorStatus, errorBody);
 
-            const prom = client.getRoomSummary(roomId).catch((error) => {
-                expect(error.httpStatus).toEqual(errorStatus);
-                expect(error.errcode).toEqual(errorBody.errcode);
-                expect(error.message).toEqual(`MatrixError: [${errorStatus}] ${errorBody.error}`);
-            });
+            const prom = client.getRoomSummary(roomId).then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorStatus);
+                    expect(error.errcode).toEqual(errorBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorStatus}] ${errorBody.error}`);
+                },
+            );
 
             httpBackend.flush("");
             return prom;
