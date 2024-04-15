@@ -1750,9 +1750,7 @@ describe("MatrixClient", function () {
         };
 
         it("should respond with a valid room summary object", () => {
-            httpBackend
-                .when("GET", prefix + suffix)
-                .respond(200, roomSummary);
+            httpBackend.when("GET", prefix + suffix).respond(200, roomSummary);
 
             const prom = client.getRoomSummary(roomId).then((response) => {
                 expect(response).toEqual(roomSummary);
@@ -1763,12 +1761,8 @@ describe("MatrixClient", function () {
         });
 
         it("should allow fallback to the deprecated endpoint", () => {
-            httpBackend
-                .when("GET", prefix + suffix)
-                .respond(errorStatus, errorBody);
-            httpBackend
-                .when("GET", prefix + deprecatedSuffix)
-                .respond(200, roomSummary);
+            httpBackend.when("GET", prefix + suffix).respond(errorStatus, errorBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, roomSummary);
 
             const prom = client.getRoomSummary(roomId).then((response) => {
                 expect(response).toEqual(roomSummary);
@@ -1779,12 +1773,8 @@ describe("MatrixClient", function () {
         });
 
         it("should respond with error if unsupported", () => {
-            httpBackend
-                .when("GET", prefix + suffix)
-                .respond(errorStatus, errorBody);
-            httpBackend
-                .when("GET", prefix + deprecatedSuffix)
-                .respond(errorStatus, errorBody);
+            httpBackend.when("GET", prefix + suffix).respond(errorStatus, errorBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorStatus, errorBody);
 
             const prom = client.getRoomSummary(roomId).catch((error) => {
                 expect(error.httpStatus).toEqual(errorStatus);
