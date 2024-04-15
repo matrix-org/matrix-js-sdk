@@ -23,7 +23,7 @@ import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
-import { CrossSigningKeyInfo } from "../crypto-api";
+import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api";
 import { RustCrypto } from "./rust-crypto";
 import { KeyBackupInfo } from "../crypto-api/keybackup";
 import { sleep } from "../utils";
@@ -161,7 +161,8 @@ async function migrateBaseData(
     const recoveryKey = await getAndDecryptCachedSecretKey(legacyStore, pickleKey, "m.megolm_backup.v1");
 
     // If we have a backup recovery key, we need to try to figure out which backup version it is for.
-    // All we can really do is ask the server for the most recent version.
+    // All we can really do is ask the server for the most recent version and check if the cached key we have matches.
+    // It is possible that the backup has changed since last time his session was opened.
     if (recoveryKey) {
         let backupCallDone = false;
         let backupInfo: KeyBackupInfo | null = null;
@@ -175,9 +176,26 @@ async function migrateBaseData(
                 await sleep(2000);
             }
         }
-        if (backupInfo) {
-            migrationData.backupVersion = backupInfo.version;
-            migrationData.backupRecoveryKey = recoveryKey;
+        if (backupInfo && backupInfo.algorithm == "m.megolm_backup.v1.curve25519-aes-sha2") {
+            // check if the recovery key matches, as the active backup version may have changed since the key was cached
+            // and the migration started.
+            try {
+                const decryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(recoveryKey);
+                const publicKey = (backupInfo.auth_data as Curve25519AuthData)?.public_key;
+                const isValid = decryptionKey.megolmV1PublicKey.publicKeyBase64 == publicKey;
+                if (isValid) {
+                    migrationData.backupVersion = backupInfo.version;
+                    migrationData.backupRecoveryKey = recoveryKey;
+                } else {
+                    logger.debug(
+                        "The backup key to migrate does not match the active backup version",
+                        `Cached pub key: ${decryptionKey.megolmV1PublicKey.publicKeyBase64}`,
+                        `Active pub key: ${publicKey}`,
+                    );
+                }
+            } catch (e) {
+                logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
+            }
         }
     }
 
