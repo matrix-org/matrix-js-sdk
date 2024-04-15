@@ -1721,30 +1721,75 @@ describe("MatrixClient", function () {
     });
 
     describe("getRoomSummary", () => {
-        it("answers with a valid room summary object", () => {
-            const roomId = "!foo:bar";
+        const roomId = "!foo:bar";
+        const encodedRoomId = encodeURIComponent(roomId);
 
-            const roomSummary: RoomSummary = {
-                "room_id": roomId,
-                "name": "My Room",
-                "avatar_url": "",
-                "topic": "My room topic",
-                "world_readable": false,
-                "guest_can_join": false,
-                "num_joined_members": 1,
-                "room_type": "",
-                "join_rule": JoinRule.Public,
-                "membership": "leave",
-                "im.nheko.summary.room_version": "6",
-                "im.nheko.summary.encryption": "algo",
-            };
+        const roomSummary: RoomSummary = {
+            "room_id": roomId,
+            "name": "My Room",
+            "avatar_url": "",
+            "topic": "My room topic",
+            "world_readable": false,
+            "guest_can_join": false,
+            "num_joined_members": 1,
+            "room_type": "",
+            "join_rule": JoinRule.Public,
+            "membership": "leave",
+            "im.nheko.summary.room_version": "6",
+            "im.nheko.summary.encryption": "algo",
+        };
 
+        const prefix = "/_matrix/client/unstable/im.nheko.summary/";
+        const suffix = `summary/${encodedRoomId}`;
+        const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
+
+        const errorStatus = 404;
+        const errorBody = {
+            errcode: "M_UNRECOGNIZED",
+            error: "Unsupported endpoint",
+        };
+
+        it("should respond with a valid room summary object", () => {
             httpBackend
-                .when("GET", "/_matrix/client/unstable/im.nheko.summary/summary/" + encodeURIComponent(roomId))
+                .when("GET", prefix + suffix)
                 .respond(200, roomSummary);
 
             const prom = client.getRoomSummary(roomId).then((response) => {
                 expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should allow fallback to the deprecated endpoint", () => {
+            httpBackend
+                .when("GET", prefix + suffix)
+                .respond(errorStatus, errorBody);
+            httpBackend
+                .when("GET", prefix + deprecatedSuffix)
+                .respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then((response) => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond with error if unsupported", () => {
+            httpBackend
+                .when("GET", prefix + suffix)
+                .respond(errorStatus, errorBody);
+            httpBackend
+                .when("GET", prefix + deprecatedSuffix)
+                .respond(errorStatus, errorBody);
+
+            const prom = client.getRoomSummary(roomId).catch((error) => {
+                expect(error.httpStatus).toEqual(errorStatus);
+                expect(error.errcode).toEqual(errorBody.errcode);
+                expect(error.message).toEqual(`MatrixError: [${errorStatus}] ${errorBody.error}`);
             });
 
             httpBackend.flush("");
