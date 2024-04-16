@@ -125,7 +125,7 @@
         "typedoc-plugin-missing-exports": "^2.0.0",
         "typescript": "^5.3.3",
         "node-fetch": "^2.7.0",
-        "knip": "^4.0.1",
+        "knip": "^5.0.0",
         "@peculiar/webcrypto": "^1.4.5"
     },
     "@casualbot/jest-sonar-reporter": {
