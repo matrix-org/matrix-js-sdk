@@ -542,6 +542,24 @@ export enum DecryptionFailureCode {
     /** Message was encrypted with a Megolm session which has been shared with us, but in a later ratchet state. */
     OLM_UNKNOWN_MESSAGE_INDEX = "OLM_UNKNOWN_MESSAGE_INDEX",
 
+    /**
+     * Message was sent before the current device was created; there is no key backup on the server, so this
+     * decryption failure is expected.
+     */
+    HISTORICAL_MESSAGE_NO_KEY_BACKUP = "HISTORICAL_MESSAGE_NO_KEY_BACKUP",
+
+    /**
+     * Message was sent before the current device was created; there was a key backup on the server, but we don't
+     * seem to have access to the backup. (Probably we don't have the right key.)
+     */
+    HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED = "HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED",
+
+    /**
+     * Message was sent before the current device was created; there was a (usable) key backup on the server, but we
+     * still can't decrypt. (Either the session isn't in the backup, or we just haven't gotten around to checking yet.)
+     */
+    HISTORICAL_MESSAGE_WORKING_BACKUP = "HISTORICAL_MESSAGE_WORKING_BACKUP",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 
