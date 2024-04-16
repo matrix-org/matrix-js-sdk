@@ -17,7 +17,7 @@ limitations under the License.
 import { OidcClient } from "oidc-client-ts";
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
+import { MSC4108FailureReason, RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
