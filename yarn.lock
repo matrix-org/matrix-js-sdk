@@ -5482,7 +5482,7 @@ min-indent@^1.0.0:
   resolved "https://registry.yarnpkg.com/min-indent/-/min-indent-1.0.1.tgz#a63f681673b30571fbe8bc25686ae746eefa9869"
   integrity sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==
 
-minimatch@9.0.3, minimatch@^9.0.1, minimatch@^9.0.3:
+minimatch@9.0.3, minimatch@^9.0.1:
   version "9.0.3"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-9.0.3.tgz#a6e00c3de44c3a542bfaae70abfc22420a6da825"
   integrity sha512-RHiac9mvaRw0x3AYRgDC1CxAP7HTcNrrECeA8YYJeWnpo+2Q5CegtZjaotWTWxDG3UeGA1coE05iH1mPjT/2mg==
@@ -5496,7 +5496,7 @@ minimatch@^3.0.4, minimatch@^3.0.5, minimatch@^3.1.1, minimatch@^3.1.2:
   dependencies:
     brace-expansion "^1.1.7"
 
-minimatch@^9.0.0, minimatch@^9.0.4:
+minimatch@^9.0.0, minimatch@^9.0.3, minimatch@^9.0.4:
   version "9.0.4"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-9.0.4.tgz#8e49c731d1749cbec05050ee5145147b32496a51"
   integrity sha512-KqWh+VchfxcMNRAJjj2tnsSJdNbHsVgnkBhTNrW7AjVo6OvLtxw8zfT9oLw1JSohlFzJ8jCoTgaoXvJ+kHt6fw==
@@ -6924,9 +6924,9 @@ typedoc-plugin-coverage@^3.0.0:
   integrity sha512-fxeJRrxQR3yM/aFZU7mOuatgRCztiMCbeNiCRVZKY6VNgOcVMC1HS+ZfZnlbLLteUOdeWleSQ6yntuipz5zi6A==
 
 typedoc-plugin-mdn-links@^3.0.3:
-  version "3.1.18"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.18.tgz#736df9b90245583aa00d726d6eec474e0cbec37a"
-  integrity sha512-BGzSUEHT15o3g2Q1q/5tBQufAM+yqJNwU1aUmYZC9qbfCS1I5qyEkmoxZ9ks2Z3TwPTZ8PMfIKd2vq5/0nmLnw==
+  version "3.1.21"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.21.tgz#bde151737be1c301117329aacf930cf701cfd860"
+  integrity sha512-RbGsC6RFDp4u5dhSj+e489dXCDM6CIBin6lluPdpwOZ5C7kCbrvIyh8tSnNd8/vLoSPYVj2wwTu6HbRSjI8fLQ==
 
 typedoc-plugin-missing-exports@^2.0.0:
   version "2.2.0"
@@ -6934,9 +6934,9 @@ typedoc-plugin-missing-exports@^2.0.0:
   integrity sha512-2+XR1IcyQ5UwXZVJe9NE6HrLmNufT9i5OwoIuuj79VxuA3eYq+Y6itS9rnNV1D7UeQnUSH8kISYD73gHE5zw+w==
 
 typedoc@^0.25.10:
-  version "0.25.12"
-  resolved "https://registry.yarnpkg.com/typedoc/-/typedoc-0.25.12.tgz#f73f0a8d3731d418cc604d4230f95a857799e27a"
-  integrity sha512-F+qhkK2VoTweDXd1c42GS/By2DvI2uDF4/EpG424dTexSHdtCH52C6IcAvMA6jR3DzAWZjHpUOW+E02kyPNUNw==
+  version "0.25.13"
+  resolved "https://registry.yarnpkg.com/typedoc/-/typedoc-0.25.13.tgz#9a98819e3b2d155a6d78589b46fa4c03768f0922"
+  integrity sha512-pQqiwiJ+Z4pigfOnnysObszLiU3mVLWAExSPf+Mu06G/qsc3wzbuM56SZQvONhHLncLUhYzOVkjFFpFfL5AzhQ==
   dependencies:
     lunr "^2.3.9"
     marked "^4.3.0"
