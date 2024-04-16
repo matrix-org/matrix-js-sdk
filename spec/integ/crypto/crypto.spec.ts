@@ -469,6 +469,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("Unable to decrypt error codes", function () {
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        });
+
         it("Decryption fails with UISI error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
