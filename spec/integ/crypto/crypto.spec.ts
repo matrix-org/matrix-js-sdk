@@ -108,6 +108,8 @@ afterEach(() => {
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
+
+    jest.useRealTimers();
 });
 
 /**
@@ -996,10 +998,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             ]);
             return encryptedMessage;
         }
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
 
         newBackendOnly("should rotate the session after 2 messages", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -2184,10 +2182,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
             return new Promise((resolve) => {
                 const listener = (url: string, options: RequestInit) => {
@@ -2250,10 +2244,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("getUserDeviceInfo", () => {
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
         // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
         const queryResponseBody = {
@@ -2740,10 +2730,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             beforeEach(async () => {
                 // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
                 jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-            });
-
-            afterEach(() => {
-                jest.useRealTimers();
             });
 
             it("Should be able to restore from 4S after bootstrap", async () => {
