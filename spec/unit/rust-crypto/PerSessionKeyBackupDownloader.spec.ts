@@ -90,7 +90,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         mockRustBackupManager = {
             getActiveBackupVersion: jest.fn(),
-            requestKeyBackupVersion: jest.fn(),
+            getServerBackupInfo: jest.fn(),
             importBackedUpRoomKeys: jest.fn(),
             createBackupDecryptor: jest.fn().mockReturnValue(mockBackupDecryptor),
             on: jest.fn().mockImplementation((event, listener) => {
@@ -135,7 +135,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
 
-            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.getServerBackupInfo.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
         });
 
         it("Should download and import a missing key from backup", async () => {
@@ -155,8 +155,11 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError(roomId, sessionId);
 
+            // `isKeyBackupDownloadConfigured` is false until the config is proven.
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
             await expectAPICall;
             await awaitKeyImported.promise;
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(true);
             expect(mockRustBackupManager.createBackupDecryptor).toHaveBeenCalledTimes(1);
         });
 
@@ -313,6 +316,9 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+
+            // isKeyBackupDownloadConfigured remains false
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
 
         it("Should not query server if backup not active", async () => {
@@ -328,6 +334,9 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+
+            // isKeyBackupDownloadConfigured remains false
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
 
         it("Should stop if backup key is not cached", async () => {
@@ -344,6 +353,9 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+
+            // isKeyBackupDownloadConfigured remains false
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
 
         it("Should stop if backup key cached as wrong version", async () => {
@@ -363,6 +375,9 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+
+            // isKeyBackupDownloadConfigured remains false
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
 
         it("Should stop if backup key version does not match the active one", async () => {
@@ -382,13 +397,16 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+
+            // isKeyBackupDownloadConfigured remains false
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
     });
 
     describe("Given Backup state update", () => {
         it("After initial sync, when backup becomes trusted it should request keys for past requests", async () => {
             // there is a backup
-            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.getServerBackupInfo.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
 
             // but at this point it's not trusted and we don't have the key
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
@@ -410,6 +428,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // @ts-ignore access to private property
             expect(downloader.hasConfigurationProblem).toEqual(true);
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
 
             // Now the backup becomes trusted
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
@@ -423,6 +442,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
 
             await jest.runAllTimersAsync();
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(true);
 
             await a0Imported;
             await a1Imported;
@@ -434,7 +454,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     describe("Error cases", () => {
         beforeEach(async () => {
             // there is a backup
-            mockRustBackupManager.requestKeyBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
+            mockRustBackupManager.getServerBackupInfo.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
             // It's trusted
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // And we have the key in cache
