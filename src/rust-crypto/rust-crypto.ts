@@ -610,15 +610,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
-        const { publicKeysOnDevice, privateKeysInSecretStorage, privateKeysCachedLocally } =
-            await this.getCrossSigningStatus();
+        const { privateKeysInSecretStorage, privateKeysCachedLocally } = await this.getCrossSigningStatus();
         const hasKeysInCache =
             Boolean(privateKeysCachedLocally.masterKey) &&
             Boolean(privateKeysCachedLocally.selfSigningKey) &&
             Boolean(privateKeysCachedLocally.userSigningKey);
 
-        // The cross signing is ready if the public and private keys are available
-        return publicKeysOnDevice && (hasKeysInCache || privateKeysInSecretStorage);
+        const identity = await this.getOwnIdentity();
+
+        // Cross-signing is ready if the public identity is trusted, and the private keys
+        // are either cached, or accessible via secret-storage.
+        return !!identity?.isVerified() && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
