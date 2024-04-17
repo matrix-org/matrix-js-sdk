@@ -28,7 +28,7 @@ import {
     MSC4108FailureReason,
     MSC4108Payload,
     RendezvousError,
-    RendezvousFailureReason,
+    RendezvousFailureListener,
 } from "..";
 import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession";
 import { logger } from "../../logger";
@@ -44,7 +44,7 @@ export class MSC4108SecureChannel {
     public constructor(
         private rendezvousSession: MSC4108RendezvousSession,
         private theirPublicKey?: Curve25519PublicKey,
-        public onFailure?: (reason: RendezvousFailureReason) => void,
+        public onFailure?: RendezvousFailureListener,
     ) {
         this.secureChannel = new SecureChannel();
     }
@@ -213,7 +213,7 @@ export class MSC4108SecureChannel {
 
     public async close(): Promise<void> {}
 
-    public async cancel(reason: RendezvousFailureReason): Promise<void> {
+    public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         try {
             await this.rendezvousSession.cancel(reason);
             this.onFailure?.(reason);

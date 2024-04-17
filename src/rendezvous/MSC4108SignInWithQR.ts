@@ -17,7 +17,7 @@ limitations under the License.
 import { OidcClient } from "oidc-client-ts";
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { MSC4108FailureReason, RendezvousError, RendezvousFailureListener, RendezvousFailureReason } from ".";
+import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener } from ".";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
@@ -376,7 +376,7 @@ export class MSC4108SignInWithQR {
         });
     }
 
-    public async cancel(reason: RendezvousFailureReason): Promise<void> {
+    public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         this.onFailure?.(reason);
         await this.channel.cancel(reason);
     }

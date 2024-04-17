@@ -16,7 +16,7 @@ limitations under the License.
 
 import { logger } from "../../logger";
 import { sleep } from "../../utils";
-import { ClientRendezvousFailureReason, RendezvousFailureListener, RendezvousFailureReason } from "..";
+import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousFailureListener } from "..";
 import { MatrixClient } from "../../matrix";
 import { ClientPrefix } from "../../http-api";
 
@@ -187,7 +187,7 @@ export class MSC4108RendezvousSession {
         }
     }
 
-    public async cancel(reason: RendezvousFailureReason): Promise<void> {
+    public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         if (
             reason === ClientRendezvousFailureReason.Unknown &&
             this.expiresAt &&
