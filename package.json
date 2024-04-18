@@ -22,7 +22,8 @@
         "lint:knip": "knip",
         "test": "jest",
         "test:watch": "jest --watch",
-        "coverage": "yarn test --coverage"
+        "coverage": "yarn test --coverage",
+        "prepare": "cd node_modules/@matrix-org/matrix-sdk-crypto-wasm && npm install && npm run prepare"
     },
     "repository": {
         "type": "git",
