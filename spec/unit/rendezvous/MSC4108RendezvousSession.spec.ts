@@ -17,7 +17,7 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import { ClientPrefix, IHttpOpts, MatrixClient, MatrixHttpApi } from "../../../src";
-import { RendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
+import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const client = {
@@ -356,7 +356,7 @@ describe("MSC4108RendezvousSession", () => {
         }
         {
             // Cancel
-            const prom = simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
+            const prom = simpleHttpTransport.cancel(ClientRendezvousFailureReason.UserDeclined);
             httpBackend.when("DELETE", "https://fallbackserver/rz/123").response = {
                 body: null,
                 rawBody: true,
@@ -377,7 +377,7 @@ describe("MSC4108RendezvousSession", () => {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        await simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
+        await simpleHttpTransport.cancel(ClientRendezvousFailureReason.UserDeclined);
         await expect(simpleHttpTransport.send("data")).resolves.toBeUndefined();
     });
 
@@ -413,7 +413,7 @@ describe("MSC4108RendezvousSession", () => {
             expect(simpleHttpTransport.send("foo=baa")).resolves.toBeUndefined(),
             httpBackend.flush("", 1),
         ]);
-        expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Unknown);
+        expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Unknown);
     });
 
     it("404 failure callback mapped to expired", async function () {
@@ -454,7 +454,7 @@ describe("MSC4108RendezvousSession", () => {
                 },
             };
             await Promise.all([expect(simpleHttpTransport.receive()).resolves.toBeUndefined(), httpBackend.flush("")]);
-            expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Expired);
+            expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Expired);
         }
     });
 });
