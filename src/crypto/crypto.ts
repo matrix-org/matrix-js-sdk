@@ -40,6 +40,11 @@ if (!TextEncoder) {
 }
 /* eslint-enable @typescript-eslint/no-var-requires */
 
+// Service workers don't have a useful `window` instance to pull these details off of, and in at least Chrome when
+// `window.$thing` is accessed, `$thing` will be non-null but complain about being undefined when accessed further.
+// To avoid spurious errors, we just override the crypto bits explicitly.
+//
+// Note: `skipWaiting` is a function exclusive to service workers.
 // @ts-expect-error - we don't have service worker types. See 'fetch' listener in Element Web service worker.
 if (typeof globalThis?.["skipWaiting"] === "function") {
     crypto = globalThis.crypto;
