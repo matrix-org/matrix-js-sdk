@@ -8,8 +8,7 @@
         "noUnusedLocals": true,
         "noEmit": true,
         "declaration": true,
-        "strict": true,
-        "types": ["serviceworker"]
+        "strict": true
     },
     "include": ["./src/**/*.ts", "./spec/**/*.ts"]
 }
