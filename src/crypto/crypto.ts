@@ -40,6 +40,13 @@ if (!TextEncoder) {
 }
 /* eslint-enable @typescript-eslint/no-var-requires */
 
+// @ts-expect-error - we don't have service worker types. See 'fetch' listener in Element Web service worker.
+if (typeof self["skipWaiting"] === "function") {
+    crypto = self.crypto;
+    subtleCrypto = self.crypto.subtle ?? self.crypto.webkitSubtle;
+    TextEncoder = self.TextEncoder;
+}
+
 export function setCrypto(_crypto: Crypto): void {
     crypto = _crypto;
     subtleCrypto = _crypto.subtle ?? _crypto.webkitSubtle;
