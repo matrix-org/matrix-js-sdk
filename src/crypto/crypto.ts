@@ -43,13 +43,16 @@ if (!TextEncoder) {
 // Service workers don't have a useful `window` instance to pull these details off of, and in at least Chrome when
 // `window.$thing` is accessed, `$thing` will be non-null but complain about being undefined when accessed further.
 // To avoid spurious errors, we just override the crypto bits explicitly.
-//
-// Note: `skipWaiting` is a function exclusive to service workers.
-// @ts-expect-error - we don't have service worker types. See 'fetch' listener in Element Web service worker.
-if (typeof globalThis?.["skipWaiting"] === "function") {
+if (isServiceWorker(globalThis)) {
     crypto = globalThis.crypto;
     subtleCrypto = globalThis.crypto.subtle ?? globalThis.crypto.webkitSubtle;
     TextEncoder = globalThis.TextEncoder;
+}
+
+// Window is a close enough approximation for what we need it for.
+function isServiceWorker(globalThis: any): globalThis is typeof Window {
+    // Note: `skipWaiting` is a function exclusive to service workers.
+    return typeof globalThis["skipWaiting"] === "function";
 }
 
 export function setCrypto(_crypto: Crypto): void {
