@@ -1742,10 +1742,9 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@matrix-org/matrix-sdk-crypto-wasm@^4.9.0":
+"@matrix-org/matrix-sdk-crypto-wasm@github:matrix-org/matrix-rust-sdk-crypto-wasm#poljar/qr-login":
   version "4.9.0"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-4.9.0.tgz#9dfed83e33f760650596c4e5c520e5e4c53355d2"
-  integrity sha512-/bgA4QfE7qkK6GFr9hnhjAvRSebGrmEJxukU0ukbudZcYvbzymoBBM8j3HeULXZT8kbw8WH6z63txYTMCBSDOA==
+  resolved "https://codeload.github.com/matrix-org/matrix-rust-sdk-crypto-wasm/tar.gz/78c5fb5cc29979d0bd188a8b0ec163dd30aa7936"
 
 "@matrix-org/olm@3.2.15":
   version "3.2.15"
