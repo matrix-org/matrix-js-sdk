@@ -78,6 +78,8 @@ export enum RoomStateEvent {
 export type RoomStateEventHandlerMap = {
     /**
      * Fires whenever the event dictionary in room state is updated.
+     * This does not guarantee that any related objects (like RoomMember) have been updated.
+     * Use RoomStateEvent.Update for that.
      * @param event - The matrix event which caused this event to fire.
      * @param state - The room state whose RoomState.events dictionary
      * was updated.

@@ -45,6 +45,7 @@ import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keyback
 import { IKeyBackup } from "../../../src/crypto/backup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
+import { DecryptionFailureCode } from "../../../src/crypto-api";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 
@@ -242,8 +243,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const room = aliceClient.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
-            await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
+            // On the first decryption attempt, decryption fails.
+            await awaitDecryption(event);
+            expect(event.decryptionFailureReason).toEqual(
+                backend === "libolm"
+                    ? DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID
+                    : DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP,
+            );
+
+            // Eventually, decryption succeeds.
+            await awaitDecryption(event, { waitOnDecryptionFailure: true });
             expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
         });
 

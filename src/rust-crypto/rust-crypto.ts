@@ -628,15 +628,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
-        const { publicKeysOnDevice, privateKeysInSecretStorage, privateKeysCachedLocally } =
-            await this.getCrossSigningStatus();
+        const { privateKeysInSecretStorage, privateKeysCachedLocally } = await this.getCrossSigningStatus();
         const hasKeysInCache =
             Boolean(privateKeysCachedLocally.masterKey) &&
             Boolean(privateKeysCachedLocally.selfSigningKey) &&
             Boolean(privateKeysCachedLocally.userSigningKey);
 
-        // The cross signing is ready if the public and private keys are available
-        return publicKeysOnDevice && (hasKeysInCache || privateKeysInSecretStorage);
+        const identity = await this.getOwnIdentity();
+
+        // Cross-signing is ready if the public identity is trusted, and the private keys
+        // are either cached, or accessible via secret-storage.
+        return !!identity?.isVerified() && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
@@ -1725,7 +1727,7 @@ class EventDecryptor {
             };
         } catch (err) {
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
-                this.onMegolmDecryptionError(event, err);
+                this.onMegolmDecryptionError(event, err, await this.perSessionBackupDownloader.getServerBackupInfo());
             } else {
                 throw new DecryptionError(DecryptionFailureCode.UNKNOWN_ERROR, "Unknown error");
             }
@@ -1736,9 +1738,19 @@ class EventDecryptor {
      * Handle a `MegolmDecryptionError` returned by the rust SDK.
      *
      * Fires off a request to the `perSessionBackupDownloader`, if appropriate, and then throws a `DecryptionError`.
+     *
+     * @param event - The event which could not be decrypted.
+     * @param err - The error from the Rust SDK.
+     * @param serverBackupInfo - Details about the current backup from the server. `null` if there is no backup.
+     *     `undefined` if our attempt to check failed.
      */
-    private onMegolmDecryptionError(event: MatrixEvent, err: RustSdkCryptoJs.MegolmDecryptionError): never {
+    private onMegolmDecryptionError(
+        event: MatrixEvent,
+        err: RustSdkCryptoJs.MegolmDecryptionError,
+        serverBackupInfo: KeyBackupInfo | null | undefined,
+    ): never {
         const content = event.getWireContent();
+        const errorDetails = { session: content.sender_key + "|" + content.session_id };
 
         // If the error looks like it might be recoverable from backup, queue up a request to try that.
         if (
@@ -1746,9 +1758,31 @@ class EventDecryptor {
             err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
         ) {
             this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
+
+            // If the event was sent before this device was created, we use some different error codes.
+            if (event.getTs() <= this.olmMachine.deviceCreationTimeMs) {
+                if (serverBackupInfo === null) {
+                    throw new DecryptionError(
+                        DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP,
+                        "This message was sent before this device logged in, and there is no key backup on the server.",
+                        errorDetails,
+                    );
+                } else if (!this.perSessionBackupDownloader.isKeyBackupDownloadConfigured()) {
+                    throw new DecryptionError(
+                        DecryptionFailureCode.HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED,
+                        "This message was sent before this device logged in, and key backup is not working.",
+                        errorDetails,
+                    );
+                } else {
+                    throw new DecryptionError(
+                        DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP,
+                        "This message was sent before this device logged in. Key backup is working, but we still do not (yet) have the key.",
+                        errorDetails,
+                    );
+                }
+            }
         }
 
-        const errorDetails = { session: content.sender_key + "|" + content.session_id };
         switch (err.code) {
             case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey:
                 throw new DecryptionError(

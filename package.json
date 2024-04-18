@@ -101,11 +101,11 @@
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
         "eslint-plugin-import": "^2.26.0",
-        "eslint-plugin-jest": "^27.1.6",
+        "eslint-plugin-jest": "^28.0.0",
         "eslint-plugin-jsdoc": "^48.0.0",
         "eslint-plugin-matrix-org": "^1.0.0",
         "eslint-plugin-tsdoc": "^0.2.17",
-        "eslint-plugin-unicorn": "^51.0.0",
+        "eslint-plugin-unicorn": "^52.0.0",
         "fake-indexeddb": "^5.0.2",
         "fetch-mock": "9.11.0",
         "fetch-mock-jest": "^1.5.1",
@@ -125,7 +125,7 @@
         "typedoc-plugin-missing-exports": "^2.0.0",
         "typescript": "^5.3.3",
         "node-fetch": "^2.7.0",
-        "knip": "^4.0.1",
+        "knip": "^5.0.0",
         "@peculiar/webcrypto": "^1.4.5"
     },
     "@casualbot/jest-sonar-reporter": {

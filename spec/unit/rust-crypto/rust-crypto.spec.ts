@@ -205,7 +205,20 @@ describe("initRustCrypto", () => {
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
 
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                auth_data: {
+                    public_key: "backup_key_public",
+                },
+                version: "45",
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            });
+            // The cached key should be valid for the backup
+            const mockBackupDecryptionKey: any = {
+                megolmV1PublicKey: {
+                    publicKeyBase64: "backup_key_public",
+                },
+            };
+            jest.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);

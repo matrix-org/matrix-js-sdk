@@ -162,6 +162,110 @@ describe("MatrixClient.initRustCrypto", () => {
             expect(progressListener).toHaveBeenLastCalledWith(-1, -1);
         }, 60000);
 
+        describe("Private key backup migration", () => {
+            it("should not migrate the backup private key if backup has changed", async () => {
+                // Here we have a new backup server side, and the migrated account has the previous backup key.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.newBackupResponse);
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
+
+                await populateStore("test-store", MSK_NOT_CACHED_DATASET.dumpPath);
+                const cryptoStore = new IndexedDBCryptoStore(indexedDB, "test-store");
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const privateBackupKey = await matrixClient.getCrypto()?.getSessionBackupPrivateKey();
+                expect(privateBackupKey).toBeNull();
+            });
+
+            it("should not migrate the backup private key if backup has unknown algorithm", async () => {
+                // Here we have a new backup server side, and the migrated account has the previous backup key.
+                const backupResponse = {
+                    ...MSK_NOT_CACHED_DATASET.backupResponse,
+                    algorithm: "m.megolm_backup.v8",
+                };
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupResponse);
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
+
+                await populateStore("test-store", MSK_NOT_CACHED_DATASET.dumpPath);
+                const cryptoStore = new IndexedDBCryptoStore(indexedDB, "test-store");
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const privateBackupKey = await matrixClient.getCrypto()?.getSessionBackupPrivateKey();
+                expect(privateBackupKey).toBeNull();
+            });
+
+            it("should not migrate the backup private key if the backup has been deleted", async () => {
+                // The old backup has been deleted server side.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                });
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
+
+                await populateStore("test-store", MSK_NOT_CACHED_DATASET.dumpPath);
+                const cryptoStore = new IndexedDBCryptoStore(indexedDB, "test-store");
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const privateBackupKey = await matrixClient.getCrypto()?.getSessionBackupPrivateKey();
+                expect(privateBackupKey).toBeNull();
+            });
+
+            it("should migrate the backup private key if the backup matches", async () => {
+                // The old backup has been deleted server side.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", MSK_NOT_CACHED_DATASET.backupResponse);
+
+                fetchMock.post("path:/_matrix/client/v3/keys/query", MSK_NOT_CACHED_DATASET.keyQueryResponse);
+
+                await populateStore("test-store", MSK_NOT_CACHED_DATASET.dumpPath);
+                const cryptoStore = new IndexedDBCryptoStore(indexedDB, "test-store");
+
+                const matrixClient = createClient({
+                    baseUrl: "http://test.server",
+                    userId: MSK_NOT_CACHED_DATASET.userId,
+                    deviceId: MSK_NOT_CACHED_DATASET.deviceId,
+                    cryptoStore,
+                    pickleKey: MSK_NOT_CACHED_DATASET.pickleKey,
+                });
+
+                await matrixClient.initRustCrypto();
+
+                const privateBackupKey = await matrixClient.getCrypto()?.getSessionBackupPrivateKey();
+                expect(privateBackupKey).toBeDefined();
+            });
+        });
+
         describe("Legacy trust migration", () => {
             async function populateAndStartLegacyCryptoStore(dumpPath: string): Promise<IndexedDBCryptoStore> {
                 const testStoreName = "test-store";

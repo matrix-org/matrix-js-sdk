@@ -108,6 +108,8 @@ afterEach(() => {
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
+
+    jest.useRealTimers();
 });
 
 /**
@@ -467,6 +469,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("Unable to decrypt error codes", function () {
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        });
+
         it("Decryption fails with UISI error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -474,11 +480,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
             const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
+            // Ensure that the timestamp post-dates the creation of our device
+            const encryptedEvent = {
+                ...testData.ENCRYPTED_EVENT,
+                origin_server_ts: Date.now(),
+            };
+
             const syncResponse = {
                 next_batch: 1,
                 rooms: {
                     join: {
-                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
                     },
                 },
             };
@@ -498,12 +510,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
 
-            // Alice gets both the events in a single sync
+            // Ensure that the timestamp post-dates the creation of our device
+            const encryptedEvent = {
+                ...testData.ENCRYPTED_EVENT,
+                origin_server_ts: Date.now(),
+            };
+
             const syncResponse = {
                 next_batch: 1,
                 rooms: {
                     join: {
-                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
                     },
                 },
             };
@@ -513,6 +530,87 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const ev = await awaitDecryption;
             expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX);
+        });
+
+        describe("Historical events", () => {
+            async function sendEventAndAwaitDecryption(): Promise<MatrixEvent> {
+                // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+                const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+
+                // Ensure that the timestamp pre-dates the creation of our device: set it to 24 hours ago
+                const encryptedEvent = {
+                    ...testData.ENCRYPTED_EVENT,
+                    origin_server_ts: Date.now() - 24 * 3600 * 1000,
+                };
+
+                const syncResponse = {
+                    next_batch: 1,
+                    rooms: {
+                        join: {
+                            [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
+                        },
+                    },
+                };
+
+                syncResponder.sendOrQueueSyncResponse(syncResponse);
+                return await awaitDecryption;
+            }
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_NO_BACKUP when there is no backup", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
+
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED when the backup is broken", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
+
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(
+                    DecryptionFailureCode.HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED,
+                );
+            });
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_WORKING_BACKUP when backup is working", async () => {
+                // The test backup data is signed by a dummy device. We'll need to tell Alice about the device, and
+                // later, tell her to trust it, so that she trusts the backup.
+                const e2eResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+                e2eResponder.addDeviceKeys(testData.SIGNED_TEST_DEVICE_DATA);
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+                await startClientAndAwaitFirstSync();
+
+                await aliceClient
+                    .getCrypto()!
+                    .storeSessionBackupPrivateKey(
+                        Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                        testData.SIGNED_BACKUP_DATA.version!,
+                    );
+
+                // Tell Alice to trust the dummy device that signed the backup
+                const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+                expect(devices.get(TEST_USER_ID)!.keys()).toContain(testData.TEST_DEVICE_ID);
+                await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+                // Tell Alice to check and enable backup
+                await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+
+                // Sanity: Alice should now have working backup.
+                expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual(
+                    testData.SIGNED_BACKUP_DATA.version,
+                );
+
+                // Finally! we can check what happens when we get an event.
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP);
+            });
         });
 
         it("Decryption fails with Unable to decrypt for other errors", async () => {
@@ -996,10 +1094,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             ]);
             return encryptedMessage;
         }
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
 
         newBackendOnly("should rotate the session after 2 messages", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -2184,10 +2278,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
             return new Promise((resolve) => {
                 const listener = (url: string, options: RequestInit) => {
@@ -2250,10 +2340,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("getUserDeviceInfo", () => {
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
         // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
         const queryResponseBody = {
@@ -2740,10 +2826,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             beforeEach(async () => {
                 // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
                 jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-            });
-
-            afterEach(() => {
-                jest.useRealTimers();
             });
 
             it("Should be able to restore from 4S after bootstrap", async () => {
