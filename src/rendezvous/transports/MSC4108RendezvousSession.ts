@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../../logger";
 import { sleep } from "../../utils";
 import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousFailureListener } from "..";
-import { MatrixClient } from "../../matrix";
+import { MatrixClient, Method } from "../../matrix";
 import { ClientPrefix } from "../../http-api";
 
 /**
@@ -107,7 +107,7 @@ export class MSC4108RendezvousSession {
         if (this.cancelled) {
             return;
         }
-        const method = this.url ? "PUT" : "POST";
+        const method = this.url ? Method.Put : Method.Post;
         const uri = this.url ?? (await this.getPostEndpoint());
 
         if (!uri) {
@@ -127,7 +127,7 @@ export class MSC4108RendezvousSession {
 
         logger.info(`=> ${method} ${uri} with ${data} if-match: ${this.etag}`);
 
-        const res = await this.fetch(uri, { method, headers, body: data });
+        const res = await this.fetch(uri, { method, headers, body: data, redirect: "follow" });
         if (res.status === 404) {
             return this.cancel(ClientRendezvousFailureReason.Unknown);
         }
@@ -135,7 +135,7 @@ export class MSC4108RendezvousSession {
 
         logger.info(`Received etag: ${this.etag}`);
 
-        if (method === "POST") {
+        if (method === Method.Post) {
             const expires = res.headers.get("expires");
             if (expires) {
                 this.expiresAt = new Date(expires);
@@ -166,7 +166,7 @@ export class MSC4108RendezvousSession {
             }
 
             logger.info(`=> GET ${this.url} if-none-match: ${this.etag}`);
-            const poll = await this.fetch(this.url, { method: "GET", headers });
+            const poll = await this.fetch(this.url, { method: Method.Get, headers });
 
             if (poll.status === 404) {
                 this.cancel(ClientRendezvousFailureReason.Unknown);
@@ -202,7 +202,7 @@ export class MSC4108RendezvousSession {
 
         if (this.url && reason === ClientRendezvousFailureReason.UserDeclined) {
             try {
-                await this.fetch(this.url, { method: "DELETE" });
+                await this.fetch(this.url, { method: Method.Delete });
             } catch (e) {
                 logger.warn(e);
             }
