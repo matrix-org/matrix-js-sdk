@@ -50,7 +50,7 @@ if (isServiceWorker(globalThis)) {
 }
 
 // Window is a close enough approximation for what we need it for.
-function isServiceWorker(globalThis: any): globalThis is typeof Window {
+function isServiceWorker(globalThis: any): globalThis is Window {
     // Note: `skipWaiting` is a function exclusive to service workers.
     return typeof globalThis["skipWaiting"] === "function";
 }
