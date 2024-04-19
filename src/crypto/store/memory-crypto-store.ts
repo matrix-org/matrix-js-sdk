@@ -481,20 +481,16 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
         func(this.inboundGroupSessions[k] || null, this.inboundGroupSessionsWithheld[k] || null);
     }
 
     public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (const key of Object.keys(this.inboundGroupSessions)) {
-            // we can't use split, as the components we are trying to split out
-            // might themselves contain '/' characters. We rely on the
-            // senderKey being a (32-byte) curve25519 key, base64-encoded
-            // (hence 43 characters long).
-
+            const keyParts = key.split("/");
             func({
-                senderKey: key.slice(0, 43),
-                sessionId: key.slice(44),
+                senderKey: decodeURIComponent(keyParts[0]),
+                sessionId: decodeURIComponent(keyParts[1]),
                 sessionData: this.inboundGroupSessions[key],
             });
         }
@@ -507,7 +503,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -519,7 +515,8 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[senderCurve25519Key + "/" + sessionId] = sessionData;
+        this.inboundGroupSessions[encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId)] =
+            sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -528,7 +525,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -613,9 +610,10 @@ export class MemoryCryptoStore implements CryptoStore {
         const sessions: ISession[] = [];
         for (const session in this.sessionsNeedingBackup) {
             if (this.inboundGroupSessions[session]) {
+                const keyParts = session.split("/");
                 sessions.push({
-                    senderKey: session.slice(0, 43),
-                    sessionId: session.slice(44),
+                    senderKey: decodeURIComponent(keyParts[0]),
+                    sessionId: decodeURIComponent(keyParts[1]),
                     sessionData: this.inboundGroupSessions[session],
                 });
                 if (limit && session.length >= limit) {
@@ -632,7 +630,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + "/" + session.sessionId;
+            const sessionKey = encodeURIComponent(session.senderKey) + "/" + encodeURIComponent(session.sessionId);
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -640,7 +638,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + "/" + session.sessionId;
+            const sessionKey = encodeURIComponent(session.senderKey) + "/" + encodeURIComponent(session.sessionId);
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();
