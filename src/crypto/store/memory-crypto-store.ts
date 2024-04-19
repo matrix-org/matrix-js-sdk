@@ -550,9 +550,10 @@ export class MemoryCryptoStore implements CryptoStore {
     public async getEndToEndInboundGroupSessionsBatch(): Promise<null | SessionExtended[]> {
         const result: SessionExtended[] = [];
         for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
+            const keyParts = key.split("/");
             result.push({
-                senderKey: key.slice(0, 43),
-                sessionId: key.slice(44),
+                senderKey: decodeURIComponent(keyParts[0]),
+                sessionId: decodeURIComponent(keyParts[1]),
                 sessionData: session,
                 needsBackup: key in this.sessionsNeedingBackup,
             });
@@ -581,7 +582,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessions: { senderKey: string; sessionId: string }[],
     ): Promise<void> {
         for (const { senderKey, sessionId } of sessions) {
-            const k = senderKey + "/" + sessionId;
+            const k = encodeURIComponent(senderKey) + "/" + encodeURIComponent(sessionId);
             delete this.inboundGroupSessions[k];
         }
     }
