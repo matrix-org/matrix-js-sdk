@@ -1164,6 +1164,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.checkKeyBackupAndEnable();
     }
 
+    public async resignKeyBackup(privateKey: Uint8Array, version: string): Promise<void> {
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privateKey!));
+        const backupInfo = await this.backupManager.updateBackupSignature(backupDecryptionKey, version, (o) => this.signObject(o));
+
+        // we want to store the private key in 4S
+        // need to check if 4S is set up?
+        if (await this.secretStorageHasAESKey()) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupInfo.decryptionKey.toBase64());
+        }
+
+        // we can check and start async
+        this.checkKeyBackupAndEnable();
+    }
+
     /**
      * Signs the given object with the current device and current identity (if available).
      * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.

@@ -545,6 +545,47 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
+     * Use PUT /room_keys/version/{version} to change the e2e_room_keys_version database entry at the server.
+     * This version should be JUST used in rare specific cases and not in general.
+     * Currently it is used as workaround for compatibility problems between backups without 4s and required 4s at the web-client.
+     * 
+     * @param backupDecKey 
+     * @param version The version of the backup we want to update.
+     * @param signObject A method to sign the backup before it is uploaded.
+     * @returns 
+     */
+    public async updateBackupSignature(backupDecKey: RustSdkCryptoJs.BackupDecryptionKey, version: string, signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        const pubKey = backupDecKey.megolmV1PublicKey;
+        const authData = { public_key: pubKey.publicKeyBase64 };
+
+        await signObject(authData);
+
+        // An alternative implementation could be using src\crypto\EncryptionSetup.ts and EncryptionSetupOperation, similar to:
+        // const setupBuilder = new EncryptionSetupBuilder(); setupBuilder.addSessionBackup(keyBackup); setupBuilder.buildOperation().apply();
+        const res = await this.http.authedRequest<{ version: string }>(
+            Method.Put,
+            "/room_keys/version/" + version,
+            undefined,
+            {
+                algorithm: pubKey.algorithm,
+                auth_data: authData,
+            },
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+
+        await this.saveBackupDecryptionKey(backupDecKey, version);
+
+        return {
+            version: res.version,
+            algorithm: pubKey.algorithm,
+            authData: authData,
+            decryptionKey: backupDecKey,
+        };
+    }
+
+    /**
      * Deletes all key backups.
      *
      * Will call the API to delete active backup until there is no more present.

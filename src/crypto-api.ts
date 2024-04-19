@@ -491,6 +491,15 @@ export interface CryptoApi {
     resetKeyBackup(): Promise<void>;
 
     /**
+     * Update the signature of the backup specified via privateKey and uploaded this change to the server.
+     * This is an altered copy of {@link @./rust-crypto/rust-crypto.ts#RustCrypto#resetKeyBackup}.
+     * 
+     * @param privateKey The privat key of the backup which should be updated.
+     * @param version The version of the backup that should be updated.
+     */
+    resignKeyBackup(privateKey: Uint8Array, version: string): Promise<void>;
+
+    /**
      * Deletes the given key backup.
      *
      * @param version - The backup version to delete.
