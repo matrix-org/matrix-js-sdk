@@ -37,6 +37,17 @@ import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 
+function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
+    return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
+}
+
+function decodeSessionKey(key: string): { senderKey: string; sessionId: string } {
+    const keyParts = key.split("/");
+    const senderKey = decodeURIComponent(keyParts[0]);
+    const sessionId = decodeURIComponent(keyParts[1]);
+    return { senderKey, sessionId };
+}
+
 /**
  * Internal module. in-memory storage for e2e.
  */
@@ -481,16 +492,14 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         func(this.inboundGroupSessions[k] || null, this.inboundGroupSessionsWithheld[k] || null);
     }
 
     public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (const key of Object.keys(this.inboundGroupSessions)) {
-            const keyParts = key.split("/");
             func({
-                senderKey: decodeURIComponent(keyParts[0]),
-                sessionId: decodeURIComponent(keyParts[1]),
+                ...decodeSessionKey(key),
                 sessionData: this.inboundGroupSessions[key],
             });
         }
@@ -503,7 +512,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -515,8 +524,8 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId)] =
-            sessionData;
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
+        this.inboundGroupSessions[k] = sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -525,7 +534,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -550,10 +559,8 @@ export class MemoryCryptoStore implements CryptoStore {
     public async getEndToEndInboundGroupSessionsBatch(): Promise<null | SessionExtended[]> {
         const result: SessionExtended[] = [];
         for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
-            const keyParts = key.split("/");
             result.push({
-                senderKey: decodeURIComponent(keyParts[0]),
-                sessionId: decodeURIComponent(keyParts[1]),
+                ...decodeSessionKey(key),
                 sessionData: session,
                 needsBackup: key in this.sessionsNeedingBackup,
             });
@@ -582,7 +589,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessions: { senderKey: string; sessionId: string }[],
     ): Promise<void> {
         for (const { senderKey, sessionId } of sessions) {
-            const k = encodeURIComponent(senderKey) + "/" + encodeURIComponent(sessionId);
+            const k = encodeSessionKey(senderKey, sessionId);
             delete this.inboundGroupSessions[k];
         }
     }
@@ -611,10 +618,8 @@ export class MemoryCryptoStore implements CryptoStore {
         const sessions: ISession[] = [];
         for (const session in this.sessionsNeedingBackup) {
             if (this.inboundGroupSessions[session]) {
-                const keyParts = session.split("/");
                 sessions.push({
-                    senderKey: decodeURIComponent(keyParts[0]),
-                    sessionId: decodeURIComponent(keyParts[1]),
+                    ...decodeSessionKey(session),
                     sessionData: this.inboundGroupSessions[session],
                 });
                 if (limit && session.length >= limit) {
@@ -631,7 +636,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = encodeURIComponent(session.senderKey) + "/" + encodeURIComponent(session.sessionId);
+            const sessionKey = encodeSessionKey(session.senderKey, session.sessionId);
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -639,7 +644,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = encodeURIComponent(session.senderKey) + "/" + encodeURIComponent(session.sessionId);
+            const sessionKey = encodeSessionKey(session.senderKey, session.sessionId);
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();
