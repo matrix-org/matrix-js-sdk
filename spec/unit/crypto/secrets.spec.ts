@@ -690,11 +690,9 @@ describe("Secrets", function () {
     it("should throw Not Implemented for importSecretsForQRLogin", async () => {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         await expect(
-            alice
-                .getCrypto()
-                ?.importSecretsForQrLogin({
-                    cross_signing: { master_key: "", self_signing_key: "", user_signing_key: "" },
-                }),
+            alice.getCrypto()?.importSecretsForQrLogin({
+                cross_signing: { master_key: "", self_signing_key: "", user_signing_key: "" },
+            }),
         ).rejects.toThrow("Method not implemented.");
     });
 
