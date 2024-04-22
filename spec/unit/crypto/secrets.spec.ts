@@ -687,6 +687,11 @@ describe("Secrets", function () {
         });
     });
 
+    it("should return false for supportsSecretsForQrLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        expect(alice.getCrypto()?.supportsSecretsForQrLogin()).toBe(false);
+    });
+
     it("should throw Not Implemented for importSecretsForQRLogin", async () => {
         const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         await expect(

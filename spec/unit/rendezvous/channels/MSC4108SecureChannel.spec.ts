@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeData, QrCodeMode, SecureChannel } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { EstablishedSecureChannel, QrCodeData, QrCodeMode, SecureChannel } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked } from "jest-mock";
 
-import { MSC4108RendezvousSession, MSC4108SecureChannel } from "../../../../src/rendezvous";
+import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
 
 describe("MSC4108SecureChannel", () => {
     const url = "https://fallbackserver/rz/123";
@@ -35,21 +35,49 @@ describe("MSC4108SecureChannel", () => {
         expect(text.endsWith(url)).toBeTruthy();
     });
 
-    it("should be able to connect as a reciprocating device", async () => {
-        const mockSession = {
-            send: jest.fn(),
-            receive: jest.fn(),
-            url,
-        } as unknown as MSC4108RendezvousSession;
-        const channel = new MSC4108SecureChannel(mockSession);
+    describe("should be able to connect as a reciprocating device", () => {
+        let mockSession: MSC4108RendezvousSession;
+        let channel: MSC4108SecureChannel;
+        let opponentChannel: EstablishedSecureChannel;
 
-        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
-        const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
-        const ciphertext = opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
+        beforeEach(async () => {
+            mockSession = {
+                send: jest.fn(),
+                receive: jest.fn(),
+                url,
+            } as unknown as MSC4108RendezvousSession;
+            channel = new MSC4108SecureChannel(mockSession);
 
-        mocked(mockSession.receive).mockResolvedValue(ciphertext);
-        await channel.connect();
-        expect(mockSession.send).toHaveBeenCalled();
-        expect(opponentChannel.decrypt(mocked(mockSession.send).mock.calls[0][0])).toBe("MATRIX_QR_CODE_LOGIN_OK");
+            const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+            opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
+            const ciphertext = opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
+
+            mocked(mockSession.receive).mockResolvedValue(ciphertext);
+            await channel.connect();
+            expect(opponentChannel.decrypt(mocked(mockSession.send).mock.calls[0][0])).toBe("MATRIX_QR_CODE_LOGIN_OK");
+            mocked(mockSession.send).mockReset();
+        });
+
+        it("should be able to securely send encrypted payloads", async () => {
+            const payload = {
+                type: PayloadType.Secrets,
+                protocols: ["a", "b", "c"],
+                homeserver: "https://example.org",
+            };
+            await channel.secureSend(payload);
+            expect(mockSession.send).toHaveBeenCalled();
+            expect(opponentChannel.decrypt(mocked(mockSession.send).mock.calls[0][0])).toBe(JSON.stringify(payload));
+        });
+
+        it("should be able to securely receive encrypted payloads", async () => {
+            const payload = {
+                type: PayloadType.Secrets,
+                protocols: ["a", "b", "c"],
+                homeserver: "https://example.org",
+            };
+            const ciphertext = opponentChannel.encrypt(JSON.stringify(payload));
+            mocked(mockSession.receive).mockResolvedValue(ciphertext);
+            await expect(channel.secureReceive()).resolves.toEqual(payload);
+        });
     });
 });
