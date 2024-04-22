@@ -1454,8 +1454,10 @@ describe("RustCrypto", () => {
             );
         });
 
-        it("should return an empty object if there is nothing to export", async () => {
-            await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual({});
+        it("should throw an error if there is nothing to export", async () => {
+            await expect(rustCrypto.exportSecretsForQrLogin()).rejects.toThrow(
+                "The store doesn't contain any cross-signing keys",
+            );
         });
 
         it("should return a JSON secrets bundle if there is something to export", async () => {
