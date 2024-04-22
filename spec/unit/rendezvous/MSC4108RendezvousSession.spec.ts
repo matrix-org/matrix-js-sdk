@@ -80,6 +80,27 @@ describe("MSC4108RendezvousSession", () => {
             await expect(transport.receive()).resolves.toEqual("data");
         }
     }
+
+    it("should use custom fetchFn if provided", async () => {
+        const sandbox = fetchMock.sandbox();
+        const fetchFn = jest.fn().mockImplementation(sandbox);
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const transport = new MSC4108RendezvousSession({
+            client,
+            fetchFn,
+            fallbackRzServer: "https://fallbackserver/rz",
+        });
+        sandbox.postOnce("https://fallbackserver/rz", {
+            status: 201,
+            body: {
+                url: "https://fallbackserver/rz/123",
+            },
+        });
+        await transport.send("data");
+        await sandbox.flush(true);
+        expect(fetchFn).toHaveBeenCalledWith("https://fallbackserver/rz", expect.anything());
+    });
+
     it("should throw an error when no server available", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({ client });

@@ -162,7 +162,7 @@ export class MSC4108SecureChannel {
 
             // Step 5 is complete. We don't yet trust the channel
 
-            // next step will be for the user to confirm that they see a checkmark on the other device
+            // next step will be for the user to confirm the check code on the other device
         }
 
         this.connected = true;

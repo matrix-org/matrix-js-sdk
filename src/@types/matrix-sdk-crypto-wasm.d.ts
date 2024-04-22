@@ -25,7 +25,7 @@ declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface SecretsBundle {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         to_json(): Promise<{
-            cross_signing?: {
+            cross_signing: {
                 master_key: string;
                 self_signing_key: string;
                 user_signing_key: string;
