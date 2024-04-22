@@ -16,9 +16,9 @@ limitations under the License.
 
 import { logger } from "../logger";
 
-export let crypto = globalThis.window?.crypto;
-export let subtleCrypto = globalThis.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
-export let TextEncoder = globalThis.window?.TextEncoder;
+export let crypto = globalThis.crypto;
+export let subtleCrypto = crypto?.subtle ?? crypto?.webkitSubtle; // TODO: Stop using webkitSubtle fallback
+export let TextEncoder = globalThis.TextEncoder;
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {
@@ -39,21 +39,6 @@ if (!TextEncoder) {
     }
 }
 /* eslint-enable @typescript-eslint/no-var-requires */
-
-// Service workers don't have a useful `window` instance to pull these details off of, and in at least Chrome when
-// `window.$thing` is accessed, `$thing` will be non-null but complain about being undefined when accessed further.
-// To avoid spurious errors, we just override the crypto bits explicitly.
-if (isServiceWorker(globalThis)) {
-    crypto = globalThis.crypto;
-    subtleCrypto = globalThis.crypto.subtle ?? globalThis.crypto.webkitSubtle;
-    TextEncoder = globalThis.TextEncoder;
-}
-
-// Window is a close enough approximation for what we need it for.
-function isServiceWorker(globalThis: any): globalThis is Window {
-    // Note: `skipWaiting` is a function exclusive to service workers.
-    return typeof globalThis["skipWaiting"] === "function";
-}
 
 export function setCrypto(_crypto: Crypto): void {
     crypto = _crypto;
