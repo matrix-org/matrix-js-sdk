@@ -1440,7 +1440,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("exportSecretsForQRLogin", () => {
+    describe("exportSecretsForQrLogin", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
@@ -1455,7 +1455,7 @@ describe("RustCrypto", () => {
         });
 
         it("should return an empty object if there is nothing to export", async () => {
-            await expect(rustCrypto.exportSecretsForQRLogin()).resolves.toEqual({});
+            await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual({});
         });
 
         it("should return a JSON secrets bundle if there is something to export", async () => {
@@ -1471,8 +1471,8 @@ describe("RustCrypto", () => {
                     backup_version: "9",
                 },
             };
-            await rustCrypto.importSecretsForQRLogin(bundle);
-            await expect(rustCrypto.exportSecretsForQRLogin()).resolves.toEqual(expect.objectContaining(bundle));
+            await rustCrypto.importSecretsForQrLogin(bundle);
+            await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual(expect.objectContaining(bundle));
         });
     });
 });

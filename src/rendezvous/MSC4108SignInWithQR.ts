@@ -333,7 +333,7 @@ export class MSC4108SignInWithQR {
 
                     if (device) {
                         // if so, return the secrets
-                        const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQRLogin();
+                        const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQrLogin();
                         // send secrets
                         await this.send<SecretsPayload>({
                             type: PayloadType.Secrets,

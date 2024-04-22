@@ -33,9 +33,24 @@ export type QRSecretsBundle = Awaited<ReturnType<SecretsBundle["to_json"]>>;
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
-    exportSecretsForQRLogin(): Promise<QRSecretsBundle>;
+    /**
+     * Boolean check to indicate whether `exportSecretsForQrLogin` and `importSecretsForQrLogin` are supported.
+     * @experimental - part of MSC4108
+     */
+    supportsSecretsForQrLogin(): boolean;
 
-    importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void>;
+    /**
+     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     * @experimental - part of MSC4108
+     */
+    exportSecretsForQrLogin(): Promise<QRSecretsBundle>;
+
+    /**
+     * Import secrets bundle transmitted from another device as part of OIDC QR login
+     * @param secrets the secrets bundle received from the other device
+     * @experimental - part of MSC4108
+     */
+    importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void>;
 
     /**
      * Global override for whether the client should ever send encrypted

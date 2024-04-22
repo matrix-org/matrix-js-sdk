@@ -177,7 +177,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.checkKeyBackupAndEnable();
     }
 
-    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
+    public supportsSecretsForQrLogin(): boolean {
+        return true;
+    }
+
+    public async exportSecretsForQrLogin(): Promise<QRSecretsBundle> {
         try {
             const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
             const secrets = secretsBundle.to_json();
@@ -189,7 +193,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
     }
 
-    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
+    public async importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void> {
         const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
         await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
     }

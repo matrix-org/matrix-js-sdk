@@ -583,11 +583,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
-    public async exportSecretsForQRLogin(): Promise<QRSecretsBundle> {
+    public supportsSecretsForQrLogin(): boolean {
+        return false;
+    }
+
+    public async exportSecretsForQrLogin(): Promise<QRSecretsBundle> {
         throw new Error("Method not implemented.");
     }
 
-    public async importSecretsForQRLogin(secrets: QRSecretsBundle): Promise<void> {
+    public async importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void> {
         throw new Error("Method not implemented.");
     }
 
