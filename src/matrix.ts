@@ -77,6 +77,7 @@ export * from "./@types/extensible_events";
 export * from "./@types/IIdentityServerProvider";
 export * from "./models/room-summary";
 export * from "./models/event-status";
+export type { RoomSummary } from "./client";
 export * as ContentHelpers from "./content-helpers";
 export * as SecretStorage from "./secret-storage";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
