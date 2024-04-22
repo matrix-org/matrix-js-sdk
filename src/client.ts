@@ -865,10 +865,24 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    room_type?: RoomType;
-    membership?: Membership;
-    is_encrypted: boolean;
+/**
+ * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
+ * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+ */
+export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
+    /**
+     * The current membership of this user in the room.
+     * Usually "leave" if the room is fetched over federation.
+     */
+    "membership"?: Membership;
+    /**
+     * Version of the room.
+     */
+    "im.nheko.summary.room_version"?: string;
+    /**
+     * The encryption algorithm used for this room, if the room is encrypted.
+     */
+    "im.nheko.summary.encryption"?: string;
 }
 
 interface IRoomKeysResponse {
@@ -9786,11 +9800,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
      * @param via - The list of servers which know about the room if only an ID was provided.
      */
-    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
-        const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-        return this.http.authedRequest(Method.Get, path, { via }, undefined, {
+    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
+        const paramOpts = {
             prefix: "/_matrix/client/unstable/im.nheko.summary",
-        });
+        };
+        try {
+            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
+            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
+                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**
