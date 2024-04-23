@@ -23,6 +23,7 @@ import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
 import { QRSecretsBundle } from "../crypto-api";
 import { MatrixError } from "../http-api";
+import { sleep } from "../utils";
 
 export enum PayloadType {
     Protocols = "m.login.protocols",
@@ -348,7 +349,7 @@ export class MSC4108SignInWithQR {
                         throw err;
                     }
                 }
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                await sleep(1000);
             } while (Date.now() < timeout);
 
             await this.send<FailurePayload>({

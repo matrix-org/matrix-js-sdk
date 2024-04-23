@@ -180,5 +180,30 @@ describe("MSC4108SignInWithQR", () => {
                 expect(opponentLogin.loginStep5()).resolves.toEqual(payload),
             ]);
         });
+
+        it("should abort on unexpected errors", async () => {
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            // We don't have the new device side of this flow implemented at this time so mock it
+            // @ts-ignore
+            ourLogin.expectingNewDeviceId = "DEADB33F";
+
+            // @ts-ignore
+            await opponentLogin.send({
+                type: PayloadType.Success,
+            });
+            mocked(client.getDevice).mockRejectedValue(
+                new MatrixError({ errcode: "M_UNKNOWN", error: "The message" }, 500),
+            );
+
+            await expect(ourLogin.loginStep5()).rejects.toThrow("The message");
+        });
+
+        it("should abort on declined login", async () => {
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            await ourLogin.declineLoginOnExistingDevice();
+            await expect(opponentLogin.loginStep5()).rejects.toThrow("Unexpected message received");
+        });
     });
 });
