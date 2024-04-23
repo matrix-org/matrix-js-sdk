@@ -1,3 +1,16 @@
+Changes in [32.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v32.1.0) (2024-04-23)
+==================================================================================================
+## ✨ Features
+
+* Add support for device dehydration v2 (Element R) ([#4062](https://github.com/matrix-org/matrix-js-sdk/pull/4062)). Contributed by @uhoreg.
+* OIDC improvements in prep of OIDC-QR reciprocation ([#4149](https://github.com/matrix-org/matrix-js-sdk/pull/4149)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Validate backup private key before migrating it ([#4114](https://github.com/matrix-org/matrix-js-sdk/pull/4114)). Contributed by @BillCarsonFr.
+* ElementR| Retry query backup until it works during migration to avoid spurious correption error popup ([#4113](https://github.com/matrix-org/matrix-js-sdk/pull/4113)). Contributed by @BillCarsonFr.
+
+
 Changes in [32.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v32.0.0) (2024-04-09)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
