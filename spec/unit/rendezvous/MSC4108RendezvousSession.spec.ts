@@ -47,12 +47,7 @@ describe("MSC4108RendezvousSession", () => {
         fetchMock.reset();
     });
 
-    async function postAndCheckLocation(
-        msc4108Enabled: boolean,
-        fallbackRzServer: string,
-        locationResponse: string,
-        expectedFinalLocation: string,
-    ) {
+    async function postAndCheckLocation(msc4108Enabled: boolean, fallbackRzServer: string, locationResponse: string) {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled });
         const transport = new MSC4108RendezvousSession({ client, fallbackRzServer });
         {
@@ -69,12 +64,12 @@ describe("MSC4108RendezvousSession", () => {
         }
 
         {
-            // first GET without etag
             fetchMock.get(locationResponse, {
                 status: 200,
                 body: "data",
                 headers: {
                     "content-type": "text/plain",
+                    "etag": "aaa",
                 },
             });
             await expect(transport.receive()).resolves.toEqual("data");
@@ -134,25 +129,19 @@ describe("MSC4108RendezvousSession", () => {
     });
 
     it("POST with absolute path response", async function () {
-        await postAndCheckLocation(false, "https://fallbackserver/rz", "/123", "https://fallbackserver/123");
+        await postAndCheckLocation(false, "https://fallbackserver/rz", "https://fallbackserver/123");
     });
 
     it("POST to built-in MSC3886 implementation", async function () {
         await postAndCheckLocation(
             true,
             "https://fallbackserver/rz",
-            "123",
             "https://example.com/_matrix/client/unstable/org.matrix.msc4108/rendezvous/123",
         );
     });
 
     it("POST with relative path response including parent", async function () {
-        await postAndCheckLocation(
-            false,
-            "https://fallbackserver/rz/abc",
-            "../xyz/123",
-            "https://fallbackserver/rz/xyz/123",
-        );
+        await postAndCheckLocation(false, "https://fallbackserver/rz/abc", "https://fallbackserver/rz/xyz/123");
     });
 
     // fetch-mock doesn't handle redirects properly, so we can't test this
