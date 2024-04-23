@@ -35,6 +35,25 @@ describe("MSC4108SecureChannel", () => {
         expect(text.endsWith(url)).toBeTruthy();
     });
 
+    it("should throw error on invalid initiate response", async () => {
+        const mockSession = {
+            send: jest.fn(),
+            receive: jest.fn(),
+            url,
+        } as unknown as MSC4108RendezvousSession;
+        const channel = new MSC4108SecureChannel(mockSession);
+
+        mocked(mockSession.receive).mockResolvedValue("");
+        await expect(channel.connect()).rejects.toThrow("No response from other device");
+
+        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+        const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
+        const ciphertext = opponentChannel.encrypt("NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE");
+
+        mocked(mockSession.receive).mockResolvedValue(ciphertext);
+        await expect(channel.connect()).rejects.toThrow("Invalid response from other device");
+    });
+
     describe("should be able to connect as a reciprocating device", () => {
         let mockSession: MSC4108RendezvousSession;
         let channel: MSC4108SecureChannel;

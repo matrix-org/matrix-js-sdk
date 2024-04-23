@@ -157,34 +157,32 @@ export class MSC4108SignInWithQR {
                     homeserver: this.client?.getHomeserverUrl() ?? "",
                 });
             }
-        } else {
-            if (this.isNewDevice) {
-                // MSC4108-Flow: ExistingScanned
-                // wait for protocols message
-                logger.info("Waiting for protocols message");
-                const message = await this.receive();
+        } else if (this.isNewDevice) {
+            // MSC4108-Flow: ExistingScanned
+            // wait for protocols message
+            logger.info("Waiting for protocols message");
+            const message = await this.receive();
 
-                if (message?.type === PayloadType.Failure) {
-                    const { reason } = message as FailurePayload;
-                    throw new RendezvousError("Failed", reason);
-                }
-
-                if (message?.type !== PayloadType.Protocols) {
-                    await this.send<FailurePayload>({
-                        type: PayloadType.Failure,
-                        reason: MSC4108FailureReason.UnexpectedMessageReceived,
-                    });
-                    throw new RendezvousError(
-                        "Unexpected message received",
-                        MSC4108FailureReason.UnexpectedMessageReceived,
-                    );
-                }
-                const protocolsMessage = message as ProtocolsPayload;
-                return { homeserverBaseUrl: protocolsMessage.homeserver };
-            } else {
-                // MSC4108-Flow: NewScanned
-                // nothing to do
+            if (message?.type === PayloadType.Failure) {
+                const { reason } = message as FailurePayload;
+                throw new RendezvousError("Failed", reason);
             }
+
+            if (message?.type !== PayloadType.Protocols) {
+                await this.send<FailurePayload>({
+                    type: PayloadType.Failure,
+                    reason: MSC4108FailureReason.UnexpectedMessageReceived,
+                });
+                throw new RendezvousError(
+                    "Unexpected message received",
+                    MSC4108FailureReason.UnexpectedMessageReceived,
+                );
+            }
+            const protocolsMessage = message as ProtocolsPayload;
+            return { homeserverBaseUrl: protocolsMessage.homeserver };
+        } else {
+            // MSC4108-Flow: NewScanned
+            // nothing to do
         }
         return {};
     }
@@ -370,7 +368,6 @@ export class MSC4108SignInWithQR {
     }
 
     public async declineLoginOnExistingDevice(): Promise<void> {
-        // logger.info("User declined sign in");
         await this.send<DeclinedPayload>({
             type: PayloadType.Declined,
         });
