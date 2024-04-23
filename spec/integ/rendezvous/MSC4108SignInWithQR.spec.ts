@@ -181,6 +181,34 @@ describe("MSC4108SignInWithQR", () => {
             ]);
         });
 
+        it("should abort if device doesn't come up by timeout", async () => {
+            jest.spyOn(global, "setTimeout").mockImplementation((fn) => {
+                (<Function>fn)();
+                return -1;
+            });
+            jest.spyOn(Date, "now").mockImplementation(() => {
+                if (mocked(setTimeout).mock.calls.length === 1) {
+                    return 12345678 + 11000;
+                }
+                return 12345678;
+            });
+
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            // We don't have the new device side of this flow implemented at this time so mock it
+            // @ts-ignore
+            ourLogin.expectingNewDeviceId = "DEADB33F";
+
+            // @ts-ignore
+            await opponentLogin.send({
+                type: PayloadType.Success,
+            });
+            mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+
+            const ourProm = ourLogin.loginStep5();
+            await expect(ourProm).rejects.toThrow("New device not found");
+        });
+
         it("should abort on unexpected errors", async () => {
             await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
 
