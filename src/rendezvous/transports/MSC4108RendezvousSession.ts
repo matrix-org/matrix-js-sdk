@@ -169,16 +169,24 @@ export class MSC4108RendezvousSession {
             const poll = await this.fetch(this.url, { method: Method.Get, headers });
 
             if (poll.status === 404) {
-                this.cancel(ClientRendezvousFailureReason.Unknown);
+                await this.cancel(ClientRendezvousFailureReason.Unknown);
                 return undefined;
             }
 
             // rely on server expiring the channel rather than checking ourselves
 
+            const etag = poll.headers.get("etag") ?? undefined;
             if (poll.headers.get("content-type") !== "text/plain") {
-                this.etag = poll.headers.get("etag") ?? undefined;
+                this.etag = etag;
             } else if (poll.status === 200) {
-                this.etag = poll.headers.get("etag") ?? undefined;
+                if (!etag) {
+                    // Some browsers & extensions block the ETag header for anti-tracking purposes
+                    // We try and detect this so the client can give the user a somewhat helpful message
+                    await this.cancel(ClientRendezvousFailureReason.ETagMissing);
+                    return undefined;
+                }
+
+                this.etag = etag;
                 const text = await poll.text();
                 logger.info(`Received: ${text} with etag ${this.etag}`);
                 return text;
