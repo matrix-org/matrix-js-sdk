@@ -280,13 +280,13 @@ export class MSC4108SignInWithQR {
             });
             // then wait for secrets
             logger.info("Waiting for secrets message");
-            const secrets = await this.receive<SecretsPayload | any>();
-            if (secrets?.type === PayloadType.Failure) {
-                const { reason } = secrets as FailurePayload;
+            const payload = await this.receive<SecretsPayload | FailurePayload>();
+            if (payload?.type === PayloadType.Failure) {
+                const { reason } = payload;
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (secrets?.type !== PayloadType.Secrets) {
+            if (payload?.type !== PayloadType.Secrets) {
                 await this.send<FailurePayload>({
                     type: PayloadType.Failure,
                     reason: MSC4108FailureReason.UnexpectedMessageReceived,
@@ -296,7 +296,7 @@ export class MSC4108SignInWithQR {
                     MSC4108FailureReason.UnexpectedMessageReceived,
                 );
             }
-            return { secrets };
+            return { secrets: payload };
             // then done?
         } else {
             if (!this.expectingNewDeviceId) {
