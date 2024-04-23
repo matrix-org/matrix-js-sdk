@@ -67,10 +67,15 @@ describe("MSC4108SignInWithQR", () => {
         const login = new MSC4108SignInWithQR(channel, false);
 
         await login.generateCode();
-        expect(login.code).toHaveLength(71);
-        const text = new TextDecoder().decode(login.code);
+        const code = login.code;
+        expect(code).toHaveLength(71);
+        const text = new TextDecoder().decode(code);
         expect(text.startsWith("MATRIX")).toBeTruthy();
         expect(text.endsWith(url)).toBeTruthy();
+
+        // Assert that the code is stable
+        await login.generateCode();
+        expect(login.code).toEqual(code);
     });
 
     describe("should be able to connect as a reciprocating device", () => {
@@ -146,6 +151,50 @@ describe("MSC4108SignInWithQR", () => {
                     device_authorization_grant: {
                         verification_uri: verificationUri,
                         verification_uri_complete: verificationUriComplete,
+                    },
+                    device_id: deviceId,
+                }),
+            ]);
+        });
+
+        it("should abort if device already exists", async () => {
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            // We don't have the new device side of this flow implemented at this time so mock it
+            const deviceId = "DEADB33F";
+            const verificationUri = "https://example.com/verify";
+
+            mocked(client.getDevice).mockResolvedValue({} as IMyDevice);
+
+            await Promise.all([
+                expect(ourLogin.loginStep2And3()).rejects.toThrow("Specified device ID already exists"),
+                // @ts-ignore
+                opponentLogin.send({
+                    type: PayloadType.Protocol,
+                    protocol: "device_authorization_grant",
+                    device_authorization_grant: {
+                        verification_uri: verificationUri,
+                    },
+                    device_id: deviceId,
+                }),
+            ]);
+        });
+
+        it("should abort on unsupported protocol", async () => {
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            // We don't have the new device side of this flow implemented at this time so mock it
+            const deviceId = "DEADB33F";
+            const verificationUri = "https://example.com/verify";
+
+            await Promise.all([
+                expect(ourLogin.loginStep2And3()).rejects.toThrow("Received a request for an unsupported protocol"),
+                // @ts-ignore
+                opponentLogin.send({
+                    type: PayloadType.Protocol,
+                    protocol: "device_authorization_grant_v2",
+                    device_authorization_grant: {
+                        verification_uri: verificationUri,
                     },
                     device_id: deviceId,
                 }),

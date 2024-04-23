@@ -35,6 +35,21 @@ describe("MSC4108SecureChannel", () => {
         expect(text.endsWith(url)).toBeTruthy();
     });
 
+    it("should throw error if attempt to connect multiple times", async () => {
+        const mockSession = {
+            send: jest.fn(),
+            receive: jest.fn(),
+            url,
+        } as unknown as MSC4108RendezvousSession;
+        const channel = new MSC4108SecureChannel(mockSession);
+
+        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+        const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
+        mocked(mockSession.receive).mockResolvedValue(opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE"));
+        await channel.connect();
+        await expect(channel.connect()).rejects.toThrow("Channel already connected");
+    });
+
     it("should throw error on invalid initiate response", async () => {
         const mockSession = {
             send: jest.fn(),
