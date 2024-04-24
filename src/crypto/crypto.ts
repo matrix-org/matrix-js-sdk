@@ -16,9 +16,9 @@ limitations under the License.
 
 import { logger } from "../logger";
 
-export let crypto = globalThis.window?.crypto;
-export let subtleCrypto = globalThis.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
-export let TextEncoder = globalThis.window?.TextEncoder;
+export let crypto = globalThis.crypto;
+export let subtleCrypto = crypto?.subtle ?? crypto?.webkitSubtle; // TODO: Stop using webkitSubtle fallback
+export let TextEncoder = globalThis.TextEncoder;
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {
