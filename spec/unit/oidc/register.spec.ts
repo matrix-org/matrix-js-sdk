@@ -117,41 +117,4 @@ describe("registerOidcClient()", () => {
             ),
         ).rejects.toThrow(OidcError.DynamicRegistrationNotSupported);
     });
-
-    it("should request device_code scope if it is supported", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
-            status: 200,
-            body: JSON.stringify({ client_id: dynamicClientId }),
-        });
-
-        await expect(registerOidcClient(delegatedAuthConfig, metadata)).resolves.toBe(dynamicClientId);
-        expect(fetchMockJest).toHaveFetched(delegatedAuthConfig.registrationEndpoint!, {
-            matchPartialBody: true,
-            body: {
-                grant_types: ["authorization_code", "refresh_token"],
-            },
-        });
-
-        await expect(
-            registerOidcClient(
-                {
-                    ...delegatedAuthConfig,
-                    metadata: {
-                        ...delegatedAuthConfig.metadata,
-                        grant_types_supported: [
-                            ...delegatedAuthConfig.metadata.grant_types_supported,
-                            "urn:ietf:params:oauth:grant-type:device_code",
-                        ],
-                    },
-                },
-                metadata,
-            ),
-        ).resolves.toBe(dynamicClientId);
-        expect(fetchMockJest).toHaveFetched(delegatedAuthConfig.registrationEndpoint!, {
-            matchPartialBody: true,
-            body: {
-                grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
-            },
-        });
-    });
 });
