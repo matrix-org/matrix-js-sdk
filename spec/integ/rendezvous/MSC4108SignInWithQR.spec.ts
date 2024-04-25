@@ -19,6 +19,7 @@ import { mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
 import {
+    MSC4108FailureReason,
     MSC4108RendezvousSession,
     MSC4108SecureChannel,
     MSC4108SignInWithQR,
@@ -128,6 +129,12 @@ describe("MSC4108SignInWithQR", () => {
                     return prom;
                 }),
                 url,
+                cancelled: false,
+                cancel: () => {
+                    // @ts-ignore
+                    ourMockSession.cancelled = true;
+                    ourData.resolve("");
+                },
             } as unknown as MSC4108RendezvousSession;
             const opponentMockSession = {
                 send: jest.fn(async (newData) => {
@@ -265,10 +272,7 @@ describe("MSC4108SignInWithQR", () => {
                 return -1;
             });
             jest.spyOn(Date, "now").mockImplementation(() => {
-                if (mocked(setTimeout).mock.calls.length === 1) {
-                    return 12345678 + 11000;
-                }
-                return 12345678;
+                return 12345678 + mocked(setTimeout).mock.calls.length * 1000;
             });
 
             await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
@@ -310,6 +314,42 @@ describe("MSC4108SignInWithQR", () => {
 
             await ourLogin.declineLoginOnExistingDevice();
             await expect(opponentLogin.loginStep5()).rejects.toThrow("Unexpected message received");
+        });
+
+        it("should not send secrets if user cancels", async () => {
+            jest.spyOn(global, "setTimeout").mockImplementation((fn) => {
+                (<Function>fn)();
+                return -1;
+            });
+
+            await Promise.all([ourLogin.loginStep1(), opponentLogin.loginStep1()]);
+
+            // We don't have the new device side of this flow implemented at this time so mock it
+            // @ts-ignore
+            ourLogin.expectingNewDeviceId = "DEADB33F";
+
+            const ourProm = ourLogin.loginStep5();
+            const opponentProm = opponentLogin.loginStep5();
+
+            // Consume the ProtocolAccepted message which would normally be handled by step 4 which we do not have here
+            // @ts-ignore
+            await opponentLogin.receive();
+
+            const deferred = defer<IMyDevice>();
+            mocked(client.getDevice).mockReturnValue(deferred.promise);
+
+            ourLogin.cancel(MSC4108FailureReason.UserCancelled).catch(() => {});
+            deferred.resolve({} as IMyDevice);
+
+            const secrets = {
+                cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
+            };
+            mocked(client.getCrypto()!.exportSecretsForQrLogin).mockResolvedValue(secrets);
+
+            await Promise.all([
+                expect(ourProm).rejects.toThrow("User cancelled"),
+                expect(opponentProm).rejects.toThrow("Unexpected message received"),
+            ]);
         });
     });
 });

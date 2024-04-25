@@ -208,7 +208,10 @@ export class MSC4108RendezvousSession {
         this._ready = false;
         this.onFailure?.(reason);
 
-        if (this.url && reason === ClientRendezvousFailureReason.UserDeclined) {
+        if (
+            this.url &&
+            (reason === ClientRendezvousFailureReason.UserDeclined || reason === MSC4108FailureReason.UserCancelled)
+        ) {
             try {
                 await this.fetch(this.url, { method: Method.Delete });
             } catch (e) {
