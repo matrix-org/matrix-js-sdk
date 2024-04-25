@@ -1745,7 +1745,7 @@ class EventDecryptor {
             // If the server is telling us our membership at the time the event
             // was sent, and it isn't "join", we use a different error code.
             const membership = event.getMembershipAtEvent();
-            if (membership && membership !== KnownMembership.Join) {
+            if (membership && membership !== KnownMembership.Join && membership !== KnownMembership.Invite) {
                 throw new DecryptionError(
                     DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED,
                     "This message was sent when we were not a member of the room.",

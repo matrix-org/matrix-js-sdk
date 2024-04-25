@@ -633,6 +633,30 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             newBackendOnly(
                 "fails with another error when the server reports user was a member of the room",
                 async () => {
+                    // This tests that when the server reports that the user
+                    // was invited at the time the event was sent, then we
+                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
+                    // and instead get some other error, since the user should
+                    // have gotten the key for the event.
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.name]: "invite",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+                },
+            );
+
+            newBackendOnly(
+                "fails with another error when the server reports user was a member of the room",
+                async () => {
                     // This tests that when the server reports the user's
                     // membership, and reports that the user was joined, then we
                     // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
