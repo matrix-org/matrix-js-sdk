@@ -109,7 +109,7 @@ export class MSC4108SignInWithQR {
         private readonly channel: MSC4108SecureChannel,
         private readonly didScanCode: boolean,
         private readonly client?: MatrixClient,
-        private readonly onFailure?: RendezvousFailureListener,
+        public onFailure?: RendezvousFailureListener,
     ) {
         this.ourIntent = client ? QrCodeMode.Reciprocate : QrCodeMode.Login;
     }
@@ -150,8 +150,14 @@ export class MSC4108SignInWithQR {
         return !this.isExistingDevice;
     }
 
-    public async loginStep1(): Promise<{ homeserverBaseUrl?: string }> {
-        logger.info(`loginStep1(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
+    /**
+     * The first step in the OIDC QR login process.
+     * To be called after the QR code has been rendered or scanned.
+     * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
+     * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
+     */
+    public async negotiateProtocols(): Promise<{ homeserverBaseUrl?: string }> {
+        logger.info(`negotiateProtocols(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
         await this.channel.connect();
 
         if (this.didScanCode) {
@@ -214,7 +220,12 @@ export class MSC4108SignInWithQR {
         return {};
     }
 
-    public async loginStep2And3(): Promise<{
+    /**
+     * The second & third step in the OIDC QR login process.
+     * To be called after `negotiateProtocols` for the existing device.
+     * To be called after OIDC negotiation for the new device. (Currently unsupported)
+     */
+    public async deviceAuthorizationGrant(): Promise<{
         verificationUri?: string;
         userCode?: string;
     }> {
@@ -283,10 +294,11 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    // Login step 4 is not implemented as it is only performed by the new device in the flow
-    // and the new device flow is not yet implemented.
-
-    public async loginStep5(): Promise<{ secrets?: QRSecretsBundle }> {
+    /**
+     * The fifth (and final) step in the OIDC QR login process.
+     * To be called after the new device has completed authentication.
+     */
+    public async shareSecrets(): Promise<{ secrets?: QRSecretsBundle }> {
         if (this.isNewDevice) {
             await this.send<SuccessPayload>({
                 type: PayloadType.Success,
