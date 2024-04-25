@@ -16,6 +16,7 @@ limitations under the License.
 
 import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import {
     MSC4108RendezvousSession,
@@ -24,7 +25,16 @@ import {
     PayloadType,
 } from "../../../src/rendezvous";
 import { defer } from "../../../src/utils";
-import { ClientPrefix, IHttpOpts, IMyDevice, MatrixClient, MatrixError, MatrixHttpApi } from "../../../src";
+import {
+    ClientPrefix,
+    DEVICE_CODE_SCOPE,
+    IHttpOpts,
+    IMyDevice,
+    MatrixClient,
+    MatrixError,
+    MatrixHttpApi,
+} from "../../../src";
+import { mockOpenIdConfiguration } from "../../test-utils/oidc";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";
@@ -47,6 +57,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
         },
         getDevice: jest.fn(),
         getCrypto: jest.fn(() => crypto),
+        getAuthIssuer: jest.fn().mockResolvedValue({ issuer: "https://issuer/" }),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -57,6 +68,24 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
 }
 
 describe("MSC4108SignInWithQR", () => {
+    beforeEach(() => {
+        fetchMock.get(
+            "https://issuer/.well-known/openid-configuration",
+            mockOpenIdConfiguration("https://issuer/", [DEVICE_CODE_SCOPE]),
+        );
+        fetchMock.get("https://issuer/jwks", {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            keys: [],
+        });
+    });
+
+    afterEach(() => {
+        fetchMock.reset();
+    });
+
     const url = "https://fallbackserver/rz/123";
 
     it("should generate qr code data as expected", async () => {
