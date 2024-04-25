@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClient } from "oidc-client-ts";
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener } from ".";
@@ -89,32 +88,28 @@ interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
 }
 
 export class MSC4108SignInWithQR {
-    private ourIntent: QrCodeMode;
+    private readonly ourIntent: QrCodeMode;
     private _code?: Uint8Array;
-    public protocol?: string;
     private expectingNewDeviceId?: string;
 
+    /**
+     * Returns the check code for the secure channel or undefined if not generated yet.
+     */
     public get checkCode(): string | undefined {
-        const x = this.channel?.getCheckCode();
-
-        if (!x) {
-            return undefined;
-        }
-        return Array.from(x.as_bytes())
-            .map((b) => `${b % 10}`)
-            .join("");
+        return this.channel?.getCheckCode();
     }
 
     /**
      * @param channel - The secure channel used for communication
      * @param client - The Matrix client in used on the device already logged in
+     * @param didScanCode - Whether this side of the channel scanned the QR code from the other party
      * @param onFailure - Callback for when the rendezvous fails
      */
     public constructor(
-        private channel: MSC4108SecureChannel,
-        private didScanCode: boolean,
-        private client?: MatrixClient,
-        public onFailure?: RendezvousFailureListener,
+        private readonly channel: MSC4108SecureChannel,
+        private readonly didScanCode: boolean,
+        private readonly client?: MatrixClient,
+        private readonly onFailure?: RendezvousFailureListener,
     ) {
         this.ourIntent = client ? QrCodeMode.Reciprocate : QrCodeMode.Login;
     }
@@ -134,13 +129,23 @@ export class MSC4108SignInWithQR {
             return;
         }
 
-        this._code = await this.channel.generateCode(this.ourIntent, this.client?.getHomeserverUrl());
+        if (this.ourIntent === QrCodeMode.Reciprocate && this.client) {
+            this._code = await this.channel.generateCode(this.ourIntent, this.client.getHomeserverUrl());
+        } else if (this.ourIntent === QrCodeMode.Login) {
+            this._code = await this.channel.generateCode(this.ourIntent);
+        }
     }
 
+    /**
+     * Returns true if the device is the already logged in device reciprocating a new login on the other side of the channel.
+     */
     public get isExistingDevice(): boolean {
         return this.ourIntent === QrCodeMode.Reciprocate;
     }
 
+    /**
+     * Returns true if the device is the new device logging in being reciprocated by the device on the other side of the channel.
+     */
     public get isNewDevice(): boolean {
         return !this.isExistingDevice;
     }
@@ -153,12 +158,9 @@ export class MSC4108SignInWithQR {
             // Secure Channel step 6 completed, we trust the channel
 
             if (this.isNewDevice) {
-                // MSC4108-Flow: ExistingScanned
-                // take homeserver from QR code which should already be set
+                // MSC4108-Flow: ExistingScanned - take homeserver from QR code which should already be set
             } else {
-                // MSC4108-Flow: NewScanned
-                // send protocols message
-
+                // MSC4108-Flow: NewScanned -send protocols message
                 let oidcClientConfig: OidcClientConfig | undefined;
                 try {
                     const { issuer } = await this.client!.getAuthIssuer();
@@ -185,8 +187,7 @@ export class MSC4108SignInWithQR {
                 }
             }
         } else if (this.isNewDevice) {
-            // MSC4108-Flow: ExistingScanned
-            // wait for protocols message
+            // MSC4108-Flow: ExistingScanned - wait for protocols message
             logger.info("Waiting for protocols message");
             const payload = await this.receive<ProtocolsPayload>();
 
@@ -208,20 +209,19 @@ export class MSC4108SignInWithQR {
 
             return { homeserverBaseUrl: payload.homeserver };
         } else {
-            // MSC4108-Flow: NewScanned
-            // nothing to do
+            // MSC4108-Flow: NewScanned - nothing to do
         }
         return {};
     }
 
-    public async loginStep2And3(oidcClient?: OidcClient): Promise<{
+    public async loginStep2And3(): Promise<{
         verificationUri?: string;
         userCode?: string;
     }> {
         if (this.isNewDevice) {
             throw new Error("New device flows around OIDC are not yet implemented");
         } else {
-            // The user needs to do step 7 for the out of band confirmation
+            // The user needs to do step 7 for the out-of-band confirmation
             // but, first we receive the protocol chosen by the other device so that
             // the confirmation_uri is ready to go
             logger.info("Waiting for protocol message");
@@ -283,13 +283,8 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    public async loginStep4a(): Promise<unknown> {
-        throw new Error("New device flows around OIDC are not yet implemented");
-    }
-
-    public async loginStep4b(): Promise<unknown> {
-        throw new Error("New device flows around OIDC are not yet implemented");
-    }
+    // Login step 4 is not implemented as it is only performed by the new device in the flow
+    // and the new device flow is not yet implemented.
 
     public async loginStep5(): Promise<{ secrets?: QRSecretsBundle }> {
         if (this.isNewDevice) {
@@ -386,17 +381,30 @@ export class MSC4108SignInWithQR {
         await this.channel.secureSend(payload);
     }
 
+    /**
+     * Decline the login on the existing device.
+     */
     public async declineLoginOnExistingDevice(): Promise<void> {
+        if (!this.isExistingDevice) {
+            throw new Error("Can only decline login on existing device");
+        }
         await this.send<DeclinedPayload>({
             type: PayloadType.Declined,
         });
     }
 
+    /**
+     * Cancels the rendezvous session.
+     * @param reason the reason for the cancellation
+     */
     public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         this.onFailure?.(reason);
         await this.channel.cancel(reason);
     }
 
+    /**
+     * Closes the rendezvous session.
+     */
     public async close(): Promise<void> {
         await this.channel.close();
     }

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import {
-    CheckCode,
     Curve25519PublicKey,
     EstablishedSecureChannel,
     QrCodeData,
@@ -49,6 +48,13 @@ export class MSC4108SecureChannel {
         this.secureChannel = new SecureChannel();
     }
 
+    /**
+     * Generate a QR code for the current session.
+     * @param mode the mode to generate the QR code in, either `Login` or `Reciprocate`.
+     * @param homeserverBaseUrl the base URL of the homeserver to connect to, required for `Reciprocate` mode.
+     */
+    public async generateCode(mode: QrCodeMode.Login): Promise<Uint8Array>;
+    public async generateCode(mode: QrCodeMode.Reciprocate, homeserverBaseUrl: string): Promise<Uint8Array>;
     public async generateCode(mode: QrCodeMode, homeserverBaseUrl?: string): Promise<Uint8Array> {
         const { url } = this.rendezvousSession;
 
@@ -63,10 +69,23 @@ export class MSC4108SecureChannel {
         ).to_bytes();
     }
 
-    public getCheckCode(): CheckCode | undefined {
-        return this.establishedChannel?.check_code();
+    /**
+     * Returns the check code for the secure channel or undefined if not generated yet.
+     */
+    public getCheckCode(): string | undefined {
+        const x = this.establishedChannel?.check_code();
+
+        if (!x) {
+            return undefined;
+        }
+        return Array.from(x.as_bytes())
+            .map((b) => `${b % 10}`)
+            .join("");
     }
 
+    /**
+     * Connects and establishes a secure channel with the other device.
+     */
     public async connect(): Promise<void> {
         if (this.connected) {
             throw new Error("Channel already connected");
@@ -76,7 +95,7 @@ export class MSC4108SecureChannel {
             // We are the scanning device
             this.establishedChannel = this.secureChannel.create_outbound_channel(this.theirPublicKey);
 
-            /**
+            /*
              Secure Channel step 4. Device S sends the initial message
 
              Nonce := 0
@@ -92,17 +111,16 @@ export class MSC4108SecureChannel {
                 await this.rendezvousSession.send(loginInitiateMessage);
             }
 
-            /**
-                Secure Channel step 6. Verification by Device S
+            /*
+            Secure Channel step 6. Verification by Device S
 
-                Nonce_G := 1
-                (TaggedCiphertext, Sp) := Unpack(Message)
-                Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_G, TaggedCiphertext)
-                Nonce_G := Nonce_G + 2
+            Nonce_G := 1
+            (TaggedCiphertext, Sp) := Unpack(Message)
+            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_G, TaggedCiphertext)
+            Nonce_G := Nonce_G + 2
 
-                unless Plaintext == "MATRIX_QR_CODE_LOGIN_OK":
-                    FAIL
-
+            unless Plaintext == "MATRIX_QR_CODE_LOGIN_OK":
+                FAIL
              */
             {
                 logger.info("Waiting for LoginOkMessage");
@@ -126,16 +144,15 @@ export class MSC4108SecureChannel {
                 // Step 6 is now complete. We trust the channel
             }
         } else {
-            /**
-                Secure Channel step 5. Device G confirms
+            /*
+            Secure Channel step 5. Device G confirms
 
-                Nonce_S := 0
-                (TaggedCiphertext, Sp) := Unpack(LoginInitiateMessage)
-                SH := ECDH(Gs, Sp)
-                EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-                Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_S, TaggedCiphertext)
-                Nonce_S := Nonce_S + 2
-
+            Nonce_S := 0
+            (TaggedCiphertext, Sp) := Unpack(LoginInitiateMessage)
+            SH := ECDH(Gs, Sp)
+            EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
+            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_S, TaggedCiphertext)
+            Nonce_S := Nonce_S + 2
              */
             // wait for the other side to send us their public key
             logger.info("Waiting for LoginInitiateMessage");
@@ -184,6 +201,10 @@ export class MSC4108SecureChannel {
         return this.establishedChannel.encrypt(plaintext);
     }
 
+    /**
+     * Sends a payload securely to the other device.
+     * @param payload the payload to encrypt and send
+     */
     public async secureSend<T extends MSC4108Payload>(payload: T): Promise<void> {
         if (!this.connected) {
             throw new Error("Channel closed");
@@ -195,6 +216,9 @@ export class MSC4108SecureChannel {
         await this.rendezvousSession.send(await this.encrypt(stringifiedPayload));
     }
 
+    /**
+     * Receives an encrypted payload from the other device and decrypts it.
+     */
     public async secureReceive<T extends MSC4108Payload>(): Promise<Partial<T> | undefined> {
         if (!this.establishedChannel) {
             throw new Error("Channel closed");
@@ -211,8 +235,17 @@ export class MSC4108SecureChannel {
         return json as Partial<T> | undefined;
     }
 
-    public async close(): Promise<void> {}
+    /**
+     * Closes the secure channel.
+     */
+    public async close(): Promise<void> {
+        await this.rendezvousSession.close();
+    }
 
+    /**
+     * Cancels the secure channel.
+     * @param reason the reason for the cancellation
+     */
     public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         try {
             await this.rendezvousSession.cancel(reason);
@@ -222,6 +255,9 @@ export class MSC4108SecureChannel {
         }
     }
 
+    /**
+     * Returns whether the rendezvous session has been cancelled.
+     */
     public get cancelled(): boolean {
         return this.rendezvousSession.cancelled;
     }

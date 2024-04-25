@@ -27,14 +27,14 @@ import { ClientPrefix } from "../../http-api";
  */
 export class MSC4108RendezvousSession {
     public url?: string;
+    private readonly client?: MatrixClient;
+    private readonly fallbackRzServer?: string;
+    private readonly fetchFn?: typeof global.fetch;
+    private readonly onFailure?: RendezvousFailureListener;
     private etag?: string;
     private expiresAt?: Date;
-    private client?: MatrixClient;
-    private fallbackRzServer?: string;
-    private fetchFn?: typeof global.fetch;
     private _cancelled = false;
     private _ready = false;
-    public onFailure?: RendezvousFailureListener;
 
     public constructor({
         onFailure,
@@ -76,8 +76,18 @@ export class MSC4108RendezvousSession {
         this.url = url;
     }
 
+    /**
+     * Returns whether the channel is ready to be used.
+     */
     public get ready(): boolean {
         return this._ready;
+    }
+
+    /**
+     * Returns whether the channel has been cancelled.
+     */
+    public get cancelled(): boolean {
+        return this._cancelled;
     }
 
     private fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
@@ -103,6 +113,10 @@ export class MSC4108RendezvousSession {
         return this.fallbackRzServer;
     }
 
+    /**
+     * Sends data via the rendezvous channel.
+     * @param data the payload to send
+     */
     public async send(data: string): Promise<void> {
         if (this._cancelled) {
             return;
@@ -150,6 +164,10 @@ export class MSC4108RendezvousSession {
         }
     }
 
+    /**
+     * Receives data from the rendezvous channel.
+     * @return the returned promise won't resolve until new data is acquired or the channel is closed either by the server or the other party.
+     */
     public async receive(): Promise<string | undefined> {
         if (!this.url) {
             throw new Error("Rendezvous not set up");
@@ -195,6 +213,11 @@ export class MSC4108RendezvousSession {
         }
     }
 
+    /**
+     * Cancels the rendezvous channel.
+     * If the reason is user_declined or user_cancelled then the channel will also be closed.
+     * @param reason the reason to cancel with
+     */
     public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
         if (
             reason === ClientRendezvousFailureReason.Unknown &&
@@ -208,19 +231,20 @@ export class MSC4108RendezvousSession {
         this._ready = false;
         this.onFailure?.(reason);
 
-        if (
-            this.url &&
-            (reason === ClientRendezvousFailureReason.UserDeclined || reason === MSC4108FailureReason.UserCancelled)
-        ) {
-            try {
-                await this.fetch(this.url, { method: Method.Delete });
-            } catch (e) {
-                logger.warn(e);
-            }
+        if (reason === ClientRendezvousFailureReason.UserDeclined || reason === MSC4108FailureReason.UserCancelled) {
+            await this.close();
         }
     }
 
-    public get cancelled(): boolean {
-        return this._cancelled;
+    /**
+     * Closes the rendezvous channel.
+     */
+    public async close(): Promise<void> {
+        if (!this.url) return;
+        try {
+            await this.fetch(this.url, { method: Method.Delete });
+        } catch (e) {
+            logger.warn(e);
+        }
     }
 }

@@ -20,6 +20,7 @@ import { mocked } from "jest-mock";
 import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
 
 describe("MSC4108SecureChannel", () => {
+    const baseUrl = "https://example.com";
     const url = "https://fallbackserver/rz/123";
 
     it("should generate qr code data as expected", async () => {
@@ -43,7 +44,7 @@ describe("MSC4108SecureChannel", () => {
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
 
-        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
         const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
         mocked(mockSession.receive).mockResolvedValue(opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE"));
         await channel.connect();
@@ -61,7 +62,7 @@ describe("MSC4108SecureChannel", () => {
         mocked(mockSession.receive).mockResolvedValue("");
         await expect(channel.connect()).rejects.toThrow("No response from other device");
 
-        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
         const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
         const ciphertext = opponentChannel.encrypt("NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE");
 
@@ -82,7 +83,7 @@ describe("MSC4108SecureChannel", () => {
             } as unknown as MSC4108RendezvousSession;
             channel = new MSC4108SecureChannel(mockSession);
 
-            const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate));
+            const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
             opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
             const ciphertext = opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
 
