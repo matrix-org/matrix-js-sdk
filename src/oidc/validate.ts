@@ -183,7 +183,7 @@ export const validateIdToken = (
     issuer: string,
     clientId: string,
     nonce: string | undefined,
-): IdTokenClaims => {
+): void => {
     try {
         if (!idToken) {
             throw new Error("No ID token");
@@ -219,8 +219,6 @@ export const validateIdToken = (
         if (!claims.exp || Date.now() > claims.exp * 1000) {
             throw new Error("Invalid expiry");
         }
-
-        return claims;
     } catch (error) {
         logger.error("Invalid ID token", error);
         throw new Error(OidcError.InvalidIdToken);

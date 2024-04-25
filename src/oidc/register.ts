@@ -71,10 +71,6 @@ export const registerOidcClient = async (
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
-    if (delegatedAuthConfig.metadata.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
-        grantTypes.push(DEVICE_CODE_SCOPE);
-    }
-
     // https://openid.net/specs/openid-connect-registration-1_0.html
     const metadata: OidcRegistrationRequestBody = {
         client_name: clientMetadata.clientName,
