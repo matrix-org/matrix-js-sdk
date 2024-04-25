@@ -221,4 +221,8 @@ export class MSC4108SecureChannel {
             await this.close();
         }
     }
+
+    public get cancelled(): boolean {
+        return this.rendezvousSession.cancelled;
+    }
 }

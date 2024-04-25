@@ -24,6 +24,7 @@ import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
 import { QRSecretsBundle } from "../crypto-api";
 import { MatrixError } from "../http-api";
 import { sleep } from "../utils";
+import { DEVICE_CODE_SCOPE, discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig } from "../oidc";
 
 export enum PayloadType {
     Protocols = "m.login.protocols",
@@ -47,7 +48,7 @@ interface ProtocolsPayload extends MSC4108Payload {
 
 interface ProtocolPayload extends MSC4108Payload {
     type: PayloadType.Protocol;
-    protocol: string;
+    protocol: Exclude<string, "device_authorization_grant">;
     device_id: string;
 }
 
@@ -57,6 +58,12 @@ interface DeviceAuthorizationGrantProtocolPayload extends ProtocolPayload {
         verification_uri: string;
         verification_uri_complete?: string;
     };
+}
+
+function isDeviceAuthorizationGrantProtocolPayload(
+    payload: ProtocolPayload,
+): payload is DeviceAuthorizationGrantProtocolPayload {
+    return payload.protocol === "device_authorization_grant";
 }
 
 interface FailurePayload extends MSC4108Payload {
@@ -151,25 +158,44 @@ export class MSC4108SignInWithQR {
             } else {
                 // MSC4108-Flow: NewScanned
                 // send protocols message
-                // PROTOTYPE: we should be checking that the advertised protocol is available
-                await this.send<ProtocolsPayload>({
-                    type: PayloadType.Protocols,
-                    protocols: ["device_authorization_grant"],
-                    homeserver: this.client?.getHomeserverUrl() ?? "",
-                });
+
+                let oidcClientConfig: OidcClientConfig | undefined;
+                try {
+                    const { issuer } = await this.client!.getAuthIssuer();
+                    oidcClientConfig = await discoverAndValidateOIDCIssuerWellKnown(issuer);
+                } catch (e) {
+                    logger.error("Failed to discover OIDC metadata", e);
+                }
+
+                if (oidcClientConfig?.metadata.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
+                    await this.send<ProtocolsPayload>({
+                        type: PayloadType.Protocols,
+                        protocols: ["device_authorization_grant"],
+                        homeserver: this.client?.getHomeserverUrl() ?? "",
+                    });
+                } else {
+                    await this.send<FailurePayload>({
+                        type: PayloadType.Failure,
+                        reason: MSC4108FailureReason.UnsupportedProtocol,
+                    });
+                    throw new RendezvousError(
+                        "Device code grant unsupported",
+                        MSC4108FailureReason.UnsupportedProtocol,
+                    );
+                }
             }
         } else if (this.isNewDevice) {
             // MSC4108-Flow: ExistingScanned
             // wait for protocols message
             logger.info("Waiting for protocols message");
-            const message = await this.receive();
+            const payload = await this.receive<ProtocolsPayload>();
 
-            if (message?.type === PayloadType.Failure) {
-                const { reason } = message as FailurePayload;
+            if (payload?.type === PayloadType.Failure) {
+                const { reason } = payload;
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (message?.type !== PayloadType.Protocols) {
+            if (payload?.type !== PayloadType.Protocols) {
                 await this.send<FailurePayload>({
                     type: PayloadType.Failure,
                     reason: MSC4108FailureReason.UnexpectedMessageReceived,
@@ -179,8 +205,8 @@ export class MSC4108SignInWithQR {
                     MSC4108FailureReason.UnexpectedMessageReceived,
                 );
             }
-            const protocolsMessage = message as ProtocolsPayload;
-            return { homeserverBaseUrl: protocolsMessage.homeserver };
+
+            return { homeserverBaseUrl: payload.homeserver };
         } else {
             // MSC4108-Flow: NewScanned
             // nothing to do
@@ -192,7 +218,6 @@ export class MSC4108SignInWithQR {
         verificationUri?: string;
         userCode?: string;
     }> {
-        logger.info("loginStep2And3()");
         if (this.isNewDevice) {
             throw new Error("New device flows around OIDC are not yet implemented");
         } else {
@@ -200,14 +225,14 @@ export class MSC4108SignInWithQR {
             // but, first we receive the protocol chosen by the other device so that
             // the confirmation_uri is ready to go
             logger.info("Waiting for protocol message");
-            const message = await this.receive();
+            const payload = await this.receive<ProtocolPayload | DeviceAuthorizationGrantProtocolPayload>();
 
-            if (message?.type === PayloadType.Failure) {
-                const { reason } = message as FailurePayload;
+            if (payload?.type === PayloadType.Failure) {
+                const { reason } = payload;
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (message?.type !== PayloadType.Protocol) {
+            if (payload?.type !== PayloadType.Protocol) {
                 await this.send<FailurePayload>({
                     type: PayloadType.Failure,
                     reason: MSC4108FailureReason.UnexpectedMessageReceived,
@@ -218,14 +243,9 @@ export class MSC4108SignInWithQR {
                 );
             }
 
-            const protocolMessage = message as ProtocolPayload;
-            if (protocolMessage.protocol === "device_authorization_grant") {
-                const { device_authorization_grant: dag, device_id: expectingNewDeviceId } =
-                    protocolMessage as DeviceAuthorizationGrantProtocolPayload;
+            if (isDeviceAuthorizationGrantProtocolPayload(payload)) {
+                const { device_authorization_grant: dag, device_id: expectingNewDeviceId } = payload;
                 const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } = dag;
-
-                // PROTOTYPE: this is an implementation of option 3c for when to share the secrets:
-                // check if there is already a device online with that device ID
 
                 let deviceAlreadyExists = true;
                 try {
@@ -272,15 +292,13 @@ export class MSC4108SignInWithQR {
     }
 
     public async loginStep5(): Promise<{ secrets?: QRSecretsBundle }> {
-        logger.info("loginStep5()");
-
         if (this.isNewDevice) {
             await this.send<SuccessPayload>({
                 type: PayloadType.Success,
             });
             // then wait for secrets
             logger.info("Waiting for secrets message");
-            const payload = await this.receive<SecretsPayload | FailurePayload>();
+            const payload = await this.receive<SecretsPayload>();
             if (payload?.type === PayloadType.Failure) {
                 const { reason } = payload;
                 throw new RendezvousError("Failed", reason);
@@ -307,14 +325,14 @@ export class MSC4108SignInWithQR {
             });
 
             logger.info("Waiting for outcome message");
-            const res = await this.receive();
+            const payload = await this.receive<SuccessPayload>();
 
-            if (res?.type === PayloadType.Failure) {
-                const { reason } = res as FailurePayload;
+            if (payload?.type === PayloadType.Failure) {
+                const { reason } = payload;
                 throw new RendezvousError("Failed", reason);
             }
 
-            if (res?.type !== PayloadType.Success) {
+            if (payload?.type !== PayloadType.Success) {
                 await this.send<FailurePayload>({
                     type: PayloadType.Failure,
                     reason: MSC4108FailureReason.UnexpectedMessageReceived,
@@ -322,8 +340,6 @@ export class MSC4108SignInWithQR {
                 throw new RendezvousError("Unexpected message", MSC4108FailureReason.UnexpectedMessageReceived);
             }
 
-            // PROTOTYPE: this also needs to handle the case of the process being cancelled
-            // i.e. aborting the waiting and making sure not to share the secrets
             const timeout = Date.now() + 10000; // wait up to 10 seconds
             do {
                 // is the device visible via the Homeserver?
@@ -333,13 +349,15 @@ export class MSC4108SignInWithQR {
                     if (device) {
                         // if so, return the secrets
                         const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQrLogin();
+                        if (this.channel.cancelled) {
+                            throw new RendezvousError("User cancelled", MSC4108FailureReason.UserCancelled);
+                        }
                         // send secrets
                         await this.send<SecretsPayload>({
                             type: PayloadType.Secrets,
                             ...secretsBundle,
                         });
                         return { secrets: secretsBundle };
-                        // done?
                         // let the other side close the rendezvous session
                     }
                 } catch (err: MatrixError | unknown) {
@@ -360,7 +378,7 @@ export class MSC4108SignInWithQR {
         }
     }
 
-    private async receive<T extends MSC4108Payload>(): Promise<T | undefined> {
+    private async receive<T extends MSC4108Payload>(): Promise<T | FailurePayload | undefined> {
         return (await this.channel.secureReceive()) as T | undefined;
     }
 

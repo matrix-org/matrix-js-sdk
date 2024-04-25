@@ -23,7 +23,7 @@ import { ClientPrefix } from "../../http-api";
 /**
  * Prototype of the unstable [4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
  * insecure rendezvous session protocol.
- * Note that this is UNSTABLE and may have breaking changes without notice.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC4108RendezvousSession {
     public url?: string;
@@ -32,7 +32,7 @@ export class MSC4108RendezvousSession {
     private client?: MatrixClient;
     private fallbackRzServer?: string;
     private fetchFn?: typeof global.fetch;
-    private cancelled = false;
+    private _cancelled = false;
     private _ready = false;
     public onFailure?: RendezvousFailureListener;
 
@@ -104,7 +104,7 @@ export class MSC4108RendezvousSession {
     }
 
     public async send(data: string): Promise<void> {
-        if (this.cancelled) {
+        if (this._cancelled) {
             return;
         }
         const method = this.url ? Method.Put : Method.Post;
@@ -156,7 +156,7 @@ export class MSC4108RendezvousSession {
         }
         // eslint-disable-next-line no-constant-condition
         while (true) {
-            if (this.cancelled) {
+            if (this._cancelled) {
                 return undefined;
             }
 
@@ -204,7 +204,7 @@ export class MSC4108RendezvousSession {
             reason = ClientRendezvousFailureReason.Expired;
         }
 
-        this.cancelled = true;
+        this._cancelled = true;
         this._ready = false;
         this.onFailure?.(reason);
 
@@ -215,5 +215,9 @@ export class MSC4108RendezvousSession {
                 logger.warn(e);
             }
         }
+    }
+
+    public get cancelled(): boolean {
+        return this._cancelled;
     }
 }

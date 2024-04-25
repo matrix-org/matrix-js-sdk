@@ -49,6 +49,8 @@ interface OidcRegistrationRequestBody {
     application_type: "web" | "native";
 }
 
+export const DEVICE_CODE_SCOPE = "urn:ietf:params:oauth:grant-type:device_code";
+
 /**
  * Attempts dynamic registration against the configured registration endpoint
  * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}
@@ -69,9 +71,8 @@ export const registerOidcClient = async (
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
-    const deviceCodeScope = "urn:ietf:params:oauth:grant-type:device_code";
-    if (delegatedAuthConfig.metadata.grant_types_supported.includes(deviceCodeScope)) {
-        grantTypes.push(deviceCodeScope);
+    if (delegatedAuthConfig.metadata.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
+        grantTypes.push(DEVICE_CODE_SCOPE);
     }
 
     // https://openid.net/specs/openid-connect-registration-1_0.html
