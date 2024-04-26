@@ -304,6 +304,56 @@ describe("initRustCrypto", () => {
             }
         }, 10000);
 
+        it("migrates data from a legacy crypto store when secret are not encrypted", async () => {
+            const PICKLE_KEY = "pickle1234";
+            const legacyStore = new MemoryCryptoStore();
+
+            // It's possible for old sessions to directly store the secrets as raw UInt8Array,
+            // so we need to support that in the migration code.
+            // See https://github.com/matrix-org/matrix-js-sdk/commit/c81f11df0afd4d0da3b088892745ae2f8ba1c4a7
+            async function storeSecretKeyInClear(type: string, key: Uint8Array, store: CryptoStore) {
+                // @ts-ignore The API to store raw UInt8Array does not exist anymore, so we need that for this test.
+                store.privateKeys[type as keyof SecretStorePrivateKeys] = key;
+            }
+
+            // Populate the legacy store with some test data
+            const storeSecretKey = (type: string, key: string) =>
+                storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
+
+            await legacyStore.storeAccount({}, "not a real account");
+            await storeSecretKey("master", "master key");
+            await storeSecretKey("self_signing", "ssk");
+            await storeSecretKey("user_signing", "usk");
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
+
+            function legacyMigrationProgressListener(progress: number, total: number): void {
+                logger.log(`migrated ${progress} of ${total}`);
+            }
+
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+                legacyMigrationProgressListener,
+            });
+
+            const data = mocked(Migration.migrateBaseData).mock.calls[0][0];
+            expect(data.pickledAccount).toEqual("not a real account");
+            expect(data.userId!.toString()).toEqual(TEST_USER);
+            expect(data.deviceId!.toString()).toEqual(TEST_DEVICE_ID);
+            expect(atob(data.privateCrossSigningMasterKey!)).toEqual("master key");
+            expect(atob(data.privateCrossSigningUserSigningKey!)).toEqual("usk");
+            expect(atob(data.privateCrossSigningSelfSigningKey!)).toEqual("ssk");
+        });
+
         it("handles megolm sessions with no `keysClaimed`", async () => {
             const legacyStore = new MemoryCryptoStore();
             legacyStore.storeAccount({}, "not a real account");
