@@ -18,6 +18,7 @@ import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import { KnownMembership } from "../@types/membership";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
@@ -1740,6 +1741,17 @@ class EventDecryptor {
             err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
         ) {
             this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
+
+            // If the server is telling us our membership at the time the event
+            // was sent, and it isn't "join", we use a different error code.
+            const membership = event.getMembershipAtEvent();
+            if (membership && membership !== KnownMembership.Join && membership !== KnownMembership.Invite) {
+                throw new DecryptionError(
+                    DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED,
+                    "This message was sent when we were not a member of the room.",
+                    errorDetails,
+                );
+            }
 
             // If the event was sent before this device was created, we use some different error codes.
             if (event.getTs() <= this.olmMachine.deviceCreationTimeMs) {

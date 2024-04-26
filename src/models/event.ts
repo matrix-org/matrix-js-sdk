@@ -31,6 +31,7 @@ import {
     RelationType,
     ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
+    UNSIGNED_MEMBERSHIP_FIELD,
 } from "../@types/event";
 import { Crypto } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
@@ -76,6 +77,7 @@ export interface IUnsigned {
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
+    [UNSIGNED_MEMBERSHIP_FIELD.name]?: Membership | string;
 }
 
 export interface IThreadBundledRelationship {
@@ -719,6 +721,22 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public isState(): boolean {
         return this.event.state_key !== undefined;
+    }
+
+    /**
+     * Get the user's room membership at the time the event was sent, as reported
+     * by the server.  This uses MSC4115.
+     *
+     * @returns The user's room membership, or `undefined` if the server does
+     *   not report it.
+     */
+    public getMembershipAtEvent(): Membership | string | undefined {
+        const unsigned = this.getUnsigned();
+        if (typeof unsigned[UNSIGNED_MEMBERSHIP_FIELD.name] === "string") {
+            return unsigned[UNSIGNED_MEMBERSHIP_FIELD.name];
+        } else {
+            return undefined;
+        }
     }
 
     /**

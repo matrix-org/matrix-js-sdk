@@ -560,6 +560,11 @@ export enum DecryptionFailureCode {
      */
     HISTORICAL_MESSAGE_WORKING_BACKUP = "HISTORICAL_MESSAGE_WORKING_BACKUP",
 
+    /**
+     * Message was sent when the user was not a member of the room.
+     */
+    HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 
