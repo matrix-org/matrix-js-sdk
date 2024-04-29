@@ -211,7 +211,7 @@ export class MSC4108SecureChannel {
         }
 
         const stringifiedPayload = JSON.stringify(payload);
-        logger.info(`=> ${stringifiedPayload}`);
+        logger.debug(`=> {"type": ${JSON.stringify(payload.type)}, ...}`);
 
         await this.rendezvousSession.send(await this.encrypt(stringifiedPayload));
     }
@@ -231,7 +231,7 @@ export class MSC4108SecureChannel {
         const plaintext = await this.decrypt(ciphertext);
         const json = JSON.parse(plaintext);
 
-        logger.info(`<= ${JSON.stringify(json)}`);
+        logger.debug(`<= {"type": ${JSON.stringify(json.type)}, ...}`);
         return json as Partial<T> | undefined;
     }
 
