@@ -56,9 +56,9 @@ jobs:
 
             - id: extra_args
               run: |
-                  coverage=$(find coverage -type f -name '*lcov.info' -printf '%f,' | tr -d '\r\n' | sed 's/,$//g')
+                  coverage=$(find coverage -type f -name '*lcov.info' -printf '%h/%f,' | tr -d '\r\n' | sed 's/,$//g')
                   echo "sonar.javascript.lcov.reportPaths=$coverage" >> sonar-project.properties
-                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' -printf '%f,' | tr -d '\r\n' | sed 's/,$//g')
+                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' -printf '%h/%f,' | tr -d '\r\n' | sed 's/,$//g')
                   echo "sonar.testExecutionReportPaths=$reports" >> sonar-project.properties
 
             - name: "🩻 SonarCloud Scan"
