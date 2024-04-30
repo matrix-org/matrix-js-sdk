@@ -4287,6 +4287,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public getRoomEncryption(roomId: string): IRoomEncryption | null {
         return this.roomList.getRoomEncryption(roomId);
     }
+
+    /**
+     * Returns whether dehydrated devices are supported by the crypto backend
+     * and by the server.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return false;
+    }
+
+    /**
+     * Stub function -- dehydration is not implemented here, so throw error
+     */
+    public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
+    }
 }
 
 /**

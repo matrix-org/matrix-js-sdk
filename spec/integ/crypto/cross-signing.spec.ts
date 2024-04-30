@@ -347,6 +347,67 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             expect(isCrossSigningReady).toBeTruthy();
         });
+
+        it("should return false if identity is not trusted, even if the secrets are in 4S", async () => {
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+
+            // Complete initial sync, to get the 4S account_data events stored
+            mockInitialApiRequests(aliceClient.getHomeserverUrl());
+
+            // For this test we need to have a well-formed 4S setup.
+            const mockSecretInfo = {
+                encrypted: {
+                    // Don't care about the actual values here, just need to be present for validation
+                    KeyId: {
+                        iv: "IVIVIVIVIVIVIV",
+                        ciphertext: "CIPHERTEXTB64",
+                        mac: "MACMACMAC",
+                    },
+                },
+            };
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                account_data: {
+                    events: [
+                        {
+                            type: "m.secret_storage.key.KeyId",
+                            content: {
+                                algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                                // iv and mac not relevant for this test
+                            },
+                        },
+                        {
+                            type: "m.secret_storage.default_key",
+                            content: {
+                                key: "KeyId",
+                            },
+                        },
+                        {
+                            type: "m.cross_signing.master",
+                            content: mockSecretInfo,
+                        },
+                        {
+                            type: "m.cross_signing.user_signing",
+                            content: mockSecretInfo,
+                        },
+                        {
+                            type: "m.cross_signing.self_signing",
+                            content: mockSecretInfo,
+                        },
+                    ],
+                },
+            });
+            await aliceClient.startClient();
+            await syncPromise(aliceClient);
+
+            // Sanity: ensure that the secrets are in 4S
+            const status = await aliceClient.getCrypto()!.getCrossSigningStatus();
+            expect(status.privateKeysInSecretStorage).toBeTruthy();
+
+            const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
+
+            expect(isCrossSigningReady).toBeFalsy();
+        });
     });
 
     describe("getCrossSigningKeyId", () => {

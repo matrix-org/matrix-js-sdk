@@ -58,6 +58,16 @@ interface KeyBackupCreationInfo {
 export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap> {
     /** Have we checked if there is a backup on the server which we can use */
     private checkedForBackup = false;
+
+    /**
+     * The latest backup version on the server, when we last checked.
+     *
+     * If there was no backup on the server, `null`. If our attempt to check resulted in an error, `undefined`.
+     *
+     * Note that the backup was not necessarily verified.
+     */
+    private serverBackupInfo: KeyBackupInfo | null | undefined = undefined;
+
     private activeBackupVersion: string | null = null;
     private stopped = false;
 
@@ -87,6 +97,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     public async getActiveBackupVersion(): Promise<string | null> {
         if (!(await this.olmMachine.isBackupEnabled())) return null;
         return this.activeBackupVersion;
+    }
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * If there was no backup on the server, `null`. If our attempt to check resulted in an error, `undefined`.
+     */
+    public async getServerBackupInfo(): Promise<KeyBackupInfo | null | undefined> {
+        // Do a validity check if we haven't already done one. The check is likely to fail if we don't yet have the
+        // backup keys -- but as a side-effect, it will populate `serverBackupInfo`.
+        await this.checkKeyBackupAndEnable(false);
+        return this.serverBackupInfo;
     }
 
     /**
@@ -242,18 +267,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /** Helper for `checkKeyBackup` */
     private async doCheckKeyBackup(): Promise<KeyBackupCheck | null> {
         logger.log("Checking key backup status...");
-        let backupInfo: KeyBackupInfo | null = null;
+        let backupInfo: KeyBackupInfo | null | undefined;
         try {
             backupInfo = await this.requestKeyBackupVersion();
         } catch (e) {
             logger.warn("Error checking for active key backup", e);
+            this.serverBackupInfo = undefined;
             return null;
         }
         this.checkedForBackup = true;
 
         if (backupInfo && !backupInfo.version) {
             logger.warn("active backup lacks a useful 'version'; ignoring it");
+            backupInfo = undefined;
         }
+        this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
 
@@ -462,12 +490,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         return count;
     }
+
     /**
      * Get information about the current key backup from the server
      *
      * @returns Information object from API or null if there is no active backup.
      */
-    public async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
+    private async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
         return await requestKeyBackupVersion(this.http);
     }
 

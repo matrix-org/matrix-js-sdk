@@ -205,7 +205,20 @@ describe("initRustCrypto", () => {
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
 
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                auth_data: {
+                    public_key: "backup_key_public",
+                },
+                version: "45",
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            });
+            // The cached key should be valid for the backup
+            const mockBackupDecryptionKey: any = {
+                megolmV1PublicKey: {
+                    publicKeyBase64: "backup_key_public",
+                },
+            };
+            jest.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);
@@ -290,6 +303,56 @@ describe("initRustCrypto", () => {
                 }
             }
         }, 10000);
+
+        it("migrates data from a legacy crypto store when secret are not encrypted", async () => {
+            const PICKLE_KEY = "pickle1234";
+            const legacyStore = new MemoryCryptoStore();
+
+            // It's possible for old sessions to directly store the secrets as raw UInt8Array,
+            // so we need to support that in the migration code.
+            // See https://github.com/matrix-org/matrix-js-sdk/commit/c81f11df0afd4d0da3b088892745ae2f8ba1c4a7
+            async function storeSecretKeyInClear(type: string, key: Uint8Array, store: CryptoStore) {
+                // @ts-ignore The API to store raw UInt8Array does not exist anymore, so we need that for this test.
+                store.privateKeys[type as keyof SecretStorePrivateKeys] = key;
+            }
+
+            // Populate the legacy store with some test data
+            const storeSecretKey = (type: string, key: string) =>
+                storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
+
+            await legacyStore.storeAccount({}, "not a real account");
+            await storeSecretKey("master", "master key");
+            await storeSecretKey("self_signing", "ssk");
+            await storeSecretKey("user_signing", "usk");
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
+
+            function legacyMigrationProgressListener(progress: number, total: number): void {
+                logger.log(`migrated ${progress} of ${total}`);
+            }
+
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+                legacyMigrationProgressListener,
+            });
+
+            const data = mocked(Migration.migrateBaseData).mock.calls[0][0];
+            expect(data.pickledAccount).toEqual("not a real account");
+            expect(data.userId!.toString()).toEqual(TEST_USER);
+            expect(data.deviceId!.toString()).toEqual(TEST_DEVICE_ID);
+            expect(atob(data.privateCrossSigningMasterKey!)).toEqual("master key");
+            expect(atob(data.privateCrossSigningUserSigningKey!)).toEqual("usk");
+            expect(atob(data.privateCrossSigningSelfSigningKey!)).toEqual("ssk");
+        });
 
         it("handles megolm sessions with no `keysClaimed`", async () => {
             const legacyStore = new MemoryCryptoStore();
@@ -762,8 +825,11 @@ describe("RustCrypto", () => {
                             },
                         },
                     };
-                } else if (request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) {
-                    // SigningKeysUploadRequest does not implement OutgoingRequest and does not need to be marked as sent.
+                } else if (
+                    request instanceof RustSdkCryptoJs.UploadSigningKeysRequest ||
+                    request instanceof RustSdkCryptoJs.PutDehydratedDeviceRequest
+                ) {
+                    // These request types do not implement OutgoingRequest and do not need to be marked as sent.
                     return;
                 }
                 if (request.id) {
@@ -1393,6 +1459,34 @@ describe("RustCrypto", () => {
                 stage: "load_keys",
                 failures: 1,
             });
+        });
+    });
+
+    describe("device dehydration", () => {
+        it("should detect if dehydration is supported", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            fetchMock.config.overwriteRoutes = true;
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(false);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: "DEVICE_ID",
+                device_data: "data",
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
         });
     });
 });

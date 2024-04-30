@@ -23,8 +23,11 @@ import { decryptAES, IEncryptedPayload } from "../crypto/aes";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { requestKeyBackupVersion } from "./backup";
 import { IRoomEncryption } from "../crypto/RoomList";
-import { CrossSigningKeyInfo } from "../crypto-api";
+import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api";
 import { RustCrypto } from "./rust-crypto";
+import { KeyBackupInfo } from "../crypto-api/keybackup";
+import { sleep } from "../utils";
+import { encodeBase64 } from "../base64";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -105,7 +108,7 @@ export async function migrateFromLegacyCrypto(args: {
 
     if (migrationState === MigrationState.NOT_STARTED) {
         logger.info("Migrating data from legacy crypto store. Step 1: base data");
-        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle);
+        await migrateBaseData(args.http, args.userId, args.deviceId, legacyStore, pickleKey, args.storeHandle, logger);
 
         migrationState = MigrationState.INITIAL_DATA_MIGRATED;
         await legacyStore.setMigrationState(migrationState);
@@ -144,6 +147,7 @@ async function migrateBaseData(
     legacyStore: CryptoStore,
     pickleKey: Uint8Array,
     storeHandle: RustSdkCryptoJs.StoreHandle,
+    logger: Logger,
 ): Promise<void> {
     const migrationData = new RustSdkCryptoJs.BaseMigrationData();
     migrationData.userId = new RustSdkCryptoJs.UserId(userId);
@@ -158,12 +162,41 @@ async function migrateBaseData(
     const recoveryKey = await getAndDecryptCachedSecretKey(legacyStore, pickleKey, "m.megolm_backup.v1");
 
     // If we have a backup recovery key, we need to try to figure out which backup version it is for.
-    // All we can really do is ask the server for the most recent version.
+    // All we can really do is ask the server for the most recent version and check if the cached key we have matches.
+    // It is possible that the backup has changed since last time his session was opened.
     if (recoveryKey) {
-        const backupInfo = await requestKeyBackupVersion(http);
-        if (backupInfo) {
-            migrationData.backupVersion = backupInfo.version;
-            migrationData.backupRecoveryKey = recoveryKey;
+        let backupCallDone = false;
+        let backupInfo: KeyBackupInfo | null = null;
+        while (!backupCallDone) {
+            try {
+                backupInfo = await requestKeyBackupVersion(http);
+                backupCallDone = true;
+            } catch (e) {
+                logger.info("Failed to get backup version during migration, retrying in 2 seconds", e);
+                // Retry until successful, use simple constant delay
+                await sleep(2000);
+            }
+        }
+        if (backupInfo && backupInfo.algorithm == "m.megolm_backup.v1.curve25519-aes-sha2") {
+            // check if the recovery key matches, as the active backup version may have changed since the key was cached
+            // and the migration started.
+            try {
+                const decryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(recoveryKey);
+                const publicKey = (backupInfo.auth_data as Curve25519AuthData)?.public_key;
+                const isValid = decryptionKey.megolmV1PublicKey.publicKeyBase64 == publicKey;
+                if (isValid) {
+                    migrationData.backupVersion = backupInfo.version;
+                    migrationData.backupRecoveryKey = recoveryKey;
+                } else {
+                    logger.debug(
+                        "The backup key to migrate does not match the active backup version",
+                        `Cached pub key: ${decryptionKey.megolmV1PublicKey.publicKeyBase64}`,
+                        `Active pub key: ${publicKey}`,
+                    );
+                }
+            } catch (e) {
+                logger.warn("Failed to check if the backup key to migrate matches the active backup version", e);
+            }
         }
     }
 
@@ -368,19 +401,20 @@ async function getAndDecryptCachedSecretKey(
     legacyPickleKey: Uint8Array,
     name: string,
 ): Promise<string | undefined> {
-    let encodedKey: IEncryptedPayload | null = null;
-
-    await legacyStore.doTxn("readonly", "account", (txn) => {
-        legacyStore.getSecretStorePrivateKey(
-            txn,
-            (k) => {
-                encodedKey = k as IEncryptedPayload | null;
-            },
-            name as keyof SecretStorePrivateKeys,
-        );
+    const key = await new Promise<any>((resolve) => {
+        legacyStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            legacyStore.getSecretStorePrivateKey(txn, resolve, name as keyof SecretStorePrivateKeys);
+        });
     });
 
-    return encodedKey === null ? undefined : await decryptAES(encodedKey, legacyPickleKey, name);
+    if (key && key.ciphertext && key.iv && key.mac) {
+        return await decryptAES(key as IEncryptedPayload, legacyPickleKey, name);
+    } else if (key instanceof Uint8Array) {
+        // This is a legacy backward compatibility case where the key was stored in clear.
+        return encodeBase64(key);
+    } else {
+        return undefined;
+    }
 }
 
 /**

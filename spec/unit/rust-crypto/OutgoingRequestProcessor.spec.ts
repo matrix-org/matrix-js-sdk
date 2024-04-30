@@ -22,6 +22,7 @@ import {
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
+    PutDehydratedDeviceRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
     UploadSigningKeysRequest,
@@ -227,6 +228,35 @@ describe("OutgoingRequestProcessor", () => {
             .respond(200, testResponse, true);
 
         // SigningKeysUploadRequest does not need to be marked as sent, so no call to OlmMachine.markAsSent is expected.
+
+        await httpBackend.flushAllExpected();
+        await reqProm;
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
+    it("should handle PutDehydratedDeviceRequest", async () => {
+        // first, mock up a request as we might expect to receive it from the Rust layer ...
+        const testReq = { foo: "bar" };
+        const outgoingRequest = new PutDehydratedDeviceRequest(JSON.stringify(testReq));
+
+        // ... then poke the request into the OutgoingRequestProcessor under test
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest);
+
+        // Now: check that it makes a matching HTTP request.
+        const testResponse = '{"result":1}';
+        httpBackend
+            .when("PUT", "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual(
+                    "https://example.com/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+                );
+                expect(JSON.parse(req.rawData)).toEqual(testReq);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
+
+        // PutDehydratedDeviceRequest does not need to be marked as sent, so no call to OlmMachine.markAsSent is expected.
 
         await httpBackend.flushAllExpected();
         await reqProm;

@@ -496,6 +496,42 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Dehydrated devices
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns whether MSC3814 dehydrated devices are supported by the crypto
+     * backend and by the server.
+     *
+     * This should be called before calling `startDehydration`, and if this
+     * returns `false`, `startDehydration` should not be called.
+     */
+    isDehydrationSupported(): Promise<boolean>;
+
+    /**
+     * Start using device dehydration.
+     *
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
+     *   Storage.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
+     *
+     * This function must not be called unless `isDehydrationSupported` returns
+     * `true`, and must not be called until after cross-signing and secret
+     * storage have been set up.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.  Defaults
+     *   to false.
+     */
+    startDehydration(createNewKey?: boolean): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */
@@ -505,6 +541,29 @@ export enum DecryptionFailureCode {
 
     /** Message was encrypted with a Megolm session which has been shared with us, but in a later ratchet state. */
     OLM_UNKNOWN_MESSAGE_INDEX = "OLM_UNKNOWN_MESSAGE_INDEX",
+
+    /**
+     * Message was sent before the current device was created; there is no key backup on the server, so this
+     * decryption failure is expected.
+     */
+    HISTORICAL_MESSAGE_NO_KEY_BACKUP = "HISTORICAL_MESSAGE_NO_KEY_BACKUP",
+
+    /**
+     * Message was sent before the current device was created; there was a key backup on the server, but we don't
+     * seem to have access to the backup. (Probably we don't have the right key.)
+     */
+    HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED = "HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED",
+
+    /**
+     * Message was sent before the current device was created; there was a (usable) key backup on the server, but we
+     * still can't decrypt. (Either the session isn't in the backup, or we just haven't gotten around to checking yet.)
+     */
+    HISTORICAL_MESSAGE_WORKING_BACKUP = "HISTORICAL_MESSAGE_WORKING_BACKUP",
+
+    /**
+     * Message was sent when the user was not a member of the room.
+     */
+    HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
 
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",

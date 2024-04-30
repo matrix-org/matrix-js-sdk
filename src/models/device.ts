@@ -51,6 +51,9 @@ export class Device {
     /** display name of the device */
     public readonly displayName?: string;
 
+    /** whether the device is a dehydrated device */
+    public readonly dehydrated: boolean = false;
+
     public constructor(opts: DeviceParameters) {
         this.deviceId = opts.deviceId;
         this.userId = opts.userId;
@@ -59,6 +62,7 @@ export class Device {
         this.verified = opts.verified || DeviceVerification.Unverified;
         this.signatures = opts.signatures || new Map();
         this.displayName = opts.displayName;
+        this.dehydrated = !!opts.dehydrated;
     }
 
     /**
