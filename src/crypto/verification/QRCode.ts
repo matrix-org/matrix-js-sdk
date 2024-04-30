@@ -74,7 +74,7 @@ export class ReciprocateQRCode extends Base {
         await new Promise<void>((resolve, reject) => {
             this.reciprocateQREvent = {
                 confirm: resolve,
-                cancel: () => reject(newUserCancelledError()),
+                cancel: (): void => reject(newUserCancelledError()),
             };
             this.emit(QrCodeEvent.ShowReciprocateQr, this.reciprocateQREvent);
         });
