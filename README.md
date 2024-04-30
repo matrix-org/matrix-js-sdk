@@ -102,24 +102,24 @@ to append the header when using the endpoints in `<img />` elements and similar.
 
 ```javascript
 const downloadUrl = client.mxcUrlToHttp(
-    /*mxcUrl=*/"mxc://example.org/abc123", // the MXC URI to download/thumbnail, typically from an event or profile
-    /*width=*/undefined, // part of the thumbnail API. Use as required.
-    /*height=*/undefined, // part of the thumbnail API. Use as required.
-    /*resizeMethod=*/undefined, // part of the thumbnail API. Use as required.
-    /*allowDirectLinks=*/false, // should generally be left `false`.
-    /*allowRedirects=*/true, // implied supported with authentication
-    /*useAuthentication=*/true, // the flag we're after in this example
+    /*mxcUrl=*/ "mxc://example.org/abc123", // the MXC URI to download/thumbnail, typically from an event or profile
+    /*width=*/ undefined, // part of the thumbnail API. Use as required.
+    /*height=*/ undefined, // part of the thumbnail API. Use as required.
+    /*resizeMethod=*/ undefined, // part of the thumbnail API. Use as required.
+    /*allowDirectLinks=*/ false, // should generally be left `false`.
+    /*allowRedirects=*/ true, // implied supported with authentication
+    /*useAuthentication=*/ true, // the flag we're after in this example
 );
 const img = await fetch(downloadUrl, {
     headers: {
-        'Authorization': `Bearer ${client.getAccessToken()}`,
+        Authorization: `Bearer ${client.getAccessToken()}`,
     },
 });
 // Do something with `img`.
 ```
 
 > [!WARNING]
-> In future the js-sdk will *only* return authentication-required URLs, mandating population of the `Authorization` header.
+> In future the js-sdk will _only_ return authentication-required URLs, mandating population of the `Authorization` header.
 
 ## What does this SDK do?
 

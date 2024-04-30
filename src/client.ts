@@ -5792,7 +5792,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         allowRedirects?: boolean,
         useAuthentication?: boolean,
     ): string | null {
-        return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks, allowRedirects, useAuthentication);
+        return getHttpUriForMxc(
+            this.baseUrl,
+            mxcUrl,
+            width,
+            height,
+            resizeMethod,
+            allowDirectLinks,
+            allowRedirects,
+            useAuthentication,
+        );
     }
 
     /**
