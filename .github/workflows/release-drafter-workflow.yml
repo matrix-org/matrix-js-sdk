@@ -1,4 +1,5 @@
-name: Release Drafter
+# Workflow used by other workflows to generate draft releases.
+name: Release Drafter Reusable
 on:
     workflow_call:
         inputs:

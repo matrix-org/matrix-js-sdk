@@ -1,3 +1,7 @@
+# Generates the draft release for the js-sdk
+# Normally triggered whenever anything is merged to the staging branch, but
+# also has a workflow dispatch trigger in case it needs running manually due
+# to failures / workflow updates etc.
 name: Release Drafter
 on:
     push:
