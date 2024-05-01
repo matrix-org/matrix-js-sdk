@@ -308,8 +308,8 @@ export class SAS extends Base {
                         reject(err);
                     }
                 },
-                cancel: () => reject(newUserCancelledError()),
-                mismatch: () => reject(newMismatchedSASError()),
+                cancel: (): void => reject(newUserCancelledError()),
+                mismatch: (): void => reject(newMismatchedSASError()),
             };
             this.emit(SasEvent.ShowSas, this.sasEvent);
         });

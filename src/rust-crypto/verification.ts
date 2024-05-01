@@ -567,8 +567,10 @@ export class RustQrCodeVerifier extends BaseRustVerifer<RustSdkCryptoJs.Qr> impl
         // application to prompt the user to confirm their side.
         if (this.callbacks === null && this.inner.hasBeenScanned()) {
             this.callbacks = {
-                confirm: () => this.confirmScanning(),
-                cancel: () => this.cancel(),
+                confirm: (): void => {
+                    this.confirmScanning();
+                },
+                cancel: (): void => this.cancel(),
             };
         }
 

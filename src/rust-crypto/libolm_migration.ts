@@ -27,6 +27,7 @@ import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api";
 import { RustCrypto } from "./rust-crypto";
 import { KeyBackupInfo } from "../crypto-api/keybackup";
 import { sleep } from "../utils";
+import { encodeBase64 } from "../base64";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -400,19 +401,20 @@ async function getAndDecryptCachedSecretKey(
     legacyPickleKey: Uint8Array,
     name: string,
 ): Promise<string | undefined> {
-    let encodedKey: IEncryptedPayload | null = null;
-
-    await legacyStore.doTxn("readonly", "account", (txn) => {
-        legacyStore.getSecretStorePrivateKey(
-            txn,
-            (k) => {
-                encodedKey = k as IEncryptedPayload | null;
-            },
-            name as keyof SecretStorePrivateKeys,
-        );
+    const key = await new Promise<any>((resolve) => {
+        legacyStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            legacyStore.getSecretStorePrivateKey(txn, resolve, name as keyof SecretStorePrivateKeys);
+        });
     });
 
-    return encodedKey === null ? undefined : await decryptAES(encodedKey, legacyPickleKey, name);
+    if (key && key.ciphertext && key.iv && key.mac) {
+        return await decryptAES(key as IEncryptedPayload, legacyPickleKey, name);
+    } else if (key instanceof Uint8Array) {
+        // This is a legacy backward compatibility case where the key was stored in clear.
+        return encodeBase64(key);
+    } else {
+        return undefined;
+    }
 }
 
 /**

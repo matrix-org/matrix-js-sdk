@@ -299,6 +299,13 @@ export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
 export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matrix.msc4023.thread_id");
 
 /**
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4115
+ *
+ * @experimental
+ */
+export const UNSIGNED_MEMBERSHIP_FIELD = new UnstableValue("membership", "io.element.msc4115.membership");
+
+/**
  * @deprecated in favour of {@link EncryptedFile}
  */
 export type IEncryptedFile = EncryptedFile;
