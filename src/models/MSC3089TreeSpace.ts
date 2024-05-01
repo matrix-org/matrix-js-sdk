@@ -35,7 +35,7 @@ import { ISendEventResponse } from "../@types/requests";
 import { FileType } from "../http-api";
 import { KnownMembership } from "../@types/membership";
 import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events";
-import { EncryptedFile, FileContent } from "../@types/media";
+import type { EncryptedFile, FileContent } from "../@types/media";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this

@@ -5,9 +5,9 @@
             "@babel/preset-env",
             {
                 "targets": {
-                    "node": 10
+                    "esmodules": true
                 },
-                "modules": "commonjs"
+                "modules": false
             }
         ],
         "@babel/preset-typescript"
