@@ -21,6 +21,10 @@ endpoints from before Matrix 1.1, for example.
 
 # Quickstart
 
+> [!IMPORTANT]
+> Servers may require or use authenticated endpoints for media (images, files, avatars, etc). See the
+> [Authenticated Media](#authenticated-media) section for information on how to enable support for this.
+
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
 
@@ -88,6 +92,34 @@ Object.keys(client.store.rooms).forEach((roomId) => {
     });
 });
 ```
+
+## Authenticated media
+
+Servers supporting [MSC3916](https://github.com/matrix-org/matrix-spec-proposals/pull/3916) will require clients, like
+yours, to include an `Authorization` header when `/download`ing or `/thumbnail`ing media. For NodeJS environments this
+may be as easy as the following code snippet, though web browsers may need to use [Service Workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)
+to append the header when using the endpoints in `<img />` elements and similar.
+
+```javascript
+const downloadUrl = client.mxcUrlToHttp(
+    /*mxcUrl=*/ "mxc://example.org/abc123", // the MXC URI to download/thumbnail, typically from an event or profile
+    /*width=*/ undefined, // part of the thumbnail API. Use as required.
+    /*height=*/ undefined, // part of the thumbnail API. Use as required.
+    /*resizeMethod=*/ undefined, // part of the thumbnail API. Use as required.
+    /*allowDirectLinks=*/ false, // should generally be left `false`.
+    /*allowRedirects=*/ true, // implied supported with authentication
+    /*useAuthentication=*/ true, // the flag we're after in this example
+);
+const img = await fetch(downloadUrl, {
+    headers: {
+        Authorization: `Bearer ${client.getAccessToken()}`,
+    },
+});
+// Do something with `img`.
+```
+
+> [!WARNING]
+> In future the js-sdk will _only_ return authentication-required URLs, mandating population of the `Authorization` header.
 
 ## What does this SDK do?
 
