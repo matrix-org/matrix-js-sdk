@@ -3,7 +3,7 @@
         "target": "es2016",
         "experimentalDecorators": true,
         "esModuleInterop": true,
-        "module": "ES2020",
+        "module": "commonjs",
         "moduleResolution": "node",
         "noUnusedLocals": true,
         "noEmit": true,
