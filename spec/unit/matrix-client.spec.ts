@@ -386,6 +386,9 @@ describe("MatrixClient", function () {
             expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true)).toBe(
                 getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true),
             );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true, true),
+            );
         });
     });
 

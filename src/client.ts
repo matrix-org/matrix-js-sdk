@@ -5775,7 +5775,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * anyone they share a room with. If false, will return null for such URLs.
      * @param allowRedirects - If true, the caller supports the URL being 307 or
      * 308 redirected to another resource upon request. If false, redirects
-     * are not expected.
+     * are not expected. Implied `true` when `useAuthentication` is `true`.
+     * @param useAuthentication - If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support
+     * for authenticated media will *not* be checked - it is the caller's responsibility
+     * to do so before calling this function. Note also that `useAuthentication`
+     * implies `allowRedirects`. Defaults to false (unauthenticated endpoints).
      * @returns the avatar URL or null.
      */
     public mxcUrlToHttp(
@@ -5785,8 +5790,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         resizeMethod?: string,
         allowDirectLinks?: boolean,
         allowRedirects?: boolean,
+        useAuthentication?: boolean,
     ): string | null {
-        return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks, allowRedirects);
+        return getHttpUriForMxc(
+            this.baseUrl,
+            mxcUrl,
+            width,
+            height,
+            resizeMethod,
+            allowDirectLinks,
+            allowRedirects,
+            useAuthentication,
+        );
     }
 
     /**
