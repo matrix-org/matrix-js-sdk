@@ -139,7 +139,7 @@ export function isValidatedIssuerMetadata(
     validateOIDCIssuerWellKnown(metadata);
 }
 
-const decodeIdToken = (token: string): IdTokenClaims => {
+export const decodeIdToken = (token: string): IdTokenClaims => {
     try {
         return jwtDecode<IdTokenClaims>(token);
     } catch (error) {
