@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { jwtDecode } from "jwt-decode";
-import { OidcMetadata, SigninResponse } from "oidc-client-ts";
+import { IdTokenClaims, OidcMetadata, SigninResponse } from "oidc-client-ts";
 
 import { logger } from "../logger";
 import { OidcError } from "./error";
@@ -139,28 +139,7 @@ export function isValidatedIssuerMetadata(
     validateOIDCIssuerWellKnown(metadata);
 }
 
-/**
- * Standard JWT claims.
- *
- * @see https://datatracker.ietf.org/doc/html/rfc7519#section-4.1
- */
-interface JwtClaims {
-    [claim: string]: unknown;
-    /** The "iss" (issuer) claim identifies the principal that issued the JWT. */
-    iss?: string;
-    /** The "sub" (subject) claim identifies the principal that is the subject of the JWT. */
-    sub?: string;
-    /** The "aud" (audience) claim identifies the recipients that the JWT is intended for. */
-    aud?: string | string[];
-    /** The "exp" (expiration time) claim identifies the expiration time on or after which the JWT MUST NOT be accepted for processing. */
-    exp?: number;
-    // unused claims excluded
-}
-interface IdTokenClaims extends JwtClaims {
-    nonce?: string;
-}
-
-const decodeIdToken = (token: string): IdTokenClaims => {
+export const decodeIdToken = (token: string): IdTokenClaims => {
     try {
         return jwtDecode<IdTokenClaims>(token);
     } catch (error) {
@@ -276,7 +255,7 @@ export type BearerTokenResponse = {
     expires_in?: number;
     // from oidc-client-ts
     expires_at?: number;
-    id_token?: string;
+    id_token: string;
 };
 
 /**
