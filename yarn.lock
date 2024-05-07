@@ -1756,7 +1756,7 @@
 
 "@matrix-org/matrix-sdk-crypto-wasm@github:matrix-org/matrix-rust-sdk-crypto-wasm#poljar/qr-login":
   version "4.9.0"
-  resolved "https://codeload.github.com/matrix-org/matrix-rust-sdk-crypto-wasm/tar.gz/78c5fb5cc29979d0bd188a8b0ec163dd30aa7936"
+  resolved "https://codeload.github.com/matrix-org/matrix-rust-sdk-crypto-wasm/tar.gz/90b63b84df65c19161f94049d83218cb4dfff97d"
 
 "@matrix-org/olm@3.2.15":
   version "3.2.15"
