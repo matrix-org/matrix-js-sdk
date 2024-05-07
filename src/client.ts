@@ -4876,10 +4876,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
             path = utils.encodeUri(pathTemplate, pathParams);
-        } else if (event.isRedaction()) {
+        } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
             path = utils.encodeUri(pathTemplate, {
-                $redactsEventId: event.event.redacts!,
+                $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
