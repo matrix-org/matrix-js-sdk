@@ -33,14 +33,13 @@ export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousT
     uri: string;
 }
 
-// n.b MSC3886/MSC3903/MSC3906 that this is based on are now closed.
-// However, we want to keep this implementation around for some time.
-// TODO: define an end-of-life date for this implementation.
-
 /**
  * Implementation of the unstable [MSC3886](https://github.com/matrix-org/matrix-spec-proposals/pull/3886)
  * simple HTTP rendezvous protocol.
  * Note that this is UNSTABLE and may have breaking changes without notice.
+ * MSC3886/MSC3903/MSC3906 are now closed and so this functionality will be removed in future.
+ * However, we want to keep this implementation around for some time.
+ * TODO: define an end-of-life date for this implementation.
  */
 export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements RendezvousTransport<T> {
     private uri?: string;
