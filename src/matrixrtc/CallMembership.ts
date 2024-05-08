@@ -29,7 +29,8 @@ export interface CallMembershipData {
     created_ts?: number;
     expires?: number;
     expires_ts?: number;
-    foci_active?: Focus[];
+    foci_active?: Focus;
+    foci_preferred?: Focus[];
     membershipID: string;
 }
 
@@ -122,7 +123,7 @@ export class CallMembership {
         return this.getMsUntilExpiry() <= 0;
     }
 
-    public getActiveFoci(): Focus[] {
-        return this.data.foci_active ?? [];
+    public getPreferredFoci(): Focus[] {
+        return this.data.foci_preferred ?? [];
     }
 }

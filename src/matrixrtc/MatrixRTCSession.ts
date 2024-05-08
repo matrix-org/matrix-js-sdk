@@ -102,7 +102,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private makeNewKeyTimeout?: ReturnType<typeof setTimeout>;
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    private activeFoci: Focus[] | undefined;
+    private fociActive: Focus | undefined;
+    private fociPreferred: Focus[] | undefined;
 
     private updateCallMembershipRunning = false;
     private needCallMembershipUpdate = false;
@@ -232,19 +233,23 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * desired.
      * This method will return immediately and the session will be joined in the background.
      *
-     * @param activeFoci - The list of foci to set as currently active in the call member event
+     * @param fociActive - The object representing the active focus. (This is dependent on focus type.)
+     * @param fociPreferred - The list of preferred foci this member proposes to use/knows/has access to.
+     *                        For the livekit case this is a list of foci generated from the homeserver well-known, the current rtc session,
+     *                        or optionally other room members homeserver well known.
      * @param manageMediaKeys - If true, generate and share a a media key for this participant,
      *                          and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
      *                          media keys for other participants become available.
      */
-    public joinRoomSession(activeFoci: Focus[], manageMediaKeys?: boolean): void {
+    public joinRoomSession(fociActive: Focus, fociPreferred: Focus[], manageMediaKeys?: boolean): void {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         }
 
         logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${manageMediaKeys}`);
-        this.activeFoci = activeFoci;
+        this.fociActive = fociActive;
+        this.fociPreferred = fociPreferred;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
         this.manageMediaKeys = manageMediaKeys ?? false;
         this.membershipId = randomString(5);
@@ -295,7 +300,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
-        this.activeFoci = undefined;
+        this.fociActive = undefined;
         this.manageMediaKeys = false;
         this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
@@ -313,6 +318,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 resolve(value != "timeout");
             });
         });
+    }
+
+    public getActiveFocus(): Focus | undefined {
+        const oldestMembership = this.getOldestMembership();
+        const focus = oldestMembership?.getPreferredFoci()[0];
+
+        return focus;
     }
 
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
@@ -627,7 +639,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             application: "m.call",
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
-            foci_active: this.activeFoci,
+            foci_preferred: this.fociPreferred,
+            foci_active: this.fociActive,
             membershipID: this.membershipId,
         };
 
