@@ -45,14 +45,6 @@ export enum RestrictedAllowType {
     RoomMembership = "m.room_membership",
 }
 
-export interface IJoinRuleEventContent {
-    join_rule: JoinRule; // eslint-disable-line camelcase
-    allow?: {
-        type: RestrictedAllowType;
-        room_id: string; // eslint-disable-line camelcase
-    }[];
-}
-
 export enum GuestAccess {
     CanJoin = "can_join",
     Forbidden = "forbidden",

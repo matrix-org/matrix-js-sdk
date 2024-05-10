@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { RoomType } from "./event";
-import { GuestAccess, HistoryVisibility, RestrictedAllowType } from "./partials";
+import { GuestAccess, HistoryVisibility, JoinRule, RestrictedAllowType } from "./partials";
 import { ImageInfo } from "./media";
 import { PolicyRecommendation } from "../models/invites-ignorer";
 
@@ -36,11 +36,17 @@ export interface RoomCreateEventContent {
 }
 
 export interface RoomJoinRulesEventContent {
+    join_rule: JoinRule;
     allow?: {
         room_id: string;
         type: RestrictedAllowType;
     }[];
 }
+
+/**
+ * @deprecated in favour of RoomJoinRulesEventContent
+ */
+export type IJoinRuleEventContent = RoomJoinRulesEventContent;
 
 export interface RoomMemberEventContent {
     avatar_url?: string;
