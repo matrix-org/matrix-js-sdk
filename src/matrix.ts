@@ -105,6 +105,10 @@ export { IdentityProviderBrand, SSOAction } from "./@types/auth";
 export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces";
 export { LocationAssetType } from "./@types/location";
+/**
+ * @deprecated in favour of RoomJoinRulesEventContent on the types export
+ */
+export type { RoomJoinRulesEventContent as IJoinRuleEventContent } from "./@types/state_events";
 
 /**
  * Types supporting cryptography.
