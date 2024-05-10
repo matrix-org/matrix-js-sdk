@@ -43,6 +43,11 @@ export interface RoomJoinRulesEventContent {
     }[];
 }
 
+/**
+ * @deprecated in favour of RoomJoinRulesEventContent
+ */
+export type IJoinRuleEventContent = RoomJoinRulesEventContent;
+
 export interface RoomMemberEventContent {
     avatar_url?: string;
     displayname?: string;
