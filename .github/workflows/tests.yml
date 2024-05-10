@@ -71,6 +71,12 @@ jobs:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
 
+    complement-crypto:
+        name: "Run Complement Crypto tests"
+        uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
+        with:
+          use_js_sdk: ${{ github.sha }}
+
     # Hook for branch protection to skip downstream testing outside of merge queues
     # and skip sonarcloud coverage within merge queues
     downstream:
