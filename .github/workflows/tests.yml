@@ -76,7 +76,7 @@ jobs:
         if: github.event_name == 'merge_group'
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
         with:
-          use_js_sdk: "."
+            use_js_sdk: "."
 
     # Hook for branch protection to skip downstream testing outside of merge queues
     # and skip sonarcloud coverage within merge queues
