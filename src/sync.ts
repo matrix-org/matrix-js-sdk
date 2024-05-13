@@ -1162,7 +1162,7 @@ export class SyncApi {
             let toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
 
             if (this.syncOpts.cryptoCallbacks) {
-                // toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
+                toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             }
 
             const cancelledKeyVerificationTxns: string[] = [];
