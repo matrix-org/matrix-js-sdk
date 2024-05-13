@@ -78,6 +78,17 @@ jobs:
         with:
             use_js_sdk: "."
 
+    # we need this so the job is reported properly when run in a merge queue
+    downstream-complement-crypto:
+        name: Downstream Complement Crypto tests
+        runs-on: ubuntu-latest
+        if: always()
+        needs:
+            - complement-crypto
+        steps:
+            - if: needs.complement-crypto.result != 'skipped' && needs.complement-crypto.result != 'success'
+              run: exit 1
+
     # Hook for branch protection to skip downstream testing outside of merge queues
     # and skip sonarcloud coverage within merge queues
     downstream:
