@@ -33,6 +33,7 @@ export class MSC4108RendezvousSession {
     private readonly onFailure?: RendezvousFailureListener;
     private etag?: string;
     private expiresAt?: Date;
+    private expiresTimer?: ReturnType<typeof setTimeout>;
     private _cancelled = false;
     private _ready = false;
 
@@ -152,7 +153,15 @@ export class MSC4108RendezvousSession {
         if (method === Method.Post) {
             const expires = res.headers.get("expires");
             if (expires) {
+                if (this.expiresTimer) {
+                    clearTimeout(this.expiresTimer);
+                    this.expiresTimer = undefined;
+                }
                 this.expiresAt = new Date(expires);
+                this.expiresTimer = setTimeout(() => {
+                    this.expiresTimer = undefined;
+                    this.cancel(ClientRendezvousFailureReason.Expired);
+                }, this.expiresAt.getTime() - Date.now());
             }
             // MSC4108: we expect a JSON response with a rendezvous URL
             const json = await res.json();
@@ -219,6 +228,12 @@ export class MSC4108RendezvousSession {
      * @param reason the reason to cancel with
      */
     public async cancel(reason: MSC4108FailureReason | ClientRendezvousFailureReason): Promise<void> {
+        if (this._cancelled) return;
+        if (this.expiresTimer) {
+            clearTimeout(this.expiresTimer);
+            this.expiresTimer = undefined;
+        }
+
         if (
             reason === ClientRendezvousFailureReason.Unknown &&
             this.expiresAt &&
@@ -240,6 +255,11 @@ export class MSC4108RendezvousSession {
      * Closes the rendezvous channel.
      */
     public async close(): Promise<void> {
+        if (this.expiresTimer) {
+            clearTimeout(this.expiresTimer);
+            this.expiresTimer = undefined;
+        }
+
         if (!this.url) return;
         try {
             await this.fetch(this.url, { method: Method.Delete });
