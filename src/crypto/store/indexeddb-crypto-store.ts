@@ -36,10 +36,10 @@ import {
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
-import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { CrossSigningKeyInfo } from "../../crypto-api";
 
 /*
  * Internal module. indexeddb storage for e2e.
@@ -420,7 +420,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      */
     public getCrossSigningKeys(
         txn: IDBTransaction,
-        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+        func: (keys: Record<string, CrossSigningKeyInfo> | null) => void,
     ): void {
         this.backend!.getCrossSigningKeys(txn, func);
     }
@@ -444,7 +444,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param txn - An active transaction. See doTxn().
      * @param keys - keys object as getCrossSigningKeys()
      */
-    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, CrossSigningKeyInfo>): void {
         this.backend!.storeCrossSigningKeys(txn, keys);
     }
 

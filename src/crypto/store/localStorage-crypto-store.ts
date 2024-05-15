@@ -31,9 +31,9 @@ import {
 } from "./base";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
-import { ICrossSigningKey } from "../../client";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { safeSet } from "../../utils";
+import { CrossSigningKeyInfo } from "../../crypto-api";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -531,8 +531,8 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         setJsonItem(this.store, KEY_END_TO_END_ACCOUNT, accountPickle);
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
-        const keys = getJsonItem<Record<string, ICrossSigningKey>>(this.store, KEY_CROSS_SIGNING_KEYS);
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void {
+        const keys = getJsonItem<Record<string, CrossSigningKeyInfo>>(this.store, KEY_CROSS_SIGNING_KEYS);
         func(keys);
     }
 
@@ -545,7 +545,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         func(key);
     }
 
-    public storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void {
         setJsonItem(this.store, KEY_CROSS_SIGNING_KEYS, keys);
     }
 

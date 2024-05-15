@@ -121,10 +121,6 @@ interface ThreepidCreds {
 type EmailIdentityDict = {
     type: AuthType.Email;
     threepid_creds: ThreepidCreds;
-    /**
-     * @deprecated in favour of `threepid_creds` - kept for backwards compatibility
-     */
-    threepidCreds?: ThreepidCreds;
     session: string;
 };
 
@@ -349,11 +345,7 @@ export class InteractiveAuth<T> {
                 }
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
-                    // TODO: Remove `threepid_creds` once servers support proper UIA
-                    // See https://github.com/matrix-org/synapse/issues/5665
-                    // See https://github.com/matrix-org/matrix-doc/issues/2220
                     threepid_creds: creds,
-                    threepidCreds: creds,
                 };
             }
         }

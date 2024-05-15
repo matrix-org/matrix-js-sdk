@@ -148,11 +148,6 @@ export interface LoginRequest {
      */
     type: "m.login.password" | "m.login.token" | string;
     /**
-     * Third-party identifier for the user.
-     * @deprecated in favour of `identifier`.
-     */
-    address?: string;
-    /**
      * ID of the client device.
      * If this does not correspond to a known client device, a new device will be created.
      * The given device ID must not be the same as a cross-signing key ID.

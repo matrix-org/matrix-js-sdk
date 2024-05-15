@@ -107,10 +107,4 @@ export interface RegisterResponse {
      * Omitted if the inhibit_login option is true.
      */
     refresh_token?: string;
-    /**
-     * The server_name of the homeserver on which the account has been registered.
-     *
-     * @deprecated Clients should extract the server_name from user_id (by splitting at the first colon) if they require it.
-     */
-    home_server?: string;
 }
