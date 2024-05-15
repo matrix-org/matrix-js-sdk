@@ -20,7 +20,7 @@ import { EventTimeline } from "../models/event-timeline";
 import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
-import { CallMembership, CallMembershipData } from "./CallMembership";
+import { CallMembership, CallMembershipData, CallMembershipDataLegacy, SessionMembershipData } from "./CallMembership";
 import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
 import { randomString, secureRandomBase64Url } from "../randomstring";
@@ -29,6 +29,8 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 import { KnownMembership } from "../@types/membership";
 import { MatrixError } from "../http-api/errors";
 import { MatrixEvent } from "../models/event";
+import { LivekitFocusActive, isLivekitFocusActive } from "./LivekitFocus";
+import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event
@@ -75,7 +77,20 @@ export type MatrixRTCSessionEventHandlerMap = {
         participantId: string,
     ) => void;
 };
-
+export interface JoinSessionConfig {
+    /** If true, generate and share a media key for this participant,
+     *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
+     *  media keys for other participants become available.
+     */
+    manageMediaKeys?: boolean;
+    /** Lets you configure how the events for the session are formatted.
+     *   - legacy: use one event with a membership array.
+     *   - MSC4143: use one event per membership (with only one membership per event)
+     * More details can be found in MSC4143 and by checking the types:
+     * `CallMembershipDataLegacy` and `SessionMembershipData`
+     */
+    useLegacyMemberEvents?: boolean;
+}
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
@@ -102,13 +117,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private makeNewKeyTimeout?: ReturnType<typeof setTimeout>;
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    private fociActive: Focus | undefined;
-    private fociPreferred: Focus[] | undefined;
+    // This is a Focus with the specifid fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
+    private ownFocusActive: Focus | undefined;
+    // This is a Foci array that contains the Focus objects this user is aware of and proposes to use.
+    private ownFociPreferred: Focus[] | undefined;
 
     private updateCallMembershipRunning = false;
     private needCallMembershipUpdate = false;
 
     private manageMediaKeys = false;
+    private useLegacyMemberEvents = true;
     // userId:deviceId => array of keys
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
@@ -135,21 +153,32 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
-            const eventMemberships: CallMembershipData[] = memberEvent.getContent()["memberships"];
-            if (eventMemberships === undefined) {
-                continue;
+            const content = memberEvent.getContent();
+            let membershipContents: CallMembershipData[] = [];
+            // We first decide if its a MSC4143 event (per device state key)
+            if ("memberships" in content) {
+                // we have a legacy (one event for all devices) event
+                membershipContents = content["memberships"];
+                if (!Array.isArray(membershipContents)) {
+                    logger.warn(`Malformed member event from ${memberEvent.getSender()}: memberships is not an array`);
+                    continue;
+                }
+            } else {
+                // we have a MSC4143 event membership event
+                if (Object.keys(content).length !== 0) {
+                    membershipContents.push(content as CallMembershipData);
+                }
             }
-            if (!Array.isArray(eventMemberships)) {
-                logger.warn(`Malformed member event from ${memberEvent.getSender()}: memberships is not an array`);
+            if (membershipContents.length === 0) {
                 continue;
             }
 
-            for (const membershipData of eventMemberships) {
+            for (const membershipData of membershipContents) {
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
 
                     if (membership.callId !== "" || membership.scope !== "m.room") {
-                        // for now, just ignore anything that isn't the a room scope call
+                        // for now, just ignore anything that isn't a room scope call
                         logger.info(`Ignoring user-scoped call`);
                         continue;
                     }
@@ -203,6 +232,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /*
      * Returns true if we intend to be participating in the MatrixRTC session.
+     * This is determined by checking if the relativeExpiry has been set.
      */
     public isJoined(): boolean {
         return this.relativeExpiry !== undefined;
@@ -233,28 +263,29 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * desired.
      * This method will return immediately and the session will be joined in the background.
      *
-     * @param fociActive - The object representing the active focus. (This is dependent on focus type.)
+     * @param fociActive - The object representing the active focus. (This depends on the focus type.)
      * @param fociPreferred - The list of preferred foci this member proposes to use/knows/has access to.
      *                        For the livekit case this is a list of foci generated from the homeserver well-known, the current rtc session,
      *                        or optionally other room members homeserver well known.
-     * @param manageMediaKeys - If true, generate and share a a media key for this participant,
-     *                          and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
-     *                          media keys for other participants become available.
+     * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(fociActive: Focus, fociPreferred: Focus[], manageMediaKeys?: boolean): void {
+    public joinRoomSession(fociActive: Focus, fociPreferred: Focus[], joinConfig?: JoinSessionConfig): void {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         }
 
-        logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${manageMediaKeys}`);
-        this.fociActive = fociActive;
-        this.fociPreferred = fociPreferred;
+        logger.info(
+            `Joining call session in room ${this.room.roomId} with manageMediaKeys=${joinConfig?.manageMediaKeys}`,
+        );
+        this.ownFocusActive = fociActive;
+        this.ownFociPreferred = fociPreferred;
         this.relativeExpiry = MEMBERSHIP_EXPIRY_TIME;
-        this.manageMediaKeys = manageMediaKeys ?? false;
+        this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
+        this.useLegacyMemberEvents = joinConfig?.useLegacyMemberEvents ?? this.useLegacyMemberEvents;
         this.membershipId = randomString(5);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
-        if (manageMediaKeys) {
+        if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestKeyEventSend();
         }
@@ -300,7 +331,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.relativeExpiry = undefined;
-        this.fociActive = undefined;
+        this.ownFocusActive = undefined;
         this.manageMediaKeys = false;
         this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
@@ -321,10 +352,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     public getActiveFocus(): Focus | undefined {
-        const oldestMembership = this.getOldestMembership();
-        const focus = oldestMembership?.getPreferredFoci()[0];
-
-        return focus;
+        if (this.ownFocusActive && isLivekitFocusActive(this.ownFocusActive)) {
+            // A livekit active focus
+            if (this.ownFocusActive.focus_selection === "oldest_membership") {
+                const oldestMembership = this.getOldestMembership();
+                return oldestMembership?.getPreferredFoci()[0];
+            }
+        }
+        if (!this.ownFocusActive) {
+            // we use the legacy call.member events so default to oldest member
+            const oldestMembership = this.getOldestMembership();
+            return oldestMembership?.getPreferredFoci()[0];
+        }
     }
 
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
@@ -500,7 +539,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         let soonestExpiry;
         for (const membership of this.memberships) {
             const thisExpiry = membership.getMsUntilExpiry();
-            if (soonestExpiry === undefined || thisExpiry < soonestExpiry) {
+            // If getMsUntilExpiry is undefined we have a MSC3143 complient event - it never expires
+            // but will be reliably resent on disconnect.
+            if (thisExpiry !== undefined && (soonestExpiry === undefined || thisExpiry < soonestExpiry)) {
                 soonestExpiry = thisExpiry;
             }
         }
@@ -625,7 +666,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Constructs our own membership
      * @param prevMembership - The previous value of our call membership, if any
      */
-    private makeMyMembership(prevMembership?: CallMembership): CallMembershipData {
+    private makeMyMembershipLegacy(prevMembership?: CallMembership): CallMembershipData {
         if (this.relativeExpiry === undefined) {
             throw new Error("Tried to create our own membership event when we're not joined!");
         }
@@ -633,14 +674,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             throw new Error("Tried to create our own membership event when we have no membership ID!");
         }
 
-        const m: CallMembershipData = {
+        const m: CallMembershipDataLegacy = {
             call_id: "",
             scope: "m.room",
             application: "m.call",
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
-            foci_preferred: this.fociPreferred,
-            foci_active: this.fociActive,
+            // we use the fociPreferred since this is the list of foci.
+            // it is named wrong in the Legacy events.
+            foci_active: this.ownFociPreferred,
             membershipID: this.membershipId,
         };
 
@@ -651,6 +693,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         return m;
     }
+    /**
+     * Constructs our own membership
+     * @param prevMembership - The previous value of our call membership, if any
+     */
+    private makeMyMembership(): SessionMembershipData {
+        return {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: this.client.getDeviceId()!,
+            foci_active: { type: "livekit", focus_selection: "oldest_membership" } as LivekitFocusActive as Focus,
+            foci_preferred: this.ownFociPreferred ?? [],
+        };
+    }
 
     /**
      * Returns true if our membership event needs to be updated
@@ -659,15 +715,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         myPrevMembershipData?: CallMembershipData,
         myPrevMembership?: CallMembership,
     ): boolean {
+        if (myPrevMembership && myPrevMembership.getMsUntilExpiry() === undefined) return false;
         // work out if we need to update our membership event
         let needsUpdate = false;
         // Need to update if there's a membership for us but we're not joined (valid or otherwise)
         if (!this.isJoined() && myPrevMembershipData) needsUpdate = true;
         if (this.isJoined()) {
             // ...or if we are joined, but there's no valid membership event
+            const expiryTime = myPrevMembership?.getMsUntilExpiry();
             if (!myPrevMembership) {
                 needsUpdate = true;
-            } else if (myPrevMembership.getMsUntilExpiry() < MEMBERSHIP_EXPIRY_TIME / 2) {
+            } else if (expiryTime !== undefined && expiryTime < MEMBERSHIP_EXPIRY_TIME / 2) {
                 // ...or if the expiry time needs bumping
                 needsUpdate = true;
                 this.relativeExpiry! += MEMBERSHIP_EXPIRY_TIME;
@@ -677,15 +735,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return needsUpdate;
     }
 
+    private makeNewMembership(): SessionMembershipData | {} {
+        // If we're joined, add our own
+        if (this.isJoined()) {
+            return this.makeMyMembership();
+        }
+        return {};
+    }
     /**
      * Makes a new membership list given the old list alonng with this user's previous membership event
      * (if any) and this device's previous membership (if any)
      */
-    private makeNewMemberships(
+    private makeNewLegacyMemberships(
         oldMemberships: CallMembershipData[],
         myCallMemberEvent?: MatrixEvent,
         myPrevMembership?: CallMembership,
-    ): CallMembershipData[] {
+    ): ExperimentalGroupCallRoomMemberState {
         const localDeviceId = this.client.getDeviceId();
         if (!localDeviceId) throw new Error("Local device ID is null!");
 
@@ -717,10 +782,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         // If we're joined, add our own
         if (this.isJoined()) {
-            newMemberships.push(this.makeMyMembership(myPrevMembership));
+            newMemberships.push(this.makeMyMembershipLegacy(myPrevMembership));
         }
 
-        return newMemberships;
+        return { memberships: newMemberships };
     }
 
     private triggerCallMembershipEventUpdate = async (): Promise<void> => {
@@ -756,7 +821,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
         const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
-        const memberships: CallMembershipData[] = Array.isArray(content["memberships"]) ? content["memberships"] : [];
+        // For MSC4134 style events we dont need to do any updating. We abort here.
+        if (!("memberships" in content)) return;
+        // We know its CallMembershipDataLegacy
+        const memberships: CallMembershipDataLegacy[] = Array.isArray(content["memberships"])
+            ? content["memberships"]
+            : [];
 
         const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
         let myPrevMembership;
@@ -780,16 +850,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        const newContent = {
-            memberships: this.makeNewMemberships(memberships, myCallMemberEvent, myPrevMembership),
-        };
+        let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
+        if (this.useLegacyMemberEvents) {
+            newContent = this.makeNewLegacyMemberships(memberships, myCallMemberEvent, myPrevMembership);
+        } else {
+            newContent = this.makeNewMembership();
+        }
 
         try {
             await this.client.sendStateEvent(
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
                 newContent,
-                localUserId,
+                this.useLegacyMemberEvents ? localUserId : localUserId + "_" + this.client.getDeviceId(),
             );
             logger.info(`Sent updated call member event.`);
 

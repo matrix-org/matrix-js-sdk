@@ -24,6 +24,7 @@ const membershipTemplate: CallMembershipData = {
     device_id: "AAAAAAA",
     expires: 5000,
     membershipID: "bloop",
+    foci_active: [{ type: "livekit" }],
 };
 
 function makeMockEvent(originTs = 0): MatrixEvent {
@@ -55,10 +56,10 @@ describe("CallMembership", () => {
         }).toThrow();
     });
 
-    it("rejects membership with no scope", () => {
+    it("allow membership with no scope", () => {
         expect(() => {
             new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
-        }).toThrow();
+        }).not.toThrow();
     });
     it("rejects with malformatted expires_ts", () => {
         expect(() => {
