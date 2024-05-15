@@ -33,11 +33,11 @@ import {
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
-import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { IndexedDBCryptoStore } from "./indexeddb-crypto-store";
+import { CrossSigningKeyInfo } from "../../crypto-api";
 
 const PROFILE_TRANSACTIONS = false;
 
@@ -418,7 +418,7 @@ export class Backend implements CryptoStore {
 
     public getCrossSigningKeys(
         txn: IDBTransaction,
-        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+        func: (keys: Record<string, CrossSigningKeyInfo> | null) => void,
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
@@ -447,7 +447,7 @@ export class Backend implements CryptoStore {
         };
     }
 
-    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, CrossSigningKeyInfo>): void {
         const objectStore = txn.objectStore("account");
         objectStore.put(keys, "crossSigningKeys");
     }

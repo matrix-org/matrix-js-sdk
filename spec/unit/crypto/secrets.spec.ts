@@ -23,12 +23,13 @@ import { makeTestClients } from "./verification/util";
 import { encryptAES } from "../../../src/crypto/aes";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
-import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
+import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { decodeBase64 } from "../../../src/base64";
+import { CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -475,7 +476,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -486,7 +487,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],
@@ -631,7 +632,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -642,7 +643,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],
