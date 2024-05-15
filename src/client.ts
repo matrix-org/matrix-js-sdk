@@ -560,16 +560,13 @@ export interface Capabilities {
     "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
 }
 
-/** @deprecated prefer {@link CrossSigningKeyInfo}. */
-export type ICrossSigningKey = CrossSigningKeyInfo;
-
 enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
     UserSigningKey = "user_signing_key",
 }
 
-export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+export type CrossSigningKeys = Record<CrossSigningKeyType, CrossSigningKeyInfo>;
 
 export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
@@ -581,7 +578,7 @@ export interface ISignedKey {
     device_id: string;
 }
 
-export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
+export type KeySignatures = Record<string, Record<string, CrossSigningKeyInfo | ISignedKey>>;
 export interface IUploadKeySignaturesResponse {
     failures: Record<
         string,

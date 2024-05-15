@@ -56,7 +56,6 @@ import {
     SDPStreamMetadataKey,
 } from "../webrtc/callEventTypes";
 import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types";
-import { EncryptedFile } from "./media";
 import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls";
 
 export enum EventType {
@@ -304,11 +303,6 @@ export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matr
  * @experimental
  */
 export const UNSIGNED_MEMBERSHIP_FIELD = new UnstableValue("membership", "io.element.msc4115.membership");
-
-/**
- * @deprecated in favour of {@link EncryptedFile}
- */
-export type IEncryptedFile = EncryptedFile;
 
 /**
  * Mapped type from event type to content type for all specified non-state room events.
