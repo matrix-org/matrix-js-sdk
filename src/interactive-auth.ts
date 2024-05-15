@@ -343,8 +343,10 @@ export class InteractiveAuth<T> {
                     sid: this.emailSid,
                     client_secret: this.clientSecret,
                 };
-                const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
-                creds.id_server = idServerParsedUrl.host;
+                const isUrl = this.matrixClient.getIdentityServerUrl();
+                if (isUrl) {
+                    creds.id_server = new URL(isUrl).host;
+                }
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
                     // TODO: Remove `threepid_creds` once servers support proper UIA
