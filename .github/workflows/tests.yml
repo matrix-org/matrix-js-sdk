@@ -77,6 +77,7 @@ jobs:
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
         with:
             use_js_sdk: "."
+            use_complement_crypto: "MATCHING_BRANCH"
 
     # we need this so the job is reported properly when run in a merge queue
     downstream-complement-crypto:
