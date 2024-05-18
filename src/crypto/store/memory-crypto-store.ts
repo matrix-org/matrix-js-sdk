@@ -32,10 +32,10 @@ import {
     SESSION_BATCH_SIZE,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
-import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { CrossSigningKeyInfo } from "../../crypto-api";
 
 function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
     return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
@@ -56,7 +56,7 @@ export class MemoryCryptoStore implements CryptoStore {
     private migrationState: MigrationState = MigrationState.NOT_STARTED;
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
-    private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
+    private crossSigningKeys: Record<string, CrossSigningKeyInfo> | null = null;
     private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
@@ -319,7 +319,7 @@ export class MemoryCryptoStore implements CryptoStore {
         this.account = accountPickle;
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void {
         func(this.crossSigningKeys);
     }
 
@@ -332,7 +332,7 @@ export class MemoryCryptoStore implements CryptoStore {
         func(result || null);
     }
 
-    public storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void {
         this.crossSigningKeys = keys;
     }
 

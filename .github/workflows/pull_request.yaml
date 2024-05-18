@@ -14,7 +14,7 @@ jobs:
         name: Preview Changelog
         runs-on: ubuntu-latest
         steps:
-            - uses: mheap/github-action-required-labels@132879b972cb7f2ac593006455875098e73cc7f2 # v5
+            - uses: mheap/github-action-required-labels@5847eef68201219cf0a4643ea7be61e77837bbce # v5
               if: github.event_name != 'merge_group'
               with:
                   labels: |

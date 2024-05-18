@@ -56,14 +56,7 @@ import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
 import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ToDeviceBatch } from "../models/ToDeviceMessage";
-import {
-    ClientEvent,
-    ICrossSigningKey,
-    IKeysUploadResponse,
-    ISignedKey,
-    IUploadKeySignaturesResponse,
-    MatrixClient,
-} from "../client";
+import { ClientEvent, IKeysUploadResponse, ISignedKey, IUploadKeySignaturesResponse, MatrixClient } from "../client";
 import { IRoomEncryption, RoomList } from "./RoomList";
 import { IKeyBackupInfo } from "./keybackup";
 import { ISyncStateData } from "../sync";
@@ -89,6 +82,7 @@ import { ISecretRequest } from "./SecretSharing";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
+    CrossSigningKeyInfo,
     CrossSigningStatus,
     DecryptionFailureCode,
     DeviceVerificationStatus,
@@ -1527,7 +1521,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     private async checkForValidDeviceSignature(
         userId: string,
-        key: ICrossSigningKey,
+        key: CrossSigningKeyInfo,
         devices: Record<string, IDevice>,
     ): Promise<string[]> {
         const deviceIds: string[] = [];
@@ -1904,7 +1898,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param keys - The new trusted set of keys
      */
-    private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey> | null): Promise<void> {
+    private async storeTrustedSelfKeys(keys: Record<string, CrossSigningKeyInfo> | null): Promise<void> {
         if (keys) {
             this.crossSigningInfo.setKeys(keys);
         } else {
@@ -2390,7 +2384,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         blocked: boolean | null = null,
         known: boolean | null = null,
         keys?: Record<string, string>,
-    ): Promise<DeviceInfo | CrossSigningInfo | ICrossSigningKey | undefined> {
+    ): Promise<DeviceInfo | CrossSigningInfo | CrossSigningKeyInfo | undefined> {
         // Check if the 'device' is actually a cross signing key
         // The js-sdk's verification treats cross-signing keys as devices
         // and so uses this method to mark them verified.

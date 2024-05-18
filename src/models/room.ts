@@ -606,27 +606,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Determines whether this room needs to be upgraded to a new version
-     * @returns What version the room should be upgraded to, or null if
-     *     the room does not require upgrading at this time.
-     * @deprecated Use #getRecommendedVersion() instead
-     */
-    public shouldUpgradeToVersion(): string | null {
-        // TODO: Remove this function.
-        // This makes assumptions about which versions are safe, and can easily
-        // be wrong. Instead, people are encouraged to use getRecommendedVersion
-        // which determines a safer value. This function doesn't use that function
-        // because this is not async-capable, and to avoid breaking the contract
-        // we're deprecating this.
-
-        if (!SAFE_ROOM_VERSIONS.includes(this.getVersion())) {
-            return KNOWN_SAFE_ROOM_VERSION;
-        }
-
-        return null;
-    }
-
-    /**
      * Determines the recommended room version for the room. This returns an
      * object with 3 properties: `version` as the new version the
      * room should be upgraded to (may be the same as the current version);

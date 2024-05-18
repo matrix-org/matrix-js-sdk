@@ -560,16 +560,13 @@ export interface Capabilities {
     "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
 }
 
-/** @deprecated prefer {@link CrossSigningKeyInfo}. */
-export type ICrossSigningKey = CrossSigningKeyInfo;
-
 enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
     UserSigningKey = "user_signing_key",
 }
 
-export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+export type CrossSigningKeys = Record<CrossSigningKeyType, CrossSigningKeyInfo>;
 
 export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
@@ -581,7 +578,7 @@ export interface ISignedKey {
     device_id: string;
 }
 
-export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
+export type KeySignatures = Record<string, Record<string, CrossSigningKeyInfo | ISignedKey>>;
 export interface IUploadKeySignaturesResponse {
     failures: Record<
         string,
@@ -4876,10 +4873,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
             path = utils.encodeUri(pathTemplate, pathParams);
-        } else if (event.isRedaction()) {
+        } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
             path = utils.encodeUri(pathTemplate, {
-                $redactsEventId: event.event.redacts!,
+                $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
@@ -5775,7 +5772,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * anyone they share a room with. If false, will return null for such URLs.
      * @param allowRedirects - If true, the caller supports the URL being 307 or
      * 308 redirected to another resource upon request. If false, redirects
-     * are not expected.
+     * are not expected. Implied `true` when `useAuthentication` is `true`.
+     * @param useAuthentication - If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support
+     * for authenticated media will *not* be checked - it is the caller's responsibility
+     * to do so before calling this function. Note also that `useAuthentication`
+     * implies `allowRedirects`. Defaults to false (unauthenticated endpoints).
      * @returns the avatar URL or null.
      */
     public mxcUrlToHttp(
@@ -5785,8 +5787,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         resizeMethod?: string,
         allowDirectLinks?: boolean,
         allowRedirects?: boolean,
+        useAuthentication?: boolean,
     ): string | null {
-        return getHttpUriForMxc(this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks, allowRedirects);
+        return getHttpUriForMxc(
+            this.baseUrl,
+            mxcUrl,
+            width,
+            height,
+            resizeMethod,
+            allowDirectLinks,
+            allowRedirects,
+            useAuthentication,
+        );
     }
 
     /**
