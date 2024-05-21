@@ -7,9 +7,10 @@ module.exports = {
                 targets: {
                     esmodules: true,
                 },
-                // Used "commonjs" for tests due to https://github.com/matrix-org/matrix-js-sdk/pull/4187#issuecomment-2117342908
-                // and "false" to preserve ESM for the final build to make async
-                // imports work correctly.
+                // We want to output ES modules for the final build (mostly to ensure that
+                // async imports work correctly). However, junit doesn't support ES modules very
+                // well yet (see https://github.com/jestjs/jest/issues/9430), so we use commonjs
+                // when testing.
                 modules: process.env.NODE_ENV === "test" ? "commonjs" : false,
             },
         ],
