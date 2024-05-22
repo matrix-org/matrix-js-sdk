@@ -23,7 +23,7 @@ type CallScope = "m.room" | "m.user";
 
 // There are two different data interfaces. One for the Legacy types and one complient with MSC4143
 
-// Current MSC4143 session membership data
+// MSC4143 (MatrixRTC) session membership data
 export interface SessionMembershipData {
     application: string;
     call_id: string;
@@ -36,12 +36,13 @@ export interface SessionMembershipData {
     // Application specific data
     scope?: CallScope;
 }
-const isSessionsMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
+const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
     "membership_id" in data &&
     !Array.isArray(data.foci_active) &&
     Array.isArray(data.foci_preferred);
+
 const checkSessionsMembershipData = (data: SessionMembershipData): void => {
     const prefix = "Malformed session membership event: ";
     if (typeof data.device_id !== "string") throw new Error(prefix + "device_id must be string");
@@ -108,7 +109,7 @@ export class CallMembership {
         private data: CallMembershipData,
     ) {
         if (isLegacyCallMembershipData(data)) checkCallMembershipDataLegacy(data);
-        else if (isSessionsMembershipData(data)) checkSessionsMembershipData(data);
+        else if (isSessionMembershipData(data)) checkSessionsMembershipData(data);
         else throw Error("unknown CallMembership data. Does not match legacy call.member events nor MSC4143");
         if (!parentEvent.getSender()) throw new Error("Invalid parent event: sender is null");
     }
@@ -183,12 +184,13 @@ export class CallMembership {
 
     public isExpired(): boolean {
         if (isLegacyCallMembershipData(this.data)) return this.getMsUntilExpiry()! <= 0;
-        // MSC4143 events expire by beeing updated. So if the event exists, its not expired.
+
+        // MSC4143 events expire by being updated. So if the event exists, its not expired.
         return false;
     }
 
     public getPreferredFoci(): Focus[] {
-        // To support both, the new and the old matrix rtc memberships have two cases based
+        // To support both, the new and the old MatrixRTC memberships have two cases based
         // on the availablitiy of `foci_preferred`
         if (isLegacyCallMembershipData(this.data)) return this.data.foci_active ?? [];
 
