@@ -20,22 +20,15 @@ import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { Method, ClientPrefix } from "../http-api";
 import { Crypto, ICryptoCallbacks } from "./index";
-import {
-    ClientEvent,
-    ClientEventHandlerMap,
-    CrossSigningKeys,
-    ICrossSigningKey,
-    ISignedKey,
-    KeySignatures,
-} from "../client";
+import { ClientEvent, ClientEventHandlerMap, CrossSigningKeys, ISignedKey, KeySignatures } from "../client";
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
-import { BootstrapCrossSigningOpts } from "../crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api";
 
 interface ICrossSigningKeys {
     authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
-    keys: Record<"master" | "self_signing" | "user_signing", ICrossSigningKey>;
+    keys: Record<"master" | "self_signing" | "user_signing", CrossSigningKeyInfo>;
 }
 
 /**

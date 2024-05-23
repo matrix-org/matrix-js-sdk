@@ -24,13 +24,13 @@ import { logger } from "../logger";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
 import { DeviceInfo } from "./deviceinfo";
-import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
+import { ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
-import { DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
+import { CrossSigningKeyInfo, DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
 import { decodeBase64, encodeBase64 } from "../base64";
 
 // backwards-compatibility re-exports
@@ -38,7 +38,7 @@ export { UserTrustLevel };
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
-function publicKeyFromKeyInfo(keyInfo: ICrossSigningKey): string {
+function publicKeyFromKeyInfo(keyInfo: CrossSigningKeyInfo): string {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
     // We assume only a single key, and we want the bare form without type
     // prefix, so we select the values.
@@ -51,13 +51,13 @@ export interface ICacheCallbacks {
 }
 
 export interface ICrossSigningInfo {
-    keys: Record<string, ICrossSigningKey>;
+    keys: Record<string, CrossSigningKeyInfo>;
     firstUse: boolean;
     crossSigningVerifiedBefore: boolean;
 }
 
 export class CrossSigningInfo {
-    public keys: Record<string, ICrossSigningKey> = {};
+    public keys: Record<string, CrossSigningKeyInfo> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
     // When you verify a user, any devices online at the time that receive
@@ -296,7 +296,7 @@ export class CrossSigningInfo {
         }
 
         const privateKeys: Record<string, Uint8Array> = {};
-        const keys: Record<string, ICrossSigningKey> = {};
+        const keys: Record<string, CrossSigningKeyInfo> = {};
         let masterSigning: PkSigning | undefined;
         let masterPub: string | undefined;
 
@@ -368,8 +368,8 @@ export class CrossSigningInfo {
         this.keys = {};
     }
 
-    public setKeys(keys: Record<string, ICrossSigningKey>): void {
-        const signingKeys: Record<string, ICrossSigningKey> = {};
+    public setKeys(keys: Record<string, CrossSigningKeyInfo>): void {
+        const signingKeys: Record<string, CrossSigningKeyInfo> = {};
         if (keys.master) {
             if (keys.master.user_id !== this.userId) {
                 const error = "Mismatched user ID " + keys.master.user_id + " in master key from " + this.userId;
@@ -457,7 +457,7 @@ export class CrossSigningInfo {
         }
     }
 
-    public async signUser(key: CrossSigningInfo): Promise<ICrossSigningKey | undefined> {
+    public async signUser(key: CrossSigningInfo): Promise<CrossSigningKeyInfo | undefined> {
         if (!this.keys.user_signing) {
             logger.info("No user signing key: not signing user");
             return;
