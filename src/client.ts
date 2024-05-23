@@ -357,7 +357,7 @@ export interface ICreateClientOpts {
     deviceToImport?: IExportedDevice;
 
     /**
-     * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link #cryptoStore}.
+     * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
      *
      * This must be set to the same value every time the client is initialised for the same device.
      *
